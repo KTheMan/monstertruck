@@ -3,7 +3,7 @@ const MUL: fn(f64, f64) -> f64 = f64::mul;
 const DOT: fn(Vector3, Vector3) -> f64 = Vector3::dot;
 const CROSS: fn(Vector3, Vector3) -> Vector3 = Vector3::cross;
 
-impl<C, S0, S1, R> RbfSurface<C, S0, S1, R>
+impl<C, S0, S1, R> RollingBallFilletSurface<C, S0, S1, R>
 where
     C: ParametricCurve3D,
     S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
@@ -19,14 +19,14 @@ where
     /// ```
     /// use monstertruck_geometry::{
     ///     prelude::*,
-    ///     decorators::rbf_surface::ContactCircle,
+    ///     decorators::rolling_ball_fillet::ContactCircle,
     /// };
     /// let line = Line(Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0));
     /// let plane0 = Plane::xy();
     /// let plane1 = Plane::zx();
     /// let r = 0.5;
     /// let t = 0.75;
-    /// let rfs = RbfSurface::new(line, plane0, plane1, r);
+    /// let rfs = RollingBallFilletSurface::new(line, plane0, plane1, r);
     /// let cc = rfs.contact_circle(t).unwrap();
     ///
     /// assert_near!(cc.center(), Point3::new(t, r, r));
@@ -563,7 +563,7 @@ fn fillet_between_two_spheres_deralgo() {
         }
     }
 
-    let fillet = RbfSurface::new(edge_circle, sphere0, sphere1, Radius);
+    let fillet = RollingBallFilletSurface::new(edge_circle, sphere0, sphere1, Radius);
 
     const N: usize = 20;
     for i in 1..N {

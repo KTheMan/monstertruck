@@ -224,10 +224,6 @@ pub struct ParameterCurve<C, S> {
     surface: S,
 }
 
-/// Renamed to [`ParameterCurve`] for clarity.
-#[deprecated(note = "renamed to ParameterCurve for clarity")]
-pub type PCurve<C, S> = ParameterCurve<C, S>;
-
 /// Intersection curve between two surfaces.
 ///
 /// # Examples
@@ -330,25 +326,25 @@ pub struct HomotopySurface<C0, C1> {
     curve1: C1,
 }
 
-/// rolling ball fillet surface, along one edge, between two surfaces
+/// Rolling ball fillet surface along one edge between two surfaces.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, SelfSameGeometry)]
-pub struct RbfSurface<C, S0, S1, R> {
+pub struct RollingBallFilletSurface<C, S0, S1, R> {
     edge_curve: C,
     surface0: S0,
     surface1: S1,
     radius: R,
 }
 
-/// the orbit curve of contact point of rolling ball fillet surface
+/// Orbit curve of a rolling ball fillet contact point.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, SelfSameGeometry)]
-pub struct RbfContactCurve<C, S0, S1, R> {
-    surface: RbfSurface<C, S0, S1, R>,
+pub struct RollingBallFilletContactCurve<C, S0, S1, R> {
+    surface: RollingBallFilletSurface<C, S0, S1, R>,
     index: usize,
 }
 
-/// Approximation surface of fillets
+/// Approximate surface for fillets.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SelfSameGeometry)]
-pub struct ApproxFilletSurface<S0, S1> {
+pub struct ApproximateFilletSurface<S0, S1> {
     knot_vec: KnotVector,
     surface0: S0,
     side_control_points0: Vec<Point2>,
@@ -359,13 +355,13 @@ pub struct ApproxFilletSurface<S0, S1> {
     weights: Vec<f64>,
 }
 
-mod approx_fillet_surface;
+mod approximate_fillet_surface;
 mod extruded_curve;
 mod homotopy;
 mod intersection_curve;
 mod pcurve;
 mod processor;
-/// structure and trait, associated with rolling ball fillet surface
-pub mod rbf_surface;
 mod revolved_curve;
+/// Structures and traits associated with rolling ball fillet surfaces.
+pub mod rolling_ball_fillet;
 mod trimmed_curve;

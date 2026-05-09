@@ -1,6 +1,6 @@
 use super::*;
 use monstertruck_core::newton::{self, CalcOutput};
-use monstertruck_traits::{ParametricCurve as PcurveTrait, SnapCurveEndpoints};
+use monstertruck_traits::{ParametricCurve as ParametricCurveTrait, SnapCurveEndpoints};
 use std::ops::Bound;
 
 impl<P> SnapCurveEndpoints for Line<P> {}
@@ -369,7 +369,7 @@ fn der_routine(
     uv1ders[n] = uv_der_n(uder1, vder1, sum1, *s1normal, cders[n]);
 }
 
-impl<C, S0, S1> PcurveTrait for IntersectionCurve<C, S0, S1>
+impl<C, S0, S1> ParametricCurveTrait for IntersectionCurve<C, S0, S1>
 where
     C: ParametricCurve3D,
     S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
@@ -568,7 +568,7 @@ impl<C: BoundedCurve> IntersectionCurve<C, Plane, Plane> {
     }
 }
 
-impl<C, S0, S1, T0, T1> PcurveTrait for SurfaceCurve<C, S0, S1, T0, T1>
+impl<C, S0, S1, T0, T1> ParametricCurveTrait for SurfaceCurve<C, S0, S1, T0, T1>
 where
     C: ParametricCurve3D,
     S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
@@ -760,7 +760,7 @@ mod double_projection_tests {
     use std::f64::consts::PI;
     type PResult = std::result::Result<(), TestCaseError>;
 
-    fn get_one_vector(u: [f64; 2]) -> Vector3 {
+    fn unit_normal_candidate(u: [f64; 2]) -> Vector3 {
         let angle = 2.0 * PI * u[0];
         let w = f64::sqrt(1.0 - u[1] * u[1]);
         Vector3::new(w * f64::cos(angle), w * f64::sin(angle), u[1])
@@ -777,11 +777,11 @@ mod double_projection_tests {
 
     fn exec_plane_case(c0: [f64; 3], n0: [f64; 2], c1: [f64; 3], n1: [f64; 2]) -> PResult {
         let c0 = Point3::from(c0);
-        let n0 = get_one_vector(n0);
+        let n0 = unit_normal_candidate(n0);
         let (x, y) = create_axis(n0);
         let plane0 = Plane::new(c0, c0 + x, c0 + y);
         let c1 = Point3::from(c1);
-        let n1 = get_one_vector(n1);
+        let n1 = unit_normal_candidate(n1);
         let (x, y) = create_axis(n1);
         let plane1 = Plane::new(c1, c1 + x, c1 + y);
         let n = n0.cross(n1).normalize();

@@ -1,6 +1,6 @@
 use super::*;
 use algo::surface::SearchParameterVector;
-use monstertruck_traits::ParametricCurve as PcurveTrait;
+use monstertruck_traits::ParametricCurve as ParametricCurveTrait;
 
 impl<C, V: Copy> ExtrusionSurface<C, V> {
     /// Creates a linear extruded curve by extrusion.
@@ -21,7 +21,7 @@ impl<C, V: Copy> ExtrusionSurface<C, V> {
 
 impl<C> ParametricSurface for ExtrusionSurface<C, C::Vector>
 where
-    C: PcurveTrait,
+    C: ParametricCurveTrait,
     C::Point: EuclideanSpace<Scalar = f64, Diff = C::Vector>,
     C::Vector: VectorSpace<Scalar = f64>,
 {
@@ -79,7 +79,7 @@ use monstertruck_traits::v2;
 
 impl<C> v2::ParametricSurface for ExtrusionSurface<C, C::Vector>
 where
-    C: PcurveTrait,
+    C: ParametricCurveTrait,
     C::Point: EuclideanSpace<Scalar = f64, Diff = C::Vector>,
     C::Vector: VectorSpace<Scalar = f64>,
 {
@@ -115,7 +115,9 @@ where
     fn period_v(&self) -> Option<f64> { ParametricSurface::v_period(self) }
 }
 
-impl<C: ParametricCurve3D + PcurveTrait> v2::ParametricSurface3D for ExtrusionSurface<C, Vector3> {
+impl<C: ParametricCurve3D + ParametricCurveTrait> v2::ParametricSurface3D
+    for ExtrusionSurface<C, Vector3>
+{
     #[inline(always)]
     fn normal(&self, u: f64, _: f64) -> Vector3 { ParametricSurface3D::normal(self, u, 0.0) }
 }
@@ -138,7 +140,7 @@ impl<P, C> SearchParameter<D2> for ExtrusionSurface<C, P::Diff>
 where
     P: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64> + Tolerance,
     P::Diff: SearchParameterVector<Point = P>,
-    C: PcurveTrait<Point = P, Vector = P::Diff> + BoundedCurve,
+    C: ParametricCurveTrait<Point = P, Vector = P::Diff> + BoundedCurve,
 {
     type Point = P;
     #[inline(always)]
@@ -189,7 +191,7 @@ impl<P, C> v2::SearchParameter<v2::D2<f64>> for ExtrusionSurface<C, P::Diff>
 where
     P: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64> + Tolerance,
     P::Diff: SearchParameterVector<Point = P>,
-    C: PcurveTrait<Point = P, Vector = P::Diff> + BoundedCurve,
+    C: ParametricCurveTrait<Point = P, Vector = P::Diff> + BoundedCurve,
 {
     type Point = P;
     #[inline(always)]

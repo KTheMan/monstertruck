@@ -1,8 +1,8 @@
-use monstertruck_geometry::prelude::{rbf_surface::RadiusFunction, *};
+use monstertruck_geometry::prelude::{rolling_ball_fillet::RadiusFunction, *};
 use std::f64::consts::PI;
 
 #[test]
-fn approx_fillet_between_two_spheres() {
+fn approximate_fillet_between_two_spheres() {
     let sphere0 = Sphere::new(Point3::new(0.0, 0.0, 10.0), 20.0);
     let sphere1 = Sphere::new(Point3::new(0.0, 0.0, -10.0), 20.0);
     let edge_circle = Processor::with_transform(
@@ -25,12 +25,15 @@ fn approx_fillet_between_two_spheres() {
         }
     }
 
-    let fillet = RbfSurface::new(edge_circle, sphere0, sphere1, Radius);
+    let fillet = RollingBallFilletSurface::new(edge_circle, sphere0, sphere1, Radius);
 
     let instance = std::time::Instant::now();
-    let approx =
-        ApproxFilletSurface::approx_rolling_ball_fillet(&fillet, (PI * 0.1, PI * 1.9), 0.001)
-            .unwrap();
+    let approx = ApproximateFilletSurface::approximate_rolling_ball_fillet(
+        &fillet,
+        (PI * 0.1, PI * 1.9),
+        0.001,
+    )
+    .unwrap();
     println!("fillet approximation: {}ms", instance.elapsed().as_millis());
 
     let instance = std::time::Instant::now();

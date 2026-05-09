@@ -91,7 +91,7 @@ fn unit_circle_arc(angle: Rad<f64>, w0: f64, w1: f64) -> NurbsCurve<Vector4> {
 }
 
 #[inline(always)]
-pub(super) fn unit_circle_knot_vec() -> KnotVector { KnotVector::uniform_knot(2, 4) }
+pub(super) fn unit_circle_knot_vector() -> KnotVector { KnotVector::uniform_knot(2, 4) }
 
 #[inline(always)]
 pub(super) const fn number_of_cpts_of_unit_circle() -> usize { 6 }
@@ -99,7 +99,7 @@ pub(super) const fn number_of_cpts_of_unit_circle() -> usize { 6 }
 #[test]
 fn unit_circle_info() {
     let uc = unit_circle_arc(Rad(PI), 1.0, 1.0);
-    assert_eq!(uc.knot_vector(), &unit_circle_knot_vec());
+    assert_eq!(uc.knot_vector(), &unit_circle_knot_vector());
     assert_eq!(uc.control_points().len(), number_of_cpts_of_unit_circle());
 }
 
@@ -299,12 +299,12 @@ pub(super) fn relay_spheres(
 fn almost_fillet_patch(rs0: RelaySphere, rs1: RelaySphere) -> BsplineSurface<Vector4> {
     let nurbs0 = rs0.fillet_wire();
     let nurbs1 = rs1.fillet_wire();
-    let knot_vecs = (KnotVector::bezier_knot(1), nurbs0.knot_vector().clone());
+    let knot_vectors = (KnotVector::bezier_knot(1), nurbs0.knot_vector().clone());
     let control_points = vec![
         nurbs0.control_points().clone(),
         nurbs1.control_points().clone(),
     ];
-    BsplineSurface::new(knot_vecs, control_points)
+    BsplineSurface::new(knot_vectors, control_points)
 }
 
 pub(super) fn expand_fillet(
@@ -336,7 +336,7 @@ pub(super) fn expand_fillet(
             })
             .collect::<Vec<_>>();
         let homo_surface = BsplineSurface::new(
-            (bezier0.knot_vector().clone(), unit_circle_knot_vec()),
+            (bezier0.knot_vector().clone(), unit_circle_knot_vector()),
             fillet_wires
                 .into_iter()
                 .map(|wire| BsplineCurve::from(wire).destruct().1)
@@ -360,8 +360,8 @@ pub(super) fn expand_fillet(
         .map(|curve| curve.destruct().1)
         .collect::<Vec<_>>();
 
-    let knot_vecs = (unit_circle_knot_vec(), knot_vector_v);
-    let mut bsp_surface = BsplineSurface::new(knot_vecs, control_points);
+    let knot_vectors = (unit_circle_knot_vector(), knot_vector_v);
+    let mut bsp_surface = BsplineSurface::new(knot_vectors, control_points);
     bsp_surface.knot_normalize();
     NurbsSurface::new(bsp_surface)
 }
@@ -416,8 +416,8 @@ pub(super) fn expand_chamfer(
         .map(|curve| curve.destruct().1)
         .collect::<Vec<_>>();
 
-    let knot_vecs = (KnotVector::bezier_knot(1), knot_vector_v);
-    let mut bsp_surface = BsplineSurface::new(knot_vecs, control_points);
+    let knot_vectors = (KnotVector::bezier_knot(1), knot_vector_v);
+    let mut bsp_surface = BsplineSurface::new(knot_vectors, control_points);
     bsp_surface.knot_normalize();
     NurbsSurface::new(bsp_surface)
 }
@@ -483,8 +483,8 @@ pub(super) fn expand_ridge(
         .map(|curve| curve.destruct().1)
         .collect::<Vec<_>>();
 
-    let knot_vecs = (KnotVector::uniform_knot(1, 2), knot_vector_v);
-    let mut bsp_surface = BsplineSurface::new(knot_vecs, control_points);
+    let knot_vectors = (KnotVector::uniform_knot(1, 2), knot_vector_v);
+    let mut bsp_surface = BsplineSurface::new(knot_vectors, control_points);
     bsp_surface.knot_normalize();
     NurbsSurface::new(bsp_surface)
 }
@@ -581,8 +581,8 @@ pub(super) fn expand_custom(
         .map(|curve| curve.destruct().1)
         .collect::<Vec<_>>();
 
-    let knot_vecs = (profile.knot_vector().clone(), knot_vector_v);
-    let mut bsp_surface = BsplineSurface::new(knot_vecs, control_points);
+    let knot_vectors = (profile.knot_vector().clone(), knot_vector_v);
+    let mut bsp_surface = BsplineSurface::new(knot_vectors, control_points);
     bsp_surface.knot_normalize();
     NurbsSurface::new(bsp_surface)
 }

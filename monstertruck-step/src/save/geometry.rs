@@ -878,8 +878,8 @@ impl DisplayByStep for ModelingSurface {
                     DisplayByStep::fmt(x, idx, f)
                 }
             }
-            ModelingSurface::TsplineSurface(tmesh) => {
-                let bsp = tmesh.to_bspline_surface(4);
+            ModelingSurface::TsplineSurface(t_mesh) => {
+                let bsp = t_mesh.to_bspline_surface(4);
                 DisplayByStep::fmt(&bsp, idx, f)
             }
         }
@@ -899,8 +899,8 @@ impl StepLength for ModelingSurface {
                     x.entity().step_length()
                 }
             }
-            ModelingSurface::TsplineSurface(tmesh) => {
-                let bsp = tmesh.to_bspline_surface(4);
+            ModelingSurface::TsplineSurface(t_mesh) => {
+                let bsp = t_mesh.to_bspline_surface(4);
                 bsp.step_length()
             }
         }

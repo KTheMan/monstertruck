@@ -197,7 +197,7 @@ impl<P: Clone, C: Clone> CompressDirector<P, C> {
         }
     }
     #[inline(always)]
-    fn get_vid(&mut self, vertex: &Vertex<P>) -> usize {
+    fn vertex_index(&mut self, vertex: &Vertex<P>) -> usize {
         let id = self.vmap.len();
         let vid = vertex.id();
         self.vertex_stable_ids
@@ -210,13 +210,13 @@ impl<P: Clone, C: Clone> CompressDirector<P, C> {
     }
 
     #[inline(always)]
-    fn get_eid(&mut self, edge: &Edge<P, C>) -> CompressedEdgeIndex {
+    fn edge_index(&mut self, edge: &Edge<P, C>) -> CompressedEdgeIndex {
         match self.emap.get(&edge.id()) {
             Some(got) => (got.0, edge.orientation()).into(),
             None => {
                 let id = self.emap.len();
-                let front_id = self.get_vid(edge.absolute_front());
-                let back_id = self.get_vid(edge.absolute_back());
+                let front_id = self.vertex_index(edge.absolute_front());
+                let back_id = self.vertex_index(edge.absolute_back());
                 let curve = edge.curve();
                 let cedge = CompressedEdge {
                     vertices: (front_id, back_id),
@@ -232,7 +232,7 @@ impl<P: Clone, C: Clone> CompressDirector<P, C> {
 
     #[inline(always)]
     fn create_boundary(&mut self, boundary: &Wire<P, C>) -> Vec<CompressedEdgeIndex> {
-        boundary.iter().map(|edge| self.get_eid(edge)).collect()
+        boundary.iter().map(|edge| self.edge_index(edge)).collect()
     }
 
     #[inline(always)]
@@ -248,7 +248,7 @@ impl<P: Clone, C: Clone> CompressDirector<P, C> {
         boundary
             .iter()
             .map(|edge| {
-                let CompressedEdgeIndex { index, orientation } = self.get_eid(edge);
+                let CompressedEdgeIndex { index, orientation } = self.edge_index(edge);
                 CompressedEdgeUse {
                     index,
                     orientation,

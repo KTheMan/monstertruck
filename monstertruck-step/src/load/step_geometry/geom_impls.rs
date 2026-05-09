@@ -9,9 +9,9 @@ use monstertruck_modeling::{
 };
 use monstertruck_traits::SnapCurveEndpoints;
 
-fn exact_parameter_curve_on(curve: &Curve3D, surface: &Surface) -> Option<Pcurve> {
+fn exact_parameter_curve_on(curve: &Curve3D, surface: &Surface) -> Option<StepParameterCurve> {
     match curve {
-        Curve3D::Pcurve(curve)
+        Curve3D::ParameterCurve(curve)
             if SurfaceCurve3D::same_surface(curve.surface().as_ref(), surface) =>
         {
             Some(curve.clone())
@@ -28,7 +28,7 @@ fn exact_parameter_curve_on(curve: &Curve3D, surface: &Surface) -> Option<Pcurve
 }
 
 fn to_modeling_trim(
-    curve: &Pcurve,
+    curve: &StepParameterCurve,
 ) -> std::result::Result<ParameterCurve<ModelingCurve2D, Box<ModelingSurface>>, StepConvertingError>
 {
     Ok(ParameterCurve::new(
@@ -118,7 +118,7 @@ impl SnapCurveEndpoints for Curve3D {
             Curve3D::Line(_)
             | Curve3D::Conic(_)
             | Curve3D::BsplineCurve(_)
-            | Curve3D::Pcurve(_)
+            | Curve3D::ParameterCurve(_)
             | Curve3D::NurbsCurve(_) => {}
         }
     }
@@ -196,7 +196,7 @@ impl ParameterDivision1D for Curve3D {
             Curve3D::Polyline(curve) => curve.parameter_division(range, tol),
             Curve3D::Conic(curve) => curve.parameter_division(range, tol),
             Curve3D::BsplineCurve(curve) => curve.parameter_division(range, tol),
-            Curve3D::Pcurve(curve) => curve.parameter_division(range, tol),
+            Curve3D::ParameterCurve(curve) => curve.parameter_division(range, tol),
             Curve3D::SurfaceCurve(curve) => curve.parameter_division(range, tol),
             Curve3D::IntersectionCurve(curve) => curve.leader().parameter_division(range, tol),
             Curve3D::NurbsCurve(curve) => curve.parameter_division(range, tol),
@@ -207,7 +207,7 @@ impl ParameterDivision1D for Curve3D {
                 Curve3D::Polyline(_) => "Polyline",
                 Curve3D::Conic(_) => "Conic",
                 Curve3D::BsplineCurve(_) => "BsplineCurve",
-                Curve3D::Pcurve(_) => "Pcurve",
+                Curve3D::ParameterCurve(_) => "StepParameterCurve",
                 Curve3D::SurfaceCurve(_) => "SurfaceCurve",
                 Curve3D::IntersectionCurve(_) => "IntersectionCurve",
                 Curve3D::NurbsCurve(_) => "NurbsCurve",
@@ -258,7 +258,7 @@ impl TryIntoHomogeneousBsplineCurve for Curve3D {
             Curve3D::Conic(Conic3D::Ellipse(curve)) => curve.try_into_homogeneous_bspline_curve(),
             Curve3D::Conic(_) => None,
             Curve3D::BsplineCurve(curve) => curve.try_into_homogeneous_bspline_curve(),
-            Curve3D::Pcurve(_) => None,
+            Curve3D::ParameterCurve(_) => None,
             Curve3D::Polyline(_) => None,
             Curve3D::SurfaceCurve(curve) => curve.leader().try_into_homogeneous_bspline_curve(),
             Curve3D::IntersectionCurve(curve) => {
@@ -274,7 +274,7 @@ impl ParameterBoundary2D<Surface> for Curve3D {
         // TODO: Re-enable sampled boundary projection after `parameter_division` can return `Option` or `Result`.
         // The old fallback can assert below `TOLERANCE` after transformed curve tolerance rescaling.
         match self {
-            Curve3D::Pcurve(curve) if curve.surface().as_ref() == surface => Some(
+            Curve3D::ParameterCurve(curve) if curve.surface().as_ref() == surface => Some(
                 curve
                     .curve()
                     .parameter_division(curve.curve().range_tuple(), tolerance)
@@ -301,7 +301,7 @@ impl ParameterBoundary2D<Surface> for Curve3D {
 }
 
 impl ExactParameterBoundary2D<Surface> for Curve3D {
-    type BoundaryCurve = Pcurve;
+    type BoundaryCurve = StepParameterCurve;
 
     fn exact_parameter_boundary_2d(&self, surface: &Surface) -> Option<Self::BoundaryCurve> {
         CurveTrimRef::new(self, surface).try_into().ok()
@@ -334,7 +334,7 @@ fn curve2d_from_sampled_boundary(points: Vec<Point2>) -> Option<Curve2D> {
     }
 }
 
-impl BoundaryCurveFromSamples<Surface> for Pcurve {
+impl BoundaryCurveFromSamples<Surface> for StepParameterCurve {
     fn boundary_curve_from_samples(surface: &Surface, points: Vec<Point2>) -> Option<Self> {
         curve2d_from_sampled_boundary(points)
             .map(|curve| ParameterCurve::new(Box::new(curve), Box::new(surface.clone())))
@@ -414,10 +414,12 @@ impl TryFrom<&Curve3D> for ModelingCurve {
             Curve3D::Line(line) => Ok((*line).into()),
             Curve3D::BsplineCurve(curve) => Ok(curve.clone().into()),
             Curve3D::NurbsCurve(curve) => Ok(curve.clone().into()),
-            Curve3D::Pcurve(curve) => Ok(ModelingCurve::ParameterCurve(ParameterCurve::new(
-                curve.curve().as_ref().try_into()?,
-                Box::new(curve.surface().as_ref().try_into()?),
-            ))),
+            Curve3D::ParameterCurve(curve) => {
+                Ok(ModelingCurve::ParameterCurve(ParameterCurve::new(
+                    curve.curve().as_ref().try_into()?,
+                    Box::new(curve.surface().as_ref().try_into()?),
+                )))
+            }
             Curve3D::SurfaceCurve(curve) => {
                 let surfaces = curve
                     .associated_geometry()
@@ -491,7 +493,7 @@ impl TryFrom<&Curve2D> for ModelingCurve2D {
     }
 }
 
-impl<'a> TryFrom<SurfaceCurveTrimRef<'a>> for Pcurve {
+impl<'a> TryFrom<SurfaceCurveTrimRef<'a>> for StepParameterCurve {
     type Error = StepConvertingError;
 
     fn try_from(value: SurfaceCurveTrimRef<'a>) -> std::result::Result<Self, Self::Error> {
@@ -502,7 +504,7 @@ impl<'a> TryFrom<SurfaceCurveTrimRef<'a>> for Pcurve {
     }
 }
 
-impl<'a> TryFrom<CurveTrimRef<'a>> for Pcurve {
+impl<'a> TryFrom<CurveTrimRef<'a>> for StepParameterCurve {
     type Error = StepConvertingError;
 
     fn try_from(value: CurveTrimRef<'a>) -> std::result::Result<Self, Self::Error> {
@@ -568,7 +570,7 @@ impl IncludeCurve<Curve3D> for Plane {
             Curve3D::Polyline(poly) => poly
                 .iter()
                 .all(|p| self.search_parameter(*p, None, 1).is_some()),
-            Curve3D::Pcurve(curve) => matches!(
+            Curve3D::ParameterCurve(curve) => matches!(
                 curve.surface().as_ref(),
                 Surface::ElementarySurface(ElementarySurface::Plane(surface)) if self == surface
             ),

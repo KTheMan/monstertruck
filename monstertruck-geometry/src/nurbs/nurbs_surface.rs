@@ -13,19 +13,9 @@ impl<V> NurbsSurface<V> {
     #[inline(always)]
     pub fn non_rationalized_mut(&mut self) -> &mut BsplineSurface<V> { &mut self.0 }
 
-    /// Returns the nurbs surface before rationalized
-    #[deprecated(note = "use `BsplineSurface::from()` or `.into()` instead")]
-    #[inline(always)]
-    pub fn into_non_rationalized(self) -> BsplineSurface<V> { self.into() }
-
     /// Returns the reference of the knot vectors.
     #[inline(always)]
     pub const fn knot_vectors(&self) -> &(KnotVector, KnotVector) { &self.0.knot_vecs }
-
-    /// Renamed to [`knot_vectors`](Self::knot_vectors).
-    #[deprecated(note = "renamed to knot_vectors")]
-    #[inline(always)]
-    pub const fn knot_vecs(&self) -> &(KnotVector, KnotVector) { &self.0.knot_vecs }
 
     /// Returns the u knot vector.
     #[inline(always)]

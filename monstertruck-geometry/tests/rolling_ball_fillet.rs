@@ -1,4 +1,4 @@
-use monstertruck_geometry::prelude::{rbf_surface::RadiusFunction, *};
+use monstertruck_geometry::prelude::{rolling_ball_fillet::RadiusFunction, *};
 use std::f64::consts::PI;
 
 #[test]
@@ -6,7 +6,7 @@ fn contact_circle_as_curve() {
     let line = Line(Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0));
     let (plane0, plane1) = (Plane::xy(), Plane::zx());
     let (r, t) = (0.5, 0.75);
-    let rfs = RbfSurface::new(line, plane0, plane1, r);
+    let rfs = RollingBallFilletSurface::new(line, plane0, plane1, r);
     let cc = rfs.contact_circle(t).unwrap();
 
     assert_near!(cc.evaluate(0.0), cc.contact_point0().point);
@@ -53,7 +53,7 @@ fn fillet_between_two_spheres() {
         }
     }
 
-    let fillet = RbfSurface::new(edge_circle, sphere0, sphere1, Radius);
+    let fillet = RollingBallFilletSurface::new(edge_circle, sphere0, sphere1, Radius);
     let cp_curve0 = fillet.contact_curve0();
     let cp_curve1 = fillet.contact_curve1();
 

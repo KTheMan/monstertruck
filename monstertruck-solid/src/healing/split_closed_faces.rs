@@ -531,8 +531,8 @@ fn boundary_to_param_polys<S: ParametricSurface3D>(
     poly_edges: &[PolylineCurve<Point3>],
     sp: impl SP<S>,
 ) -> Option<Vec<PolylineCurve<Point2>>> {
-    let get_poly = closure_get_poly(poly_edges);
-    let poly_boundary: Vec<_> = boundary.iter().copied().map(get_poly).collect();
+    let oriented_polyline = oriented_polyline_mapper(poly_edges);
+    let poly_boundary: Vec<_> = boundary.iter().copied().map(oriented_polyline).collect();
     let poly_wire_iter = PolyWireIter::try_new(&poly_boundary)?;
     let closure = poly_project_to_uv(surface, sp);
     let mut long_poly = poly_wire_iter.map(closure).collect::<Option<Vec<_>>>()?;
@@ -590,10 +590,10 @@ fn poly_project_to_uv<'a, S: ParametricSurface3D>(
     move |pt| {
         let (mut u, mut v) = sp(surface, pt, previous)?;
         if let (Some(up), Some((u0, _))) = (up, previous) {
-            u = get_mindiff(u, u0, up);
+            u = periodic_min_difference(u, u0, up);
         }
         if let (Some(vp), Some((_, v0))) = (vp, previous) {
-            v = get_mindiff(v, v0, vp);
+            v = periodic_min_difference(v, v0, vp);
         }
         previous = Some((u, v));
         Some(Point2::new(u, v))
@@ -604,7 +604,7 @@ fn abs_diff(previous: f64) -> impl Fn(&f64, &f64) -> std::cmp::Ordering {
     let f = move |x: &f64| f64::abs(x - previous);
     move |x: &f64, y: &f64| f(x).total_cmp(&f(y))
 }
-fn get_mindiff(u: f64, u0: f64, up: f64) -> f64 {
+fn periodic_min_difference(u: f64, u0: f64, up: f64) -> f64 {
     let closure = |i| u + i as f64 * up;
     (-2..=2).map(closure).min_by(abs_diff(u0)).unwrap_or(u)
 }
@@ -904,7 +904,7 @@ fn closure_take_back<C>(edges: &[Edge<C>]) -> impl Fn(EdgeIndex) -> usize + '_ {
     }
 }
 
-fn closure_get_poly<P: Clone>(
+fn oriented_polyline_mapper<P: Clone>(
     poly_edges: &[PolylineCurve<P>],
 ) -> impl Fn(EdgeIndex) -> PolylineCurve<P> + '_ {
     move |edge_index: EdgeIndex| {

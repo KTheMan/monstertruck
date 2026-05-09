@@ -1,5 +1,5 @@
 use super::*;
-use monstertruck_traits::ParametricCurve as PcurveTrait;
+use monstertruck_traits::ParametricCurve as ParametricCurveTrait;
 use std::f64::consts::PI;
 
 impl Revolution {
@@ -246,7 +246,7 @@ struct ProjectedCurve<C> {
     revolution: Revolution,
 }
 
-impl<C: ParametricCurve3D> PcurveTrait for ProjectedCurve<C> {
+impl<C: ParametricCurve3D> ParametricCurveTrait for ProjectedCurve<C> {
     type Point = Point2;
     type Vector = Vector2;
     #[inline(always)]
@@ -493,7 +493,7 @@ where
             })
         })
         .all(move |t| {
-            let pt = PcurveTrait::evaluate(curve, t);
+            let pt = ParametricCurveTrait::evaluate(curve, t);
             surface
                 .search_parameter(pt, Some(hint), INCLUDE_CURVE_TRIALS)
                 .or_else(|| surface.search_parameter(pt, None, INCLUDE_CURVE_TRIALS))

@@ -155,7 +155,7 @@ impl Splitting for PolygonMesh {
 
     fn components(&self, use_normal: bool) -> Vec<Vec<usize>> {
         let face_adjacency = self.faces().face_adjacency(use_normal);
-        get_components(&face_adjacency)
+        connected_components(&face_adjacency)
     }
 }
 
@@ -165,12 +165,12 @@ pub trait ExperimentalSplitters {
         &self,
         func: F,
     ) -> (Vec<usize>, Vec<usize>);
-    fn clustering_faces_by_gcurvature(
+    fn cluster_faces_by_gaussian_curvature(
         &self,
         threshold: f64,
         preferred_upper: bool,
     ) -> (Vec<usize>, Vec<usize>);
-    fn get_gcurve(&self) -> Vec<f64>;
+    fn vertex_gaussian_curvature(&self) -> Vec<f64>;
 }
 
 /// splitting the global faces
@@ -193,41 +193,41 @@ impl ExperimentalSplitters for PolygonMesh {
         (true_faces, false_faces)
     }
 
-    fn clustering_faces_by_gcurvature(
+    fn cluster_faces_by_gaussian_curvature(
         &self,
         threshold: f64,
         preferred_upper: bool,
     ) -> (Vec<usize>, Vec<usize>) {
-        let gcurve = self.get_gcurve();
+        let gaussian_curvature = self.vertex_gaussian_curvature();
         self.faces_into_two_clusters(|face: &[Vertex]| {
-            is_signed_up_upper(face, &gcurve, preferred_upper, threshold)
+            is_signed_up_upper(face, &gaussian_curvature, preferred_upper, threshold)
         })
     }
 
-    fn get_gcurve(&self) -> Vec<f64> {
+    fn vertex_gaussian_curvature(&self) -> Vec<f64> {
         let positions = self.positions();
         let mut angles = vec![0.0; positions.len()];
         let mut weights = vec![0.0; positions.len()];
         for face in self.tri_faces() {
-            angles[face[0].pos] += get_angle(positions, face, 0, 1, 2);
-            angles[face[1].pos] += get_angle(positions, face, 1, 2, 0);
-            angles[face[2].pos] += get_angle(positions, face, 2, 0, 1);
+            angles[face[0].pos] += corner_angle(positions, face, 0, 1, 2);
+            angles[face[1].pos] += corner_angle(positions, face, 1, 2, 0);
+            angles[face[2].pos] += corner_angle(positions, face, 2, 0, 1);
             add_weights(&mut weights, positions, face);
         }
         for face in self.quad_faces() {
-            angles[face[0].pos] += get_angle(positions, face, 0, 1, 3);
-            angles[face[1].pos] += get_angle(positions, face, 1, 2, 0);
-            angles[face[2].pos] += get_angle(positions, face, 2, 3, 1);
-            angles[face[3].pos] += get_angle(positions, face, 3, 0, 1);
+            angles[face[0].pos] += corner_angle(positions, face, 0, 1, 3);
+            angles[face[1].pos] += corner_angle(positions, face, 1, 2, 0);
+            angles[face[2].pos] += corner_angle(positions, face, 2, 3, 1);
+            angles[face[3].pos] += corner_angle(positions, face, 3, 0, 1);
             add_weights(&mut weights, positions, face);
         }
         for face in self.other_faces() {
             let n = face.len() - 1;
-            angles[face[0].pos] += get_angle(positions, face, 0, 1, n);
+            angles[face[0].pos] += corner_angle(positions, face, 0, 1, n);
             for i in 1..n {
-                angles[face[i].pos] += get_angle(positions, face, i, i + 1, i - 1);
+                angles[face[i].pos] += corner_angle(positions, face, i, i + 1, i - 1);
             }
-            angles[face[n].pos] += get_angle(positions, face, n, 0, n - 1);
+            angles[face[n].pos] += corner_angle(positions, face, n, 0, n - 1);
             add_weights(&mut weights, positions, face);
         }
 
@@ -244,7 +244,7 @@ impl ExperimentalSplitters for PolygonMesh {
 /// * adjacency - the adjacency matrix
 /// # Return
 /// * the list of the indices of faces contained in each components
-fn get_components(adjacency: &[Vec<usize>]) -> Vec<Vec<usize>> {
+fn connected_components(adjacency: &[Vec<usize>]) -> Vec<Vec<usize>> {
     let mut unchecked = vec![true; adjacency.len()];
     let mut components = Vec::new();
     loop {
@@ -282,18 +282,28 @@ fn is_in_the_plane(positions: &[Point3], normals: &[Vector3], face: &[Vertex], t
 
 fn is_signed_up_upper(
     face: &[Vertex],
-    gcurve: &[f64],
+    gaussian_curvature: &[f64],
     preferred_upper: bool,
     threshold: f64,
 ) -> bool {
     if preferred_upper {
-        face.as_ref().iter().any(|v| gcurve[v.pos] > threshold)
+        face.as_ref()
+            .iter()
+            .any(|v| gaussian_curvature[v.pos] > threshold)
     } else {
-        face.as_ref().iter().all(|v| gcurve[v.pos] > threshold)
+        face.as_ref()
+            .iter()
+            .all(|v| gaussian_curvature[v.pos] > threshold)
     }
 }
 
-fn get_angle(positions: &[Point3], face: &[Vertex], idx0: usize, idx1: usize, idx2: usize) -> f64 {
+fn corner_angle(
+    positions: &[Point3],
+    face: &[Vertex],
+    idx0: usize,
+    idx1: usize,
+    idx2: usize,
+) -> f64 {
     let vec0 = positions[face[idx1].pos] - positions[face[idx0].pos];
     let vec1 = positions[face[idx2].pos] - positions[face[idx0].pos];
     vec0.angle(vec1).0

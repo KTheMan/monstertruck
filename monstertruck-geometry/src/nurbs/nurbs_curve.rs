@@ -9,19 +9,9 @@ impl<V> NurbsCurve<V> {
     #[inline(always)]
     pub const fn non_rationalized(&self) -> &BsplineCurve<V> { &self.0 }
 
-    /// Returns the Bspline curve before rationalized.
-    #[deprecated(note = "use `BsplineCurve::from()` or `.into()` instead")]
-    #[inline(always)]
-    pub fn into_non_rationalized(self) -> BsplineCurve<V> { self.into() }
-
     /// Returns the reference of the knot vector. cf.[`BsplineCurve::knot_vector`]
     #[inline(always)]
     pub const fn knot_vector(&self) -> &KnotVector { &self.0.knot_vec }
-
-    /// Renamed to [`knot_vector`](Self::knot_vector).
-    #[deprecated(note = "renamed to knot_vector")]
-    #[inline(always)]
-    pub const fn knot_vec(&self) -> &KnotVector { &self.0.knot_vec }
 
     /// Returns the `idx`th knot. cf.[`BsplineCurve::knot`]
     #[inline(always)]

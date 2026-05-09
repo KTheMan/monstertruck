@@ -31,8 +31,9 @@ pub type ConicalSurface = Processor<RevolutionSurface<Line<Point3>>, Matrix4>;
 pub type StepExtrusionSurface = ExtrusionSurface<Curve3D, Vector3>;
 /// `surface_of_revolution`, realized in `monstertruck`
 pub type StepRevolutionSurface = Processor<RevolutionSurface<Curve3D>, Matrix4>;
-/// `pcurve`, realized in `monstertruck`
-pub type Pcurve = monstertruck_geometry::prelude::ParameterCurve<Box<Curve2D>, Box<Surface>>;
+/// STEP parameter curve on a surface, realized in `monstertruck`.
+pub type StepParameterCurve =
+    monstertruck_geometry::prelude::ParameterCurve<Box<Curve2D>, Box<Surface>>;
 
 /// STEP `surface_curve` trim lookup on a specific surface.
 #[derive(Clone, Copy, Debug)]
@@ -91,7 +92,7 @@ pub enum SurfaceCurveKind {
 /// Associated geometry entry of a STEP `surface_curve`.
 #[derive(Clone, Debug, PartialEq, From, Serialize, Deserialize)]
 pub enum SurfaceCurveAssociatedGeometry {
-    ParameterCurve(Pcurve),
+    ParameterCurve(StepParameterCurve),
     Surface(Box<Surface>),
 }
 
@@ -159,7 +160,7 @@ impl SurfaceCurve3D {
     }
 
     /// Returns the first associated `ParameterCurve` whose basis surface matches `surface`.
-    pub fn parameter_curve_on(&self, surface: &Surface) -> Option<&Pcurve> {
+    pub fn parameter_curve_on(&self, surface: &Surface) -> Option<&StepParameterCurve> {
         self.associated_geometry
             .iter()
             .find_map(|entry| match entry {
@@ -284,7 +285,7 @@ pub enum Curve3D {
     Polyline(PolylineCurve<Point3>),
     Conic(Conic3D),
     BsplineCurve(BsplineCurve<Point3>),
-    Pcurve(Pcurve),
+    ParameterCurve(StepParameterCurve),
     SurfaceCurve(SurfaceCurve3D),
     IntersectionCurve(IntersectionCurve<Box<Curve3D>, Box<Surface>, Box<Surface>>),
     NurbsCurve(NurbsCurve<Vector4>),
@@ -396,7 +397,7 @@ mod from_pcurve {
     impl From<ParameterCurve<Line<Point2>, Surface>> for Curve3D {
         fn from(value: ParameterCurve<Line<Point2>, Surface>) -> Self {
             let (line, surface) = value.decompose();
-            Curve3D::Pcurve(ParameterCurve::new(
+            Curve3D::ParameterCurve(ParameterCurve::new(
                 Curve2D::Line(line).into(),
                 surface.into(),
             ))

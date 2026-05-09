@@ -1,15 +1,15 @@
 use super::*;
 use crate::errors::Error;
 
-impl<P> Tnurcc<P>
+impl<P> TnurccSurface<P>
 where P: Debug
 {
-    /// Creates a new `Tnurcc` instance. `points` is a vector containing the control points in the mesh, and `faces`
+    /// Creates a new `TnurccSurface` instance. `points` is a vector containing the control points in the mesh, and `faces`
     /// describes the connections of the mesh. `faces` must describe every face in the mesh, as no `faces` will be
     /// inferred by the constructor. Each face in `faces` contains 4 edges. Each edge is described by a tuple containing
     /// an initial point index and a vector containing the other point indices and knot intervals on the edge.
     /// It is important to note that because there is no sense of orientation in the T-NURCC, the points in edges, and
-    /// the edges themselves must be arranged in the correct order prior to instantiating the `Tnurcc` relative to each
+    /// the edges themselves must be arranged in the correct order prior to instantiating the `TnurccSurface` relative to each
     /// other. All point indices refer to the indices of the points in the `points` parameter.
     ///
     /// Put together, this means that in an edge, the initial point index must be either the clockwise first corner or
@@ -57,7 +57,7 @@ where P: Debug
     ///
     /// - `TnurccIncompleteFaceEdge` if any edge is comprised of less than 2 points.
     ///
-    /// - `Ok(Tnurcc)` if the T-NURCC was successfully created.
+    /// - `Ok(TnurccSurface)` if the T-NURCC was successfully created.
     ///
     /// # Panics
     #[allow(clippy::type_complexity)]
@@ -212,7 +212,7 @@ where P: Debug
             .map(Arc::clone)
             .collect();
 
-        Ok(Tnurcc {
+        Ok(TnurccSurface {
             edges,
             control_points,
             extraordinary_control_points,
@@ -220,23 +220,23 @@ where P: Debug
         })
     }
 
-    /// Creates a new `Tnurcc` instance using `try_new`, panicking if it fails. See [`Tnurcc::try_new`] for details on the constructor.
+    /// Creates a new `TnurccSurface` instance using `try_new`, panicking if it fails. See [`TnurccSurface::try_new`] for details on the constructor.
     ///
     /// # Panics
     /// Panics if construction fails.
     #[allow(clippy::type_complexity)]
     pub fn new(points: Vec<P>, faces: Vec<[(usize, Vec<(usize, f64)>); 4]>) -> Self {
         // SAFETY: panicking convenience wrapper; callers must ensure valid inputs.
-        Tnurcc::try_new(points, faces).unwrap()
+        TnurccSurface::try_new(points, faces).unwrap()
     }
 
-    /// Creates a new `Tnurcc` from a quad mesh. All knot intervals are set to 1.0.
+    /// Creates a new `TnurccSurface` from a quad mesh. All knot intervals are set to 1.0.
     /// The mesh must be closed (every edge shared by exactly 2 faces).
     /// Face winding order should be consistent (counter-clockwise recommended).
     ///
     /// # Returns
-    /// - Any error from [`Tnurcc::try_new`] if the mesh is malformed.
-    /// - `Ok(Tnurcc)` on success.
+    /// - Any error from [`TnurccSurface::try_new`] if the mesh is malformed.
+    /// - `Ok(TnurccSurface)` on success.
     pub fn from_quad_mesh(positions: Vec<P>, quad_faces: &[[usize; 4]]) -> Result<Self> {
         let faces = quad_faces
             .iter()
@@ -249,11 +249,11 @@ where P: Debug
                 ]
             })
             .collect();
-        Tnurcc::try_new(positions, faces)
+        TnurccSurface::try_new(positions, faces)
     }
 }
 
-impl<P> Tnurcc<P>
+impl<P> TnurccSurface<P>
 where P: ControlPoint<f64>
 {
     /// Performs the global subdivide algorithm required by \[Sederberg et al. 2003\] and described
@@ -446,7 +446,7 @@ where P: ControlPoint<f64>
             let mut radial_edges = TnurccControlPoint::radial_edges(Arc::clone(vertex));
             if radial_edges.is_empty() {
                 // Probably needs its own error
-                // TODO: Fix the Tnurcc errors?
+                // TODO: Fix the TnurccSurface errors?
                 return Err(Error::TnurccMalformedFace);
             }
             radial_edges.push(Arc::clone(&radial_edges[0]));
@@ -750,7 +750,7 @@ where P: ControlPoint<f64>
     }
 }
 
-impl<P> Clone for Tnurcc<P>
+impl<P> Clone for TnurccSurface<P>
 where P: Clone
 {
     fn clone(&self) -> Self {
@@ -865,7 +865,7 @@ where P: Clone
             .map(|p| Arc::clone(&new_control_points[p.read().index]))
             .collect::<Vec<_>>();
 
-        Tnurcc {
+        TnurccSurface {
             edges: new_edges,
             control_points: new_control_points,
             extraordinary_control_points: new_extraordinary_control_points,
@@ -874,7 +874,7 @@ where P: Clone
     }
 }
 
-impl<P> Drop for Tnurcc<P> {
+impl<P> Drop for TnurccSurface<P> {
     fn drop(&mut self) {
         for face in self.faces.iter() {
             face.write().corners.iter_mut().for_each(|o| *o = None);
@@ -893,7 +893,7 @@ impl<P> Drop for Tnurcc<P> {
     }
 }
 
-impl<P> Tnurcc<P>
+impl<P> TnurccSurface<P>
 where P: ControlPoint<f64> + Debug + Clone
 {
     /// Converts the T-NURCC to a T-mesh by applying CC subdivision and extracting
@@ -907,15 +907,15 @@ where P: ControlPoint<f64> + Debug + Clone
     /// # Returns
     /// - `Ok(Tmesh)` on success.
     /// - Error if subdivision or mesh construction fails.
-    pub fn to_tmesh(&self, subdivision_levels: usize) -> Result<Tmesh<P>> {
+    pub fn to_t_mesh(&self, subdivision_levels: usize) -> Result<Tmesh<P>> {
         use std::collections::{HashMap, HashSet, VecDeque};
 
-        let mut tnurcc = self.clone();
+        let mut t_nurcc_surface = self.clone();
         for _ in 0..subdivision_levels {
-            tnurcc.global_subdivide()?;
+            t_nurcc_surface.global_subdivide()?;
         }
 
-        if tnurcc.faces.is_empty() {
+        if t_nurcc_surface.faces.is_empty() {
             return Err(Error::TmeshMalformedMesh);
         }
 
@@ -926,7 +926,7 @@ where P: ControlPoint<f64> + Debug + Clone
 
         // Seed from face 0. CCW vertex order: V0(bottom-left), V1(bottom-right),
         // V2(top-right), V3(top-left). Edge 0 is horizontal, edge 1 is vertical.
-        let seed = Arc::clone(&tnurcc.faces[0]);
+        let seed = Arc::clone(&t_nurcc_surface.faces[0]);
         let seed_verts = TnurccFace::boundary_vertices(Arc::clone(&seed));
         let seed_edges = TnurccFace::border_edges(Arc::clone(&seed));
         if seed_verts.len() != 4 || seed_edges.len() != 4 {
@@ -958,7 +958,7 @@ where P: ControlPoint<f64> + Debug + Clone
         }
 
         // BFS with safety limit.
-        let max_iterations = tnurcc.faces.len() * 3;
+        let max_iterations = t_nurcc_surface.faces.len() * 3;
         let mut iterations = 0;
         while let Some(face) = queue.pop_front() {
             iterations += 1;
@@ -1054,7 +1054,7 @@ where P: ControlPoint<f64> + Debug + Clone
         let mut tmesh_points: HashMap<usize, Arc<RwLock<TmeshControlPoint<P>>>> = HashMap::new();
         let mut control_points_vec: Vec<Arc<RwLock<TmeshControlPoint<P>>>> = Vec::new();
 
-        for cp in &tnurcc.control_points {
+        for cp in &t_nurcc_surface.control_points {
             let idx = cp.read().index;
             if let Some(&(s, t)) = vertex_coords.get(&idx) {
                 let norm_s = if range_s.so_small() {
@@ -1085,7 +1085,7 @@ where P: ControlPoint<f64> + Debug + Clone
         }
 
         // Phase 4: Connect adjacent points based on T-NURCC edges.
-        for edge in &tnurcc.edges {
+        for edge in &t_nurcc_surface.edges {
             let origin_idx = edge.read().origin.read().index;
             let dest_idx = edge.read().dest.read().index;
 
@@ -1209,7 +1209,7 @@ mod tests {
 
     /// Creates a T-NURCC cube with sides of lenth `1`, lower front left point at `(0, 0, 0)`,
     /// and all verticies in the first octant.
-    fn make_cube() -> Result<Tnurcc<Point3>> {
+    fn make_cube() -> Result<TnurccSurface<Point3>> {
         use crate::prelude::Point3;
         let points = vec![
             Point3::from((0.0, 0.0, 0.0)), // 0
@@ -1267,10 +1267,10 @@ mod tests {
             ],
         ];
 
-        Tnurcc::try_new(points, faces)
+        TnurccSurface::try_new(points, faces)
     }
 
-    fn verify_tnurcc_control_points(t: &Tnurcc<Point3>) {
+    fn verify_tnurcc_control_points(t: &TnurccSurface<Point3>) {
         for (i, p) in t.control_points.iter().enumerate() {
             // Incoming edge of the point
             let point_edge = Arc::clone(p.read().incoming_edge.as_ref().unwrap_or_else(|| {
@@ -1347,12 +1347,12 @@ mod tests {
         }
     }
 
-    fn verify_tnurcc_edges(t: &Tnurcc<Point3>) {
+    fn verify_tnurcc_edges(t: &TnurccSurface<Point3>) {
         for (i, e) in t.edges.iter().enumerate() {
             // Check index field
             assert!(
                 i == e.read().index,
-                "Tnurcc edge index field must be equal to edge index in edge array"
+                "TnurccSurface edge index field must be equal to edge index in edge array"
             );
 
             let common_faces = [
@@ -1391,7 +1391,7 @@ mod tests {
                     common_face.as_ref(),
                     e.read()
                         .face_from_side(common_faces[dir_index])
-                        .expect("Tnurcc must be closed on all edges")
+                        .expect("TnurccSurface must be closed on all edges")
                         .as_ref()
                 ));
 
@@ -1423,7 +1423,7 @@ mod tests {
         }
     }
 
-    fn verify_tnurcc_faces(t: &Tnurcc<Point3>) {
+    fn verify_tnurcc_faces(t: &TnurccSurface<Point3>) {
         for face in t.faces.iter() {
             // Get reference edge for face
             let face_edge = Arc::clone(
@@ -1533,7 +1533,7 @@ mod tests {
         }
     }
 
-    fn t_nurcc_subdivded_cube() -> Tnurcc<Point3> {
+    fn t_nurcc_subdivded_cube() -> TnurccSurface<Point3> {
         let mut surface = make_cube().unwrap();
         surface
             .global_subdivide()
@@ -1701,20 +1701,20 @@ mod tests {
             [2, 3, 7, 6],
             [0, 4, 7, 3],
         ];
-        let tnurcc = Tnurcc::from_quad_mesh(points, &faces);
+        let t_nurcc_surface = TnurccSurface::from_quad_mesh(points, &faces);
         assert!(
-            tnurcc.is_ok(),
+            t_nurcc_surface.is_ok(),
             "from_quad_mesh should succeed for a cube: {}",
-            tnurcc.err().unwrap()
+            t_nurcc_surface.err().unwrap()
         );
-        let tnurcc = tnurcc.unwrap();
-        assert_eq!(tnurcc.control_points.len(), 8);
-        assert_eq!(tnurcc.faces.len(), 6);
-        assert_eq!(tnurcc.edges.len(), 12);
+        let t_nurcc_surface = t_nurcc_surface.unwrap();
+        assert_eq!(t_nurcc_surface.control_points.len(), 8);
+        assert_eq!(t_nurcc_surface.faces.len(), 6);
+        assert_eq!(t_nurcc_surface.edges.len(), 12);
 
-        verify_tnurcc_control_points(&tnurcc);
-        verify_tnurcc_edges(&tnurcc);
-        verify_tnurcc_faces(&tnurcc);
+        verify_tnurcc_control_points(&t_nurcc_surface);
+        verify_tnurcc_edges(&t_nurcc_surface);
+        verify_tnurcc_faces(&t_nurcc_surface);
     }
 
     #[test]
@@ -1728,7 +1728,7 @@ mod tests {
         ];
         // Single quad face -- edges have only 1 face each.
         let faces = [[0, 1, 2, 3]];
-        let result = Tnurcc::from_quad_mesh(points, &faces);
+        let result = TnurccSurface::from_quad_mesh(points, &faces);
         assert!(
             result.is_err(),
             "Open mesh (single face) should be rejected"
@@ -1737,38 +1737,38 @@ mod tests {
 
     #[test]
     fn t_nurcc_test_subdivision_point_count() {
-        let mut tnurcc = make_cube().unwrap();
+        let mut t_nurcc_surface = make_cube().unwrap();
         // Before: V=8, E=12, F=6.
-        tnurcc
+        t_nurcc_surface
             .global_subdivide()
             .expect("Subdivision should succeed");
         // After 1 CC level: V' = V + E + F = 8 + 12 + 6 = 26.
-        assert_eq!(tnurcc.control_points.len(), 26);
-        assert_eq!(tnurcc.edges.len(), 48);
-        assert_eq!(tnurcc.faces.len(), 24);
+        assert_eq!(t_nurcc_surface.control_points.len(), 26);
+        assert_eq!(t_nurcc_surface.edges.len(), 48);
+        assert_eq!(t_nurcc_surface.faces.len(), 24);
     }
 
     #[test]
     fn t_nurcc_test_to_tmesh_cube() {
-        let tnurcc = make_cube().unwrap();
-        let tmesh = tnurcc.to_tmesh(2);
+        let t_nurcc_surface = make_cube().unwrap();
+        let t_mesh = t_nurcc_surface.to_t_mesh(2);
         assert!(
-            tmesh.is_ok(),
-            "to_tmesh should succeed: {}",
-            tmesh.err().unwrap()
+            t_mesh.is_ok(),
+            "to_t_mesh should succeed: {}",
+            t_mesh.err().unwrap()
         );
-        let tmesh = tmesh.unwrap();
+        let t_mesh = t_mesh.unwrap();
 
         // After 2 subdivisions: V = 98 total, all should be included.
         assert!(
-            tmesh.control_points().len() > 20,
+            t_mesh.control_points().len() > 20,
             "T-mesh should have many control points, got {}",
-            tmesh.control_points().len()
+            t_mesh.control_points().len()
         );
 
         // Verify `try_evaluate` produces valid (non-NaN) points at several locations.
         for &(u, v) in &[(0.25, 0.25), (0.5, 0.5), (0.75, 0.75), (0.1, 0.9)] {
-            let p: Point3 = tmesh
+            let p: Point3 = t_mesh
                 .try_evaluate(u, v)
                 .unwrap_or_else(|e| panic!("try_evaluate({}, {}) failed: {}", u, v, e));
             assert!(

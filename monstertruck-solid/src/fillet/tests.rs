@@ -172,8 +172,8 @@ fn create_fillet_with_side() {
     let plane = |i: usize, j: usize, k: usize, l: usize| {
         let control_points = vec![vec![p[i], p[l]], vec![p[j], p[k]]];
         let knot_vec = KnotVector::bezier_knot(1);
-        let knot_vecs = (knot_vec.clone(), knot_vec);
-        let bsp = BsplineSurface::new(knot_vecs, control_points);
+        let knot_vectors = (knot_vec.clone(), knot_vec);
+        let bsp = BsplineSurface::new(knot_vectors, control_points);
 
         let wire: Wire = [i, j, k, l]
             .into_iter()
@@ -273,7 +273,7 @@ fn fillet_to_nurbs() {
         ],
     ));
     let bsp1 = NurbsSurface::new(BsplineSurface::new(
-        (KnotVector::bezier_knot(1), unit_circle_knot_vec()),
+        (KnotVector::bezier_knot(1), unit_circle_knot_vector()),
         vec![
             circle_arc_by_three_points(
                 p[1].to_homogeneous(),
@@ -368,8 +368,8 @@ fn fillet_semi_cube() {
     let plane = |i: usize, j: usize, k: usize, l: usize| {
         let control_points = vec![vec![p[i], p[l]], vec![p[j], p[k]]];
         let knot_vec = KnotVector::bezier_knot(1);
-        let knot_vecs = (knot_vec.clone(), knot_vec);
-        let bsp = BsplineSurface::new(knot_vecs, control_points);
+        let knot_vectors = (knot_vec.clone(), knot_vec);
+        let bsp = BsplineSurface::new(knot_vectors, control_points);
 
         let wire: Wire = [i, j, k, l]
             .into_iter()
@@ -491,8 +491,8 @@ fn fillet_closed_wire_box_top() {
     let plane = |i: usize, j: usize, k: usize, l: usize| {
         let control_points = vec![vec![p[i], p[l]], vec![p[j], p[k]]];
         let knot_vec = KnotVector::bezier_knot(1);
-        let knot_vecs = (knot_vec.clone(), knot_vec);
-        let bsp = BsplineSurface::new(knot_vecs, control_points);
+        let knot_vectors = (knot_vec.clone(), knot_vec);
+        let bsp = BsplineSurface::new(knot_vectors, control_points);
 
         let wire: Wire = [i, j, k, l]
             .into_iter()
@@ -591,8 +591,8 @@ fn build_box_shell() -> (Shell, [Edge; 12], Vec<Vertex>) {
     let plane = |i: usize, j: usize, k: usize, l: usize| {
         let control_points = vec![vec![p[i], p[l]], vec![p[j], p[k]]];
         let knot_vec = KnotVector::bezier_knot(1);
-        let knot_vecs = (knot_vec.clone(), knot_vec);
-        let bsp = BsplineSurface::new(knot_vecs, control_points);
+        let knot_vectors = (knot_vec.clone(), knot_vec);
+        let bsp = BsplineSurface::new(knot_vectors, control_points);
 
         let wire: Wire = [i, j, k, l]
             .into_iter()
@@ -961,9 +961,9 @@ fn generic_fillet_unsupported() {
     ]
     .into();
 
-    // Use a TSplineSurface (Tmesh) which is unsupported.
-    let tmesh = Tmesh::new(p, 1.0);
-    let face = MFace::new(vec![wire], MSurface::TsplineSurface(tmesh));
+    // Use a TsplineSurface (Tmesh) which is unsupported.
+    let t_mesh = Tmesh::new(p, 1.0);
+    let face = MFace::new(vec![wire], MSurface::TsplineSurface(t_mesh));
     let mut shell: MShell = vec![face].into();
 
     let params = FilletOptions {
@@ -1019,8 +1019,8 @@ fn fillet_edges_multi_chain() {
     let plane = |i: usize, j: usize, k: usize, l: usize| {
         let control_points = vec![vec![p[i], p[l]], vec![p[j], p[k]]];
         let knot_vec = KnotVector::bezier_knot(1);
-        let knot_vecs = (knot_vec.clone(), knot_vec);
-        let bsp = BsplineSurface::new(knot_vecs, control_points);
+        let knot_vectors = (knot_vec.clone(), knot_vec);
+        let bsp = BsplineSurface::new(knot_vectors, control_points);
 
         let wire: Wire = [i, j, k, l]
             .into_iter()

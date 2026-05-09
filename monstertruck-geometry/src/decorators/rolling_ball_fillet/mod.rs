@@ -1,8 +1,8 @@
 use super::*;
-use monstertruck_traits::ParametricCurve as PcurveTrait;
+use monstertruck_traits::ParametricCurve as ParametricCurveTrait;
 use std::f64::consts::PI;
 
-impl<C, S0, S1, R> RbfSurface<C, S0, S1, R> {
+impl<C, S0, S1, R> RollingBallFilletSurface<C, S0, S1, R> {
     /// constructor
     #[inline]
     pub const fn new(edge_curve: C, surface0: S0, surface1: S1, radius: R) -> Self {
@@ -29,18 +29,18 @@ impl<C, S0, S1, R> RbfSurface<C, S0, S1, R> {
 
     /// returns the orbit curve of contact point with `surface0`.
     #[inline]
-    pub fn contact_curve0(&self) -> RbfContactCurve<C, S0, S1, R>
+    pub fn contact_curve0(&self) -> RollingBallFilletContactCurve<C, S0, S1, R>
     where Self: Clone {
-        RbfContactCurve {
+        RollingBallFilletContactCurve {
             surface: self.clone(),
             index: 0,
         }
     }
     /// returns the orbit curve of contact point with `surface1`.
     #[inline]
-    pub fn contact_curve1(&self) -> RbfContactCurve<C, S0, S1, R>
+    pub fn contact_curve1(&self) -> RollingBallFilletContactCurve<C, S0, S1, R>
     where Self: Clone {
-        RbfContactCurve {
+        RollingBallFilletContactCurve {
             surface: self.clone(),
             index: 1,
         }
@@ -82,7 +82,7 @@ macro_rules! impl_radius_1dim {
         impl RadiusFunction for $ty {
             #[inline]
             fn derivative_n(&self, n: usize, t: f64) -> f64 {
-                PcurveTrait::derivative_n(self, n, t).x
+                ParametricCurveTrait::derivative_n(self, n, t).x
             }
         }
     };
@@ -123,7 +123,7 @@ pub struct ContactCircle {
 mod algo;
 mod contact_circle;
 
-impl<C, S0, S1, R> RbfSurface<C, S0, S1, R>
+impl<C, S0, S1, R> RollingBallFilletSurface<C, S0, S1, R>
 where
     C: ParametricCurve3D,
     S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
@@ -136,12 +136,14 @@ where
             (0, 1) => self.vder_info(cc, 1).derivative_v(u),
             (1, 1) => self.vder_info(cc, 1).derivative_uv(u),
             (0, 2) => self.vder_info(cc, 2).derivative_vv(u),
-            _ => unimplemented!("higher order derivation of RbfSurface is not implemented."),
+            _ => unimplemented!(
+                "higher order derivation of RollingBallFilletSurface is not implemented."
+            ),
         }
     }
 }
 
-impl<C, S0, S1, R> ParametricSurface for RbfSurface<C, S0, S1, R>
+impl<C, S0, S1, R> ParametricSurface for RollingBallFilletSurface<C, S0, S1, R>
 where
     C: ParametricCurve3D,
     S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
@@ -195,7 +197,7 @@ where
     fn v_period(&self) -> Option<f64> { self.edge_curve.period() }
 }
 
-impl<C, S0, S1, R> ParametricSurface3D for RbfSurface<C, S0, S1, R>
+impl<C, S0, S1, R> ParametricSurface3D for RollingBallFilletSurface<C, S0, S1, R>
 where
     C: ParametricCurve3D,
     S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
@@ -204,7 +206,7 @@ where
 {
 }
 
-impl<C, S0, S1, R> BoundedSurface for RbfSurface<C, S0, S1, R>
+impl<C, S0, S1, R> BoundedSurface for RollingBallFilletSurface<C, S0, S1, R>
 where
     C: ParametricCurve3D + BoundedCurve,
     S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
@@ -213,7 +215,7 @@ where
 {
 }
 
-impl<C, S0, S1, R> ParameterDivision2D for RbfSurface<C, S0, S1, R>
+impl<C, S0, S1, R> ParameterDivision2D for RollingBallFilletSurface<C, S0, S1, R>
 where
     C: ParametricCurve3D,
     S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
@@ -235,7 +237,7 @@ where
     }
 }
 
-impl<C, S0, S1, R> SearchParameter<D2> for RbfSurface<C, S0, S1, R>
+impl<C, S0, S1, R> SearchParameter<D2> for RollingBallFilletSurface<C, S0, S1, R>
 where
     C: ParametricCurve3D + SearchNearestParameter<D1, Point = Point3>,
     S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
@@ -268,16 +270,16 @@ where
     }
 }
 
-impl<C, S0, S1, R> RbfContactCurve<C, S0, S1, R> {
+impl<C, S0, S1, R> RollingBallFilletContactCurve<C, S0, S1, R> {
     /// original fillet surface
     #[inline]
-    pub const fn fillet_surface(&self) -> &RbfSurface<C, S0, S1, R> { &self.surface }
+    pub const fn fillet_surface(&self) -> &RollingBallFilletSurface<C, S0, S1, R> { &self.surface }
     /// curve index: curve on `surface0` => 0, curve on `surface1` => 1.
     #[inline]
     pub const fn index(&self) -> usize { self.index }
 }
 
-impl<C, S0, S1, R> PcurveTrait for RbfContactCurve<C, S0, S1, R>
+impl<C, S0, S1, R> ParametricCurveTrait for RollingBallFilletContactCurve<C, S0, S1, R>
 where
     C: ParametricCurve3D,
     S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
@@ -317,7 +319,7 @@ where
     fn period(&self) -> Option<f64> { self.surface.edge_curve.period() }
 }
 
-impl<C, S0, S1, R> BoundedCurve for RbfContactCurve<C, S0, S1, R>
+impl<C, S0, S1, R> BoundedCurve for RollingBallFilletContactCurve<C, S0, S1, R>
 where
     C: ParametricCurve3D + BoundedCurve,
     S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
@@ -326,7 +328,7 @@ where
 {
 }
 
-impl<C, S0, S1, R> ParameterDivision1D for RbfContactCurve<C, S0, S1, R>
+impl<C, S0, S1, R> ParameterDivision1D for RollingBallFilletContactCurve<C, S0, S1, R>
 where
     C: ParametricCurve3D,
     S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
@@ -339,7 +341,7 @@ where
     }
 }
 
-impl<C, S0, S1, R> SearchParameter<D1> for RbfContactCurve<C, S0, S1, R>
+impl<C, S0, S1, R> SearchParameter<D1> for RollingBallFilletContactCurve<C, S0, S1, R>
 where
     C: ParametricCurve3D + SearchNearestParameter<D1, Point = Point3>,
     S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,

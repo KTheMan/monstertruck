@@ -1,21 +1,21 @@
-use super::{rbf_surface::*, *};
-use monstertruck_traits::ParametricCurve as PcurveTrait;
+use super::{rolling_ball_fillet::*, *};
+use monstertruck_traits::ParametricCurve as ParametricCurveTrait;
 
-impl<S0, S1> ApproxFilletSurface<S0, S1> {
+impl<S0, S1> ApproximateFilletSurface<S0, S1> {
     /// Returns the first surface.
     pub const fn surface0(&self) -> &S0 { &self.surface0 }
     /// Returns the second surface.
     pub const fn surface1(&self) -> &S1 { &self.surface1 }
     /// Returns the knot vector for the parameter `v`.
     pub const fn knot_vector_v(&self) -> &KnotVector { &self.knot_vec }
-    /// Returns side curve on the first surface.
-    pub fn side_pcurve0(&self) -> ParameterCurve<BsplineCurve<Point2>, S0>
+    /// Returns the side parameter curve on the first surface.
+    pub fn side_parameter_curve0(&self) -> ParameterCurve<BsplineCurve<Point2>, S0>
     where S0: Clone {
         let bsp = BsplineCurve::new(self.knot_vec.clone(), self.side_control_points0.clone());
         ParameterCurve::new(bsp, self.surface0.clone())
     }
-    /// Returns side curve on the second surface.
-    pub fn side_pcurve1(&self) -> ParameterCurve<BsplineCurve<Point2>, S1>
+    /// Returns the side parameter curve on the second surface.
+    pub fn side_parameter_curve1(&self) -> ParameterCurve<BsplineCurve<Point2>, S1>
     where S1: Clone {
         let bsp = BsplineCurve::new(self.knot_vec.clone(), self.side_control_points1.clone());
         ParameterCurve::new(bsp, self.surface1.clone())
@@ -124,7 +124,7 @@ mod subders {
     }
 }
 
-impl<S0, S1> ParametricSurface for ApproxFilletSurface<S0, S1>
+impl<S0, S1> ParametricSurface for ApproximateFilletSurface<S0, S1>
 where
     S0: ParametricSurface3D,
     S1: ParametricSurface3D,
@@ -204,7 +204,7 @@ where
     }
 }
 
-impl<S0, S1> ParametricSurface3D for ApproxFilletSurface<S0, S1>
+impl<S0, S1> ParametricSurface3D for ApproximateFilletSurface<S0, S1>
 where
     S0: ParametricSurface3D,
     S1: ParametricSurface3D,
@@ -215,7 +215,7 @@ where
     }
 }
 
-impl<S0, S1> ParameterDivision2D for ApproxFilletSurface<S0, S1>
+impl<S0, S1> ParameterDivision2D for ApproximateFilletSurface<S0, S1>
 where
     S0: ParametricSurface3D,
     S1: ParametricSurface3D,
@@ -229,14 +229,14 @@ where
     }
 }
 
-impl<S0, S1> ApproxFilletSurface<S0, S1>
+impl<S0, S1> ApproximateFilletSurface<S0, S1>
 where
     S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
     S1: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
 {
-    /// approx fillet by `ApproxFilletSurface`.
-    pub fn approx_rolling_ball_fillet<C, R>(
-        fillet_surface: &RbfSurface<C, S0, S1, R>,
+    /// Approximates a rolling ball fillet with an [`ApproximateFilletSurface`].
+    pub fn approximate_rolling_ball_fillet<C, R>(
+        fillet_surface: &RollingBallFilletSurface<C, S0, S1, R>,
         edge_parameter_range: (f64, f64),
         tol: f64,
     ) -> Option<Self>
@@ -310,7 +310,7 @@ where
             let weights_points = weights_curve.destruct().1;
             let weights = weights_points.into_iter().map(|x| x.x).collect();
 
-            let approx = ApproxFilletSurface {
+            let approx = ApproximateFilletSurface {
                 knot_vec,
                 surface0: fillet_surface.surface0(),
                 side_control_points0: parameter_curve0.destruct().1,
@@ -363,7 +363,7 @@ mod tests {
 
     #[property_test]
     fn plane_cylinder(#[strategy = 0.0..=1.0] u: f64, #[strategy = 0.0..=1.0] v: f64) {
-        let surface = ApproxFilletSurface {
+        let surface = ApproximateFilletSurface {
             knot_vec: KnotVector::bezier_knot(1),
             surface0: Plane::xy(),
             side_control_points0: vec![(-1.0, 0.0).into(), (-1.0, 1.0).into()],
@@ -411,7 +411,7 @@ mod tests {
             ]
         );
 
-        let surface = ApproxFilletSurface {
+        let surface = ApproximateFilletSurface {
             knot_vec: KnotVector::bezier_knot(2),
             surface0,
             side_control_points0: vec![(0.8, 0.0).into(), (0.5, 0.5).into(), (0.8, 1.0).into()],

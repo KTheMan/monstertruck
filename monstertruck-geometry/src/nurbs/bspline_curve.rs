@@ -78,11 +78,6 @@ impl<P> BsplineCurve<P> {
     #[inline(always)]
     pub const fn knot_vector(&self) -> &KnotVector { &self.knot_vec }
 
-    /// Renamed to [`knot_vector`](Self::knot_vector).
-    #[deprecated(note = "renamed to knot_vector")]
-    #[inline(always)]
-    pub const fn knot_vec(&self) -> &KnotVector { &self.knot_vec }
-
     /// Returns the `idx`th knot
     #[inline(always)]
     pub fn knot(&self, idx: usize) -> f64 { self.knot_vec[idx] }
@@ -157,10 +152,11 @@ impl<P: ControlPoint<f64>> BsplineCurve<P> {
     /// let control_points = vec![Vector2::new(-1.0, 1.0), Vector2::new(0.0, -1.0), Vector2::new(1.0, 1.0)];
     /// let bspcurve = BsplineCurve::new(knot_vec, control_points);
     ///
-    /// const N: usize = 100; // sample size
-    /// let get_t = |i: usize| -1.0 + 2.0 * (i as f64) / (N as f64);
-    /// let res: Vec<_> = (0..=N).map(get_t).map(bspcurve.closure()).collect();
-    /// let ans: Vec<_> = (0..=N).map(get_t).map(|t| Vector2::new(t, t * t)).collect();
+    /// // Sample size.
+    /// const N: usize = 100;
+    /// let parameter = |i: usize| -1.0 + 2.0 * (i as f64) / (N as f64);
+    /// let res: Vec<_> = (0..=N).map(parameter).map(bspcurve.closure()).collect();
+    /// let ans: Vec<_> = (0..=N).map(parameter).map(|t| Vector2::new(t, t * t)).collect();
     /// res.iter().zip(&ans).for_each(|(v0, v1)| assert_near2!(v0, v1));
     /// ```
     #[inline(always)]

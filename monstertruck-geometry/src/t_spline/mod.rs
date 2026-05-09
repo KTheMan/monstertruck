@@ -18,7 +18,7 @@ use monstertruck_core::cgmath64::control_point::ControlPoint;
 use parking_lot::RwLock;
 use std::sync::Arc;
 
-/// The compound type which defines a connection within a tmesh.
+/// The compound type which defines a connection within a t_mesh.
 /// The first element of the tuple is the (optional) point the connection interfaces to.
 /// The second element of the tuple is the knot weight of the connection.
 pub type TmeshConnection<P> = (Option<Arc<RwLock<TmeshControlPoint<P>>>>, f64);
@@ -154,7 +154,7 @@ struct TnurccEdge<P> {
 ///
 /// Described in \[Sederberg et al. 2003\], building on material from \[Sederberg et al. 1998\].
 #[derive(Debug)]
-pub struct Tnurcc<P> {
+pub struct TnurccSurface<P> {
     #[allow(dead_code)]
     extraordinary_control_points: Vec<Arc<RwLock<TnurccControlPoint<P>>>>,
     control_points: Vec<Arc<RwLock<TnurccControlPoint<P>>>>,

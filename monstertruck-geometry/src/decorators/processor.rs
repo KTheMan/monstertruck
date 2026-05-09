@@ -1,6 +1,6 @@
 use super::*;
 use algo::surface::SearchNearestParameterVector;
-use monstertruck_traits::ParametricCurve as PcurveTrait;
+use monstertruck_traits::ParametricCurve as ParametricCurveTrait;
 
 impl<E, T: One> Processor<E, T> {
     /// Creates new processor
@@ -100,7 +100,7 @@ impl<C: BoundedCurve, T> Processor<C, T> {
     }
 }
 
-impl<C, T> PcurveTrait for Processor<C, T>
+impl<C, T> ParametricCurveTrait for Processor<C, T>
 where
     C: BoundedCurve,
     C::Point: EuclideanSpace<Diff = C::Vector>,
@@ -468,7 +468,7 @@ where
 
 impl<E, T, C> IncludeCurve<C> for Processor<E, T>
 where
-    C: PcurveTrait + Transformed<T> + Clone,
+    C: ParametricCurveTrait + Transformed<T> + Clone,
     C::Point: EuclideanSpace,
     E: IncludeCurve<C>,
     T: Transform<C::Point>,

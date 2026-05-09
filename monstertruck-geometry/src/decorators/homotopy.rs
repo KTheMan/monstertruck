@@ -1,7 +1,7 @@
 use super::*;
 use algo::surface::{SearchNearestParameterVector, SearchParameterVector};
 use control_point::ControlPoint;
-use monstertruck_traits::ParametricCurve as PcurveTrait;
+use monstertruck_traits::ParametricCurve as ParametricCurveTrait;
 use std::ops::RangeBounds;
 
 impl<C0, C1> HomotopySurface<C0, C1> {
@@ -24,8 +24,8 @@ impl<C0, C1> HomotopySurface<C0, C1> {
 
 impl<C0, C1> ParametricSurface for HomotopySurface<C0, C1>
 where
-    C0: PcurveTrait,
-    C1: PcurveTrait<Point = C0::Point, Vector = C0::Vector>,
+    C0: ParametricCurveTrait,
+    C1: ParametricCurveTrait<Point = C0::Point, Vector = C0::Vector>,
     C0::Point: EuclideanSpace<Scalar = f64, Diff = C0::Vector>,
     C0::Vector: VectorSpace<Scalar = f64>,
 {

@@ -100,11 +100,6 @@ impl<P> BsplineSurface<P> {
     #[inline(always)]
     pub const fn knot_vectors(&self) -> &(KnotVector, KnotVector) { &self.knot_vecs }
 
-    /// Renamed to [`knot_vectors`](Self::knot_vectors).
-    #[deprecated(note = "renamed to knot_vectors")]
-    #[inline(always)]
-    pub const fn knot_vecs(&self) -> &(KnotVector, KnotVector) { &self.knot_vecs }
-
     /// Returns the u knot vector.
     #[inline(always)]
     pub const fn knot_vector_u(&self) -> &KnotVector { &self.knot_vecs.0 }

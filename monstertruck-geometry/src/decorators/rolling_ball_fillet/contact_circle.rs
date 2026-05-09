@@ -1,5 +1,5 @@
 use super::*;
-use monstertruck_traits::ParametricCurve as PcurveTrait;
+use monstertruck_traits::ParametricCurve as ParametricCurveTrait;
 
 /// trait for attach rolling fillet
 pub(super) trait FilletableSurface:
@@ -61,7 +61,7 @@ impl ContactCircle {
     }
 }
 
-impl PcurveTrait for ContactCircle {
+impl ParametricCurveTrait for ContactCircle {
     type Point = Point3;
     type Vector = Vector3;
     fn derivative_n(&self, n: usize, t: f64) -> Self::Vector {

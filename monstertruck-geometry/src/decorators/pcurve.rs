@@ -1,6 +1,6 @@
 use super::*;
 use monstertruck_core::cgmath64::control_point::ControlPoint;
-use monstertruck_traits::ParametricCurve as PcurveTrait;
+use monstertruck_traits::ParametricCurve as ParametricCurveTrait;
 
 impl<C, S> ParameterCurve<C, S> {
     /// Creates composited
@@ -45,7 +45,7 @@ where
     }
 }
 
-impl<C, S> PcurveTrait for ParameterCurve<C, S>
+impl<C, S> ParametricCurveTrait for ParameterCurve<C, S>
 where
     C: ParametricCurve2D,
     S: ParametricSurface,
@@ -109,7 +109,7 @@ where
 impl<C, S> BoundedCurve for ParameterCurve<C, S>
 where
     C: BoundedCurve,
-    ParameterCurve<C, S>: PcurveTrait,
+    ParameterCurve<C, S>: ParametricCurveTrait,
 {
 }
 
@@ -117,7 +117,7 @@ impl<C, S> Cut for ParameterCurve<C, S>
 where
     C: Cut,
     S: Clone,
-    ParameterCurve<C, S>: PcurveTrait,
+    ParameterCurve<C, S>: ParametricCurveTrait,
 {
     fn cut(&mut self, t: f64) -> Self {
         let curve = self.curve.cut(t);
@@ -171,11 +171,11 @@ where
 impl<C, S> SearchNearestParameter<D1> for ParameterCurve<C, S>
 where
     Self: BoundedCurve,
-    <Self as PcurveTrait>::Point: EuclideanSpace<Scalar = f64, Diff = <Self as PcurveTrait>::Vector>
+    <Self as ParametricCurveTrait>::Point: EuclideanSpace<Scalar = f64, Diff = <Self as ParametricCurveTrait>::Vector>
         + MetricSpace<Metric = f64>,
-    <Self as PcurveTrait>::Vector: InnerSpace<Scalar = f64> + Tolerance,
+    <Self as ParametricCurveTrait>::Vector: InnerSpace<Scalar = f64> + Tolerance,
 {
-    type Point = <Self as PcurveTrait>::Point;
+    type Point = <Self as ParametricCurveTrait>::Point;
     fn search_nearest_parameter<H: Into<SearchParameterHint1D>>(
         &self,
         point: Self::Point,

@@ -62,10 +62,6 @@ impl From<Option<f64>> for SearchParameterHint1D {
     }
 }
 
-/// Renamed to [`SearchParameterHint1D`] for clarity.
-#[deprecated(note = "renamed to SearchParameterHint1D for clarity")]
-pub type SPHint1D = SearchParameterHint1D;
-
 /// hint for searching parameter for surface
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum SearchParameterHint2D {
@@ -96,10 +92,6 @@ impl From<Option<(f64, f64)>> for SearchParameterHint2D {
         }
     }
 }
-
-/// Renamed to [`SearchParameterHint2D`] for clarity.
-#[deprecated(note = "renamed to SearchParameterHint2D for clarity")]
-pub type SPHint2D = SearchParameterHint2D;
 
 /// Search parameter `t` such that `self.evaluate(t)` is near point.
 pub trait SearchParameter<Dim: SearchParameterDimension> {

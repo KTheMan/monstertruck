@@ -7,14 +7,14 @@ pub fn construct_polylines(lines: &[(Point3, Point3)]) -> Vec<PolylineCurve<Poin
     let mut graph: Graph = lines.iter().collect();
     let mut res = Vec::new();
     while !graph.is_empty() {
-        let (mut idx, node) = graph.get_one();
+        let (mut idx, node) = graph.first_node();
         let mut wire: VecDeque<_> = vec![node.coord].into();
-        while let Some((idx0, pt)) = graph.get_a_next_node(idx) {
+        while let Some((idx0, pt)) = graph.next_node(idx) {
             idx = idx0;
             wire.push_back(pt);
         }
         let mut idx = PointIndex::from(wire[0]);
-        while let Some((idx0, pt)) = graph.get_a_next_node(idx) {
+        while let Some((idx0, pt)) = graph.next_node(idx) {
             idx = idx0;
             wire.push_front(pt);
         }
@@ -93,13 +93,13 @@ impl Graph {
     }
 
     #[inline(always)]
-    fn get_one(&self) -> (PointIndex, &Node) {
+    fn first_node(&self) -> (PointIndex, &Node) {
         // SAFETY: only called inside `while !graph.is_empty()`.
         let (idx, node) = self.iter().next().unwrap();
         (*idx, node)
     }
 
-    fn get_a_next_node(&mut self, idx: PointIndex) -> Option<(PointIndex, Point3)> {
+    fn next_node(&mut self, idx: PointIndex) -> Option<(PointIndex, Point3)> {
         let node = self.get_mut(&idx)?;
         let idx0 = node.pop_one_adjacency();
         if node.adjacency.is_empty() {

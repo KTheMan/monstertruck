@@ -149,10 +149,11 @@ impl Table {
         curve: &Curve3D,
         surface: &Surface,
         orientation: bool,
-    ) -> Option<step_geometry::Pcurve> {
-        let mut trim_curve =
-            step_geometry::Pcurve::try_from(step_geometry::CurveTrimRef::new(curve, surface))
-                .ok()?;
+    ) -> Option<step_geometry::StepParameterCurve> {
+        let mut trim_curve = step_geometry::StepParameterCurve::try_from(
+            step_geometry::CurveTrimRef::new(curve, surface),
+        )
+        .ok()?;
         if !orientation {
             trim_curve.invert();
         }
@@ -164,7 +165,7 @@ impl Table {
         bound: FaceBoundHolder,
         face_surface: &Surface,
         eidx_map: &HashMap<u64, usize>,
-    ) -> Option<Vec<CompressedEdgeUse<step_geometry::Pcurve>>> {
+    ) -> Option<Vec<CompressedEdgeUse<step_geometry::StepParameterCurve>>> {
         use PlaceHolder::Ref;
         let ori = bound.orientation;
         let bound = bound.bound_holder(self)?;
@@ -241,7 +242,7 @@ impl Table {
         &self,
         shell: &ShellHolder,
         eidx_map: &HashMap<u64, usize>,
-    ) -> Vec<CompressedTrimmedFace<Surface, step_geometry::Pcurve>> {
+    ) -> Vec<CompressedTrimmedFace<Surface, step_geometry::StepParameterCurve>> {
         shell
             .cfs_faces_holder(self)
             .filter_map(|face| self.face_any_to_orientation_and_face(face))
@@ -303,7 +304,7 @@ impl Table {
         &self,
         shell: &impl StepShell,
     ) -> Result<
-        CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::Pcurve>,
+        CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::StepParameterCurve>,
         StepConvertingError,
     > {
         shell.to_compressed_trimmed_shell(self)
@@ -335,7 +336,7 @@ impl Table {
         &self,
         shells: &ShellBasedSurfaceModelHolder,
     ) -> Result<
-        Vec<CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::Pcurve>>,
+        Vec<CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::StepParameterCurve>>,
         StepConvertingError,
     > {
         let mut res = Vec::new();
@@ -411,7 +412,7 @@ impl Table {
         &self,
         solid: &ManifoldSolidBrepHolder,
     ) -> Result<
-        CompressedTrimmedSolid<Point3, Curve3D, Surface, step_geometry::Pcurve>,
+        CompressedTrimmedSolid<Point3, Curve3D, Surface, step_geometry::StepParameterCurve>,
         StepConvertingError,
     > {
         let PlaceHolder::Ref(Name::Entity(outer_idx)) = &solid.outer else {
@@ -654,7 +655,7 @@ pub trait StepShell {
         &self,
         table: &Table,
     ) -> Result<
-        CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::Pcurve>,
+        CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::StepParameterCurve>,
         StepConvertingError,
     >;
 }
@@ -680,7 +681,7 @@ impl StepShell for ShellHolder {
         &self,
         table: &Table,
     ) -> Result<
-        CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::Pcurve>,
+        CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::StepParameterCurve>,
         StepConvertingError,
     > {
         let (vertices, vidx_map) = table.shell_vertices(self);
@@ -717,7 +718,7 @@ impl StepShell for OrientedShellHolder {
         &self,
         table: &Table,
     ) -> Result<
-        CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::Pcurve>,
+        CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::StepParameterCurve>,
         StepConvertingError,
     > {
         let PlaceHolder::Ref(Name::Entity(idx)) = &self.shell_element else {
@@ -751,7 +752,7 @@ impl StepShell for ShellAnyHolder {
         &self,
         table: &Table,
     ) -> Result<
-        CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::Pcurve>,
+        CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::StepParameterCurve>,
         StepConvertingError,
     > {
         match self {

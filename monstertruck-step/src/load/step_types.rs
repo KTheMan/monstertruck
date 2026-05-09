@@ -319,7 +319,7 @@ impl TryFrom<&CurveAny> for Curve3D {
             Line(line) => Self::Line(line.as_ref().into()),
             BoundedCurve(b) => b.as_ref().try_into()?,
             Conic(curve) => Self::Conic(curve.as_ref().try_into()?),
-            Pcurve(c) => Self::Pcurve(c.as_ref().try_into()?),
+            Pcurve(c) => Self::ParameterCurve(c.as_ref().try_into()?),
             SurfaceCurve(c) => c.as_ref().try_into()?,
         })
     }
@@ -882,7 +882,7 @@ pub struct Pcurve {
     reference_to_curve: DefinitionalRepresentation,
 }
 
-impl TryFrom<&Pcurve> for step_geometry::Pcurve {
+impl TryFrom<&Pcurve> for step_geometry::StepParameterCurve {
     type Error = StepConvertingError;
     #[inline(always)]
     fn try_from(value: &Pcurve) -> Result<Self, Self::Error> {
@@ -893,7 +893,7 @@ impl TryFrom<&Pcurve> for step_geometry::Pcurve {
             .first()
             .ok_or("no representation item")?
             .try_into()?;
-        Ok(step_geometry::Pcurve::new(
+        Ok(step_geometry::StepParameterCurve::new(
             Box::new(curve),
             Box::new(surface),
         ))
@@ -1865,7 +1865,7 @@ impl EdgeCurve {
                     Point2::new(v.0, v.1),
                     true,
                 )?;
-                Curve3D::Pcurve(geom::ParameterCurve::new(
+                Curve3D::ParameterCurve(geom::ParameterCurve::new(
                     Box::new(curve2d),
                     Box::new(surface),
                 ))

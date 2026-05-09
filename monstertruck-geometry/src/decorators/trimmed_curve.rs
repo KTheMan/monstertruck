@@ -1,5 +1,5 @@
 use super::*;
-use monstertruck_traits::ParametricCurve as PcurveTrait;
+use monstertruck_traits::ParametricCurve as ParametricCurveTrait;
 
 impl<C> TrimmedCurve<C> {
     /// constructor
@@ -16,7 +16,7 @@ impl<C> TrimmedCurve<C> {
     pub const fn range(&self) -> (f64, f64) { self.range }
 }
 
-impl<C: PcurveTrait> PcurveTrait for TrimmedCurve<C> {
+impl<C: ParametricCurveTrait> ParametricCurveTrait for TrimmedCurve<C> {
     type Point = C::Point;
     type Vector = C::Vector;
     #[inline(always)]
@@ -35,9 +35,9 @@ impl<C: PcurveTrait> PcurveTrait for TrimmedCurve<C> {
     }
 }
 
-impl<C: PcurveTrait> BoundedCurve for TrimmedCurve<C> {}
+impl<C: ParametricCurveTrait> BoundedCurve for TrimmedCurve<C> {}
 
-impl<C: PcurveTrait> Cut for TrimmedCurve<C> {
+impl<C: ParametricCurveTrait> Cut for TrimmedCurve<C> {
     fn cut(&mut self, t: f64) -> Self {
         let (t0, t1) = self.range;
         self.range = (t0, t);

@@ -320,7 +320,7 @@ impl PolyBoundaryPiece {
             None
         } else if let Some(previous) = previous {
             if let Some(period) = period {
-                Some(get_mindiff(value, previous, period))
+                Some(periodic_min_difference(value, previous, period))
             } else if let Some((min, max)) = range {
                 Some(value.clamp(min, max))
             } else {
@@ -489,7 +489,7 @@ fn abs_diff(previous: f64) -> impl Fn(&f64, &f64) -> std::cmp::Ordering {
     // SAFETY: UV parameters from surface evaluation are finite, so comparison succeeds.
     move |x: &f64, y: &f64| f(x).partial_cmp(&f(y)).unwrap()
 }
-fn get_mindiff(u: f64, u0: f64, up: f64) -> f64 {
+fn periodic_min_difference(u: f64, u0: f64, up: f64) -> f64 {
     let closure = |i| u + i as f64 * up;
     // SAFETY: the iterator (-2..=2) is non-empty, containing five elements.
     (-2..=2).map(closure).min_by(abs_diff(u0)).unwrap()

@@ -42,7 +42,7 @@ fn curve_kind(curve: &Curve3D) -> &'static str {
         Curve3D::Polyline(_) => "Polyline",
         Curve3D::Conic(_) => "Conic",
         Curve3D::BsplineCurve(_) => "BsplineCurve",
-        Curve3D::Pcurve(_) => "ParameterCurve",
+        Curve3D::ParameterCurve(_) => "ParameterCurve",
         Curve3D::SurfaceCurve(_) => "SurfaceCurve",
         Curve3D::IntersectionCurve(_) => "IntersectionCurve",
         Curve3D::NurbsCurve(_) => "NurbsCurve",
