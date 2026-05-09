@@ -10,10 +10,16 @@ impl<V> NurbsCurve<V> {
     pub const fn non_rationalized(&self) -> &BsplineCurve<V> { &self.0 }
 
     /// Returns the Bspline curve before rationalized.
+    #[deprecated(note = "use `BsplineCurve::from()` or `.into()` instead")]
     #[inline(always)]
-    pub fn into_non_rationalized(self) -> BsplineCurve<V> { self.0 }
+    pub fn into_non_rationalized(self) -> BsplineCurve<V> { self.into() }
 
-    /// Returns the reference of the knot vector. cf.[`BsplineCurve::knot_vec`]
+    /// Returns the reference of the knot vector. cf.[`BsplineCurve::knot_vector`]
+    #[inline(always)]
+    pub const fn knot_vector(&self) -> &KnotVector { &self.0.knot_vec }
+
+    /// Renamed to [`knot_vector`](Self::knot_vector).
+    #[deprecated(note = "renamed to knot_vector")]
     #[inline(always)]
     pub const fn knot_vec(&self) -> &KnotVector { &self.0.knot_vec }
 
@@ -109,7 +115,7 @@ impl<V: Homogeneous<Scalar = f64>> NurbsCurve<V> {
 impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>> NurbsCurve<V> {
     /// Returns the closure of substitution.
     #[inline(always)]
-    pub fn get_closure(&self) -> impl Fn(f64) -> V::Point + '_ { move |t| self.subs(t) }
+    pub fn closure(&self) -> impl Fn(f64) -> V::Point + '_ { move |t| self.subs(t) }
 }
 
 impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>> NurbsCurve<V>
@@ -555,6 +561,91 @@ impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>> ParametricCurve
 
 impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>> BoundedCurve for NurbsCurve<V> {}
 
+// -- v2 scalar-generic impls ------------------------------------------------
+
+use monstertruck_core::scalar::HasScalar;
+use monstertruck_traits::v2;
+
+impl<V> v2::ParametricCurve for NurbsCurve<V>
+where V: HasScalar<Scalar = f64> + Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>
+{
+    type Scalar = f64;
+    type Point = V::Point;
+    type Vector = <V::Point as EuclideanSpace>::Diff;
+
+    #[inline(always)]
+    fn evaluate(&self, t: Self::Scalar) -> Self::Point { ParametricCurve::evaluate(self, t) }
+    #[inline(always)]
+    fn derivative(&self, t: Self::Scalar) -> Self::Vector { ParametricCurve::derivative(self, t) }
+    #[inline(always)]
+    fn derivative_2(&self, t: Self::Scalar) -> Self::Vector {
+        ParametricCurve::derivative_2(self, t)
+    }
+    #[inline(always)]
+    fn derivative_n(&self, n: usize, t: Self::Scalar) -> Self::Vector {
+        ParametricCurve::derivative_n(self, n, t)
+    }
+    #[inline(always)]
+    fn period(&self) -> Option<Self::Scalar> { ParametricCurve::period(self) }
+    #[inline(always)]
+    fn try_range_tuple(&self) -> Option<(Self::Scalar, Self::Scalar)> {
+        ParametricCurve::try_range_tuple(self)
+    }
+}
+
+impl<V> v2::BoundedCurve for NurbsCurve<V>
+where V: HasScalar<Scalar = f64> + Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>
+{
+    #[inline(always)]
+    fn range_tuple(&self) -> (f64, f64) { BoundedCurve::range_tuple(self) }
+}
+
+impl<V> v2::Cut for NurbsCurve<V>
+where V: HasScalar<Scalar = f64>
+        + Homogeneous<Scalar = f64>
+        + ControlPoint<f64, Diff = V>
+        + Tolerance
+{
+    #[inline(always)]
+    fn cut(&mut self, t: f64) -> Self { Cut::cut(self, t) }
+}
+
+impl<V> v2::SearchNearestParameter<v2::D1<f64>> for NurbsCurve<V>
+where
+    V: HasScalar<Scalar = f64> + Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>,
+    V::Point: MetricSpace<Metric = f64>,
+    <V::Point as EuclideanSpace>::Diff: InnerSpace + Tolerance,
+{
+    type Point = V::Point;
+    #[inline(always)]
+    fn search_nearest_parameter<H: Into<v2::SearchParameterHint1D<f64>>>(
+        &self,
+        pt: V::Point,
+        _: H,
+        trials: usize,
+    ) -> Option<f64> {
+        SearchNearestParameter::<D1>::search_nearest_parameter(self, pt, None, trials)
+    }
+}
+
+impl<V> v2::SearchParameter<v2::D1<f64>> for NurbsCurve<V>
+where
+    V: HasScalar<Scalar = f64> + Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>,
+    V::Point: MetricSpace<Metric = f64>,
+    <V::Point as EuclideanSpace>::Diff: InnerSpace + Tolerance,
+{
+    type Point = V::Point;
+    #[inline(always)]
+    fn search_parameter<H: Into<v2::SearchParameterHint1D<f64>>>(
+        &self,
+        pt: V::Point,
+        _: H,
+        trials: usize,
+    ) -> Option<f64> {
+        SearchParameter::<D1>::search_parameter(self, pt, None, trials)
+    }
+}
+
 impl<V: Clone> Invertible for NurbsCurve<V> {
     #[inline(always)]
     fn invert(&mut self) { self.0.invert(); }
@@ -590,4 +681,9 @@ impl<V: Homogeneous<Scalar = f64>> From<BsplineCurve<V::Point>> for NurbsCurve<V
                 .collect(),
         ))
     }
+}
+
+impl<V> From<NurbsCurve<V>> for BsplineCurve<V> {
+    #[inline(always)]
+    fn from(nurbs: NurbsCurve<V>) -> Self { nurbs.0 }
 }

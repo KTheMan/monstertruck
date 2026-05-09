@@ -123,7 +123,7 @@ fn test_parameter_division() {
     let curve = NurbsCurve::new(BsplineCurve::new(knot_vec, control_points));
     let tol = 0.01;
     let (div, pts) = curve.parameter_division(curve.range_tuple(), tol * 0.5);
-    let knot_vec = curve.knot_vec();
+    let knot_vec = curve.knot_vector();
     assert_eq!(knot_vec[0], div[0]);
     assert_eq!(knot_vec.range_length(), div.last().unwrap() - div[0]);
     for i in 1..div.len() {

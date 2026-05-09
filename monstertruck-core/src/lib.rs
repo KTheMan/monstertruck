@@ -19,15 +19,23 @@ pub mod bounding_box;
 pub mod cgmath64;
 /// Additional traits for cgmath
 pub mod cgmath_extend_traits;
+/// Deterministic content hashing for BRep cache invalidation.
+pub mod content_hash;
 /// Utilities for performing calculations related to differentiation
 pub mod derivatives;
 /// Utility
 pub mod entry_map;
+/// Generic point/vector/matrix aliases parameterized over scalar type.
+pub mod generic_math;
+pub use content_hash::{ContentHasher, DeterministicContentHash};
 /// Deterministic hash functions
 pub mod hash;
 /// Id structure with `Copy`, `Hash` and `Eq` using raw pointers
 pub mod id;
+pub use id::{StableId, StableIdAllocator};
 pub mod newton;
+/// Scalar trait hierarchy for scalar-generic kernel infrastructure.
+pub mod scalar;
 /// Setting Tolerance
 pub mod tolerance;
 

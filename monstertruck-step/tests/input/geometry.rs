@@ -324,7 +324,7 @@ fn exec_b_spline_curve_with_knots(
         .zip(knot_incrs)
         .flat_map(|(m, x)| {
             s += x;
-            std::iter::repeat(s).take(*m)
+            std::iter::repeat_n(s, *m)
         })
         .collect::<Vec<f64>>();
     let knots = KnotVector::from(vec);
@@ -337,11 +337,11 @@ fn exec_b_spline_curve_with_knots(
     let step_str = format!("DATA;{}ENDSEC;", StepDisplay::new(&bsp, 1));
     let bsp_step = step_to_entity::<BsplineCurveWithKnotsHolder>(&step_str);
     let res: BsplineCurve<Point3> = (&bsp_step).try_into().unwrap();
-    assert_eq!(res.knot_vec().len(), bsp.knot_vec().len());
+    assert_eq!(res.knot_vector().len(), bsp.knot_vector().len());
     assert_eq!(res.control_points().len(), bsp.control_points().len());
-    res.knot_vec()
+    res.knot_vector()
         .iter()
-        .zip(bsp.knot_vec())
+        .zip(bsp.knot_vector())
         .for_each(|(x, y)| assert_near!(x, y));
     res.control_points()
         .iter()
@@ -389,11 +389,11 @@ fn exec_bezier_curve(degree: usize, ctrlpt_coords: Vec<[f64; 3]>) {
     let bsp_step = step_to_entity::<BezierCurveHolder>(&step_str);
     let res: BsplineCurve<Point3> = (&bsp_step).try_into().unwrap();
     let ans = BsplineCurve::new(KnotVector::bezier_knot(degree), points);
-    assert_eq!(res.knot_vec().len(), ans.knot_vec().len());
+    assert_eq!(res.knot_vector().len(), ans.knot_vector().len());
     assert_eq!(res.control_points().len(), ans.control_points().len());
-    res.knot_vec()
+    res.knot_vector()
         .iter()
-        .zip(ans.knot_vec())
+        .zip(ans.knot_vector())
         .for_each(|(x, y)| assert_near!(x, y));
     res.control_points()
         .iter()
@@ -428,11 +428,11 @@ fn exec_quasi_uniform_curve(degree: usize, division: usize, ctrlpt_coords: Vec<[
     let bsp_step = step_to_entity::<QuasiUniformCurveHolder>(&step_str);
     let res: BsplineCurve<Point3> = (&bsp_step).try_into().unwrap();
     let ans = BsplineCurve::new(knots, points);
-    assert_eq!(res.knot_vec().len(), ans.knot_vec().len());
+    assert_eq!(res.knot_vector().len(), ans.knot_vector().len());
     assert_eq!(res.control_points().len(), ans.control_points().len());
-    res.knot_vec()
+    res.knot_vector()
         .iter()
-        .zip(ans.knot_vec())
+        .zip(ans.knot_vector())
         .for_each(|(x, y)| assert_near!(x, y));
     res.control_points()
         .iter()
@@ -467,11 +467,11 @@ fn exec_uniform_curve(degree: usize, knot_len: usize, ctrlpt_coords: Vec<[f64; 3
     let bsp_step = step_to_entity::<UniformCurveHolder>(&step_str);
     let res: BsplineCurve<Point3> = (&bsp_step).try_into().unwrap();
     let ans = BsplineCurve::new(knots, points);
-    assert_eq!(res.knot_vec().len(), ans.knot_vec().len());
+    assert_eq!(res.knot_vector().len(), ans.knot_vector().len());
     assert_eq!(res.control_points().len(), ans.control_points().len());
-    res.knot_vec()
+    res.knot_vector()
         .iter()
-        .zip(ans.knot_vec())
+        .zip(ans.knot_vector())
         .for_each(|(x, y)| assert_near!(x, y));
     res.control_points()
         .iter()
@@ -505,7 +505,7 @@ fn exec_nurbs_curve_b_spline_with_knots(
         .zip(knot_incrs)
         .flat_map(|(m, x)| {
             s += x;
-            std::iter::repeat(s).take(*m)
+            std::iter::repeat_n(s, *m)
         })
         .collect::<Vec<f64>>();
     let knots = KnotVector::from(vec);
@@ -520,11 +520,11 @@ fn exec_nurbs_curve_b_spline_with_knots(
     let step_str = format!("DATA;{}ENDSEC;", StepDisplay::new(&nurbs, 1));
     let nurbs_step = step_to_entity::<RationalBsplineCurveHolder>(&step_str);
     let res: NurbsCurve<Vector4> = (&nurbs_step).try_into().unwrap();
-    assert_eq!(res.knot_vec().len(), nurbs.knot_vec().len());
+    assert_eq!(res.knot_vector().len(), nurbs.knot_vector().len());
     assert_eq!(res.control_points().len(), nurbs.control_points().len());
-    res.knot_vec()
+    res.knot_vector()
         .iter()
-        .zip(nurbs.knot_vec())
+        .zip(nurbs.knot_vector())
         .for_each(|(x, y)| assert_near!(x, y));
     res.control_points()
         .iter()
@@ -576,11 +576,11 @@ fn exec_nurbs_curve_bezier_curve(
     let res: NurbsCurve<Vector4> = (&bsp_step).try_into().unwrap();
     let bsp = BsplineCurve::new(KnotVector::bezier_knot(degree), points);
     let ans = NurbsCurve::<Vector4>::try_from_bspline_and_weights(bsp, weights).unwrap();
-    assert_eq!(res.knot_vec().len(), ans.knot_vec().len());
+    assert_eq!(res.knot_vector().len(), ans.knot_vector().len());
     assert_eq!(res.control_points().len(), ans.control_points().len());
-    res.knot_vec()
+    res.knot_vector()
         .iter()
-        .zip(ans.knot_vec())
+        .zip(ans.knot_vector())
         .for_each(|(x, y)| assert_near!(x, y));
     res.control_points()
         .iter()
@@ -632,11 +632,11 @@ fn exec_nurbs_curve_quasi_uniform_curve(
     let res: NurbsCurve<Vector4> = (&bsp_step).try_into().unwrap();
     let bsp = BsplineCurve::new(knots, points);
     let ans = NurbsCurve::<Vector4>::try_from_bspline_and_weights(bsp, weights).unwrap();
-    assert_eq!(res.knot_vec().len(), ans.knot_vec().len());
+    assert_eq!(res.knot_vector().len(), ans.knot_vector().len());
     assert_eq!(res.control_points().len(), ans.control_points().len());
-    res.knot_vec()
+    res.knot_vector()
         .iter()
-        .zip(ans.knot_vec())
+        .zip(ans.knot_vector())
         .for_each(|(x, y)| assert_near!(x, y));
     res.control_points()
         .iter()
@@ -688,11 +688,11 @@ fn exec_nurbs_curve_uniform_curve(
     let res: NurbsCurve<Vector4> = (&bsp_step).try_into().unwrap();
     let bsp = BsplineCurve::new(knots, points);
     let ans = NurbsCurve::<Vector4>::try_from_bspline_and_weights(bsp, weights).unwrap();
-    assert_eq!(res.knot_vec().len(), ans.knot_vec().len());
+    assert_eq!(res.knot_vector().len(), ans.knot_vector().len());
     assert_eq!(res.control_points().len(), ans.control_points().len());
-    res.knot_vec()
+    res.knot_vector()
         .iter()
-        .zip(ans.knot_vec())
+        .zip(ans.knot_vector())
         .for_each(|(x, y)| assert_near!(x, y));
     res.control_points()
         .iter()
@@ -1269,7 +1269,7 @@ fn exec_b_spline_surface_with_knots(
         .zip(uknot_incrs)
         .flat_map(|(m, x)| {
             s += x;
-            std::iter::repeat(s).take(*m)
+            std::iter::repeat_n(s, *m)
         })
         .collect::<Vec<f64>>();
     let uknots = KnotVector::from(uvec);
@@ -1280,7 +1280,7 @@ fn exec_b_spline_surface_with_knots(
         .zip(vknot_incrs)
         .flat_map(|(m, x)| {
             s += x;
-            std::iter::repeat(s).take(*m)
+            std::iter::repeat_n(s, *m)
         })
         .collect::<Vec<f64>>();
     let vknots = KnotVector::from(vvec);
@@ -1466,7 +1466,7 @@ fn exec_nurbs_surface_b_spline_surface_with_knots(
         .zip(uknot_incrs)
         .flat_map(|(m, x)| {
             s += x;
-            std::iter::repeat(s).take(*m)
+            std::iter::repeat_n(s, *m)
         })
         .collect::<Vec<f64>>();
     let uknots = KnotVector::from(uvec);
@@ -1477,7 +1477,7 @@ fn exec_nurbs_surface_b_spline_surface_with_knots(
         .zip(vknot_incrs)
         .flat_map(|(m, x)| {
             s += x;
-            std::iter::repeat(s).take(*m)
+            std::iter::repeat_n(s, *m)
         })
         .collect::<Vec<f64>>();
     let vknots = KnotVector::from(vvec);
@@ -1713,7 +1713,7 @@ fn exec_surface_of_linear_extrusion(
         StepDisplay::new(&line, 4),
     );
     let step_surface = step_to_entity::<SurfaceOfLinearExtrusionHolder>(&step_str);
-    let surface: StepExtrudedCurve = (&step_surface).try_into().unwrap();
+    let surface: StepExtrusionSurface = (&step_surface).try_into().unwrap();
     (0..=100)
         .flat_map(move |i| (0..=100).map(move |j| (i, j)))
         .for_each(|(i, j)| {
@@ -1755,7 +1755,7 @@ fn exec_surface_of_revolution(
         StepDisplay::new(&line, 5),
     );
     let step_surface = step_to_entity::<SurfaceOfRevolutionHolder>(&step_str);
-    let surface: StepRevolutedCurve = (&step_surface).try_into().unwrap();
+    let surface: StepRevolutionSurface = (&step_surface).try_into().unwrap();
     (0..=100)
         .flat_map(move |i| (0..=100).map(move |j| (i, j)))
         .for_each(|(i, j)| {

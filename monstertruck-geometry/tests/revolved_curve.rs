@@ -6,7 +6,7 @@ fn revolve_test() {
     let pt0 = Point3::new(0.0, 2.0, 1.0);
     let pt1 = Point3::new(1.0, 0.0, 0.0);
     let curve = BsplineCurve::new(KnotVector::bezier_knot(1), vec![pt0, pt1]);
-    let surface = RevolutedCurve::by_revolution(curve, Point3::origin(), Vector3::unit_y());
+    let surface = RevolutionSurface::by_revolution(curve, Point3::origin(), Vector3::unit_y());
     const N: usize = 100;
     for i in 0..=N {
         for j in 0..=N {
@@ -57,7 +57,7 @@ fn search_parameter() {
         KnotVector::bezier_knot(1),
         vec![Point3::new(0.0, 2.0, 1.0), Point3::new(1.0, 0.0, 0.0)],
     );
-    let surface = RevolutedCurve::by_revolution(line, Point3::origin(), Vector3::unit_y());
+    let surface = RevolutionSurface::by_revolution(line, Point3::origin(), Vector3::unit_y());
     let pt = Point3::new(-0.5, 1.0, 0.5);
     let (u, v) = surface.search_parameter(pt, Some((0.4, 1.2)), 100).unwrap();
     assert_near!(surface.subs(u, v), pt);
@@ -73,7 +73,7 @@ fn search_parameter_with_fixed_points() {
             Point3::new(0.0, -1.0, 0.0),
         ],
     );
-    let surface = RevolutedCurve::by_revolution(line, Point3::origin(), Vector3::unit_y());
+    let surface = RevolutionSurface::by_revolution(line, Point3::origin(), Vector3::unit_y());
 
     let (u, v) = surface
         .search_parameter(Point3::new(0.0, 1.0, 0.0), Some((0.5, 0.3)), 10)
@@ -92,7 +92,7 @@ fn search_nearest_parameter() {
         KnotVector::bezier_knot(1),
         vec![Point3::new(0.0, 2.0, 1.0), Point3::new(1.0, 0.0, 0.0)],
     );
-    let surface = RevolutedCurve::by_revolution(line, Point3::origin(), Vector3::unit_y());
+    let surface = RevolutionSurface::by_revolution(line, Point3::origin(), Vector3::unit_y());
     let pt = surface.subs(0.4, 1.2) + 0.1 * surface.normal(0.4, 1.2);
     let (u, v) = surface
         .search_nearest_parameter(pt, Some((0.4, 1.2)), 100)
@@ -110,7 +110,7 @@ fn search_nearest_parameter_with_fixed_points() {
             Point3::new(0.0, -1.0, 0.0),
         ],
     );
-    let surface = RevolutedCurve::by_revolution(line, Point3::origin(), Vector3::unit_y());
+    let surface = RevolutionSurface::by_revolution(line, Point3::origin(), Vector3::unit_y());
 
     let (u, v) = surface
         .search_nearest_parameter(Point3::new(0.0, 2.0, 0.0), Some((0.5, 0.3)), 10)
@@ -129,7 +129,7 @@ fn include_curve_normal() {
         KnotVector::bezier_knot(1),
         vec![Point3::new(0.0, 0.0, 0.0), Point3::new(0.0, 2.0, 2.0)],
     );
-    let surface = RevolutedCurve::by_revolution(line, Point3::origin(), Vector3::unit_y());
+    let surface = RevolutionSurface::by_revolution(line, Point3::origin(), Vector3::unit_y());
     let parabola = BsplineCurve::new(
         KnotVector::bezier_knot(2),
         vec![
@@ -147,7 +147,7 @@ fn include_curve_abnormal0() {
         KnotVector::bezier_knot(1),
         vec![Point3::new(0.0, 0.0, 0.0), Point3::new(0.0, 2.0, 2.0)],
     );
-    let surface = RevolutedCurve::by_revolution(line, Point3::origin(), Vector3::unit_y());
+    let surface = RevolutionSurface::by_revolution(line, Point3::origin(), Vector3::unit_y());
     let parabola = BsplineCurve::new(
         KnotVector::bezier_knot(2),
         vec![
@@ -172,7 +172,7 @@ fn include_curve_abnormal1() {
     ));
     let pt0 = curve.subs(0.2);
     let pt1 = curve.subs(0.6);
-    let surface = RevolutedCurve::by_revolution(curve, Point3::origin(), Vector3::unit_y());
+    let surface = RevolutionSurface::by_revolution(curve, Point3::origin(), Vector3::unit_y());
     let line = BsplineCurve::new(KnotVector::bezier_knot(1), vec![pt0, pt1]);
     assert!(!surface.include(&line));
 }

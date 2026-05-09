@@ -338,10 +338,12 @@ pub struct ExtrudeConnector {
 impl<C, S> Connector<C, S> for ExtrudeConnector
 where
     C: Clone,
-    ExtrudedCurve<C, Vector3>: ToSameGeometry<S>,
+    ExtrusionSurface<C, Vector3>: ToSameGeometry<S>,
 {
     fn connector(self) -> impl Fn(&C, &C) -> S {
-        move |curve0, _| ExtrudedCurve::by_extrusion(curve0.clone(), self.vector).to_same_geometry()
+        move |curve0, _| {
+            ExtrusionSurface::by_extrusion(curve0.clone(), self.vector).to_same_geometry()
+        }
     }
 }
 
@@ -374,12 +376,12 @@ pub struct RevoluteConnector {
 impl<C, S> Connector<C, S> for RevoluteConnector
 where
     C: Clone,
-    RevolutedCurve<C>: ToSameGeometry<S>,
+    RevolutionSurface<C>: ToSameGeometry<S>,
 {
     fn connector(self) -> impl Fn(&C, &C) -> S {
         let Self { origin, axis } = self;
         move |curve, _| {
-            RevolutedCurve::by_revolution(curve.clone(), origin, axis).to_same_geometry()
+            RevolutionSurface::by_revolution(curve.clone(), origin, axis).to_same_geometry()
         }
     }
 }

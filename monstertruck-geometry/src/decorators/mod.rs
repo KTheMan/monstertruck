@@ -8,9 +8,9 @@ struct Revolution {
     axis: Vector3,
 }
 
-/// surface constructed by revoluting a curve
+/// Surface constructed by revolving a curve around an axis.
 /// # Examples
-/// Revoluted sphere
+/// Revolved sphere
 /// ```
 /// use monstertruck_geometry::prelude::*;
 /// use std::f64::consts::PI;
@@ -22,8 +22,8 @@ struct Revolution {
 /// ];
 /// // upper half circle on xy-plane
 /// let uhcircle = NurbsCurve::new(BsplineCurve::new(knot_vec, control_points));
-/// // sphere constructed by revolute circle
-/// let sphere = RevolutedCurve::by_revolution(
+/// // sphere constructed by revolving circle
+/// let sphere = RevolutionSurface::by_revolution(
 ///     uhcircle, Point3::origin(), Vector3::unit_x(),
 /// );
 /// const N: usize = 30;
@@ -38,12 +38,16 @@ struct Revolution {
 /// }
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, SelfSameGeometry)]
-pub struct RevolutedCurve<C> {
+pub struct RevolutionSurface<C> {
     curve: C,
     revolution: Revolution,
 }
 
-/// Linearly extruded curve
+/// Renamed to [`RevolutionSurface`].
+#[deprecated(note = "renamed to RevolutionSurface")]
+pub type RevolutedCurve<C> = RevolutionSurface<C>;
+
+/// Surface constructed by linearly extruding a curve along a vector.
 ///
 /// # Examples
 /// ```
@@ -62,10 +66,10 @@ pub struct RevolutedCurve<C> {
 /// ];
 /// let curve = BsplineCurve::new(KnotVector::bezier_knot(2), cpts);
 ///
-/// // create extruded curve
-/// let surface0 = ExtrudedCurve::by_extrusion(curve, Vector3::unit_z());
+/// // create extruded surface
+/// let surface0 = ExtrusionSurface::by_extrusion(curve, Vector3::unit_z());
 ///
-/// // same curve defined by B-spline description
+/// // same surface defined by B-spline description
 /// let surface1 = BsplineSurface::new((KnotVector::bezier_knot(2), KnotVector::bezier_knot(1)), spts);
 ///
 /// assert_eq!(surface0.range_tuple(), surface1.range_tuple());
@@ -89,10 +93,14 @@ pub struct RevolutedCurve<C> {
 /// }
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, SelfSameGeometry)]
-pub struct ExtrudedCurve<C, V> {
+pub struct ExtrusionSurface<C, V> {
     curve: C,
     vector: V,
 }
+
+/// Renamed to [`ExtrusionSurface`].
+#[deprecated(note = "renamed to ExtrusionSurface")]
+pub type ExtrudedCurve<C, V> = ExtrusionSurface<C, V>;
 
 /// invertible and transformable geometric element
 /// # Examples
@@ -273,6 +281,16 @@ pub struct IntersectionCurve<C, S0, S1> {
     surface0: S0,
     surface1: S1,
     leader: C,
+}
+
+/// Surface curve with exact face-local boundaries on both supporting surfaces.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SelfSameGeometry)]
+pub struct SurfaceCurve<C, S0, S1, T0, T1> {
+    surface0: S0,
+    surface1: S1,
+    leader: C,
+    boundary0: Option<T0>,
+    boundary1: Option<T1>,
 }
 
 /// trimmed curve for parametric curve

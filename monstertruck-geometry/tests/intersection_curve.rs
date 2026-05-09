@@ -35,9 +35,9 @@ proptest! {
     #[test]
     fn cylinder_case(t in 0.0..=2.0 * PI, n in 0usize..=4) {
         let line0 = Line(Point3::new(1.0, 0.0, 2.0), Point3::new(-1.0, 0.0, 2.0));
-        let cylinder0 = RevolutedCurve::by_revolution(line0, Point3::origin(), Vector3::unit_x());
+        let cylinder0 = RevolutionSurface::by_revolution(line0, Point3::origin(), Vector3::unit_x());
         let line1 = Line(Point3::new(1.0, 0.0, 1.0), Point3::new(1.0, 0.0, -1.0));
-        let cylinder1 = RevolutedCurve::by_revolution(line1, Point3::origin(), Vector3::unit_z());
+        let cylinder1 = RevolutionSurface::by_revolution(line1, Point3::origin(), Vector3::unit_z());
         let z = (1.0 + f64::sqrt(3.0)) / 2.0;
         let lead_circle = Processor::with_transform(
             UnitCircle::<Point3>::new(),

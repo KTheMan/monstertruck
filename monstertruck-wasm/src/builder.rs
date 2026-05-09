@@ -150,6 +150,11 @@ pub fn revolve(
     derive_all_sweepable!(
         shape,
         builder::revolve,
-        (origin, axis, Rad(angle), division)
+        (
+            origin,
+            axis,
+            builder::SweepAngle::Partial(Rad(angle)),
+            division
+        )
     )
 }

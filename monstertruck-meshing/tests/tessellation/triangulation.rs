@@ -95,7 +95,7 @@ fn special_cylinder_model() -> Shell {
         builder::try_attach_plane(&[vec![edge2.inverse(), edge3.inverse()].into()]).unwrap();
     let face1 = builder::try_attach_plane(&[vec![edge4.clone(), edge5.clone()].into()]).unwrap();
 
-    let surface_row = RevolutedCurve::<Curve>::by_revolution(
+    let surface_row = RevolutionSurface::<Curve>::by_revolution(
         Line(Point3::new(1.0, 0.0, 1.0), Point3::new(1.0, 0.0, 0.0)).into(),
         Point3::origin(),
         Vector3::unit_z(),

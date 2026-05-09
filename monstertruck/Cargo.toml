@@ -21,11 +21,12 @@ topology = ["monstertruck-topology"]
 mesh = ["traits", "monstertruck-mesh"]
 modeling = ["geometry", "topology", "monstertruck-modeling"]
 meshing = ["mesh", "modeling", "monstertruck-meshing"]
-solid = ["meshing", "monstertruck-solid"]
+solid = ["meshing", "monstertruck-solid", "monstertruck-modeling/fillet"]
 assembly = ["monstertruck-assembly"]
 step = ["modeling", "monstertruck-step"]
 gpu = ["monstertruck-gpu"]
 render = ["gpu", "mesh", "meshing", "monstertruck-render"]
+rkyv = ["monstertruck-core/rkyv", "monstertruck-topology?/rkyv"]
 
 [dependencies]
 monstertruck-core = { workspace = true }

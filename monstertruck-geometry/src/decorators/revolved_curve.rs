@@ -59,7 +59,7 @@ impl Revolution {
     }
 }
 
-impl<C: ParametricCurve3D> ParametricSurface for RevolutedCurve<C> {
+impl<C: ParametricCurve3D> ParametricSurface for RevolutionSurface<C> {
     type Point = Point3;
     type Vector = Vector3;
     #[inline(always)]
@@ -120,7 +120,7 @@ impl<C: ParametricCurve3D> ParametricSurface for RevolutedCurve<C> {
     fn v_period(&self) -> Option<f64> { Some(2.0 * PI) }
 }
 
-impl<C: ParametricCurve3D + BoundedCurve> ParametricSurface3D for RevolutedCurve<C> {
+impl<C: ParametricCurve3D + BoundedCurve> ParametricSurface3D for RevolutionSurface<C> {
     #[inline(always)]
     fn normal(&self, u: f64, v: f64) -> Vector3 {
         let (u0, u1) = self.curve.range_tuple();
@@ -149,14 +149,91 @@ impl<C: ParametricCurve3D + BoundedCurve> ParametricSurface3D for RevolutedCurve
     }
 }
 
-impl<C: ParametricCurve3D + BoundedCurve> BoundedSurface for RevolutedCurve<C> {}
+impl<C: ParametricCurve3D + BoundedCurve> BoundedSurface for RevolutionSurface<C> {}
 
-impl<C: Clone> Invertible for RevolutedCurve<C> {
+// -- v2 scalar-generic impls ------------------------------------------------
+
+use monstertruck_traits::v2;
+
+impl<C: ParametricCurve3D> v2::ParametricSurface for RevolutionSurface<C> {
+    type Scalar = f64;
+    type Point = Point3;
+    type Vector = Vector3;
+
+    #[inline(always)]
+    fn evaluate(&self, u: f64, v: f64) -> Point3 { ParametricSurface::evaluate(self, u, v) }
+    #[inline(always)]
+    fn derivative_u(&self, u: f64, v: f64) -> Vector3 {
+        ParametricSurface::derivative_u(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_v(&self, u: f64, v: f64) -> Vector3 {
+        ParametricSurface::derivative_v(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_uu(&self, u: f64, v: f64) -> Vector3 {
+        ParametricSurface::derivative_uu(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_uv(&self, u: f64, v: f64) -> Vector3 {
+        ParametricSurface::derivative_uv(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_vv(&self, u: f64, v: f64) -> Vector3 {
+        ParametricSurface::derivative_vv(self, u, v)
+    }
+    #[inline(always)]
+    fn period_u(&self) -> Option<f64> { ParametricSurface::u_period(self) }
+    #[inline(always)]
+    fn period_v(&self) -> Option<f64> { ParametricSurface::v_period(self) }
+}
+
+impl<C: ParametricCurve3D + BoundedCurve> v2::BoundedSurface for RevolutionSurface<C> {
+    #[inline(always)]
+    fn range_tuple(&self) -> ((f64, f64), (f64, f64)) { BoundedSurface::range_tuple(self) }
+}
+
+impl<C: ParametricCurve3D + BoundedCurve> v2::ParametricSurface3D for RevolutionSurface<C> {
+    #[inline(always)]
+    fn normal(&self, u: f64, v: f64) -> Vector3 { ParametricSurface3D::normal(self, u, v) }
+}
+
+impl<C: ParametricCurve3D + BoundedCurve> v2::SearchParameter<v2::D2<f64>>
+    for RevolutionSurface<C>
+{
+    type Point = Point3;
+    #[inline(always)]
+    fn search_parameter<H: Into<v2::SearchParameterHint2D<f64>>>(
+        &self,
+        pt: Point3,
+        _: H,
+        trials: usize,
+    ) -> Option<(f64, f64)> {
+        SearchParameter::<D2>::search_parameter(self, pt, None, trials)
+    }
+}
+
+impl<C: ParametricCurve3D + BoundedCurve> v2::SearchNearestParameter<v2::D2<f64>>
+    for RevolutionSurface<C>
+{
+    type Point = Point3;
+    #[inline(always)]
+    fn search_nearest_parameter<H: Into<v2::SearchParameterHint2D<f64>>>(
+        &self,
+        pt: Point3,
+        _: H,
+        trials: usize,
+    ) -> Option<(f64, f64)> {
+        SearchNearestParameter::<D2>::search_nearest_parameter(self, pt, None, trials)
+    }
+}
+
+impl<C: Clone> Invertible for RevolutionSurface<C> {
     #[inline(always)]
     fn invert(&mut self) { self.revolution.invert() }
     #[inline(always)]
     fn inverse(&self) -> Self {
-        RevolutedCurve {
+        RevolutionSurface {
             curve: self.curve.clone(),
             revolution: self.revolution.inverse(),
         }
@@ -246,11 +323,11 @@ impl<C: ParametricCurve3D + BoundedCurve> SearchNearestParameter<D1> for Project
     }
 }
 
-impl<C> RevolutedCurve<C> {
+impl<C> RevolutionSurface<C> {
     /// Creates a surface by revoluting a curve.
     #[inline(always)]
     pub fn by_revolution(curve: C, origin: Point3, axis: Vector3) -> Self {
-        RevolutedCurve {
+        RevolutionSurface {
             curve,
             revolution: Revolution::new(origin, axis),
         }
@@ -269,7 +346,7 @@ impl<C> RevolutedCurve<C> {
     pub const fn axis(&self) -> Vector3 { self.revolution.axis }
 }
 
-impl<C: ParametricCurve3D + BoundedCurve> RevolutedCurve<C> {
+impl<C: ParametricCurve3D + BoundedCurve> RevolutionSurface<C> {
     /// Returns true if the front point of the curve is on the axis of rotation.
     /// # Examples
     /// ```
@@ -278,9 +355,9 @@ impl<C: ParametricCurve3D + BoundedCurve> RevolutedCurve<C> {
     ///     KnotVector::bezier_knot(1),
     ///     vec![Point3::new(0.0, 0.0, 0.0), Point3::new(0.0, 0.0, 1.0)],
     /// );
-    /// let surface0 = RevolutedCurve::by_revolution(line.clone(), Point3::origin(), Vector3::unit_y());
+    /// let surface0 = RevolutionSurface::by_revolution(line.clone(), Point3::origin(), Vector3::unit_y());
     /// assert!(surface0.is_front_fixed());
-    /// let surface1 = RevolutedCurve::by_revolution(line, Point3::new(1.0, 0.0, 0.0), Vector3::unit_y());
+    /// let surface1 = RevolutionSurface::by_revolution(line, Point3::new(1.0, 0.0, 0.0), Vector3::unit_y());
     /// assert!(!surface1.is_front_fixed());
     /// ```
     #[inline(always)]
@@ -293,16 +370,16 @@ impl<C: ParametricCurve3D + BoundedCurve> RevolutedCurve<C> {
     ///     KnotVector::bezier_knot(1),
     ///     vec![Point3::new(0.0, 0.0, 1.0), Point3::new(0.0, 0.0, 0.0)],
     /// );
-    /// let surface0 = RevolutedCurve::by_revolution(line.clone(), Point3::origin(), Vector3::unit_y());
+    /// let surface0 = RevolutionSurface::by_revolution(line.clone(), Point3::origin(), Vector3::unit_y());
     /// assert!(surface0.is_back_fixed());
-    /// let surface1 = RevolutedCurve::by_revolution(line, Point3::new(1.0, 0.0, 0.0), Vector3::unit_y());
+    /// let surface1 = RevolutionSurface::by_revolution(line, Point3::new(1.0, 0.0, 0.0), Vector3::unit_y());
     /// assert!(!surface1.is_back_fixed());
     /// ```
     #[inline(always)]
     pub fn is_back_fixed(&self) -> bool { self.revolution.contains(self.curve.back()) }
 }
 
-impl<C: ParametricCurve3D + BoundedCurve> SearchParameter<D2> for RevolutedCurve<C> {
+impl<C: ParametricCurve3D + BoundedCurve> SearchParameter<D2> for RevolutionSurface<C> {
     type Point = Point3;
     fn search_parameter<H: Into<SearchParameterHint2D>>(
         &self,
@@ -347,7 +424,7 @@ impl<C: ParametricCurve3D + BoundedCurve> SearchParameter<D2> for RevolutedCurve
     }
 }
 
-impl<C: ParametricCurve3D + BoundedCurve> SearchNearestParameter<D2> for RevolutedCurve<C> {
+impl<C: ParametricCurve3D + BoundedCurve> SearchNearestParameter<D2> for RevolutionSurface<C> {
     type Point = Point3;
     fn search_nearest_parameter<H: Into<SearchParameterHint2D>>(
         &self,
@@ -393,7 +470,7 @@ impl<C: ParametricCurve3D + BoundedCurve> SearchNearestParameter<D2> for Revolut
 }
 
 fn sub_include<C0, C1>(
-    surface: &RevolutedCurve<C0>,
+    surface: &RevolutionSurface<C0>,
     curve: &C1,
     knots: &[f64],
     degree: usize,
@@ -425,71 +502,71 @@ where
         })
 }
 
-impl IncludeCurve<BsplineCurve<Point3>> for RevolutedCurve<&BsplineCurve<Point3>> {
+impl IncludeCurve<BsplineCurve<Point3>> for RevolutionSurface<&BsplineCurve<Point3>> {
     fn include(&self, curve: &BsplineCurve<Point3>) -> bool {
-        let knots = curve.knot_vec().to_single_multi().0;
+        let knots = curve.knot_vector().to_single_multi().0;
         let degree = usize::max(2, usize::max(curve.degree(), self.curve.degree()));
         sub_include(self, curve, &knots, degree)
     }
 }
 
-impl IncludeCurve<BsplineCurve<Point3>> for RevolutedCurve<BsplineCurve<Point3>> {
+impl IncludeCurve<BsplineCurve<Point3>> for RevolutionSurface<BsplineCurve<Point3>> {
     fn include(&self, curve: &BsplineCurve<Point3>) -> bool {
-        let knots = curve.knot_vec().to_single_multi().0;
+        let knots = curve.knot_vector().to_single_multi().0;
         let degree = usize::max(2, usize::max(curve.degree(), self.curve.degree()));
         sub_include(self, curve, &knots, degree)
     }
 }
 
-impl IncludeCurve<BsplineCurve<Point3>> for RevolutedCurve<&NurbsCurve<Vector4>> {
+impl IncludeCurve<BsplineCurve<Point3>> for RevolutionSurface<&NurbsCurve<Vector4>> {
     fn include(&self, curve: &BsplineCurve<Point3>) -> bool {
-        let knots = curve.knot_vec().to_single_multi().0;
+        let knots = curve.knot_vector().to_single_multi().0;
         let degree = curve.degree() + usize::max(2, self.curve.degree());
         sub_include(self, curve, &knots, degree)
     }
 }
 
-impl IncludeCurve<BsplineCurve<Point3>> for RevolutedCurve<NurbsCurve<Vector4>> {
+impl IncludeCurve<BsplineCurve<Point3>> for RevolutionSurface<NurbsCurve<Vector4>> {
     fn include(&self, curve: &BsplineCurve<Point3>) -> bool {
-        let knots = curve.knot_vec().to_single_multi().0;
+        let knots = curve.knot_vector().to_single_multi().0;
         let degree = curve.degree() + usize::max(2, self.curve.degree());
         sub_include(self, curve, &knots, degree)
     }
 }
 
-impl IncludeCurve<NurbsCurve<Vector4>> for RevolutedCurve<&BsplineCurve<Point3>> {
+impl IncludeCurve<NurbsCurve<Vector4>> for RevolutionSurface<&BsplineCurve<Point3>> {
     fn include(&self, curve: &NurbsCurve<Vector4>) -> bool {
-        let knots = curve.knot_vec().to_single_multi().0;
+        let knots = curve.knot_vector().to_single_multi().0;
         let degree = curve.degree() + usize::max(2, self.curve.degree());
         sub_include(self, curve, &knots, degree)
     }
 }
 
-impl IncludeCurve<NurbsCurve<Vector4>> for RevolutedCurve<BsplineCurve<Point3>> {
+impl IncludeCurve<NurbsCurve<Vector4>> for RevolutionSurface<BsplineCurve<Point3>> {
     fn include(&self, curve: &NurbsCurve<Vector4>) -> bool {
-        let knots = curve.knot_vec().to_single_multi().0;
+        let knots = curve.knot_vector().to_single_multi().0;
         let degree = curve.degree() + usize::max(2, self.curve.degree());
         sub_include(self, curve, &knots, degree)
     }
 }
 
-impl IncludeCurve<NurbsCurve<Vector4>> for RevolutedCurve<&NurbsCurve<Vector4>> {
+impl IncludeCurve<NurbsCurve<Vector4>> for RevolutionSurface<&NurbsCurve<Vector4>> {
     fn include(&self, curve: &NurbsCurve<Vector4>) -> bool {
-        let knots = curve.knot_vec().to_single_multi().0;
+        let knots = curve.knot_vector().to_single_multi().0;
         let degree = curve.degree() + usize::max(2, self.curve.degree());
         sub_include(self, curve, &knots, degree)
     }
 }
 
-impl IncludeCurve<NurbsCurve<Vector4>> for RevolutedCurve<NurbsCurve<Vector4>> {
+impl IncludeCurve<NurbsCurve<Vector4>> for RevolutionSurface<NurbsCurve<Vector4>> {
     fn include(&self, curve: &NurbsCurve<Vector4>) -> bool {
-        let knots = curve.knot_vec().to_single_multi().0;
+        let knots = curve.knot_vector().to_single_multi().0;
         let degree = curve.degree() + usize::max(2, self.curve.degree());
         sub_include(self, curve, &knots, degree)
     }
 }
 
-impl<C> ParameterDivision2D for RevolutedCurve<C>
+impl<C> ParameterDivision2D for RevolutionSurface<C>
 where C: ParametricCurve3D + ParameterDivision1D<Point = Point3>
 {
     fn parameter_division(

@@ -61,27 +61,18 @@ impl<P> Iterator for TnurccAcwPointIter<P> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let ret = self.cur.as_ref().map(Arc::clone);
+        let edge = self.cur.as_ref()?;
+        let end = edge.read().point_end(Arc::clone(&self.point))?;
 
-        if let Some(edge) = self.cur.as_ref() {
-            // Is point the origin or dest?
-            let end = edge.read().point_end(Arc::clone(&self.point));
+        // Get the next ACW edge for point.
+        let new_edge = edge.read().acw_edge_from_end(end);
 
-            end?;
-            // SAFETY: we just checked that `end` is `Some` via `?`.
-            let end = end.unwrap();
-
-            // Get the next ACW edge for point
-            let new_edge = edge.read().acw_edge_from_end(end);
-
-            // If the new edge is the starting edge, stop the iterator by setting cur to none
-            // Otherwise, keep going
-            if std::ptr::eq(self.start.as_ref(), new_edge.as_ref()) {
-                self.cur = None;
-            } else {
-                self.cur = Some(new_edge);
-            }
+        // If the new edge is the starting edge, stop the iterator by setting `cur` to none.
+        // Otherwise, keep going.
+        if std::ptr::eq(self.start.as_ref(), new_edge.as_ref()) {
+            self.cur = None;
         } else {
-            return None;
+            self.cur = Some(new_edge);
         }
 
         ret
@@ -93,27 +84,18 @@ impl<P> Iterator for TnurccAcwFaceIter<P> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let ret = self.cur.as_ref().map(Arc::clone);
+        let edge = self.cur.as_ref()?;
+        let side = edge.read().face_side(Arc::clone(&self.face))?;
 
-        if let Some(edge) = self.cur.as_ref() {
-            // Is point the origin or dest?
-            let side = edge.read().face_side(Arc::clone(&self.face));
+        // Get the next ACW edge for point.
+        let new_edge = edge.read().acw_edge_from_side(side);
 
-            side?;
-            // SAFETY: we just checked that `side` is `Some` via `?`.
-            let side = side.unwrap();
-
-            // Get the next ACW edge for point
-            let new_edge = edge.read().acw_edge_from_side(side);
-
-            // If the new edge is the starting edge, stop the iterator by setting cur to none
-            // Otherwise, keep going
-            if std::ptr::eq(self.start.as_ref(), new_edge.as_ref()) {
-                self.cur = None;
-            } else {
-                self.cur = Some(new_edge);
-            }
+        // If the new edge is the starting edge, stop the iterator by setting `cur` to none.
+        // Otherwise, keep going.
+        if std::ptr::eq(self.start.as_ref(), new_edge.as_ref()) {
+            self.cur = None;
         } else {
-            return None;
+            self.cur = Some(new_edge);
         }
 
         ret

@@ -1,4 +1,5 @@
 use super::*;
+use monstertruck_topology::compress::*;
 
 impl Table {
     fn place_holder_edge_any_to_index_and_edge_curve(
@@ -144,6 +145,63 @@ impl Table {
         Some(edges)
     }
 
+    fn exact_trim_curve_on(
+        curve: &Curve3D,
+        surface: &Surface,
+        orientation: bool,
+    ) -> Option<step_geometry::Pcurve> {
+        let mut trim_curve =
+            step_geometry::Pcurve::try_from(step_geometry::CurveTrimRef::new(curve, surface))
+                .ok()?;
+        if !orientation {
+            trim_curve.invert();
+        }
+        Some(trim_curve)
+    }
+
+    fn face_bound_to_edge_uses(
+        &self,
+        bound: FaceBoundHolder,
+        face_surface: &Surface,
+        eidx_map: &HashMap<u64, usize>,
+    ) -> Option<Vec<CompressedEdgeUse<step_geometry::Pcurve>>> {
+        use PlaceHolder::Ref;
+        let ori = bound.orientation;
+        let bound = bound.bound_holder(self)?;
+        let mut edges = bound
+            .edge_list
+            .into_iter()
+            .filter_map(|edge| {
+                let Ref(Name::Entity(idx)) = edge else {
+                    return None;
+                };
+                let (edge_entity_idx, edge_curve_holder) =
+                    self.place_holder_edge_any_to_index_and_edge_curve(&Ref(Name::Entity(idx)))?;
+                let orientation = self
+                    .oriented_edge
+                    .get(&idx)
+                    .map(|oriented_edge| oriented_edge.orientation == ori)
+                    .unwrap_or(ori);
+                let curve = edge_curve_holder
+                    .into_owned(self)
+                    .map_err(|e| eprintln!("{e}"))
+                    .ok()?
+                    .parse_curve3d()
+                    .map_err(|e| eprintln!("{e}"))
+                    .ok()?;
+                Some(CompressedEdgeUse {
+                    index: *eidx_map.get(&edge_entity_idx)?,
+                    orientation,
+                    trim_curve: Self::exact_trim_curve_on(&curve, face_surface, orientation),
+                })
+            })
+            .collect::<Vec<_>>();
+        if !ori {
+            edges.reverse();
+        }
+        Some(edges)
+    }
+
     fn shell_faces(
         &self,
         shell: &ShellHolder,
@@ -179,6 +237,41 @@ impl Table {
             .collect()
     }
 
+    fn shell_trimmed_faces(
+        &self,
+        shell: &ShellHolder,
+        eidx_map: &HashMap<u64, usize>,
+    ) -> Vec<CompressedTrimmedFace<Surface, step_geometry::Pcurve>> {
+        shell
+            .cfs_faces_holder(self)
+            .filter_map(|face| self.face_any_to_orientation_and_face(face))
+            .filter_map(|(orientation, face)| {
+                let step_surface: SurfaceAny = face
+                    .face_geometry
+                    .clone()
+                    .into_owned(self)
+                    .map_err(|e| eprintln!("{e}"))
+                    .ok()?;
+                let mut surface = Surface::try_from(&step_surface)
+                    .map_err(|e| eprintln!("{e}"))
+                    .ok()?;
+                if !face.same_sense {
+                    surface.invert()
+                }
+                let boundaries = face
+                    .bounds_holder(self)
+                    .into_iter()
+                    .filter_map(|bound| self.face_bound_to_edge_uses(bound?, &surface, eidx_map))
+                    .collect();
+                Some(CompressedTrimmedFace {
+                    surface,
+                    boundaries,
+                    orientation,
+                })
+            })
+            .collect()
+    }
+
     /// Constructs `CompressedShell` from `Shell` in STEP file
     /// # Example
     /// ```
@@ -204,6 +297,18 @@ impl Table {
         shell.to_compressed_shell(self)
     }
 
+    /// Constructs `CompressedTrimmedShell` from `Shell` in STEP file while preserving
+    /// exact face-local `ParameterCurve`s when they are present in the STEP data.
+    pub fn to_compressed_trimmed_shell(
+        &self,
+        shell: &impl StepShell,
+    ) -> Result<
+        CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::Pcurve>,
+        StepConvertingError,
+    > {
+        shell.to_compressed_trimmed_shell(self)
+    }
+
     /// Constructs `CompressedShell`s from `ShellBasedSurfaceModel` in STEP file
     pub fn to_compressed_shells(
         &self,
@@ -218,6 +323,30 @@ impl Table {
                 res.push(self.to_compressed_shell(shell)?);
             } else if let Some(oriented_shell) = self.oriented_shell.get(idx) {
                 res.push(self.to_compressed_shell(oriented_shell)?);
+            } else {
+                return Err("failed to reference an element of `sbsm_boundary`".into());
+            }
+        }
+        Ok(res)
+    }
+
+    /// Constructs `CompressedTrimmedShell`s from `ShellBasedSurfaceModel` in STEP file.
+    pub fn to_compressed_trimmed_shells(
+        &self,
+        shells: &ShellBasedSurfaceModelHolder,
+    ) -> Result<
+        Vec<CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::Pcurve>>,
+        StepConvertingError,
+    > {
+        let mut res = Vec::new();
+        for place_holder in &shells.sbsm_boundary {
+            let PlaceHolder::Ref(Name::Entity(idx)) = place_holder else {
+                return Err("failed to reference an element of `sbsm_boundary`".into());
+            };
+            if let Some(shell) = self.shell.get(idx) {
+                res.push(self.to_compressed_trimmed_shell(shell)?);
+            } else if let Some(oriented_shell) = self.oriented_shell.get(idx) {
+                res.push(self.to_compressed_trimmed_shell(oriented_shell)?);
             } else {
                 return Err("failed to reference an element of `sbsm_boundary`".into());
             }
@@ -270,7 +399,68 @@ impl Table {
             };
             boundaries.push(self.to_compressed_shell(oriented_shell)?);
         }
-        Ok(CompressedSolid { boundaries })
+        Ok(CompressedSolid {
+            boundaries,
+            id_allocator: None,
+            attributes: None,
+        })
+    }
+
+    /// Constructs `CompressedTrimmedSolid` from `ManifoldSolidBrep` in STEP file.
+    pub fn to_compressed_trimmed_solid(
+        &self,
+        solid: &ManifoldSolidBrepHolder,
+    ) -> Result<
+        CompressedTrimmedSolid<Point3, Curve3D, Surface, step_geometry::Pcurve>,
+        StepConvertingError,
+    > {
+        let PlaceHolder::Ref(Name::Entity(outer_idx)) = &solid.outer else {
+            return Err("failed to reference `solid.outer`".into());
+        };
+        let outer_shell = if let Some(step_shell) = self.shell.get(outer_idx) {
+            self.to_compressed_trimmed_shell(step_shell)
+        } else if let Some(step_shell) = self.oriented_shell.get(outer_idx) {
+            self.to_compressed_trimmed_shell(step_shell)
+        } else {
+            Err("failed to reference `solid.outer`".into())
+        }?;
+        let mut boundaries = vec![outer_shell];
+        for inner in &solid.voids {
+            let PlaceHolder::Ref(Name::Entity(inner_idx)) = inner else {
+                return Err("failed to reference a member of `solid.voids`".into());
+            };
+            if let Some(shell) = self.shell.get(inner_idx) {
+                boundaries.push(self.to_compressed_trimmed_shell(shell)?);
+            } else if let Some(oriented_shell) = self.oriented_shell.get(inner_idx) {
+                boundaries.push(self.to_compressed_trimmed_shell(oriented_shell)?);
+            } else {
+                return Err("failed to reference a member of `solid.voids`".into());
+            }
+        }
+        Ok(CompressedTrimmedSolid { boundaries })
+    }
+
+    /// Extracts [`Curve3D`] curves from a [`GeometricCurveSet`].
+    ///
+    /// Returns `None` if the holder cannot be resolved or yields no curves.
+    /// Silently skips points and curves that fail conversion.
+    pub fn to_curve3d_set(&self, gcs: &GeometricCurveSetHolder) -> Option<Vec<Curve3D>> {
+        let owned = gcs.clone().into_owned(self).ok()?;
+        let curves: Vec<Curve3D> = owned
+            .elements
+            .iter()
+            .filter_map(|elem| match elem {
+                GeometricSetSelect::Curve(curve) => Curve3D::try_from(curve.as_ref())
+                    .map_err(|e| eprintln!("skipping curve in geometric_curve_set: {e}"))
+                    .ok(),
+                GeometricSetSelect::Point(_) => None,
+            })
+            .collect();
+        if curves.is_empty() {
+            None
+        } else {
+            Some(curves)
+        }
     }
 }
 
@@ -459,6 +649,14 @@ pub trait StepShell {
         &self,
         table: &Table,
     ) -> Result<CompressedShell<Point3, Curve3D, Surface>, StepConvertingError>;
+
+    fn to_compressed_trimmed_shell(
+        &self,
+        table: &Table,
+    ) -> Result<
+        CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::Pcurve>,
+        StepConvertingError,
+    >;
 }
 
 impl StepShell for ShellHolder {
@@ -472,6 +670,25 @@ impl StepShell for ShellHolder {
             vertices,
             edges,
             faces: table.shell_faces(self, &eidx_map),
+            vertex_stable_ids: None,
+            edge_stable_ids: None,
+            face_stable_ids: None,
+        })
+    }
+
+    fn to_compressed_trimmed_shell(
+        &self,
+        table: &Table,
+    ) -> Result<
+        CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::Pcurve>,
+        StepConvertingError,
+    > {
+        let (vertices, vidx_map) = table.shell_vertices(self);
+        let (edges, eidx_map) = table.shell_edges(self, &vidx_map);
+        Ok(CompressedTrimmedShell {
+            vertices,
+            edges,
+            faces: table.shell_trimmed_faces(self, &eidx_map),
         })
     }
 }
@@ -495,6 +712,28 @@ impl StepShell for OrientedShellHolder {
         }
         Ok(res)
     }
+
+    fn to_compressed_trimmed_shell(
+        &self,
+        table: &Table,
+    ) -> Result<
+        CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::Pcurve>,
+        StepConvertingError,
+    > {
+        let PlaceHolder::Ref(Name::Entity(idx)) = &self.shell_element else {
+            return Err("failed to reference shell".into());
+        };
+        let Some(shell) = table.shell.get(idx) else {
+            return Err("failed to reference shell".into());
+        };
+        let mut res = shell.to_compressed_trimmed_shell(table)?;
+        if !self.orientation {
+            res.faces.iter_mut().for_each(|face| {
+                face.orientation = !face.orientation;
+            });
+        }
+        Ok(res)
+    }
 }
 
 impl StepShell for ShellAnyHolder {
@@ -505,6 +744,19 @@ impl StepShell for ShellAnyHolder {
         match self {
             ShellAnyHolder::OrientedShell(shell) => shell.to_compressed_shell(table),
             ShellAnyHolder::Shell(shell) => shell.to_compressed_shell(table),
+        }
+    }
+
+    fn to_compressed_trimmed_shell(
+        &self,
+        table: &Table,
+    ) -> Result<
+        CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::Pcurve>,
+        StepConvertingError,
+    > {
+        match self {
+            ShellAnyHolder::OrientedShell(shell) => shell.to_compressed_trimmed_shell(table),
+            ShellAnyHolder::Shell(shell) => shell.to_compressed_trimmed_shell(table),
         }
     }
 }

@@ -338,14 +338,28 @@ ENDSEC;\n",
 }
 
 /// Display model with configurations
-#[derive(Clone, Debug)]
 pub struct StepModel<'a, P, C, S>(PreStepModel<'a, P, C, S>);
 
 /// Display models with configurations
-#[derive(Clone, Debug)]
 pub struct StepModels<'a, P, C, S> {
     models: Vec<PreStepModel<'a, P, C, S>>,
     next_idx: usize,
+}
+
+impl<P, C, S> Debug for StepModel<'_, P, C, S> {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
+        formatter.debug_tuple("StepModel").finish_non_exhaustive()
+    }
+}
+
+impl<P, C, S> Debug for StepModels<'_, P, C, S> {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
+        formatter
+            .debug_struct("StepModels")
+            .field("count", &self.models.len())
+            .field("next_idx", &self.next_idx)
+            .finish()
+    }
 }
 
 /// Display struct for outputting STEP file format with header.

@@ -43,7 +43,7 @@ impl Plane {
     /// );
     ///
     /// let pt = Point3::new(2.1, -6.5, 4.7);
-    /// let prm = plane.get_parameter(pt);
+    /// let prm = plane.parameter(pt);
     /// let rev = plane.origin()
     ///     + prm[0] * plane.u_axis()
     ///     + prm[1] * plane.v_axis()
@@ -51,7 +51,7 @@ impl Plane {
     /// assert_near!(pt, rev);
     /// ```
     #[inline(always)]
-    pub fn get_parameter(&self, pt: Point3) -> Vector3 {
+    pub fn parameter(&self, pt: Point3) -> Vector3 {
         let a = self.u_axis();
         let b = self.v_axis();
         let c = self.normal();
@@ -219,7 +219,7 @@ impl SearchParameter<D2> for Plane {
         _: H,
         _: usize,
     ) -> Option<(f64, f64)> {
-        let v = self.get_parameter(point);
+        let v = self.parameter(point);
         match v[2].so_small() {
             true => Some((v[0], v[1])),
             false => None,
@@ -236,7 +236,7 @@ impl SearchNearestParameter<D2> for Plane {
         _: H,
         _: usize,
     ) -> Option<(f64, f64)> {
-        let v = self.get_parameter(point);
+        let v = self.parameter(point);
         Some((v[0], v[1]))
     }
 }
@@ -252,4 +252,66 @@ impl From<Plane> for BsplineSurface<Point3> {
 
 impl ToSameGeometry<BsplineSurface<Point3>> for Plane {
     fn to_same_geometry(&self) -> BsplineSurface<Point3> { (*self).into() }
+}
+
+// -- v2 scalar-generic impls ------------------------------------------------
+
+use monstertruck_traits::v2;
+
+impl v2::ParametricSurface for Plane {
+    type Scalar = f64;
+    type Point = Point3;
+    type Vector = Vector3;
+
+    #[inline(always)]
+    fn evaluate(&self, u: f64, v: f64) -> Point3 {
+        self.o + u * (self.p - self.o) + v * (self.q - self.o)
+    }
+    #[inline(always)]
+    fn derivative_u(&self, _: f64, _: f64) -> Vector3 { self.p - self.o }
+    #[inline(always)]
+    fn derivative_v(&self, _: f64, _: f64) -> Vector3 { self.q - self.o }
+    #[inline(always)]
+    fn derivative_uu(&self, _: f64, _: f64) -> Vector3 { Vector3::zero() }
+    #[inline(always)]
+    fn derivative_uv(&self, _: f64, _: f64) -> Vector3 { Vector3::zero() }
+    #[inline(always)]
+    fn derivative_vv(&self, _: f64, _: f64) -> Vector3 { Vector3::zero() }
+    #[inline(always)]
+    fn period_u(&self) -> Option<f64> { None }
+    #[inline(always)]
+    fn period_v(&self) -> Option<f64> { None }
+}
+
+impl v2::BoundedSurface for Plane {
+    #[inline(always)]
+    fn range_tuple(&self) -> ((f64, f64), (f64, f64)) { ((0.0, 1.0), (0.0, 1.0)) }
+}
+
+impl v2::ParametricSurface3D for Plane {}
+
+impl v2::SearchNearestParameter<v2::D2<f64>> for Plane {
+    type Point = Point3;
+    #[inline(always)]
+    fn search_nearest_parameter<H: Into<v2::SearchParameterHint2D<f64>>>(
+        &self,
+        pt: Point3,
+        _: H,
+        trials: usize,
+    ) -> Option<(f64, f64)> {
+        SearchNearestParameter::<D2>::search_nearest_parameter(self, pt, None, trials)
+    }
+}
+
+impl v2::SearchParameter<v2::D2<f64>> for Plane {
+    type Point = Point3;
+    #[inline(always)]
+    fn search_parameter<H: Into<v2::SearchParameterHint2D<f64>>>(
+        &self,
+        pt: Point3,
+        _: H,
+        trials: usize,
+    ) -> Option<(f64, f64)> {
+        SearchParameter::<D2>::search_parameter(self, pt, None, trials)
+    }
 }

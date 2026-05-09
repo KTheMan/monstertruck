@@ -1,5 +1,74 @@
 use super::*;
-use crate::save::{FloatDisplay, StepDisplay, VectorAsDirection};
+use crate::load::{GeometricCurveSet, GeometricSetSelect};
+use crate::save::{FloatDisplay, IndexSliceDisplay, StepDisplay, StepLength, VectorAsDirection};
+
+impl save::DisplayByStep for SurfaceCurveAssociatedGeometry {
+    fn fmt(&self, idx: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SurfaceCurveAssociatedGeometry::ParameterCurve(curve) => curve.fmt(idx, f),
+            SurfaceCurveAssociatedGeometry::Surface(surface) => surface.fmt(idx, f),
+        }
+    }
+}
+
+impl save::StepLength for SurfaceCurveAssociatedGeometry {
+    fn step_length(&self) -> usize {
+        match self {
+            SurfaceCurveAssociatedGeometry::ParameterCurve(curve) => curve.step_length(),
+            SurfaceCurveAssociatedGeometry::Surface(surface) => surface.step_length(),
+        }
+    }
+}
+
+impl save::DisplayByStep for SurfaceCurve3D {
+    fn fmt(&self, idx: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let leader_idx = idx + 1;
+        let (associated_indices, _) = self.associated_geometry().iter().fold(
+            (
+                Vec::<usize>::with_capacity(self.associated_geometry().len()),
+                leader_idx + self.leader().step_length(),
+            ),
+            |(mut indices, cursor), entry| {
+                indices.push(cursor);
+                (indices, cursor + entry.step_length())
+            },
+        );
+        let entity = match self.kind() {
+            SurfaceCurveKind::Surface => "SURFACE_CURVE",
+            SurfaceCurveKind::Seam => "SEAM_CURVE",
+            SurfaceCurveKind::Intersection => "INTERSECTION_CURVE",
+        };
+        let master_representation = match self.master_representation() {
+            SurfaceCurveRepresentation::Curve3D => ".CURVE_3D.",
+            SurfaceCurveRepresentation::ParameterCurve0 => ".PCURVE_S1.",
+            SurfaceCurveRepresentation::ParameterCurve1 => ".PCURVE_S2.",
+        };
+        f.write_fmt(format_args!(
+            "#{idx} = {entity}('', #{leader_idx}, {associated_geometry}, {master_representation});\n",
+            associated_geometry = IndexSliceDisplay(associated_indices.iter().copied()),
+        ))?;
+        self.leader().fmt(leader_idx, f)?;
+        self.associated_geometry()
+            .iter()
+            .zip(associated_indices)
+            .try_for_each(|(entry, entry_idx)| entry.fmt(entry_idx, f))
+    }
+}
+
+impl save::StepLength for SurfaceCurve3D {
+    fn step_length(&self) -> usize {
+        1 + self.leader().step_length()
+            + self
+                .associated_geometry()
+                .iter()
+                .map(save::StepLength::step_length)
+                .sum::<usize>()
+    }
+}
+
+impl save::StepCurve for SurfaceCurve3D {
+    fn same_sense(&self) -> bool { self.leader().same_sense() }
+}
 
 impl save::ConstStepLength for Processor<Sphere, Matrix4> {
     const LENGTH: usize = Processor::<monstertruck_geometry::prelude::Sphere, Matrix4>::LENGTH;
@@ -74,5 +143,73 @@ impl save::DisplayByStep for ElementarySurface {
                 ))
             }
         }
+    }
+}
+
+/// Step length of a single [`GeometricSetSelect`] element.
+fn set_select_step_length(elem: &GeometricSetSelect) -> usize {
+    match elem {
+        GeometricSetSelect::Curve(c) => Curve3D::try_from(c.as_ref())
+            .map(|c3d| c3d.step_length())
+            .unwrap_or(0),
+        // Point3 has ConstStepLength = 1.
+        GeometricSetSelect::Point(_) => 1,
+    }
+}
+
+impl save::StepLength for GeometricCurveSet {
+    fn step_length(&self) -> usize {
+        // 1 for the GEOMETRIC_CURVE_SET entity + sum of element lengths.
+        1 + self
+            .elements
+            .iter()
+            .map(set_select_step_length)
+            .sum::<usize>()
+    }
+}
+
+impl save::DisplayByStep for GeometricCurveSet {
+    fn fmt(&self, idx: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Collect element start indices.
+        let mut cursor = idx + 1;
+        let element_indices: Vec<usize> = self
+            .elements
+            .iter()
+            .filter_map(|e| {
+                let len = set_select_step_length(e);
+                if len == 0 {
+                    return None;
+                }
+                let this = cursor;
+                cursor += len;
+                Some(this)
+            })
+            .collect();
+
+        // Write the GEOMETRIC_CURVE_SET entity.
+        f.write_fmt(format_args!(
+            "#{idx} = GEOMETRIC_CURVE_SET('{}', {});\n",
+            self.label,
+            IndexSliceDisplay(element_indices.into_iter()),
+        ))?;
+
+        // Write each element.
+        let mut cursor = idx + 1;
+        for elem in &self.elements {
+            match elem {
+                GeometricSetSelect::Curve(c) => {
+                    if let Ok(c3d) = Curve3D::try_from(c.as_ref()) {
+                        save::DisplayByStep::fmt(&c3d, cursor, f)?;
+                        cursor += c3d.step_length();
+                    }
+                }
+                GeometricSetSelect::Point(p) => {
+                    let pt = Point3::from(p.as_ref());
+                    save::DisplayByStep::fmt(&pt, cursor, f)?;
+                    cursor += 1;
+                }
+            }
+        }
+        Ok(())
     }
 }

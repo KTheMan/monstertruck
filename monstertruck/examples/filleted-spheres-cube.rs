@@ -15,8 +15,20 @@ use std::f64::consts::PI;
 /// Create a sphere solid centered at `center` with the given `radius`.
 fn sphere(center: Point3, radius: f64) -> Solid {
     let top = builder::vertex(Point3::new(0.0, radius, 0.0));
-    let wire: Wire = builder::revolve(&top, Point3::origin(), Vector3::unit_x(), Rad(PI), 3);
-    let shell = builder::cone(&wire, Vector3::unit_y(), Rad(7.0), 4);
+    let wire: Wire = builder::revolve(
+        &top,
+        Point3::origin(),
+        Vector3::unit_x(),
+        builder::SweepAngle::Partial(Rad(PI)),
+        3,
+    );
+    let shell = builder::revolve_wire(
+        &wire,
+        top.point(),
+        Vector3::unit_y(),
+        builder::SweepAngle::Closed,
+        4,
+    );
     let s = Solid::new(vec![shell]);
     builder::translated(&s, center.to_vec())
 }

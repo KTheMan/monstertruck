@@ -14,10 +14,16 @@ impl<V> NurbsSurface<V> {
     pub fn non_rationalized_mut(&mut self) -> &mut BsplineSurface<V> { &mut self.0 }
 
     /// Returns the nurbs surface before rationalized
+    #[deprecated(note = "use `BsplineSurface::from()` or `.into()` instead")]
     #[inline(always)]
-    pub fn into_non_rationalized(self) -> BsplineSurface<V> { self.0 }
+    pub fn into_non_rationalized(self) -> BsplineSurface<V> { self.into() }
 
-    /// Returns the reference of the knot vectors
+    /// Returns the reference of the knot vectors.
+    #[inline(always)]
+    pub const fn knot_vectors(&self) -> &(KnotVector, KnotVector) { &self.0.knot_vecs }
+
+    /// Renamed to [`knot_vectors`](Self::knot_vectors).
+    #[deprecated(note = "renamed to knot_vectors")]
     #[inline(always)]
     pub const fn knot_vecs(&self) -> &(KnotVector, KnotVector) { &self.0.knot_vecs }
 
@@ -226,7 +232,7 @@ impl<V: Homogeneous<Scalar = f64>> NurbsSurface<V> {
 impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>> NurbsSurface<V> {
     /// Returns the closure of substitution.
     #[inline(always)]
-    pub fn get_closure(&self) -> impl Fn(f64, f64) -> V::Point + '_ { move |u, v| self.subs(u, v) }
+    pub fn closure(&self) -> impl Fn(f64, f64) -> V::Point + '_ { move |u, v| self.subs(u, v) }
 }
 
 impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>> NurbsSurface<V>
@@ -613,12 +619,45 @@ impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>> ParametricSurfa
 }
 
 impl ParametricSurface3D for NurbsSurface<Vector4> {
-    #[inline(always)]
     fn normal(&self, u: f64, v: f64) -> Vector3 {
         let pt = self.0.evaluate(u, v);
         let ud = self.0.derivative_u(u, v);
         let vd = self.0.derivative_v(u, v);
-        rat_der(&[pt, ud]).cross(rat_der(&[pt, vd])).normalize()
+        let n = rat_der(&[pt, ud]).cross(rat_der(&[pt, vd]));
+        if n.magnitude2() > TOLERANCE2 {
+            return n.normalize();
+        }
+        // Degenerate point (e.g. pole of a revolution surface).
+        // Sample nearby non-degenerate points and average their normals.
+        let eps = 1.0e-4;
+        let kvu = self.0.knot_vector_u();
+        let kvv = self.0.knot_vector_v();
+        let u_lo = kvu[0];
+        let u_hi = kvu[kvu.len() - 1];
+        let v_lo = kvv[0];
+        let v_hi = kvv[kvv.len() - 1];
+        let mut sum = Vector3::zero();
+        let mut count = 0u32;
+        for &(du, dv) in &[(eps, 0.0), (-eps, 0.0), (0.0, eps), (0.0, -eps)] {
+            let u2 = (u + du).clamp(u_lo, u_hi);
+            let v2 = (v + dv).clamp(v_lo, v_hi);
+            if (u2 - u).abs() < eps * 0.5 && (v2 - v).abs() < eps * 0.5 {
+                continue; // Clamped back to the original point.
+            }
+            let pt2 = self.0.evaluate(u2, v2);
+            let ud2 = self.0.derivative_u(u2, v2);
+            let vd2 = self.0.derivative_v(u2, v2);
+            let n2 = rat_der(&[pt2, ud2]).cross(rat_der(&[pt2, vd2]));
+            if n2.magnitude2() > TOLERANCE2 {
+                sum += n2.normalize();
+                count += 1;
+            }
+        }
+        if count > 0 {
+            (sum / count as f64).normalize()
+        } else {
+            Vector3::unit_z()
+        }
     }
 }
 
@@ -638,10 +677,102 @@ where V::Point: MetricSpace<Metric = f64> + HashGen<f64>
 
 impl<V> BoundedSurface for NurbsSurface<V> where Self: ParametricSurface {}
 
+// -- v2 scalar-generic impls ------------------------------------------------
+
+use monstertruck_core::scalar::HasScalar;
+use monstertruck_traits::v2;
+
+impl<V> v2::ParametricSurface for NurbsSurface<V>
+where V: HasScalar<Scalar = f64> + Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>
+{
+    type Scalar = f64;
+    type Point = V::Point;
+    type Vector = <V::Point as EuclideanSpace>::Diff;
+
+    #[inline(always)]
+    fn evaluate(&self, u: Self::Scalar, v: Self::Scalar) -> Self::Point {
+        ParametricSurface::evaluate(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_u(&self, u: Self::Scalar, v: Self::Scalar) -> Self::Vector {
+        ParametricSurface::derivative_u(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_v(&self, u: Self::Scalar, v: Self::Scalar) -> Self::Vector {
+        ParametricSurface::derivative_v(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_uu(&self, u: Self::Scalar, v: Self::Scalar) -> Self::Vector {
+        ParametricSurface::derivative_uu(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_uv(&self, u: Self::Scalar, v: Self::Scalar) -> Self::Vector {
+        ParametricSurface::derivative_uv(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_vv(&self, u: Self::Scalar, v: Self::Scalar) -> Self::Vector {
+        ParametricSurface::derivative_vv(self, u, v)
+    }
+    #[inline(always)]
+    fn period_u(&self) -> Option<Self::Scalar> { ParametricSurface::u_period(self) }
+    #[inline(always)]
+    fn period_v(&self) -> Option<Self::Scalar> { ParametricSurface::v_period(self) }
+}
+
+impl<V> v2::BoundedSurface for NurbsSurface<V>
+where
+    V: HasScalar<Scalar = f64> + Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>,
+    Self: ParametricSurface + BoundedSurface,
+{
+    #[inline(always)]
+    fn range_tuple(&self) -> ((f64, f64), (f64, f64)) { BoundedSurface::range_tuple(self) }
+}
+
+impl v2::ParametricSurface3D for NurbsSurface<Vector4> {}
+
+impl<V> v2::SearchNearestParameter<v2::D2<f64>> for NurbsSurface<V>
+where
+    V: HasScalar<Scalar = f64> + Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>,
+    Self: ParametricSurface<Point = V::Point, Vector = <V::Point as EuclideanSpace>::Diff>,
+    V::Point: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64>,
+    <V::Point as EuclideanSpace>::Diff: SearchNearestParameterVector<Point = V::Point>,
+{
+    type Point = V::Point;
+    #[inline(always)]
+    fn search_nearest_parameter<H: Into<v2::SearchParameterHint2D<f64>>>(
+        &self,
+        pt: V::Point,
+        _: H,
+        trials: usize,
+    ) -> Option<(f64, f64)> {
+        SearchNearestParameter::<D2>::search_nearest_parameter(self, pt, None, trials)
+    }
+}
+
+impl<V> v2::SearchParameter<v2::D2<f64>> for NurbsSurface<V>
+where
+    V: HasScalar<Scalar = f64> + Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>,
+    V::Point: ControlPoint<f64, Diff = <V::Point as EuclideanSpace>::Diff>
+        + MetricSpace<Metric = f64>
+        + Tolerance,
+    <V::Point as EuclideanSpace>::Diff: SearchParameterVector<Point = V::Point>,
+{
+    type Point = V::Point;
+    #[inline(always)]
+    fn search_parameter<H: Into<v2::SearchParameterHint2D<f64>>>(
+        &self,
+        pt: V::Point,
+        _: H,
+        trials: usize,
+    ) -> Option<(f64, f64)> {
+        SearchParameter::<D2>::search_parameter(self, pt, None, trials)
+    }
+}
+
 impl IncludeCurve<NurbsCurve<Vector3>> for NurbsSurface<Vector3> {
     #[inline(always)]
     fn include(&self, curve: &NurbsCurve<Vector3>) -> bool {
-        let pt = curve.subs(curve.knot_vec()[0]);
+        let pt = curve.subs(curve.knot_vector()[0]);
         let mut hint = match self.search_parameter(pt, None, INCLUDE_CURVE_TRIALS) {
             Some(got) => got,
             None => return false,
@@ -649,7 +780,7 @@ impl IncludeCurve<NurbsCurve<Vector3>> for NurbsSurface<Vector3> {
         let knot_vector_u = self.knot_vector_u();
         let knot_vector_v = self.knot_vector_v();
         let degree = curve.degree() * 6;
-        let (knots, _) = curve.knot_vec().to_single_multi();
+        let (knots, _) = curve.knot_vector().to_single_multi();
         for i in 1..knots.len() {
             for j in 1..=degree {
                 let p = j as f64 / degree as f64;
@@ -684,7 +815,7 @@ impl IncludeCurve<BsplineCurve<Point3>> for NurbsSurface<Vector4> {
         let knot_vector_u = self.knot_vector_u();
         let knot_vector_v = self.knot_vector_v();
         let degree = curve.degree() * 6;
-        let (knots, _) = curve.knot_vec().to_single_multi();
+        let (knots, _) = curve.knot_vector().to_single_multi();
         for i in 1..knots.len() {
             for j in 1..=degree {
                 let p = j as f64 / degree as f64;
@@ -719,7 +850,7 @@ impl IncludeCurve<NurbsCurve<Vector4>> for NurbsSurface<Vector4> {
         let knot_vector_u = self.knot_vector_u();
         let knot_vector_v = self.knot_vector_v();
         let degree = curve.degree() * 6;
-        let (knots, _) = curve.knot_vec().to_single_multi();
+        let (knots, _) = curve.knot_vector().to_single_multi();
         for i in 1..knots.len() {
             for j in 1..=degree {
                 let p = j as f64 / degree as f64;
@@ -815,6 +946,11 @@ impl<V: Homogeneous<Scalar = f64>> From<BsplineSurface<V::Point>> for NurbsSurfa
             control_points,
         })
     }
+}
+
+impl<V> From<NurbsSurface<V>> for BsplineSurface<V> {
+    #[inline(always)]
+    fn from(nurbs: NurbsSurface<V>) -> Self { nurbs.0 }
 }
 
 #[test]

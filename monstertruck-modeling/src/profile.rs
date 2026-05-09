@@ -242,7 +242,7 @@ where
     S: Invertible + Transformed<Matrix4>,
     Plane: IncludeCurve<C> + ToSameGeometry<S>,
     Line<Point3>: ToSameGeometry<C>,
-    ExtrudedCurve<C, Vector3>: ToSameGeometry<S>,
+    ExtrusionSurface<C, Vector3>: ToSameGeometry<S>,
 {
     let face = attach_plane_normalized(wires)?;
     let solid: monstertruck_topology::Solid<Point3, C, S> = crate::builder::extrude(&face, dir);

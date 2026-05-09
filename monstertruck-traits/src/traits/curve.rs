@@ -54,7 +54,7 @@ pub trait ParametricCurve: Clone {
     #[inline(always)]
     fn try_range_tuple(&self) -> Option<(f64, f64)> {
         let (x, y) = self.parameter_range();
-        bound2opt(x).and_then(move |x| bound2opt(y).map(move |y| (x, y)))
+        bound2opt(x).zip(bound2opt(y))
     }
     /// `None` in default implementation; `Some(period)` if periodic.
     #[inline(always)]
@@ -188,6 +188,85 @@ impl<C: ParameterDivision1D> ParameterDivision1D for Box<C> {
     type Point = C::Point;
     fn parameter_division(&self, range: (f64, f64), tol: f64) -> (Vec<f64>, Vec<Self::Point>) {
         (**self).parameter_division(range, tol)
+    }
+}
+
+/// Face-local 2D trim of a 3D curve on a given surface.
+pub trait ParameterBoundary2D<S> {
+    /// Returns the boundary polyline in the parameter domain of `surface`.
+    ///
+    /// Returns `None` when `self` does not carry an exact boundary on `surface`.
+    fn parameter_boundary_2d(&self, _surface: &S, _tolerance: f64) -> Option<Vec<Point2>> { None }
+}
+
+/// Exact face-local trim of a 3D curve on a given surface.
+pub trait ExactParameterBoundary2D<S> {
+    /// The exact face-local boundary curve type carried by `self`.
+    ///
+    /// This is a curve-on-surface object in 3D, not a raw UV primitive.
+    type BoundaryCurve: ParametricCurve3D<Point = Point3>
+        + BoundedCurve<Point = Point3>
+        + SearchNearestParameter<D1, Point = Point3>
+        + Cut
+        + Clone
+        + Invertible;
+
+    /// Returns the exact boundary curve in the parameter domain of `surface`.
+    ///
+    /// Returns `None` when `self` does not carry an exact trim on `surface`.
+    fn exact_parameter_boundary_2d(&self, _surface: &S) -> Option<Self::BoundaryCurve> { None }
+}
+
+/// Builds a face-local boundary curve from sampled parameter-space points.
+pub trait BoundaryCurveFromSamples<S>: Sized {
+    /// Creates a boundary curve on `surface` from sampled [`Point2`] values.
+    ///
+    /// Returns `None` when the sample set is not usable for this boundary
+    /// curve representation.
+    fn boundary_curve_from_samples(surface: &S, points: Vec<Point2>) -> Option<Self>;
+}
+
+impl<C, S> ParameterBoundary2D<S> for &C
+where C: ParameterBoundary2D<S>
+{
+    fn parameter_boundary_2d(&self, surface: &S, tolerance: f64) -> Option<Vec<Point2>> {
+        (*self).parameter_boundary_2d(surface, tolerance)
+    }
+}
+
+impl<C, S> ParameterBoundary2D<S> for Box<C>
+where C: ParameterBoundary2D<S>
+{
+    fn parameter_boundary_2d(&self, surface: &S, tolerance: f64) -> Option<Vec<Point2>> {
+        (**self).parameter_boundary_2d(surface, tolerance)
+    }
+}
+
+impl<C, S> ExactParameterBoundary2D<S> for &C
+where C: ExactParameterBoundary2D<S>
+{
+    type BoundaryCurve = C::BoundaryCurve;
+
+    fn exact_parameter_boundary_2d(&self, surface: &S) -> Option<Self::BoundaryCurve> {
+        (*self).exact_parameter_boundary_2d(surface)
+    }
+}
+
+impl<C, S> ExactParameterBoundary2D<S> for Box<C>
+where C: ExactParameterBoundary2D<S>
+{
+    type BoundaryCurve = C::BoundaryCurve;
+
+    fn exact_parameter_boundary_2d(&self, surface: &S) -> Option<Self::BoundaryCurve> {
+        (**self).exact_parameter_boundary_2d(surface)
+    }
+}
+
+impl<C, S> BoundaryCurveFromSamples<S> for Box<C>
+where C: BoundaryCurveFromSamples<S>
+{
+    fn boundary_curve_from_samples(surface: &S, points: Vec<Point2>) -> Option<Self> {
+        C::boundary_curve_from_samples(surface, points).map(Box::new)
     }
 }
 
@@ -366,6 +445,18 @@ impl<C> From<CurveCollector<C>> for Option<C> {
 pub trait Cut: BoundedCurve {
     /// Cuts one curve into two curves. Assigns the former curve to `self` and returns the later curve.
     fn cut(&mut self, t: f64) -> Self;
+}
+
+/// Aligns endpoint evaluation hints with resolved 3D vertices.
+pub trait SnapCurveEndpoints {
+    /// Updates endpoint-specific state to match resolved vertices.
+    fn snap_endpoints(&mut self, _front: Point3, _back: Point3) {}
+}
+
+impl<C: SnapCurveEndpoints> SnapCurveEndpoints for Box<C> {
+    fn snap_endpoints(&mut self, front: Point3, back: Point3) {
+        (**self).snap_endpoints(front, back);
+    }
 }
 
 /// positive test implementation for `ParameterTransform` by random transformation

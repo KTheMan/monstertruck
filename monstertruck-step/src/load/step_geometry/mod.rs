@@ -22,17 +22,163 @@ pub type Parabola<P, M> = Processor<TrimmedCurve<UnitParabola<P>>, M>;
 /// `spherical_surface`, realized in `monstertruck`
 pub type SphericalSurface = Processor<Sphere, Matrix4>;
 /// `cylindrical_surface`, realized in `monstertruck`
-pub type CylindricalSurface = Processor<RevolutedCurve<Line<Point3>>, Matrix4>;
+pub type CylindricalSurface = Processor<RevolutionSurface<Line<Point3>>, Matrix4>;
 /// `toroidal_surface`, realized in `monstertruck`
 pub type ToroidalSurface = Processor<Torus, Matrix4>;
 /// `conical_surface`, realized in `monstertruck`
-pub type ConicalSurface = Processor<RevolutedCurve<Line<Point3>>, Matrix4>;
+pub type ConicalSurface = Processor<RevolutionSurface<Line<Point3>>, Matrix4>;
 /// `surface_of_linear_extrusion`, realized in `monstertruck`
-pub type StepExtrudedCurve = ExtrudedCurve<Curve3D, Vector3>;
+pub type StepExtrusionSurface = ExtrusionSurface<Curve3D, Vector3>;
 /// `surface_of_revolution`, realized in `monstertruck`
-pub type StepRevolutedCurve = Processor<RevolutedCurve<Curve3D>, Matrix4>;
+pub type StepRevolutionSurface = Processor<RevolutionSurface<Curve3D>, Matrix4>;
 /// `pcurve`, realized in `monstertruck`
 pub type Pcurve = monstertruck_geometry::prelude::ParameterCurve<Box<Curve2D>, Box<Surface>>;
+
+/// STEP `surface_curve` trim lookup on a specific surface.
+#[derive(Clone, Copy, Debug)]
+pub struct SurfaceCurveTrimRef<'a> {
+    curve: &'a SurfaceCurve3D,
+    surface: &'a Surface,
+}
+
+impl<'a> SurfaceCurveTrimRef<'a> {
+    /// Creates a new trim lookup reference.
+    pub const fn new(curve: &'a SurfaceCurve3D, surface: &'a Surface) -> Self {
+        Self { curve, surface }
+    }
+
+    /// Returns the referenced STEP `surface_curve`.
+    pub const fn curve(self) -> &'a SurfaceCurve3D { self.curve }
+
+    /// Returns the target surface.
+    pub const fn surface(self) -> &'a Surface { self.surface }
+}
+
+/// STEP curve trim lookup on a specific surface.
+#[derive(Clone, Copy, Debug)]
+pub struct CurveTrimRef<'a> {
+    curve: &'a Curve3D,
+    surface: &'a Surface,
+}
+
+impl<'a> CurveTrimRef<'a> {
+    /// Creates a new trim lookup reference.
+    pub const fn new(curve: &'a Curve3D, surface: &'a Surface) -> Self { Self { curve, surface } }
+
+    /// Returns the referenced curve.
+    pub const fn curve(self) -> &'a Curve3D { self.curve }
+
+    /// Returns the target surface.
+    pub const fn surface(self) -> &'a Surface { self.surface }
+}
+
+/// Preferred master representation for a STEP `surface_curve`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SurfaceCurveRepresentation {
+    Curve3D,
+    ParameterCurve0,
+    ParameterCurve1,
+}
+
+/// STEP `surface_curve` flavor.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SurfaceCurveKind {
+    Surface,
+    Seam,
+    Intersection,
+}
+
+/// Associated geometry entry of a STEP `surface_curve`.
+#[derive(Clone, Debug, PartialEq, From, Serialize, Deserialize)]
+pub enum SurfaceCurveAssociatedGeometry {
+    ParameterCurve(Pcurve),
+    Surface(Box<Surface>),
+}
+
+/// STEP `surface_curve` with preserved associated trim geometry.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SurfaceCurve3D {
+    kind: SurfaceCurveKind,
+    leader: Box<Curve3D>,
+    associated_geometry: Vec<SurfaceCurveAssociatedGeometry>,
+    master_representation: SurfaceCurveRepresentation,
+}
+
+impl SurfaceCurve3D {
+    pub(crate) fn same_surface(lhs: &Surface, rhs: &Surface) -> bool {
+        if lhs == rhs {
+            true
+        } else if let (Some((lu0, lu1)), Some((lv0, lv1)), Some((ru0, ru1)), Some((rv0, rv1))) = (
+            lhs.try_range_tuple().0,
+            lhs.try_range_tuple().1,
+            rhs.try_range_tuple().0,
+            rhs.try_range_tuple().1,
+        ) {
+            [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0), (0.5, 0.5)]
+                .into_iter()
+                .all(|(s, t)| {
+                    let lp = lhs.subs(lu0 + (lu1 - lu0) * s, lv0 + (lv1 - lv0) * t);
+                    let rp = rhs.subs(ru0 + (ru1 - ru0) * s, rv0 + (rv1 - rv0) * t);
+                    lp.near(&rp)
+                })
+        } else {
+            false
+        }
+    }
+
+    /// Creates a new STEP `surface_curve`.
+    pub fn new(
+        kind: SurfaceCurveKind,
+        leader: Box<Curve3D>,
+        associated_geometry: Vec<SurfaceCurveAssociatedGeometry>,
+        master_representation: SurfaceCurveRepresentation,
+    ) -> Self {
+        Self {
+            kind,
+            leader,
+            associated_geometry,
+            master_representation,
+        }
+    }
+
+    /// Returns the STEP `surface_curve` flavor.
+    pub fn kind(&self) -> SurfaceCurveKind { self.kind }
+
+    /// Returns the master representation.
+    pub fn master_representation(&self) -> SurfaceCurveRepresentation { self.master_representation }
+
+    /// Returns the 3D leader curve.
+    pub fn leader(&self) -> &Curve3D { self.leader.as_ref() }
+
+    /// Returns the mutable 3D leader curve.
+    pub fn leader_mut(&mut self) -> &mut Curve3D { self.leader.as_mut() }
+
+    /// Returns the associated geometries.
+    pub fn associated_geometry(&self) -> &[SurfaceCurveAssociatedGeometry] {
+        &self.associated_geometry
+    }
+
+    /// Returns the first associated `ParameterCurve` whose basis surface matches `surface`.
+    pub fn parameter_curve_on(&self, surface: &Surface) -> Option<&Pcurve> {
+        self.associated_geometry
+            .iter()
+            .find_map(|entry| match entry {
+                SurfaceCurveAssociatedGeometry::ParameterCurve(curve)
+                    if Self::same_surface(curve.surface().as_ref(), surface) =>
+                {
+                    Some(curve)
+                }
+                _ => None,
+            })
+    }
+}
+
+/// Renamed to [`StepExtrusionSurface`].
+#[deprecated(note = "renamed to StepExtrusionSurface")]
+pub type StepExtrudedCurve = StepExtrusionSurface;
+/// Renamed to [`StepRevolutionSurface`].
+#[deprecated(note = "renamed to StepRevolutionSurface")]
+pub type StepRevolutedCurve = StepRevolutionSurface;
 
 /// `conic` in 2D, realized in `monstertruck`
 #[derive(
@@ -132,7 +278,6 @@ pub enum Conic3D {
     BoundedCurve,
     Cut,
     Invertible,
-    ParameterDivision1D,
     SearchParameterD1,
     SearchNearestParameterD1,
     TransformedM4,
@@ -147,6 +292,8 @@ pub enum Curve3D {
     Conic(Conic3D),
     BsplineCurve(BsplineCurve<Point3>),
     Pcurve(Pcurve),
+    SurfaceCurve(SurfaceCurve3D),
+    IntersectionCurve(IntersectionCurve<Box<Curve3D>, Box<Surface>, Box<Surface>>),
     NurbsCurve(NurbsCurve<Vector4>),
 }
 
@@ -195,9 +342,9 @@ pub enum ElementarySurface {
     DisplayByStep,
     StepSurface,
 )]
-pub enum SweptCurve {
-    ExtrudedCurve(StepExtrudedCurve),
-    RevolutedCurve(StepRevolutedCurve),
+pub enum SweepSurface {
+    ExtrusionSurface(StepExtrusionSurface),
+    RevolutionSurface(StepRevolutionSurface),
 }
 
 /// `surface`, realized in `monstertruck`
@@ -220,7 +367,7 @@ pub enum SweptCurve {
 )]
 pub enum Surface {
     ElementarySurface(ElementarySurface),
-    SweptCurve(SweptCurve),
+    SweepSurface(SweepSurface),
     BsplineSurface(BsplineSurface<Point3>),
     NurbsSurface(NurbsSurface<Vector4>),
 }
@@ -230,7 +377,7 @@ impl save::DisplayByStep for Surface {
         use Surface::*;
         match self {
             ElementarySurface(x) => x.fmt(idx, f),
-            SweptCurve(x) => x.fmt(idx, f),
+            SweepSurface(x) => x.fmt(idx, f),
             BsplineSurface(x) => x.fmt(idx, f),
             NurbsSurface(x) => x.fmt(idx, f),
         }

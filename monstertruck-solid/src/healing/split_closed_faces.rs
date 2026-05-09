@@ -130,6 +130,7 @@ fn non_closed_wires_in_param_divisor<C, S>(
         edges,
         faces,
         vertices,
+        ..
     }: &mut Shell<Point3, C, S>,
     poly_edges: &[PolylineCurve<Point3>],
     sp: impl SP<S>,
@@ -264,6 +265,7 @@ fn take_vertices_to_intersections<C, S>(
         vertices,
         edges,
         faces,
+        ..
     }: &mut Shell<Point3, C, S>,
     poly_edges: &mut Vec<PolylineCurve<Point3>>,
     sp: impl SP<S>,

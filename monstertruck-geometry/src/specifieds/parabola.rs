@@ -137,6 +137,95 @@ impl SearchParameter<D1> for UnitParabola<Point3> {
     }
 }
 
+// -- v2 scalar-generic impls ------------------------------------------------
+
+use monstertruck_traits::v2;
+
+impl v2::ParametricCurve for UnitParabola<Point2> {
+    type Scalar = f64;
+    type Point = Point2;
+    type Vector = Vector2;
+
+    #[inline]
+    fn evaluate(&self, t: f64) -> Point2 { Point2::new(t * t, 2.0 * t) }
+    #[inline]
+    fn derivative(&self, t: f64) -> Vector2 { Vector2::new(2.0 * t, 2.0) }
+    #[inline]
+    fn derivative_2(&self, _: f64) -> Vector2 { Vector2::new(2.0, 0.0) }
+    #[inline]
+    fn derivative_n(&self, n: usize, t: f64) -> Vector2 {
+        match n {
+            0 => Vector2::new(t * t, 2.0 * t),
+            1 => Vector2::new(2.0 * t, 2.0),
+            2 => Vector2::new(2.0, 0.0),
+            _ => Vector2::zero(),
+        }
+    }
+    #[inline]
+    fn period(&self) -> Option<f64> { None }
+    #[inline]
+    fn try_range_tuple(&self) -> Option<(f64, f64)> { None }
+}
+
+impl v2::ParametricCurve for UnitParabola<Point3> {
+    type Scalar = f64;
+    type Point = Point3;
+    type Vector = Vector3;
+
+    #[inline]
+    fn evaluate(&self, t: f64) -> Point3 { Point3::new(t * t, 2.0 * t, 0.0) }
+    #[inline]
+    fn derivative(&self, t: f64) -> Vector3 { Vector3::new(2.0 * t, 2.0, 0.0) }
+    #[inline]
+    fn derivative_2(&self, _: f64) -> Vector3 { Vector3::new(2.0, 0.0, 0.0) }
+    #[inline]
+    fn derivative_n(&self, n: usize, t: f64) -> Vector3 {
+        match n {
+            0 => Vector3::new(t * t, 2.0 * t, 0.0),
+            1 => Vector3::new(2.0 * t, 2.0, 0.0),
+            2 => Vector3::new(2.0, 0.0, 0.0),
+            _ => Vector3::zero(),
+        }
+    }
+    #[inline]
+    fn period(&self) -> Option<f64> { None }
+    #[inline]
+    fn try_range_tuple(&self) -> Option<(f64, f64)> { None }
+}
+
+macro_rules! impl_v2_parabola_search {
+    ($point:ty) => {
+        impl v2::SearchNearestParameter<v2::D1<f64>> for UnitParabola<$point> {
+            type Point = $point;
+            #[inline]
+            fn search_nearest_parameter<H: Into<v2::SearchParameterHint1D<f64>>>(
+                &self,
+                pt: $point,
+                _: H,
+                _: usize,
+            ) -> Option<f64> {
+                SearchNearestParameter::<D1>::search_nearest_parameter(self, pt, None, 0)
+            }
+        }
+
+        impl v2::SearchParameter<v2::D1<f64>> for UnitParabola<$point> {
+            type Point = $point;
+            #[inline]
+            fn search_parameter<H: Into<v2::SearchParameterHint1D<f64>>>(
+                &self,
+                pt: $point,
+                _: H,
+                _: usize,
+            ) -> Option<f64> {
+                SearchParameter::<D1>::search_parameter(self, pt, None, 0)
+            }
+        }
+    };
+}
+
+impl_v2_parabola_search!(Point2);
+impl_v2_parabola_search!(Point3);
+
 #[test]
 fn snp_test() {
     let curve = UnitParabola::<Point2>::new();

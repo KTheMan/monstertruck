@@ -15,8 +15,26 @@ impl<P> Vertex<P> {
     pub fn new(point: P) -> Vertex<P> {
         Vertex {
             point: Arc::new(Mutex::new(point)),
+            stable_id: StableId::UNASSIGNED,
         }
     }
+
+    /// Creates a vertex with an explicit [`StableId`].
+    #[inline(always)]
+    pub fn new_with_id(point: P, stable_id: StableId) -> Vertex<P> {
+        Vertex {
+            point: Arc::new(Mutex::new(point)),
+            stable_id,
+        }
+    }
+
+    /// Returns the stable persistent identifier of this vertex.
+    #[inline(always)]
+    pub fn stable_id(&self) -> StableId { self.stable_id }
+
+    /// Sets the stable persistent identifier of this vertex.
+    #[inline(always)]
+    pub fn set_stable_id(&mut self, id: StableId) { self.stable_id = id; }
 
     /// Creates `len` distinct vertices and return them by vector.
     /// # Examples
@@ -70,7 +88,10 @@ impl<P> Vertex<P> {
         &self,
         mut point_mapping: impl FnMut(&P) -> Option<Q>,
     ) -> Option<Vertex<Q>> {
-        Some(Vertex::new(point_mapping(&*self.point.lock())?))
+        Some(Vertex::new_with_id(
+            point_mapping(&*self.point.lock())?,
+            self.stable_id,
+        ))
     }
 
     /// Returns vertex whose point is converted by `point_mapping`.
@@ -87,7 +108,7 @@ impl<P> Vertex<P> {
     #[doc(hidden)]
     #[inline(always)]
     pub fn mapped<Q>(&self, mut point_mapping: impl FnMut(&P) -> Q) -> Vertex<Q> {
-        Vertex::new(point_mapping(&*self.point.lock()))
+        Vertex::new_with_id(point_mapping(&*self.point.lock()), self.stable_id)
     }
 
     /// Returns the id of the vertex.
@@ -156,6 +177,7 @@ impl<P> Clone for Vertex<P> {
     fn clone(&self) -> Vertex<P> {
         Vertex {
             point: Arc::clone(&self.point),
+            stable_id: self.stable_id,
         }
     }
 }
@@ -188,8 +210,91 @@ impl<P: Debug> Debug for DebugDisplay<'_, Vertex<P>, VertexDisplayFormat> {
                 .field(&MutexFmt(&self.entity.point))
                 .finish(),
             VertexDisplayFormat::AsPoint => {
-                f.write_fmt(format_args!("{:?}", &MutexFmt(&self.entity.point)))
+                f.write_fmt(format_args!("{:?}", MutexFmt(&self.entity.point)))
             }
         }
     }
+}
+
+#[test]
+fn vertex_stable_id_survives_clone() {
+    let mut alloc = StableIdAllocator::new();
+    let v = Vertex::new_with_id((), alloc.allocate());
+    let v2 = v.clone();
+    assert_eq!(v.stable_id(), v2.stable_id());
+    assert!(v.stable_id().is_assigned());
+}
+
+#[test]
+fn vertex_default_stable_id_is_unassigned() {
+    let v = Vertex::new(());
+    assert!(!v.stable_id().is_assigned());
+    assert_eq!(v.stable_id(), StableId::UNASSIGNED);
+}
+
+#[test]
+fn edge_stable_id_survives_inverse() {
+    let v = Vertex::news([(), ()]);
+    let mut edge = Edge::new(&v[0], &v[1], ());
+    edge.set_stable_id(StableId::new(42));
+    let inv = edge.inverse();
+    assert_eq!(edge.stable_id(), inv.stable_id());
+}
+
+#[test]
+fn face_stable_id_survives_clone() {
+    use crate::Wire;
+    let v = Vertex::news([(), (), ()]);
+    let wire = Wire::from(vec![
+        Edge::new(&v[0], &v[1], ()),
+        Edge::new(&v[1], &v[2], ()),
+        Edge::new(&v[2], &v[0], ()),
+    ]);
+    let mut face = Face::new(vec![wire], ());
+    face.set_stable_id(StableId::new(99));
+    let face2 = face.clone();
+    assert_eq!(face.stable_id(), face2.stable_id());
+}
+
+#[test]
+fn solid_alloc_id() {
+    let v = Vertex::news([(); 8]);
+    let edge = [
+        Edge::new(&v[0], &v[1], ()),
+        Edge::new(&v[1], &v[2], ()),
+        Edge::new(&v[2], &v[3], ()),
+        Edge::new(&v[3], &v[0], ()),
+        Edge::new(&v[0], &v[4], ()),
+        Edge::new(&v[1], &v[5], ()),
+        Edge::new(&v[2], &v[6], ()),
+        Edge::new(&v[3], &v[7], ()),
+        Edge::new(&v[4], &v[5], ()),
+        Edge::new(&v[5], &v[6], ()),
+        Edge::new(&v[6], &v[7], ()),
+        Edge::new(&v[7], &v[4], ()),
+    ];
+    let wire0 = wire![&edge[0], &edge[1], &edge[2], &edge[3]];
+    let wire1 = wire![&edge[4], &edge[8], &edge[5].inverse(), &edge[0].inverse()];
+    let wire2 = wire![&edge[5], &edge[9], &edge[6].inverse(), &edge[1].inverse()];
+    let wire3 = wire![&edge[6], &edge[10], &edge[7].inverse(), &edge[2].inverse()];
+    let wire4 = wire![&edge[7], &edge[11], &edge[4].inverse(), &edge[3].inverse()];
+    let wire5 = wire![
+        &edge[11].inverse(),
+        &edge[10].inverse(),
+        &edge[9].inverse(),
+        &edge[8].inverse(),
+    ];
+    let face0 = Face::new(vec![wire0], ());
+    let face1 = Face::new(vec![wire1], ());
+    let face2 = Face::new(vec![wire2], ());
+    let face3 = Face::new(vec![wire3], ());
+    let face4 = Face::new(vec![wire4], ());
+    let face5 = Face::new(vec![wire5], ());
+    let shell: Shell<(), (), ()> = vec![face0, face1, face2, face3, face4, face5].into();
+    let mut solid = Solid::new(vec![shell]);
+    let a = solid.alloc_id();
+    let b = solid.alloc_id();
+    assert_ne!(a, b);
+    assert_eq!(a.raw(), 1);
+    assert_eq!(b.raw(), 2);
 }

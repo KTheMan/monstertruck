@@ -179,10 +179,7 @@ impl SubStructureFilter for PolygonMesh {
         n /= n.magnitude();
         let vec2 = self.positions()[face1[k].pos] - self.positions()[face0[0].pos];
         let mat = Matrix3::from_cols(vec0, vec1, n);
-        let coef = match mat.invert() {
-            Some(inv) => inv * vec2,
-            None => return None,
-        };
+        let coef = mat.invert()? * vec2;
 
         if coef[2] > plane_tol {
             None

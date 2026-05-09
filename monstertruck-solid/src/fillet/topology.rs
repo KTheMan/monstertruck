@@ -309,8 +309,8 @@ pub(super) fn concat_fillet_surface(
     let long_beziers = (0..len).map(concat_beziers).collect::<Option<Vec<_>>>()?;
 
     let knot_vector_u = surfaces[0].knot_vector_u().clone();
-    let knot_vector_v = long_beziers[0].knot_vec().clone();
-    let destruct_bezier = |bezier: NurbsCurve<Vector4>| bezier.into_non_rationalized().destruct().1;
+    let knot_vector_v = long_beziers[0].knot_vector().clone();
+    let destruct_bezier = |bezier: NurbsCurve<Vector4>| BsplineCurve::from(bezier).destruct().1;
     let control_points = long_beziers.into_iter().map(destruct_bezier).collect();
     Some(NurbsSurface::new(BsplineSurface::new(
         (knot_vector_u, knot_vector_v),

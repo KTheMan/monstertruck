@@ -109,6 +109,14 @@ pub struct StructuredMesh {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolylineCurve<P>(pub Vec<P>);
 
+impl<S> ParameterBoundary2D<S> for PolylineCurve<Point3> {}
+
+impl<P: monstertruck_core::DeterministicContentHash> monstertruck_core::DeterministicContentHash
+    for PolylineCurve<P>
+{
+    fn content_hash<H: std::hash::Hasher>(&self, state: &mut H) { self.0.content_hash(state); }
+}
+
 mod attributes;
 /// Defines errors
 pub mod errors;

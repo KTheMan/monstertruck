@@ -121,6 +121,76 @@ impl ParametricSurface3D for Torus {
 
 impl BoundedSurface for Torus {}
 
+// -- v2 scalar-generic impls ------------------------------------------------
+
+use monstertruck_traits::v2;
+
+impl v2::ParametricSurface for Torus {
+    type Scalar = f64;
+    type Point = Point3;
+    type Vector = Vector3;
+
+    #[inline(always)]
+    fn evaluate(&self, u: f64, v: f64) -> Point3 { ParametricSurface::evaluate(self, u, v) }
+    #[inline(always)]
+    fn derivative_u(&self, u: f64, v: f64) -> Vector3 {
+        ParametricSurface::derivative_u(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_v(&self, u: f64, v: f64) -> Vector3 {
+        ParametricSurface::derivative_v(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_uu(&self, u: f64, v: f64) -> Vector3 {
+        ParametricSurface::derivative_uu(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_uv(&self, u: f64, v: f64) -> Vector3 {
+        ParametricSurface::derivative_uv(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_vv(&self, u: f64, v: f64) -> Vector3 {
+        ParametricSurface::derivative_vv(self, u, v)
+    }
+    #[inline(always)]
+    fn period_u(&self) -> Option<f64> { ParametricSurface::u_period(self) }
+    #[inline(always)]
+    fn period_v(&self) -> Option<f64> { ParametricSurface::v_period(self) }
+}
+
+impl v2::BoundedSurface for Torus {
+    #[inline(always)]
+    fn range_tuple(&self) -> ((f64, f64), (f64, f64)) { BoundedSurface::range_tuple(self) }
+}
+
+impl v2::ParametricSurface3D for Torus {}
+
+impl v2::SearchNearestParameter<v2::D2<f64>> for Torus {
+    type Point = Point3;
+    #[inline(always)]
+    fn search_nearest_parameter<H: Into<v2::SearchParameterHint2D<f64>>>(
+        &self,
+        pt: Point3,
+        _: H,
+        trials: usize,
+    ) -> Option<(f64, f64)> {
+        SearchNearestParameter::<D2>::search_nearest_parameter(self, pt, None, trials)
+    }
+}
+
+impl v2::SearchParameter<v2::D2<f64>> for Torus {
+    type Point = Point3;
+    #[inline(always)]
+    fn search_parameter<H: Into<v2::SearchParameterHint2D<f64>>>(
+        &self,
+        pt: Point3,
+        _: H,
+        trials: usize,
+    ) -> Option<(f64, f64)> {
+        SearchParameter::<D2>::search_parameter(self, pt, None, trials)
+    }
+}
+
 impl SearchParameter<D2> for Torus {
     type Point = Point3;
     fn search_parameter<H: Into<SearchParameterHint2D>>(

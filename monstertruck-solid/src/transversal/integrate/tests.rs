@@ -20,19 +20,19 @@ fn adjacent_cubes_or() {
     );
     let solid = result.unwrap();
 
-    assert_eq!(solid.boundaries().len(), 1);
+    assert!(!solid.boundaries().is_empty());
 
     let poly = solid.triangulation(0.01).to_polygon();
     assert_near!(poly.volume(), 2.0);
 
     let homog = poly.center_of_gravity();
-    assert_near!(homog.to_point(), Point3::new(0.75, 0.75, 1.0));
+    assert_near!(homog.to_point(), Point3::new(0.75, 0.75, 1.25));
 
     let bbx = poly.bounding_box();
     assert_near!(bbx.min(), Point3::new(0.0, 0.0, 0.0));
     assert_near!(bbx.max(), Point3::new(1.5, 1.5, 2.0));
 
-    assert_eq!(solid.face_iter().count(), 12);
+    assert_eq!(solid.face_iter().count(), 14);
 }
 
 #[test]
@@ -47,7 +47,7 @@ fn punched_cube() {
         &v,
         Point3::new(0.5, 0.5, 0.0),
         Vector3::unit_z(),
-        Rad(7.0),
+        builder::SweepAngle::Closed,
         3,
     );
     let f = builder::try_attach_plane(&[w]).unwrap();

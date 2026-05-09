@@ -30,7 +30,13 @@ fn body_shell(bottom: f64, height: f64, width: f64, thickness: f64) -> Shell {
 
 fn cylinder(bottom: f64, height: f64, radius: f64) -> Shell {
     let vertex = builder::vertex(Point3::new(0.0, bottom, radius));
-    let circle = builder::revolve(&vertex, Point3::origin(), Vector3::unit_y(), Rad(7.0), 2);
+    let circle = builder::revolve(
+        &vertex,
+        Point3::origin(),
+        Vector3::unit_y(),
+        builder::SweepAngle::Closed,
+        2,
+    );
     let disk = builder::try_attach_plane(&[circle]).unwrap();
     let solid = builder::extrude(&disk, Vector3::new(0.0, height, 0.0));
     solid.into_boundaries().pop().unwrap()
@@ -39,7 +45,7 @@ fn cylinder(bottom: f64, height: f64, radius: f64) -> Shell {
 fn grue_body_neck(body: &mut Shell, neck: Shell) {
     let body_seiling = body.last_mut().unwrap();
     let wire = neck[0].boundaries()[0].clone();
-    body_seiling.add_boundary(wire);
+    body_seiling.add_boundary(wire).unwrap();
     body.extend(neck.into_iter().skip(1));
 }
 
@@ -111,7 +117,7 @@ fn bottle(height: f64, width: f64, thickness: f64) -> Solid {
 
     let inner_hat = inner_body.pop().unwrap();
     let wire = inner_hat.into_boundaries()[0].inverse();
-    body.last_mut().unwrap().add_boundary(wire);
+    body.last_mut().unwrap().add_boundary(wire).unwrap();
     body.extend(inner_body.into_iter().map(|face| face.inverse()));
     Solid::new(vec![body])
 }

@@ -32,6 +32,9 @@ fn test_split_closed_edges() {
         vertices,
         edges,
         faces,
+        vertex_stable_ids: None,
+        edge_stable_ids: None,
+        face_stable_ids: None,
     };
     assert!(Shell::extract(shell.clone()).is_err());
 
@@ -42,6 +45,7 @@ fn test_split_closed_edges() {
         vertices,
         edges,
         faces,
+        ..
     } = &shell;
     assert_eq!(vertices.len(), 2);
     assert_near!(vertices[0], Point2::new(1.0, 0.0));
@@ -88,7 +92,7 @@ fn test_split_closed_edges() {
 
 #[test]
 fn test_split_closed_face_simple_cylinder_case() {
-    type Surface = RevolutedCurve<Line<Point3>>;
+    type Surface = RevolutionSurface<Line<Point3>>;
     #[derive(
         Clone,
         Debug,
@@ -152,7 +156,7 @@ fn test_split_closed_face_simple_cylinder_case() {
             )),
         },
     ];
-    let surface = RevolutedCurve::by_revolution(
+    let surface = RevolutionSurface::by_revolution(
         Line(vertices[2], vertices[0]),
         Point3::origin(),
         Vector3::unit_z(),
@@ -191,6 +195,9 @@ fn test_split_closed_face_simple_cylinder_case() {
         vertices,
         edges,
         faces,
+        vertex_stable_ids: None,
+        edge_stable_ids: None,
+        face_stable_ids: None,
     };
 
     assert!(Shell::extract(shell.clone()).is_err());
@@ -202,6 +209,7 @@ fn test_split_closed_face_simple_cylinder_case() {
         ref vertices,
         ref edges,
         ref mut faces,
+        ..
     } = shell;
     assert_eq!(vertices.len(), 4);
     assert_eq!(edges.len(), 6);
@@ -301,7 +309,7 @@ fn test_split_closed_face_simple_cylinder_case() {
 
 #[test]
 fn test_split_closed_face_cylinder_with_hole() {
-    type Surface = RevolutedCurve<Line<Point3>>;
+    type Surface = RevolutionSurface<Line<Point3>>;
     #[derive(
         Clone,
         Debug,
@@ -346,7 +354,7 @@ fn test_split_closed_face_cylinder_with_hole() {
         Point3::new(-1.0, 0.0, 0.75),
     ];
 
-    let surface = RevolutedCurve::by_revolution(
+    let surface = RevolutionSurface::by_revolution(
         Line(vertices[2], vertices[0]),
         Point3::origin(),
         Vector3::unit_z(),
@@ -454,6 +462,9 @@ fn test_split_closed_face_cylinder_with_hole() {
         vertices,
         edges,
         faces,
+        vertex_stable_ids: None,
+        edge_stable_ids: None,
+        face_stable_ids: None,
     };
 
     assert!(Shell::extract(shell.clone()).is_err());
@@ -464,6 +475,7 @@ fn test_split_closed_face_cylinder_with_hole() {
         ref vertices,
         ref edges,
         ref mut faces,
+        ..
     } = shell;
     assert_eq!(vertices.len(), 6);
     assert_eq!(edges.len(), 9);
@@ -619,9 +631,9 @@ fn test_split_closed_face_cylinder_with_rotated_hole() {
             Self::ParameterCurve(ParameterCurve::new(ParamCurve2D::Line(line), surface))
         }
     }
-    type Surface = RevolutedCurve<Line<Point3>>;
+    type Surface = RevolutionSurface<Line<Point3>>;
 
-    let surface = RevolutedCurve::by_revolution(
+    let surface = RevolutionSurface::by_revolution(
         Line(Point3::new(1.0, 0.0, 1.0), Point3::new(1.0, 0.0, 0.0)),
         Point3::origin(),
         Vector3::unit_z(),
@@ -738,6 +750,9 @@ fn test_split_closed_face_cylinder_with_rotated_hole() {
         vertices,
         edges,
         faces,
+        vertex_stable_ids: None,
+        edge_stable_ids: None,
+        face_stable_ids: None,
     };
 
     assert!(Shell::extract(shell.clone()).is_err());
@@ -748,6 +763,7 @@ fn test_split_closed_face_cylinder_with_rotated_hole() {
         ref vertices,
         ref edges,
         ref mut faces,
+        ..
     } = shell;
     assert_eq!(vertices.len(), 8);
     assert_eq!(edges.len(), 11);
@@ -900,7 +916,7 @@ fn too_simple_cylinder() {
             Curve::ParameterCurve(value)
         }
     }
-    type Surface = RevolutedCurve<Line<Point3>>;
+    type Surface = RevolutionSurface<Line<Point3>>;
 
     let vertices = vec![Point3::new(1.0, 0.0, 0.0), Point3::new(1.0, 0.0, 1.0)];
 
@@ -921,7 +937,7 @@ fn too_simple_cylinder() {
         },
     ];
 
-    let surface = RevolutedCurve::by_revolution(
+    let surface = RevolutionSurface::by_revolution(
         Line(vertices[1], vertices[0]),
         Point3::origin(),
         Vector3::unit_z(),
@@ -945,6 +961,9 @@ fn too_simple_cylinder() {
         vertices,
         edges,
         faces,
+        vertex_stable_ids: None,
+        edge_stable_ids: None,
+        face_stable_ids: None,
     };
 
     assert!(Shell::extract(shell.clone()).is_err());
@@ -956,6 +975,7 @@ fn too_simple_cylinder() {
         ref vertices,
         ref edges,
         ref mut faces,
+        ..
     } = shell;
 
     assert_eq!(vertices.len(), 4);
@@ -1093,7 +1113,7 @@ fn double_closed_boundary_cylinder() {
             Self::ParameterCurve(ParameterCurve::new(ParamCurve2D::Line(line), surface))
         }
     }
-    type Surface = RevolutedCurve<Line<Point3>>;
+    type Surface = RevolutionSurface<Line<Point3>>;
 
     let vertices = vec![
         Point3::new(1.0, 0.0, 0.0),
@@ -1101,7 +1121,7 @@ fn double_closed_boundary_cylinder() {
         Point3::new(1.0, 0.0, 0.25),
         Point3::new(-1.0, 0.0, 0.25),
     ];
-    let surface = RevolutedCurve::by_revolution(
+    let surface = RevolutionSurface::by_revolution(
         Line(vertices[1], vertices[0]),
         Point3::origin(),
         Vector3::unit_z(),
@@ -1175,6 +1195,9 @@ fn double_closed_boundary_cylinder() {
         vertices,
         edges,
         faces,
+        vertex_stable_ids: None,
+        edge_stable_ids: None,
+        face_stable_ids: None,
     };
 
     assert!(Shell::extract(shell.clone()).is_err());
@@ -1186,6 +1209,7 @@ fn double_closed_boundary_cylinder() {
         ref vertices,
         ref edges,
         ref mut faces,
+        ..
     } = shell;
 
     assert_eq!(vertices.len(), 8);
@@ -1365,7 +1389,7 @@ fn many_closed_boundary_cylinder() {
             Self::ParameterCurve(ParameterCurve::new(ParamCurve2D::Line(line), surface))
         }
     }
-    type Surface = RevolutedCurve<Line<Point3>>;
+    type Surface = RevolutionSurface<Line<Point3>>;
 
     const NUM_OF_CIRCLES: usize = 10;
 
@@ -1377,7 +1401,7 @@ fn many_closed_boundary_cylinder() {
         }));
         vertices
     };
-    let surface = RevolutedCurve::by_revolution(
+    let surface = RevolutionSurface::by_revolution(
         Line(vertices[1], vertices[0]),
         Point3::origin(),
         Vector3::unit_z(),
@@ -1437,6 +1461,9 @@ fn many_closed_boundary_cylinder() {
         vertices,
         edges,
         faces,
+        vertex_stable_ids: None,
+        edge_stable_ids: None,
+        face_stable_ids: None,
     };
 
     assert!(Shell::extract(shell.clone()).is_err());
@@ -1448,6 +1475,7 @@ fn many_closed_boundary_cylinder() {
         ref vertices,
         ref edges,
         ref mut faces,
+        ..
     } = shell;
 
     assert_eq!(vertices.len(), (2 + NUM_OF_CIRCLES) * 2);

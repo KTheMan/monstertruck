@@ -240,7 +240,7 @@ impl<P: ControlPoint<f64>> ParametricCurve for PolylineCurve<P> {
     }
     #[inline(always)]
     fn derivative(&self, t: f64) -> P::Diff {
-        if t < 0.0 || (self.len() as f64) < t + 1.0 {
+        if self.len() <= 1 || t < 0.0 || (self.len() as f64) < t + 1.0 {
             P::Diff::zero()
         } else {
             let n = t as usize;
@@ -269,6 +269,17 @@ impl<P: Clone> Invertible for PolylineCurve<P> {
     fn invert(&mut self) { self.reverse(); }
     #[inline(always)]
     fn inverse(&self) -> Self { Self(self.iter().rev().cloned().collect()) }
+}
+
+impl SnapCurveEndpoints for PolylineCurve<Point3> {
+    fn snap_endpoints(&mut self, front: Point3, back: Point3) {
+        if let Some(point) = self.first_mut() {
+            *point = front;
+        }
+        if let Some(point) = self.last_mut() {
+            *point = back;
+        }
+    }
 }
 
 impl<P: ControlPoint<f64>> Cut for PolylineCurve<P> {

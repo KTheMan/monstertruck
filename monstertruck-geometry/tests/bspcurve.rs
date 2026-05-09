@@ -182,7 +182,7 @@ fn test_parameter_division() {
     let bspcurve = BsplineCurve::new(knot_vec, control_points);
     let tol = 0.01;
     let (div, pts) = bspcurve.parameter_division(bspcurve.range_tuple(), tol);
-    let knot_vec = bspcurve.knot_vec();
+    let knot_vec = bspcurve.knot_vector();
     assert_eq!(knot_vec[0], div[0]);
     assert_eq!(knot_vec.range_length(), div.last().unwrap() - div[0]);
     for i in 1..div.len() {
