@@ -28,8 +28,8 @@ monstertruck-topology = { workspace = true }
 proptest = { workspace = true }
 rand = { workspace = true }
 serde_json = { workspace = true }
-monstertruck-modeling = { workspace = true, features = ["fillet"] }
-monstertruck-step = { workspace = true }
+monstertruck-modeling = { path = "../monstertruck-modeling", features = ["fillet"] }
+monstertruck-step = { path = "../monstertruck-step" }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 getrandom = { workspace = true }
