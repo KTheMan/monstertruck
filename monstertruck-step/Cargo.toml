@@ -37,4 +37,5 @@ itertools = { workspace = true }
 proptest = { workspace = true }
 serde_json = { workspace = true }
 monstertruck-meshing = { workspace = true }
+monstertruck-modeling = { workspace = true, features = ["fillet"] }
 monstertruck-solid = { workspace = true }

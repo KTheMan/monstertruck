@@ -13,7 +13,7 @@ fn main() {
         &v,
         Point3::new(0.5, 0.5, 0.0),
         Vector3::unit_z(),
-        Rad(7.0),
+        builder::SweepAngle::Closed,
         4,
     );
     let f = builder::try_attach_plane(&[w]).unwrap();

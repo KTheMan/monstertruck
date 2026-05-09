@@ -349,7 +349,8 @@ ENDSEC;
                     PlaceHolder::Ref(Name::Entity(21)),
                     PlaceHolder::Ref(Name::Entity(29)),
                 ],
-                master_representation: PreferredSurfaceCurveRepresentation::Curve3D
+                master_representation: PreferredSurfaceCurveRepresentation::Curve3D,
+                kind: Default::default(),
             }
         )]),
         plane: HashMap::from_iter(vec![(

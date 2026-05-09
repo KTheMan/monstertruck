@@ -4,16 +4,8 @@ use crate::*;
 use std::vec::Vec;
 
 impl<P, C, S> Solid<P, C, S> {
-    /// create the shell whose boundaries is boundary.
-    /// # Panic
-    /// All boundary must be non-empty, connected, and closed manifold.
-    #[inline(always)]
-    pub fn new(boundaries: Vec<Shell<P, C, S>>) -> Solid<P, C, S> {
-        Solid::try_new(boundaries).remove_try()
-    }
-    /// create the shell whose boundaries is boundary.
-    /// # Failure
-    /// All boundary must be non-empty, connected, and closed manifold.
+    /// Create a solid whose boundaries must be non-empty, connected,
+    /// and closed manifold.
     #[inline(always)]
     pub fn try_new(boundaries: Vec<Shell<P, C, S>>) -> Result<Solid<P, C, S>> {
         for shell in &boundaries {
@@ -29,20 +21,71 @@ impl<P, C, S> Solid<P, C, S> {
         }
         Ok(Solid::new_unchecked(boundaries))
     }
-    /// create the shell whose boundaries is boundary.
-    /// # Remarks
-    /// This method is prepared only for performance-critical development and is not recommended.
-    /// This method does NOT check whether all boundary is non-empty, connected, and closed.
-    /// The programmer must guarantee this condition before using this method.
+
+    /// Create a solid whose boundaries must be non-empty, connected,
+    /// and closed manifold.
     #[inline(always)]
-    pub const fn new_unchecked(boundaries: Vec<Shell<P, C, S>>) -> Solid<P, C, S> {
-        Solid { boundaries }
+    pub fn new(boundaries: Vec<Shell<P, C, S>>) -> Solid<P, C, S> {
+        Self::try_new(boundaries).unwrap_or_else(|error| panic!("Solid::new: {error}"))
     }
 
-    /// create the shell whose boundaries is boundary.
-    /// # Remarks
-    /// This method checks whether all boundary is non-empty, connected, and closed in the debug mode.
-    /// The programmer must guarantee this condition before using this method.
+    /// Create without validation (for performance-critical code).
+    #[inline(always)]
+    pub fn new_unchecked(boundaries: Vec<Shell<P, C, S>>) -> Solid<P, C, S> {
+        Solid {
+            boundaries,
+            id_allocator: StableIdAllocator::new(),
+            attributes: SolidAttributes::new(),
+        }
+    }
+
+    /// Allocate a fresh [`StableId`] from this solid's allocator.
+    #[inline(always)]
+    pub fn alloc_id(&mut self) -> StableId { self.id_allocator.allocate() }
+
+    /// Returns a reference to this solid's [`StableIdAllocator`].
+    #[inline(always)]
+    pub fn id_allocator(&self) -> &StableIdAllocator { &self.id_allocator }
+
+    /// Returns a mutable reference to this solid's [`StableIdAllocator`].
+    #[inline(always)]
+    pub fn id_allocator_mut(&mut self) -> &mut StableIdAllocator { &mut self.id_allocator }
+
+    /// Returns a reference to this solid's [`SolidAttributes`].
+    #[inline(always)]
+    pub fn attributes(&self) -> &SolidAttributes { &self.attributes }
+
+    /// Returns a mutable reference to this solid's [`SolidAttributes`].
+    #[inline(always)]
+    pub fn attributes_mut(&mut self) -> &mut SolidAttributes { &mut self.attributes }
+
+    /// Returns a reference to the face [`ElementAttributes`].
+    #[inline(always)]
+    pub fn face_attributes(&self) -> &ElementAttributes { &self.attributes.faces }
+
+    /// Returns a mutable reference to the face [`ElementAttributes`].
+    #[inline(always)]
+    pub fn face_attributes_mut(&mut self) -> &mut ElementAttributes { &mut self.attributes.faces }
+
+    /// Returns a reference to the edge [`ElementAttributes`].
+    #[inline(always)]
+    pub fn edge_attributes(&self) -> &ElementAttributes { &self.attributes.edges }
+
+    /// Returns a mutable reference to the edge [`ElementAttributes`].
+    #[inline(always)]
+    pub fn edge_attributes_mut(&mut self) -> &mut ElementAttributes { &mut self.attributes.edges }
+
+    /// Returns a reference to the vertex [`ElementAttributes`].
+    #[inline(always)]
+    pub fn vertex_attributes(&self) -> &ElementAttributes { &self.attributes.vertices }
+
+    /// Returns a mutable reference to the vertex [`ElementAttributes`].
+    #[inline(always)]
+    pub fn vertex_attributes_mut(&mut self) -> &mut ElementAttributes {
+        &mut self.attributes.vertices
+    }
+
+    /// Create with validation only in debug mode.
     #[inline(always)]
     pub fn debug_new(boundaries: Vec<Shell<P, C, S>>) -> Solid<P, C, S> {
         match cfg!(debug_assertions) {
@@ -162,7 +205,7 @@ impl<P, C, S> Solid<P, C, S> {
             .iter_mut()
             .find_map(|shell| shell.cut_edge(edge_id, vertex));
         #[cfg(debug_assertions)]
-        Solid::new(self.boundaries.clone());
+        let _ = Solid::new(self.boundaries.clone());
         res
     }
     /// Removes `vertex` from `self` by concat two edges on both sides.
@@ -176,7 +219,7 @@ impl<P, C, S> Solid<P, C, S> {
             .iter_mut()
             .find_map(|shell| shell.remove_vertex_by_concat_edges(vertex_id));
         #[cfg(debug_assertions)]
-        Solid::new(self.boundaries.clone());
+        let _ = Solid::new(self.boundaries.clone());
         res
     }
 

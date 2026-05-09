@@ -21,16 +21,11 @@ impl<P, C> Edge<P, C> {
         }
     }
     /// Generates the edge from `front` to `back`.
-    /// # Panic
-    /// The condition `front == back` is not allowed.
-    /// ```should_panic
-    /// use monstertruck_topology::*;
-    /// let v = Vertex::new(());
-    /// Edge::new(&v, &v, ()); // panic occurs
-    /// ```
+    /// # Panics
+    /// Panics if `front == back`.
     #[inline(always)]
     pub fn new(front: &Vertex<P>, back: &Vertex<P>, curve: C) -> Edge<P, C> {
-        Edge::try_new(front, back, curve).remove_try()
+        Self::try_new(front, back, curve).expect("Edge::new: front and back vertices must differ")
     }
     /// Generates the edge from `front` to `back`.
     /// # Remarks
@@ -43,8 +38,17 @@ impl<P, C> Edge<P, C> {
             vertices: (front.clone(), back.clone()),
             orientation: true,
             curve: Arc::new(Mutex::new(curve)),
+            stable_id: StableId::UNASSIGNED,
         }
     }
+
+    /// Returns the stable persistent identifier of this edge.
+    #[inline(always)]
+    pub fn stable_id(&self) -> StableId { self.stable_id }
+
+    /// Sets the stable persistent identifier of this edge.
+    #[inline(always)]
+    pub fn set_stable_id(&mut self, id: StableId) { self.stable_id = id; }
 
     /// Generates the edge from `front` to `back`.
     /// # Remarks
@@ -115,6 +119,7 @@ impl<P, C> Edge<P, C> {
             vertices: self.vertices.clone(),
             orientation: !self.orientation,
             curve: Arc::clone(&self.curve),
+            stable_id: self.stable_id,
         }
     }
 
@@ -216,6 +221,7 @@ impl<P, C> Edge<P, C> {
             vertices: self.vertices.clone(),
             curve: Arc::clone(&self.curve),
             orientation: true,
+            stable_id: self.stable_id,
         }
     }
 
@@ -410,11 +416,13 @@ impl<P, C> Edge<P, C> {
             vertices: (self.absolute_front().clone(), vertex.clone()),
             orientation: self.orientation,
             curve: Arc::new(Mutex::new(curve0)),
+            stable_id: StableId::UNASSIGNED,
         };
         let edge1 = Edge {
             vertices: (vertex.clone(), self.absolute_back().clone()),
             orientation: self.orientation,
             curve: Arc::new(Mutex::new(curve1)),
+            stable_id: StableId::UNASSIGNED,
         };
         match self.orientation {
             true => (edge0, edge1),
@@ -554,6 +562,7 @@ impl<P, C> Clone for Edge<P, C> {
             vertices: self.vertices.clone(),
             orientation: self.orientation,
             curve: Arc::clone(&self.curve),
+            stable_id: self.stable_id,
         }
     }
 }
@@ -624,7 +633,7 @@ impl<P: Debug, C: Debug> Debug for DebugDisplay<'_, Edge<P, C>, EdgeDisplayForma
                 self.entity.back().display(vertex_format),
             )),
             EdgeDisplayFormat::AsCurve => {
-                f.write_fmt(format_args!("{:?}", &MutexFmt(&self.entity.curve)))
+                f.write_fmt(format_args!("{:?}", MutexFmt(&self.entity.curve)))
             }
         }
     }

@@ -40,6 +40,82 @@ impl<T> Debug for Id<T> {
     }
 }
 
+/// Persistent topology element identifier.
+///
+/// Unlike [`Id`] (derived from Arc pointer addresses, changes on
+/// deserialization), `StableId` survives serialization round-trips.
+/// Values are unique within a Solid but not globally unique.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
+#[cfg_attr(
+    feature = "rkyv",
+    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
+)]
+#[cfg_attr(feature = "rkyv", rkyv(derive(PartialEq, Eq, PartialOrd, Ord, Hash)))]
+pub struct StableId(u64);
+
+impl StableId {
+    /// Reserved sentinel for unassigned IDs.
+    pub const UNASSIGNED: StableId = StableId(0);
+
+    /// Create a new [`StableId`].
+    pub fn new(val: u64) -> Self {
+        debug_assert!(val != 0, "StableId 0 is reserved for UNASSIGNED");
+        StableId(val)
+    }
+
+    /// Get the raw `u64` value.
+    pub fn raw(self) -> u64 { self.0 }
+
+    /// Whether this ID has been assigned.
+    pub fn is_assigned(self) -> bool { self.0 != 0 }
+}
+
+impl Default for StableId {
+    fn default() -> Self { Self::UNASSIGNED }
+}
+
+impl std::fmt::Display for StableId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "#{}", self.0) }
+}
+
+/// Monotonic counter for assigning fresh [`StableId`]s within a Solid.
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(
+    feature = "rkyv",
+    derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
+)]
+pub struct StableIdAllocator {
+    next: u64,
+}
+
+impl StableIdAllocator {
+    /// Create a new allocator starting at 1.
+    pub const fn new() -> Self { Self { next: 1 } }
+
+    /// Allocate a fresh [`StableId`].
+    pub fn allocate(&mut self) -> StableId {
+        let id = StableId::new(self.next);
+        self.next += 1;
+        id
+    }
+
+    /// Advance the counter past `ceil` to avoid collisions.
+    pub fn ensure_above(&mut self, ceil: u64) {
+        if self.next <= ceil {
+            self.next = ceil + 1;
+        }
+    }
+
+    /// Current counter value (next ID that will be allocated).
+    pub fn peek(&self) -> u64 { self.next }
+}
+
+impl Default for StableIdAllocator {
+    fn default() -> Self { Self::new() }
+}
+
 #[test]
 fn debug_backward_compatibility() {
     let x: f64 = 3.0;
@@ -47,4 +123,22 @@ fn debug_backward_compatibility() {
     let a = format!("{id:?}");
     let b = format!("{:p}", &x);
     assert_eq!(a, b);
+}
+
+#[test]
+fn stable_id_basics() {
+    let id = StableId::new(42);
+    assert_eq!(id.raw(), 42);
+    assert!(id.is_assigned());
+    assert!(!StableId::UNASSIGNED.is_assigned());
+}
+
+#[test]
+fn stable_id_allocator() {
+    let mut alloc = StableIdAllocator::new();
+    let a = alloc.allocate();
+    let b = alloc.allocate();
+    assert_ne!(a, b);
+    assert_eq!(a.raw(), 1);
+    assert_eq!(b.raw(), 2);
 }

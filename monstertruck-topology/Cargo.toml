@@ -14,11 +14,13 @@ categories = ["graphics"]
 [features]
 default = ["rclite"]
 nightly = ["parking_lot/nightly"]
+rkyv = ["dep:rkyv", "monstertruck-core/rkyv"]
 
 [dependencies]
 parking_lot = { workspace = true }
 rayon = { workspace = true }
 rclite = { workspace = true, optional = true }
+rkyv = { workspace = true, optional = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

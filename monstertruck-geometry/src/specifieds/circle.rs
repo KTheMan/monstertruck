@@ -61,6 +61,78 @@ impl ParametricCurve for UnitCircle<Point3> {
 
 impl BoundedCurve for UnitCircle<Point3> {}
 
+// -- v2 scalar-generic impls ------------------------------------------------
+
+use monstertruck_traits::v2;
+
+macro_rules! impl_v2_circle {
+    ($point:ty, $vector:ty) => {
+        impl v2::ParametricCurve for UnitCircle<$point> {
+            type Scalar = f64;
+            type Point = $point;
+            type Vector = $vector;
+
+            #[inline]
+            fn evaluate(&self, t: f64) -> $point { ParametricCurve::evaluate(self, t) }
+            #[inline]
+            fn derivative(&self, t: f64) -> $vector { ParametricCurve::derivative(self, t) }
+            #[inline]
+            fn derivative_2(&self, t: f64) -> $vector { ParametricCurve::derivative_2(self, t) }
+            #[inline]
+            fn derivative_n(&self, n: usize, t: f64) -> $vector {
+                ParametricCurve::derivative_n(self, n, t)
+            }
+            #[inline]
+            fn period(&self) -> Option<f64> { ParametricCurve::period(self) }
+            #[inline]
+            fn try_range_tuple(&self) -> Option<(f64, f64)> {
+                ParametricCurve::try_range_tuple(self)
+            }
+        }
+
+        impl v2::BoundedCurve for UnitCircle<$point> {
+            #[inline]
+            fn range_tuple(&self) -> (f64, f64) { BoundedCurve::range_tuple(self) }
+        }
+    };
+}
+
+impl_v2_circle!(Point2, Vector2);
+impl_v2_circle!(Point3, Vector3);
+
+macro_rules! impl_v2_circle_search {
+    ($point:ty) => {
+        impl v2::SearchNearestParameter<v2::D1<f64>> for UnitCircle<$point> {
+            type Point = $point;
+            #[inline]
+            fn search_nearest_parameter<H: Into<v2::SearchParameterHint1D<f64>>>(
+                &self,
+                pt: $point,
+                _: H,
+                _: usize,
+            ) -> Option<f64> {
+                SearchNearestParameter::<D1>::search_nearest_parameter(self, pt, None, 0)
+            }
+        }
+
+        impl v2::SearchParameter<v2::D1<f64>> for UnitCircle<$point> {
+            type Point = $point;
+            #[inline]
+            fn search_parameter<H: Into<v2::SearchParameterHint1D<f64>>>(
+                &self,
+                pt: $point,
+                _: H,
+                _: usize,
+            ) -> Option<f64> {
+                SearchParameter::<D1>::search_parameter(self, pt, None, 0)
+            }
+        }
+    };
+}
+
+impl_v2_circle_search!(Point2);
+impl_v2_circle_search!(Point3);
+
 impl<P> ParameterDivision1D for UnitCircle<P>
 where UnitCircle<P>: ParametricCurve<Point = P>
 {
@@ -174,7 +246,7 @@ impl ToSameGeometry<NurbsCurve<Vector4>> for TrimmedCurve<UnitCircle<Point3>> {
         let (t0, t1) = self.range_tuple();
         let bsp: NurbsCurve<Vector3> =
             TrimmedCurve::new(UnitCircle::<Point2>::new(), (t0, t1)).to_same_geometry();
-        let (knot_vec, pts) = bsp.into_non_rationalized().destruct();
+        let (knot_vec, pts) = BsplineCurve::from(bsp).destruct();
         let mut curve = NurbsCurve::new(BsplineCurve::new_unchecked(
             knot_vec,
             vec![

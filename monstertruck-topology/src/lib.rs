@@ -81,6 +81,7 @@
     unused_qualifications
 )]
 
+pub use monstertruck_core::{StableId, StableIdAllocator};
 use monstertruck_core::{id::Id, tolerance::*};
 use monstertruck_traits::*;
 use parking_lot::Mutex;
@@ -108,6 +109,7 @@ const SEARCH_PARAMETER_TRIALS: usize = 100;
 #[derive(Debug)]
 pub struct Vertex<P> {
     point: Arc<Mutex<P>>,
+    stable_id: StableId,
 }
 
 /// Edge, which consists two vertices.
@@ -127,6 +129,7 @@ pub struct Edge<P, C> {
     vertices: (Vertex<P>, Vertex<P>),
     orientation: bool,
     curve: Arc<Mutex<C>>,
+    stable_id: StableId,
 }
 
 /// Wire, a path or cycle which consists some edges.
@@ -158,6 +161,7 @@ pub struct Face<P, C, S> {
     boundaries: Vec<Wire<P, C>>,
     orientation: bool,
     surface: Arc<Mutex<S>>,
+    stable_id: StableId,
 }
 
 /// Shell, a connected compounded faces.
@@ -173,19 +177,12 @@ pub struct Shell<P, C, S> {
 #[derive(Clone, Debug)]
 pub struct Solid<P, C, S> {
     boundaries: Vec<Shell<P, C, S>>,
+    id_allocator: StableIdAllocator,
+    attributes: SolidAttributes,
 }
 
 /// `Result` with crate's errors.
 pub type Result<T> = std::result::Result<T, errors::Error>;
-
-trait RemoveTry<T> {
-    fn remove_try(self) -> T;
-}
-
-impl<T> RemoveTry<T> for Result<T> {
-    #[inline(always)]
-    fn remove_try(self) -> T { self.unwrap_or_else(|e| panic!("{}", e)) }
-}
 
 /// The id of vertex. `Copy` trait is implemented.
 /// # Details
@@ -396,7 +393,12 @@ pub enum SolidDisplayFormat {
     },
 }
 
+/// Per-element attribute storage for topology elements.
+pub mod attributes;
+pub use attributes::{AttributeValue, ElementAttributes, SolidAttributes};
+
 pub mod compress;
+pub use compress::SolidHashOptions;
 mod edge;
 /// classifies the errors that can occur in this crate.
 pub mod errors;
@@ -405,6 +407,8 @@ pub mod face;
 /// classifies shell conditions and defines the face iterators.
 pub mod shell;
 mod solid;
+/// Runtime topology with face-local trim storage.
+pub mod trimmed;
 mod vertex;
 /// define the edge iterators and the vertex iterator.
 pub mod wire;

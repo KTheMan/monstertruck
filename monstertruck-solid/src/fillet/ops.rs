@@ -95,7 +95,7 @@ pub fn fillet(
     )?;
     let fillet = {
         let fillet_boundary = [fillet_edge0.inverse(), edge0, fillet_edge1.inverse(), edge1];
-        Face::new(vec![fillet_boundary.into()], fillet_surface)
+        Face::new_unchecked(vec![fillet_boundary.into()], fillet_surface)
     };
 
     Ok((new_face0, new_face1, fillet))
@@ -307,7 +307,7 @@ fn fillet_along_wire_open(
         };
 
         let boundary = [edge0.inverse(), edge2, edge1.inverse(), edge3.inverse()].into();
-        Some(Face::new(vec![boundary], fillet_surface))
+        Some(Face::new_unchecked(vec![boundary], fillet_surface))
     };
 
     let mut fillet_faces = fillet_surfaces
@@ -378,7 +378,7 @@ fn fillet_along_wire_open(
         };
 
         let wire = [edge0.inverse(), edge2, edge1.inverse(), edge3.inverse()].into();
-        Face::new(vec![wire], fillet_surface)
+        Face::new_unchecked(vec![wire], fillet_surface)
     };
     fillet_faces.insert(0, first_fillet);
 
@@ -443,7 +443,7 @@ fn fillet_along_wire_open(
         };
 
         let wire = [edge0.inverse(), edge2, edge1.inverse(), edge3.inverse()].into();
-        Face::new(vec![wire], fillet_surface)
+        Face::new_unchecked(vec![wire], fillet_surface)
     };
     fillet_faces.push(last_fillet);
 
@@ -521,7 +521,7 @@ fn fillet_along_wire_open(
             });
         }
         boundaries[shared_face_index.boundary_index] = new_wire;
-        *shared_face = Face::new(boundaries, shared_face.oriented_surface())
+        *shared_face = Face::new_unchecked(boundaries, shared_face.oriented_surface())
     }
 
     shell.extend(fillet_faces);
@@ -589,7 +589,7 @@ fn fillet_along_wire_closed(
         };
 
         let boundary = [edge0.inverse(), edge2, edge1.inverse(), edge3.inverse()].into();
-        fillet_faces.push(Face::new(vec![boundary], fillet_surface));
+        fillet_faces.push(Face::new_unchecked(vec![boundary], fillet_surface));
     }
 
     // Rebuild the shared face boundary: replace the entire boundary with
@@ -620,7 +620,7 @@ fn fillet_along_wire_closed(
         let shared_face = &mut shell[shared_face_index.face_index];
         let mut boundaries = shared_face.boundaries();
         boundaries[shared_face_index.boundary_index] = new_wire;
-        *shared_face = Face::new(boundaries, shared_face.oriented_surface());
+        *shared_face = Face::new_unchecked(boundaries, shared_face.oriented_surface());
     }
 
     shell.extend(fillet_faces);

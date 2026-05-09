@@ -1,7 +1,7 @@
 use monstertruck_geometry::prelude::*;
 use monstertruck_solid::{FilletIntersectionCurve, ParameterCurveLinear};
 
-use crate::{Curve, Surface};
+use crate::{Curve, Curve2D, Surface};
 
 impl TryFrom<Surface> for NurbsSurface<Vector4> {
     type Error = ();
@@ -10,7 +10,7 @@ impl TryFrom<Surface> for NurbsSurface<Vector4> {
             Surface::Plane(plane) => Ok(NurbsSurface::from(BsplineSurface::from(plane))),
             Surface::BsplineSurface(bsp) => Ok(NurbsSurface::from(bsp)),
             Surface::NurbsSurface(ns) => Ok(ns),
-            Surface::RevolutedCurve(_) | Surface::TSplineSurface(_) => Err(()),
+            Surface::RevolutionSurface(_) | Surface::TsplineSurface(_) => Err(()),
         }
     }
 }
@@ -23,6 +23,10 @@ impl TryFrom<Curve> for NurbsCurve<Vector4> {
             Curve::Line(line) => Ok(NurbsCurve::from(BsplineCurve::from(line))),
             Curve::BsplineCurve(bsp) => Ok(NurbsCurve::from(bsp)),
             Curve::NurbsCurve(nc) => Ok(nc),
+            Curve::ParameterCurve(pc) => {
+                let range = pc.range_tuple();
+                Ok(sample_to_nurbs(range, |t| pc.subs(t), 16))
+            }
             Curve::IntersectionCurve(ic) => {
                 let range = ic.range_tuple();
                 Ok(sample_to_nurbs(range, |t| ic.subs(t), 16))
@@ -34,8 +38,11 @@ impl TryFrom<Curve> for NurbsCurve<Vector4> {
 
 impl From<ParameterCurveLinear> for Curve {
     fn from(c: ParameterCurveLinear) -> Self {
-        let range = c.range_tuple();
-        Curve::NurbsCurve(sample_to_nurbs(range, |t| c.subs(t), 16))
+        let (line, surface) = c.decompose();
+        Curve::ParameterCurve(ParameterCurve::new(
+            Curve2D::Line(line),
+            Box::new(Surface::NurbsSurface(surface)),
+        ))
     }
 }
 

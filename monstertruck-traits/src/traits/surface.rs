@@ -75,8 +75,8 @@ pub trait ParametricSurface: Clone {
     fn try_range_tuple(&self) -> (Option<Tuple>, Option<Tuple>) {
         let ((u0, u1), (v0, v1)) = self.parameter_range();
         (
-            bound2opt(u0).and_then(move |u0| bound2opt(u1).map(move |u1| (u0, u1))),
-            bound2opt(v0).and_then(move |v0| bound2opt(v1).map(move |v1| (v0, v1))),
+            bound2opt(u0).zip(bound2opt(u1)),
+            bound2opt(v0).zip(bound2opt(v1)),
         )
     }
     /// `None` in default; `Some(period)` if periodic w.r.t. parameter u.
@@ -85,6 +85,14 @@ pub trait ParametricSurface: Clone {
     /// `None` in default; `Some(period)` if periodic w.r.t. parameter v.
     #[inline(always)]
     fn v_period(&self) -> Option<f64> { None }
+    /// Alias for [`u_period`](ParametricSurface::u_period), consistent with
+    /// `derivative_u` naming (`<type>_<direction>`).
+    #[inline(always)]
+    fn period_u(&self) -> Option<f64> { self.u_period() }
+    /// Alias for [`v_period`](ParametricSurface::v_period), consistent with
+    /// `derivative_v` naming (`<type>_<direction>`).
+    #[inline(always)]
+    fn period_v(&self) -> Option<f64> { self.v_period() }
 }
 
 impl<S: ParametricSurface> ParametricSurface for &S {

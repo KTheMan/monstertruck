@@ -170,7 +170,7 @@ where
         e[0].inverse(),
     ];
     let plane0 = Plane::new(v[0].point(), v[3].point(), v[1].point());
-    let mut shell = shell![Face::new(vec![wire0], plane0.to_same_geometry())];
+    let mut shell = shell![Face::new_unchecked(vec![wire0], plane0.to_same_geometry())];
 
     (0..4).for_each(|i| {
         let wirei = wire![
@@ -180,12 +180,12 @@ where
             e[i + 4].inverse(),
         ];
         let planei = Plane::new(v[i].point(), v[i + 1].point(), v[i + 4].point());
-        shell.push(Face::new(vec![wirei], planei.to_same_geometry()));
+        shell.push(Face::new_unchecked(vec![wirei], planei.to_same_geometry()));
     });
 
     let wire5 = wire![e[8].clone(), e[9].clone(), e[10].clone(), e[11].clone(),];
     let plane5 = Plane::new(v[4].point(), v[5].point(), v[7].point());
-    shell.push(Face::new(vec![wire5], plane5.to_same_geometry()));
+    shell.push(Face::new_unchecked(vec![wire5], plane5.to_same_geometry()));
 
     Solid::new(vec![shell])
 }

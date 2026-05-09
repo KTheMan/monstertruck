@@ -11,6 +11,9 @@ impl<C> TrimmedCurve<C> {
     /// Returns the mutable reference of non-trimmed curve
     #[inline(always)]
     pub fn curve_mut(&mut self) -> &mut C { &mut self.curve }
+    /// Returns the trim range as `(start, end)`.
+    #[inline(always)]
+    pub const fn range(&self) -> (f64, f64) { self.range }
 }
 
 impl<C: PcurveTrait> PcurveTrait for TrimmedCurve<C> {

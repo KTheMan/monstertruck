@@ -6,7 +6,13 @@ use monstertruck_modeling::*;
 
 fn cylinder(height: f64, radius: f64) -> Solid {
     let vertex = builder::vertex(Point3::new(0.0, -height / 2.0, radius));
-    let circle = builder::revolve(&vertex, Point3::origin(), Vector3::unit_y(), Rad(7.0), 2);
+    let circle = builder::revolve(
+        &vertex,
+        Point3::origin(),
+        Vector3::unit_y(),
+        builder::SweepAngle::Closed,
+        2,
+    );
     let disk = builder::try_attach_plane(&[circle]).unwrap();
 
     builder::extrude(&disk, Vector3::new(0.0, height, 0.0))

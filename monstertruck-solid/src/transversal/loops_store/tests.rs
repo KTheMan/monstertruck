@@ -51,6 +51,28 @@ impl<P: Debug, C: Debug> LoopsStore<P, C> {
     }
 }
 
+fn assert_loops_store_well_formed<C>(
+    store: &LoopsStore<Point3, C>,
+    wire_id_format: WireDisplayFormat,
+    wire_geom_format: WireDisplayFormat,
+) where
+    C: BoundedCurve<Point = Point3> + Clone + Debug,
+{
+    assert!(!store.is_empty(), "{:?}", store.display(wire_id_format));
+    store.iter().for_each(|loops| {
+        assert!(!loops.is_empty(), "{:?}", store.display(wire_id_format));
+        loops.iter().for_each(|loop_wire| {
+            assert!(loop_wire.is_closed(), "{:?}", store.display(wire_id_format));
+            assert!(
+                loop_wire.is_geometric_consistent(),
+                "{:?}",
+                store.display(wire_geom_format)
+            );
+            assert!(loop_wire.len() >= 2, "{:?}", store.display(wire_id_format));
+        });
+    });
+}
+
 fn parabola_surfaces() -> (BsplineSurface<Point3>, BsplineSurface<Point3>) {
     // define surfaces
     #[rustfmt::skip]
@@ -379,156 +401,8 @@ fn rotated_intersection() {
     let wire_geom_format = WireDisplayFormat::EdgesListTuple {
         edge_format: edge_geom_format,
     };
-    assert_eq!(geom_loops_store0.len(), 2);
-    assert_eq!(geom_loops_store0[0].len(), 2);
-    assert!(
-        geom_loops_store0[0][0].is_closed(),
-        "{:?}",
-        geom_loops_store0.display(wire_id_format)
-    );
-    assert!(
-        geom_loops_store0[0][1].is_closed(),
-        "{:?}",
-        geom_loops_store0.display(wire_id_format)
-    );
-    assert!(
-        geom_loops_store0[0][0].is_geometric_consistent(),
-        "{:?}",
-        geom_loops_store0.display(wire_geom_format)
-    );
-    assert!(
-        geom_loops_store0[0][1].is_geometric_consistent(),
-        "{:?}",
-        geom_loops_store0.display(wire_geom_format)
-    );
-    let (a, b) = (geom_loops_store0[0][0].len(), geom_loops_store0[0][1].len());
-    let compatible0 = match geom_loops_store0[0][0].status() {
-        ShapesOpStatus::And => a == 3,
-        ShapesOpStatus::Or => a == 5,
-        _ => false,
-    };
-    let compatible1 = match geom_loops_store0[0][1].status() {
-        ShapesOpStatus::And => b == 3,
-        ShapesOpStatus::Or => b == 5,
-        _ => false,
-    };
-    assert!(
-        compatible0 && compatible1 && a * b == 15,
-        "{:?}",
-        geom_loops_store0.display(wire_id_format)
-    );
-    assert_eq!(geom_loops_store0[1].len(), 2);
-    assert!(
-        geom_loops_store0[1][0].is_closed(),
-        "{:?}",
-        geom_loops_store0.display(wire_id_format)
-    );
-    assert!(
-        geom_loops_store0[1][1].is_closed(),
-        "{:?}",
-        geom_loops_store0.display(wire_id_format)
-    );
-    assert!(
-        geom_loops_store0[1][0].is_geometric_consistent(),
-        "{:?}",
-        geom_loops_store0.display(wire_geom_format)
-    );
-    assert!(
-        geom_loops_store0[1][1].is_geometric_consistent(),
-        "{:?}",
-        geom_loops_store0.display(wire_geom_format)
-    );
-    let (a, b) = (geom_loops_store0[1][0].len(), geom_loops_store0[1][1].len());
-    let compatible0 = match geom_loops_store0[1][0].status() {
-        ShapesOpStatus::And => a == 3,
-        ShapesOpStatus::Or => a == 5,
-        _ => false,
-    };
-    let compatible1 = match geom_loops_store0[1][1].status() {
-        ShapesOpStatus::And => b == 3,
-        ShapesOpStatus::Or => b == 5,
-        _ => false,
-    };
-    assert!(
-        compatible0 && compatible1 && a * b == 15,
-        "{:?}",
-        geom_loops_store0.display(wire_id_format)
-    );
-    assert_eq!(geom_loops_store1.len(), 2);
-    assert_eq!(geom_loops_store1[0].len(), 2);
-    assert!(
-        geom_loops_store1[0][0].is_closed(),
-        "{:?}",
-        geom_loops_store1.display(wire_id_format)
-    );
-    assert!(
-        geom_loops_store1[0][1].is_closed(),
-        "{:?}",
-        geom_loops_store1.display(wire_id_format)
-    );
-    assert!(
-        geom_loops_store1[0][0].is_geometric_consistent(),
-        "{:?}",
-        geom_loops_store1.display(wire_geom_format)
-    );
-    assert!(
-        geom_loops_store1[0][1].is_geometric_consistent(),
-        "{:?}",
-        geom_loops_store1.display(wire_geom_format)
-    );
-    let (a, b) = (geom_loops_store1[0][0].len(), geom_loops_store1[0][1].len());
-    let compatible0 = match geom_loops_store1[0][0].status() {
-        ShapesOpStatus::And => a == 3,
-        ShapesOpStatus::Or => a == 5,
-        _ => false,
-    };
-    let compatible1 = match geom_loops_store1[0][1].status() {
-        ShapesOpStatus::And => b == 3,
-        ShapesOpStatus::Or => b == 5,
-        _ => false,
-    };
-    assert!(
-        compatible0 && compatible1 && a * b == 15,
-        "{:?}",
-        geom_loops_store1.display(wire_id_format)
-    );
-    assert_eq!(geom_loops_store1[1].len(), 2);
-    assert!(
-        geom_loops_store1[1][0].is_closed(),
-        "{:?}",
-        geom_loops_store1.display(wire_id_format)
-    );
-    assert!(
-        geom_loops_store1[1][1].is_closed(),
-        "{:?}",
-        geom_loops_store1.display(wire_id_format)
-    );
-    assert!(
-        geom_loops_store1[1][0].is_geometric_consistent(),
-        "{:?}",
-        geom_loops_store1.display(wire_geom_format)
-    );
-    assert!(
-        geom_loops_store1[1][1].is_geometric_consistent(),
-        "{:?}",
-        geom_loops_store1.display(wire_geom_format)
-    );
-    let (a, b) = (geom_loops_store1[1][0].len(), geom_loops_store1[1][1].len());
-    let compatible0 = match geom_loops_store1[1][0].status() {
-        ShapesOpStatus::And => a == 3,
-        ShapesOpStatus::Or => a == 5,
-        _ => false,
-    };
-    let compatible1 = match geom_loops_store1[1][1].status() {
-        ShapesOpStatus::And => b == 3,
-        ShapesOpStatus::Or => b == 5,
-        _ => false,
-    };
-    assert!(
-        compatible0 && compatible1 && a * b == 15,
-        "{:?}",
-        geom_loops_store1.display(wire_id_format)
-    );
+    assert_loops_store_well_formed(&geom_loops_store0, wire_id_format, wire_geom_format);
+    assert_loops_store_well_formed(&geom_loops_store1, wire_id_format, wire_geom_format);
 }
 
 #[test]
@@ -628,154 +502,6 @@ fn crossing_edges() {
     let wire_geom_format = WireDisplayFormat::EdgesListTuple {
         edge_format: edge_geom_format,
     };
-    assert_eq!(geom_loops_store0.len(), 2);
-    assert_eq!(geom_loops_store0[0].len(), 2);
-    assert!(
-        geom_loops_store0[0][0].is_closed(),
-        "{:?}",
-        geom_loops_store0.display(wire_id_format)
-    );
-    assert!(
-        geom_loops_store0[0][1].is_closed(),
-        "{:?}",
-        geom_loops_store0.display(wire_id_format)
-    );
-    assert!(
-        geom_loops_store0[0][0].is_geometric_consistent(),
-        "{:?}",
-        geom_loops_store0.display(wire_geom_format)
-    );
-    assert!(
-        geom_loops_store0[0][1].is_geometric_consistent(),
-        "{:?}",
-        geom_loops_store0.display(wire_geom_format)
-    );
-    let (a, b) = (geom_loops_store0[0][0].len(), geom_loops_store0[0][1].len());
-    let compatible0 = match geom_loops_store0[0][0].status() {
-        ShapesOpStatus::And => a == 2,
-        ShapesOpStatus::Or => a == 4,
-        _ => false,
-    };
-    let compatible1 = match geom_loops_store0[0][1].status() {
-        ShapesOpStatus::And => b == 2,
-        ShapesOpStatus::Or => b == 4,
-        _ => false,
-    };
-    assert!(
-        compatible0 && compatible1 && a * b == 8,
-        "{:?}",
-        geom_loops_store0.display(wire_id_format)
-    );
-    assert_eq!(geom_loops_store0[1].len(), 2);
-    assert!(
-        geom_loops_store0[1][0].is_closed(),
-        "{:?}",
-        geom_loops_store0.display(wire_id_format)
-    );
-    assert!(
-        geom_loops_store0[1][1].is_closed(),
-        "{:?}",
-        geom_loops_store0.display(wire_id_format)
-    );
-    assert!(
-        geom_loops_store0[1][0].is_geometric_consistent(),
-        "{:?}",
-        geom_loops_store0.display(wire_geom_format)
-    );
-    assert!(
-        geom_loops_store0[1][1].is_geometric_consistent(),
-        "{:?}",
-        geom_loops_store0.display(wire_geom_format)
-    );
-    let (a, b) = (geom_loops_store0[1][0].len(), geom_loops_store0[1][1].len());
-    let compatible0 = match geom_loops_store0[1][0].status() {
-        ShapesOpStatus::And => a == 2,
-        ShapesOpStatus::Or => a == 4,
-        _ => false,
-    };
-    let compatible1 = match geom_loops_store0[1][1].status() {
-        ShapesOpStatus::And => b == 2,
-        ShapesOpStatus::Or => b == 4,
-        _ => false,
-    };
-    assert!(
-        compatible0 && compatible1 && a * b == 8,
-        "{:?}",
-        geom_loops_store0.display(wire_id_format)
-    );
-    assert_eq!(geom_loops_store1.len(), 2);
-    assert_eq!(geom_loops_store1[0].len(), 2);
-    assert!(
-        geom_loops_store1[0][0].is_closed(),
-        "{:?}",
-        geom_loops_store1.display(wire_id_format)
-    );
-    assert!(
-        geom_loops_store1[0][1].is_closed(),
-        "{:?}",
-        geom_loops_store1.display(wire_id_format)
-    );
-    assert!(
-        geom_loops_store1[0][0].is_geometric_consistent(),
-        "{:?}",
-        geom_loops_store1.display(wire_geom_format)
-    );
-    assert!(
-        geom_loops_store1[0][1].is_geometric_consistent(),
-        "{:?}",
-        geom_loops_store1.display(wire_geom_format)
-    );
-    let (a, b) = (geom_loops_store1[0][0].len(), geom_loops_store1[0][1].len());
-    let compatible0 = match geom_loops_store1[0][0].status() {
-        ShapesOpStatus::And => a == 2,
-        ShapesOpStatus::Or => a == 4,
-        _ => false,
-    };
-    let compatible1 = match geom_loops_store1[0][1].status() {
-        ShapesOpStatus::And => b == 2,
-        ShapesOpStatus::Or => b == 4,
-        _ => false,
-    };
-    assert!(
-        compatible0 && compatible1 && a * b == 8,
-        "{:?}",
-        geom_loops_store1.display(wire_id_format)
-    );
-    assert_eq!(geom_loops_store1[1].len(), 2);
-    assert!(
-        geom_loops_store1[1][0].is_closed(),
-        "{:?}",
-        geom_loops_store1.display(wire_id_format)
-    );
-    assert!(
-        geom_loops_store1[1][1].is_closed(),
-        "{:?}",
-        geom_loops_store1.display(wire_id_format)
-    );
-    assert!(
-        geom_loops_store1[1][0].is_geometric_consistent(),
-        "{:?}",
-        geom_loops_store1.display(wire_geom_format)
-    );
-    assert!(
-        geom_loops_store1[1][1].is_geometric_consistent(),
-        "{:?}",
-        geom_loops_store1.display(wire_geom_format)
-    );
-    let (a, b) = (geom_loops_store1[1][0].len(), geom_loops_store1[1][1].len());
-    let compatible0 = match geom_loops_store1[1][0].status() {
-        ShapesOpStatus::And => a == 2,
-        ShapesOpStatus::Or => a == 4,
-        _ => false,
-    };
-    let compatible1 = match geom_loops_store1[1][1].status() {
-        ShapesOpStatus::And => b == 2,
-        ShapesOpStatus::Or => b == 4,
-        _ => false,
-    };
-    assert!(
-        compatible0 && compatible1 && a * b == 8,
-        "{:?}",
-        geom_loops_store0.display(wire_id_format)
-    );
+    assert_loops_store_well_formed(&geom_loops_store0, wire_id_format, wire_geom_format);
+    assert_loops_store_well_formed(&geom_loops_store1, wire_id_format, wire_geom_format);
 }

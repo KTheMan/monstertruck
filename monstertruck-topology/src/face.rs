@@ -44,11 +44,10 @@ impl<P, C, S> Face<P, C, S> {
     }
 
     /// Creates a new face by a wire.
-    /// # Panic
     /// All wires in `boundaries` must be non-empty, simple and closed.
     #[inline(always)]
     pub fn new(boundaries: Vec<Wire<P, C>>, surface: S) -> Face<P, C, S> {
-        Face::try_new(boundaries, surface).remove_try()
+        Self::try_new(boundaries, surface).unwrap_or_else(|error| panic!("Face::new: {error}"))
     }
 
     /// Creates a new face by a wire.
@@ -62,18 +61,27 @@ impl<P, C, S> Face<P, C, S> {
             boundaries,
             orientation: true,
             surface: Arc::new(Mutex::new(surface)),
+            stable_id: StableId::UNASSIGNED,
         }
     }
+
+    /// Returns the stable persistent identifier of this face.
+    #[inline(always)]
+    pub fn stable_id(&self) -> StableId { self.stable_id }
+
+    /// Sets the stable persistent identifier of this face.
+    #[inline(always)]
+    pub fn set_stable_id(&mut self, id: StableId) { self.stable_id = id; }
 
     /// Creates a new face by a wire.
     /// # Remarks
     /// This method check the regularity conditions of `Face::try_new()` in the debug mode.  
     /// The programmer must guarantee this condition before using this method.
     #[inline(always)]
-    pub fn debug_new(boundaries: Vec<Wire<P, C>>, surface: S) -> Face<P, C, S> {
+    pub fn debug_new(boundaries: Vec<Wire<P, C>>, surface: S) -> Result<Face<P, C, S>> {
         match cfg!(debug_assertions) {
-            true => Face::new(boundaries, surface),
-            false => Face::new_unchecked(boundaries, surface),
+            true => Face::try_new(boundaries, surface),
+            false => Ok(Face::new_unchecked(boundaries, surface)),
         }
     }
 
@@ -178,6 +186,7 @@ impl<P, C, S> Face<P, C, S> {
             boundaries: self.boundaries.clone(),
             surface: Arc::clone(&self.surface),
             orientation: true,
+            stable_id: self.stable_id,
         }
     }
 
@@ -402,9 +411,9 @@ impl<P, C, S> Face<P, C, S> {
     /// assert_ne!(face0.id(), face1.id());
     /// ```
     #[inline(always)]
-    pub fn add_boundary(&mut self, wire: Wire<P, C>)
+    pub fn add_boundary(&mut self, wire: Wire<P, C>) -> Result<()>
     where S: Clone {
-        self.try_add_boundary(wire).remove_try()
+        self.try_add_boundary(wire)
     }
 
     /// Returns a new face whose surface is mapped by `surface_mapping`,
@@ -425,7 +434,7 @@ impl<P, C, S> Face<P, C, S> {
             .map(|wire| wire.try_mapped(&mut point_mapping, &mut curve_mapping))
             .collect::<Option<Vec<_>>>()?;
         let surface = surface_mapping(&*self.surface.lock())?;
-        let mut face = Face::debug_new(wires, surface);
+        let mut face = Face::debug_new(wires, surface).ok()?;
         if !self.orientation() {
             face.invert();
         }
@@ -497,7 +506,7 @@ impl<P, C, S> Face<P, C, S> {
             .map(|wire| wire.mapped(&mut point_mapping, &mut curve_mapping))
             .collect();
         let surface = surface_mapping(&*self.surface.lock());
-        let mut face = Face::debug_new(wires, surface);
+        let mut face = Face::new_unchecked(wires, surface);
         if !self.orientation() {
             face.invert();
         }
@@ -886,6 +895,7 @@ impl<P, C, S> Face<P, C, S> {
             boundaries: self.boundaries.clone(),
             orientation: self.orientation,
             surface: Arc::new(Mutex::new(self.surface())),
+            stable_id: StableId::UNASSIGNED,
         };
         let boundary = &mut face0.boundaries[0];
         let i = boundary
@@ -909,6 +919,7 @@ impl<P, C, S> Face<P, C, S> {
             boundaries: vec![new_wire],
             orientation: self.orientation,
             surface: Arc::new(Mutex::new(self.surface())),
+            stable_id: StableId::UNASSIGNED,
         };
         Some((face0, face1))
     }
@@ -1010,6 +1021,7 @@ impl<P, C, S> Face<P, C, S> {
             boundaries,
             orientation: self.orientation(),
             surface: Arc::new(Mutex::new(surface)),
+            stable_id: StableId::UNASSIGNED,
         })
     }
 
@@ -1117,6 +1129,7 @@ impl<P, C, S> Clone for Face<P, C, S> {
             boundaries: self.boundaries.clone(),
             orientation: self.orientation,
             surface: Arc::clone(&self.surface),
+            stable_id: self.stable_id,
         }
     }
 }
@@ -1264,7 +1277,7 @@ impl<P: Debug, C: Debug, S: Debug> Debug for DebugDisplay<'_, Face<P, C, S>, Fac
                 )
                 .finish(),
             FaceDisplayFormat::AsSurface => {
-                f.write_fmt(format_args!("{:?}", &MutexFmt(&self.entity.surface)))
+                f.write_fmt(format_args!("{:?}", MutexFmt(&self.entity.surface)))
             }
         }
     }

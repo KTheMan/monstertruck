@@ -1,6 +1,33 @@
 use super::*;
 use monstertruck_core::newton::{self, CalcOutput};
-use monstertruck_traits::ParametricCurve as PcurveTrait;
+use monstertruck_traits::{ParametricCurve as PcurveTrait, SnapCurveEndpoints};
+use std::ops::Bound;
+
+impl<P> SnapCurveEndpoints for Line<P> {}
+
+impl<P> SnapCurveEndpoints for BsplineCurve<P> {}
+
+impl<V> SnapCurveEndpoints for NurbsCurve<V> {}
+
+impl<C: SnapCurveEndpoints, T> SnapCurveEndpoints for Processor<C, T> {
+    fn snap_endpoints(&mut self, front: Point3, back: Point3) {
+        self.entity.snap_endpoints(front, back);
+    }
+}
+
+impl<C: SnapCurveEndpoints> SnapCurveEndpoints for TrimmedCurve<C> {
+    fn snap_endpoints(&mut self, front: Point3, back: Point3) {
+        self.curve_mut().snap_endpoints(front, back);
+    }
+}
+
+impl<C, S> SnapCurveEndpoints for ParameterCurve<C, S> {}
+
+impl<C: SnapCurveEndpoints, S0, S1> SnapCurveEndpoints for IntersectionCurve<C, S0, S1> {
+    fn snap_endpoints(&mut self, front: Point3, back: Point3) {
+        self.leader.snap_endpoints(front, back);
+    }
+}
 
 fn double_projection<S0, S1>(
     surface0: &S0,
@@ -89,6 +116,67 @@ impl<C, S0, S1> IntersectionCurve<C, S0, S1> {
     pub fn destruct(self) -> (S0, S1, C) { (self.surface0, self.surface1, self.leader) }
 }
 
+impl<C, S0, S1, T0, T1> SurfaceCurve<C, S0, S1, T0, T1> {
+    /// Constructor with face-local boundary curves.
+    #[inline(always)]
+    pub fn with_boundaries(
+        surface0: S0,
+        surface1: S1,
+        leader: C,
+        boundary0: Option<T0>,
+        boundary1: Option<T1>,
+    ) -> Self {
+        Self {
+            surface0,
+            surface1,
+            leader,
+            boundary0,
+            boundary1,
+        }
+    }
+    /// This curve is carried by `self.surface0()` and `self.surface1()`.
+    #[inline(always)]
+    pub fn surface0(&self) -> &S0 { &self.surface0 }
+    /// This curve is carried by `self.surface0()` and `self.surface1()`.
+    #[inline(always)]
+    pub fn surface1(&self) -> &S1 { &self.surface1 }
+    /// Returns the 3D leader curve.
+    #[inline(always)]
+    pub fn leader(&self) -> &C { &self.leader }
+    /// This curve is carried by `self.surface0()` and `self.surface1()`.
+    #[inline(always)]
+    pub fn surface0_mut(&mut self) -> &mut S0 { &mut self.surface0 }
+    /// This curve is carried by `self.surface0()` and `self.surface1()`.
+    #[inline(always)]
+    pub fn surface1_mut(&mut self) -> &mut S1 { &mut self.surface1 }
+    /// Returns the 3D leader curve.
+    #[inline(always)]
+    pub fn leader_mut(&mut self) -> &mut C { &mut self.leader }
+    /// Returns the exact face-local boundary on `surface0`, if available.
+    #[inline(always)]
+    pub fn boundary0(&self) -> Option<&T0> { self.boundary0.as_ref() }
+    /// Returns the exact face-local boundary on `surface1`, if available.
+    #[inline(always)]
+    pub fn boundary1(&self) -> Option<&T1> { self.boundary1.as_ref() }
+    /// Returns the mutable exact face-local boundary on `surface0`, if available.
+    #[inline(always)]
+    pub fn boundary0_mut(&mut self) -> Option<&mut T0> { self.boundary0.as_mut() }
+    /// Returns the mutable exact face-local boundary on `surface1`, if available.
+    #[inline(always)]
+    pub fn boundary1_mut(&mut self) -> Option<&mut T1> { self.boundary1.as_mut() }
+    /// Destructs `self`, preserving face-local boundaries.
+    #[inline(always)]
+    pub fn destruct_with_boundaries(self) -> (S0, S1, C, Option<T0>, Option<T1>) {
+        (
+            self.surface0,
+            self.surface1,
+            self.leader,
+            self.boundary0,
+            self.boundary1,
+        )
+    }
+}
+
 impl<C, S0, S1> IntersectionCurve<C, S0, S1>
 where
     C: ParametricCurve3D,
@@ -170,6 +258,50 @@ where
     }
 }
 
+impl<C, S0, S1, T0, T1> SurfaceCurve<C, S0, S1, T0, T1>
+where
+    C: ParametricCurve3D,
+    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
+    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
+{
+    /// Search triple value of the point corresponding to the parameter `t`.
+    /// - the coordinate on 3D space
+    /// - the uv coordinate on `self.surface0()`
+    /// - the uv coordinate on `self.surface1()`
+    #[inline(always)]
+    pub fn search_triple(&self, t: f64, trials: usize) -> Option<(Point3, Point2, Point2)> {
+        let point = self.leader.subs(t);
+        double_projection(
+            self.surface0(),
+            None,
+            self.surface1(),
+            None,
+            point,
+            self.leader.der(t),
+            trials,
+        )
+        .or_else(|| self.search_nearest_point(point, None, None, trials))
+    }
+    /// Search triple value of the point nearest to `point`.
+    /// - the coordinate on 3D space
+    /// - the uv coordinate on `self.surface0()`
+    /// - the uv coordinate on `self.surface1()`
+    pub fn search_nearest_point(
+        &self,
+        point: Point3,
+        hint0: Option<(f64, f64)>,
+        hint1: Option<(f64, f64)>,
+        trials: usize,
+    ) -> Option<(Point3, Point2, Point2)> {
+        let intersection = IntersectionCurve::new(
+            self.surface0.clone(),
+            self.surface1.clone(),
+            self.leader.clone(),
+        );
+        intersection.search_nearest_point(point, hint0, hint1, trials)
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct DerRoutineImmutableArgs {
     s0ders: SurfaceDers<Vector3>,
@@ -244,9 +376,19 @@ where
     type Point = Point3;
     type Vector = Vector3;
     fn evaluate(&self, t: f64) -> Point3 {
-        self.search_triple(t, 100)
-            .map(|triple| triple.0)
-            .unwrap_or_else(|| self.leader.subs(t))
+        if let (Bound::Included(t0), Bound::Included(_)) = self.leader.parameter_range()
+            && t.near(&t0)
+        {
+            self.leader.subs(t0)
+        } else if let (Bound::Included(_), Bound::Included(t1)) = self.leader.parameter_range()
+            && t.near(&t1)
+        {
+            self.leader.subs(t1)
+        } else {
+            self.search_triple(t, 100)
+                .map(|triple| triple.0)
+                .unwrap_or_else(|| self.leader.subs(t))
+        }
     }
     fn derivative(&self, t: f64) -> Vector3 {
         let IntersectionCurve {
@@ -321,7 +463,7 @@ where
 
 impl<C, S0, S1> ParameterDivision1D for IntersectionCurve<C, S0, S1>
 where
-    C: ParametricCurve3D,
+    C: ParametricCurve3D + BoundedCurve,
     S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
     S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
 {
@@ -334,16 +476,23 @@ where
 
 impl<C, S0, S1> Cut for IntersectionCurve<C, S0, S1>
 where
-    C: Cut<Point = Point3, Vector = Vector3>,
+    C: Cut<Point = Point3, Vector = Vector3> + SnapCurveEndpoints,
     S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
     S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
 {
-    #[inline(always)]
     fn cut(&mut self, t: f64) -> Self {
+        let split = self.search_triple(t, 100).map(|(point, _, _)| point);
+        let front = self.front();
+        let mut leader = self.leader.cut(t);
+        let back = leader.back();
+        if let Some(point) = split {
+            self.leader.snap_endpoints(front, point);
+            leader.snap_endpoints(point, back);
+        }
         Self {
             surface0: self.surface0.clone(),
             surface1: self.surface1.clone(),
-            leader: self.leader.cut(t),
+            leader,
         }
     }
 }
@@ -414,6 +563,191 @@ impl<C: BoundedCurve> IntersectionCurve<C, Plane, Plane> {
     pub fn optimize(&self) -> Line<C::Point> {
         let (s, t) = self.leader.range_tuple();
         Line(self.leader.subs(s), self.leader.subs(t))
+    }
+}
+
+impl<C, S0, S1, T0, T1> PcurveTrait for SurfaceCurve<C, S0, S1, T0, T1>
+where
+    C: ParametricCurve3D,
+    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
+    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
+    T0: Clone,
+    T1: Clone,
+{
+    type Point = Point3;
+    type Vector = Vector3;
+    fn evaluate(&self, t: f64) -> Point3 {
+        IntersectionCurve::new(
+            self.surface0.clone(),
+            self.surface1.clone(),
+            self.leader.clone(),
+        )
+        .evaluate(t)
+    }
+    fn derivative(&self, t: f64) -> Vector3 {
+        IntersectionCurve::new(
+            self.surface0.clone(),
+            self.surface1.clone(),
+            self.leader.clone(),
+        )
+        .derivative(t)
+    }
+    fn derivative_2(&self, t: f64) -> Vector3 {
+        IntersectionCurve::new(
+            self.surface0.clone(),
+            self.surface1.clone(),
+            self.leader.clone(),
+        )
+        .derivative_2(t)
+    }
+    fn derivative_n(&self, n: usize, t: f64) -> Vector3 {
+        IntersectionCurve::new(
+            self.surface0.clone(),
+            self.surface1.clone(),
+            self.leader.clone(),
+        )
+        .derivative_n(n, t)
+    }
+    fn derivatives(&self, n: usize, t: f64) -> CurveDers<Vector3> {
+        IntersectionCurve::new(
+            self.surface0.clone(),
+            self.surface1.clone(),
+            self.leader.clone(),
+        )
+        .derivatives(n, t)
+    }
+    #[inline(always)]
+    fn parameter_range(&self) -> ParameterRange { self.leader.parameter_range() }
+}
+
+impl<C, S0, S1, T0, T1> BoundedCurve for SurfaceCurve<C, S0, S1, T0, T1>
+where
+    C: ParametricCurve3D + BoundedCurve,
+    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
+    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
+    T0: Clone,
+    T1: Clone,
+{
+}
+
+impl<C, S0, S1, T0, T1> ParameterDivision1D for SurfaceCurve<C, S0, S1, T0, T1>
+where
+    C: ParametricCurve3D + BoundedCurve,
+    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
+    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
+    T0: Clone,
+    T1: Clone,
+{
+    type Point = Point3;
+    #[inline(always)]
+    fn parameter_division(&self, range: (f64, f64), tol: f64) -> (Vec<f64>, Vec<Point3>) {
+        algo::curve::parameter_division(self, range, tol)
+    }
+}
+
+impl<C, S0, S1, T0, T1> Cut for SurfaceCurve<C, S0, S1, T0, T1>
+where
+    C: Cut<Point = Point3, Vector = Vector3>,
+    T0: Cut,
+    T1: Cut,
+    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
+    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
+{
+    #[inline(always)]
+    fn cut(&mut self, t: f64) -> Self {
+        Self {
+            surface0: self.surface0.clone(),
+            surface1: self.surface1.clone(),
+            leader: self.leader.cut(t),
+            boundary0: self.boundary0.as_mut().map(|boundary| boundary.cut(t)),
+            boundary1: self.boundary1.as_mut().map(|boundary| boundary.cut(t)),
+        }
+    }
+}
+
+impl<C, S0: Clone, S1: Clone, T0, T1> Invertible for SurfaceCurve<C, S0, S1, T0, T1>
+where
+    C: Invertible,
+    T0: Invertible,
+    T1: Invertible,
+{
+    fn invert(&mut self) {
+        self.leader.invert();
+        if let Some(boundary) = self.boundary0_mut() {
+            boundary.invert();
+        }
+        if let Some(boundary) = self.boundary1_mut() {
+            boundary.invert();
+        }
+    }
+}
+
+impl<C, S0, S1, T0, T1> SearchParameter<D1> for SurfaceCurve<C, S0, S1, T0, T1>
+where
+    C: ParametricCurve3D + SearchNearestParameter<D1, Point = Point3>,
+    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
+    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
+    T0: Clone,
+    T1: Clone,
+{
+    type Point = Point3;
+    fn search_parameter<H: Into<SearchParameterHint1D>>(
+        &self,
+        point: Point3,
+        hint: H,
+        trials: usize,
+    ) -> Option<f64> {
+        let intersection = IntersectionCurve::new(
+            self.surface0.clone(),
+            self.surface1.clone(),
+            self.leader.clone(),
+        );
+        intersection.search_parameter(point, hint, trials)
+    }
+}
+
+impl<C, S0, S1, T0, T1> SearchNearestParameter<D1> for SurfaceCurve<C, S0, S1, T0, T1>
+where
+    C: ParametricCurve3D + SearchNearestParameter<D1, Point = Point3>,
+    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
+    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
+    T0: Clone,
+    T1: Clone,
+{
+    type Point = Point3;
+    fn search_nearest_parameter<H: Into<SearchParameterHint1D>>(
+        &self,
+        point: Point3,
+        hint: H,
+        trials: usize,
+    ) -> Option<f64> {
+        let intersection = IntersectionCurve::new(
+            self.surface0.clone(),
+            self.surface1.clone(),
+            self.leader.clone(),
+        );
+        intersection.search_nearest_parameter(point, hint, trials)
+    }
+}
+
+impl<C, S0, S1, T0, T1> Transformed<Matrix4> for SurfaceCurve<C, S0, S1, T0, T1>
+where
+    C: Transformed<Matrix4>,
+    S0: Transformed<Matrix4>,
+    S1: Transformed<Matrix4>,
+    T0: Transformed<Matrix4>,
+    T1: Transformed<Matrix4>,
+{
+    fn transform_by(&mut self, trans: Matrix4) {
+        self.surface0.transform_by(trans);
+        self.surface1.transform_by(trans);
+        self.leader.transform_by(trans);
+        if let Some(boundary) = self.boundary0_mut() {
+            boundary.transform_by(trans);
+        }
+        if let Some(boundary) = self.boundary1_mut() {
+            boundary.transform_by(trans);
+        }
     }
 }
 

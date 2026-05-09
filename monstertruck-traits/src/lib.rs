@@ -34,6 +34,8 @@ pub mod traits;
 pub use traits::*;
 /// Algorithms for curves and surfaces.
 pub mod algo;
+/// Scalar-generic v2 trait family.
+pub mod v2;
 #[cfg(feature = "derive")]
 pub use monstertruck_derive::{
     BoundedCurve, BoundedSurface, Cut, Invertible, ParameterDivision1D, ParameterDivision2D,

@@ -30,6 +30,7 @@ bytemuck = { version = "1", features = ["derive"] }
 cgmath = { version = "0.18", features = ["serde"] }
 chrono = { version = "0.4", features = ["wasmbind"] }
 clap = { version = "4", features = ["derive"] }
+criterion = { version = "0.5", features = ["html_reports"] }
 console_error_panic_hook = "0.1"
 console_log = "1"
 derive_more = { version = "2", features = ["full"] }
@@ -43,6 +44,7 @@ itertools = "0.14"
 js-sys = "0.3"
 log = "0.4"
 matext4cgmath = "0.1"
+num-traits = "0.2"
 naga = { version = "27", features = ["wgsl-in"] }
 parking_lot = "0.12"
 pollster = "0.4"
@@ -52,8 +54,10 @@ proptest = "1"
 quote = "1"
 rand = "0.9"
 rayon = "1"
+rkyv = { version = "0.8.8", features = ["alloc"] }
 rclite = "0.4"
 rustc-hash = "2"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
 ruststep = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

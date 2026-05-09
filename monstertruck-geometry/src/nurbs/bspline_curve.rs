@@ -74,7 +74,12 @@ impl<P> BsplineCurve<P> {
         }
     }
 
-    /// Returns the reference of the knot vector
+    /// Returns the reference of the knot vector.
+    #[inline(always)]
+    pub const fn knot_vector(&self) -> &KnotVector { &self.knot_vec }
+
+    /// Renamed to [`knot_vector`](Self::knot_vector).
+    #[deprecated(note = "renamed to knot_vector")]
     #[inline(always)]
     pub const fn knot_vec(&self) -> &KnotVector { &self.knot_vec }
 
@@ -154,12 +159,12 @@ impl<P: ControlPoint<f64>> BsplineCurve<P> {
     ///
     /// const N: usize = 100; // sample size
     /// let get_t = |i: usize| -1.0 + 2.0 * (i as f64) / (N as f64);
-    /// let res: Vec<_> = (0..=N).map(get_t).map(bspcurve.get_closure()).collect();
+    /// let res: Vec<_> = (0..=N).map(get_t).map(bspcurve.closure()).collect();
     /// let ans: Vec<_> = (0..=N).map(get_t).map(|t| Vector2::new(t, t * t)).collect();
     /// res.iter().zip(&ans).for_each(|(v0, v1)| assert_near2!(v0, v1));
     /// ```
     #[inline(always)]
-    pub fn get_closure(&self) -> impl Fn(f64) -> P + '_ { move |t| self.subs(t) }
+    pub fn closure(&self) -> impl Fn(f64) -> P + '_ { move |t| self.subs(t) }
     #[inline(always)]
     fn delta_control_points(&self, i: usize) -> P::Diff {
         if i == 0 {
@@ -417,6 +422,92 @@ impl<P: ControlPoint<f64>> ParametricCurve for BsplineCurve<P> {
 
 impl<P: ControlPoint<f64>> BoundedCurve for BsplineCurve<P> {}
 
+// -- v2 scalar-generic impls ------------------------------------------------
+
+use monstertruck_core::scalar::HasScalar;
+use monstertruck_traits::v2;
+
+impl<P> v2::ParametricCurve for BsplineCurve<P>
+where P: HasScalar<Scalar = f64> + ControlPoint<f64>
+{
+    type Scalar = f64;
+    type Point = P;
+    type Vector = P::Diff;
+
+    #[inline(always)]
+    fn evaluate(&self, t: Self::Scalar) -> P { ParametricCurve::evaluate(self, t) }
+    #[inline(always)]
+    fn derivative(&self, t: Self::Scalar) -> P::Diff { ParametricCurve::derivative(self, t) }
+    #[inline(always)]
+    fn derivative_2(&self, t: Self::Scalar) -> P::Diff { ParametricCurve::derivative_2(self, t) }
+    #[inline(always)]
+    fn derivative_n(&self, n: usize, t: Self::Scalar) -> P::Diff {
+        ParametricCurve::derivative_n(self, n, t)
+    }
+    #[inline(always)]
+    fn period(&self) -> Option<Self::Scalar> { ParametricCurve::period(self) }
+    #[inline(always)]
+    fn try_range_tuple(&self) -> Option<(Self::Scalar, Self::Scalar)> {
+        ParametricCurve::try_range_tuple(self)
+    }
+}
+
+impl<P> v2::BoundedCurve for BsplineCurve<P>
+where P: HasScalar<Scalar = f64> + ControlPoint<f64>
+{
+    #[inline(always)]
+    fn range_tuple(&self) -> (f64, f64) { BoundedCurve::range_tuple(self) }
+}
+
+impl<P> v2::Cut for BsplineCurve<P>
+where P: HasScalar<Scalar = f64> + ControlPoint<f64> + Tolerance
+{
+    #[inline(always)]
+    fn cut(&mut self, t: f64) -> Self { Cut::cut(self, t) }
+}
+
+impl<P> v2::SearchNearestParameter<v2::D1<f64>> for BsplineCurve<P>
+where
+    P: HasScalar<Scalar = f64>
+        + ControlPoint<f64>
+        + EuclideanSpace<Scalar = f64, Diff = <P as ControlPoint<f64>>::Diff>
+        + MetricSpace<Metric = f64>
+        + Tolerance,
+    <P as ControlPoint<f64>>::Diff: InnerSpace<Scalar = f64> + Tolerance,
+{
+    type Point = P;
+    #[inline(always)]
+    fn search_nearest_parameter<H: Into<v2::SearchParameterHint1D<f64>>>(
+        &self,
+        pt: P,
+        _: H,
+        trials: usize,
+    ) -> Option<f64> {
+        SearchNearestParameter::<D1>::search_nearest_parameter(self, pt, None, trials)
+    }
+}
+
+impl<P> v2::SearchParameter<v2::D1<f64>> for BsplineCurve<P>
+where
+    P: HasScalar<Scalar = f64>
+        + ControlPoint<f64>
+        + EuclideanSpace<Scalar = f64, Diff = <P as ControlPoint<f64>>::Diff>
+        + MetricSpace<Metric = f64>
+        + Tolerance,
+    <P as ControlPoint<f64>>::Diff: InnerSpace<Scalar = f64> + Tolerance,
+{
+    type Point = P;
+    #[inline(always)]
+    fn search_parameter<H: Into<v2::SearchParameterHint1D<f64>>>(
+        &self,
+        pt: P,
+        _: H,
+        trials: usize,
+    ) -> Option<f64> {
+        SearchParameter::<D1>::search_parameter(self, pt, None, trials)
+    }
+}
+
 impl<P: ControlPoint<f64> + Tolerance> BsplineCurve<P> {
     /// Returns whether all control points are the same or not.
     /// If the knot vector is clamped, it means whether the curve is constant or not.
@@ -467,7 +558,7 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineCurve<P> {
     ///
     /// // add 4 knots
     /// bspcurve.add_knot(0.5).add_knot(0.5).add_knot(0.25).add_knot(0.75);
-    /// assert_eq!(bspcurve.knot_vec().len(), org_curve.knot_vec().len() + 4);
+    /// assert_eq!(bspcurve.knot_vector().len(), org_curve.knot_vector().len() + 4);
     /// // bspcurve does not change as a curve
     /// assert!(bspcurve.near2_as_curve(&org_curve));
     /// ```
@@ -478,13 +569,13 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineCurve<P> {
     /// let knot_vec = KnotVector::bezier_knot(2);
     /// let control_points = vec![Vector2::new(-1.0, 1.0), Vector2::new(0.0, -1.0), Vector2::new(1.0, 1.0)];
     /// let mut bspcurve = BsplineCurve::new(knot_vec, control_points);
-    /// assert_eq!(bspcurve.knot_vec().range_length(), 1.0);
+    /// assert_eq!(bspcurve.knot_vector().range_length(), 1.0);
     /// assert_eq!(bspcurve.front(), Vector2::new(-1.0, 1.0));
     /// assert_eq!(bspcurve.back(), Vector2::new(1.0, 1.0));
     ///
     /// // add knots out of the range of the knot vectors.
     /// bspcurve.add_knot(-1.0).add_knot(2.0);
-    /// assert_eq!(bspcurve.knot_vec().range_length(), 3.0);
+    /// assert_eq!(bspcurve.knot_vector().range_length(), 3.0);
     /// // The parameter range [knot[degree], knot[n_cv]] is still [0, 1].
     /// // front() is unchanged because the triple-0 knot still clamps the left boundary.
     /// assert_eq!(bspcurve.front(), Vector2::new(-1.0, 1.0));
@@ -535,7 +626,7 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineCurve<P> {
     /// bspcurve.add_knot(0.5).add_knot(0.5).add_knot(0.25).add_knot(0.75);
     /// bspcurve.remove_knot(3).remove_knot(3).remove_knot(3).remove_knot(3);
     /// assert!(bspcurve.near2_as_curve(&org_curve));
-    /// assert_eq!(bspcurve.knot_vec().len(), org_curve.knot_vec().len())
+    /// assert_eq!(bspcurve.knot_vector().len(), org_curve.knot_vector().len())
     /// ```
     pub fn remove_knot(&mut self, idx: usize) -> &mut Self {
         let _ = self.try_remove_knot(idx);
@@ -620,7 +711,7 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineCurve<P> {
     /// let mut bspcurve = BsplineCurve::new(knot_vec, control_points);
     /// bspcurve.elevate_degree();
     /// assert_eq!(bspcurve.degree(), 2);
-    /// assert_eq!(bspcurve.knot_vec(), &KnotVector::bezier_knot(2));
+    /// assert_eq!(bspcurve.knot_vector(), &KnotVector::bezier_knot(2));
     /// assert_eq!(bspcurve.control_point(1), &Vector2::new(0.5, 0.5));
     /// ```
     pub fn elevate_degree(&mut self) -> &mut Self {
@@ -644,7 +735,7 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineCurve<P> {
     /// assert!(!bspcurve.is_clamped());
     /// bspcurve.clamp();
     /// assert!(bspcurve.is_clamped());
-    /// assert_eq!(bspcurve.knot_vec().len(), 10);
+    /// assert_eq!(bspcurve.knot_vector().len(), 10);
     /// ```
     #[inline(always)]
     pub fn clamp(&mut self) -> &mut Self {
@@ -675,11 +766,11 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineCurve<P> {
     ///
     /// // add 4 new knots
     /// bspcurve.add_knot(0.5).add_knot(0.5).add_knot(0.25).add_knot(0.75);
-    /// assert_eq!(bspcurve.knot_vec().len(), KnotVector::bezier_knot(2).len() + 4);
+    /// assert_eq!(bspcurve.knot_vector().len(), KnotVector::bezier_knot(2).len() + 4);
     ///
     /// // By the optimization, added knots are removed.
     /// bspcurve.optimize();
-    /// assert_eq!(bspcurve.knot_vec(), &KnotVector::bezier_knot(2));
+    /// assert_eq!(bspcurve.knot_vector(), &KnotVector::bezier_knot(2));
     /// assert!(bspcurve.near2_as_curve(&org_curve));
     /// ```
     pub fn optimize(&mut self) -> &mut Self {
@@ -740,9 +831,9 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineCurve<P> {
     /// bspcurve0.syncro_knots(&mut bspcurve1);
     ///
     /// // The knot vectors are made the same.
-    /// assert_eq!(bspcurve0.knot_vec(), bspcurve1.knot_vec());
+    /// assert_eq!(bspcurve0.knot_vector(), bspcurve1.knot_vector());
     /// assert_eq!(
-    ///     bspcurve0.knot_vec().as_slice(),
+    ///     bspcurve0.knot_vector().as_slice(),
     ///     &[0.0, 0.0, 0.0, 0.25, 0.5, 0.75, 1.0, 1.0, 1.0]
     /// );
     /// // The degrees are not changed.

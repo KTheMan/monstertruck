@@ -91,7 +91,7 @@ impl<E: Clone, T: Clone> Invertible for Processor<E, T> {
 
 impl<C: BoundedCurve, T> Processor<C, T> {
     #[inline(always)]
-    fn get_curve_parameter(&self, t: f64) -> f64 {
+    fn curve_parameter(&self, t: f64) -> f64 {
         let (t0, t1) = self.range_tuple();
         match self.orientation {
             true => t,
@@ -114,24 +114,24 @@ where
         if n == 0 {
             self.evaluate(t).to_vec()
         } else {
-            let t = self.get_curve_parameter(t);
+            let t = self.curve_parameter(t);
             self.transform
                 .transform_vector(self.entity.derivative_n(n, t))
         }
     }
     #[inline(always)]
     fn evaluate(&self, t: f64) -> C::Point {
-        let t = self.get_curve_parameter(t);
+        let t = self.curve_parameter(t);
         self.transform.transform_point(self.entity.evaluate(t))
     }
     #[inline(always)]
     fn derivative(&self, t: f64) -> Self::Vector {
-        let t = self.get_curve_parameter(t);
+        let t = self.curve_parameter(t);
         self.transform.transform_vector(self.entity.derivative(t)) * self.sign()
     }
     #[inline(always)]
     fn derivative_2(&self, t: f64) -> Self::Vector {
-        let t = self.get_curve_parameter(t);
+        let t = self.curve_parameter(t);
         self.transform.transform_vector(self.entity.derivative_2(t))
     }
     #[inline(always)]
@@ -157,7 +157,7 @@ where
     T: Transform<C::Point> + Clone,
 {
     fn cut(&mut self, t: f64) -> Self {
-        let t = self.get_curve_parameter(t);
+        let t = self.curve_parameter(t);
         let mut entity = self.entity.cut(t);
         if !self.orientation {
             std::mem::swap(&mut entity, &mut self.entity);
@@ -305,6 +305,139 @@ where
 {
 }
 
+// -- v2 scalar-generic impls ------------------------------------------------
+
+use monstertruck_traits::v2;
+
+impl<S, T> v2::ParametricSurface for Processor<S, T>
+where
+    S: ParametricSurface<Point = Point3, Vector = Vector3>,
+    T: Transform<Point3> + SquareMatrix<Scalar = f64> + Clone,
+{
+    type Scalar = f64;
+    type Point = Point3;
+    type Vector = Vector3;
+
+    #[inline(always)]
+    fn evaluate(&self, u: f64, v: f64) -> Point3 { ParametricSurface::evaluate(self, u, v) }
+    #[inline(always)]
+    fn derivative_u(&self, u: f64, v: f64) -> Vector3 {
+        ParametricSurface::derivative_u(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_v(&self, u: f64, v: f64) -> Vector3 {
+        ParametricSurface::derivative_v(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_uu(&self, u: f64, v: f64) -> Vector3 {
+        ParametricSurface::derivative_uu(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_uv(&self, u: f64, v: f64) -> Vector3 {
+        ParametricSurface::derivative_uv(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_vv(&self, u: f64, v: f64) -> Vector3 {
+        ParametricSurface::derivative_vv(self, u, v)
+    }
+    #[inline(always)]
+    fn period_u(&self) -> Option<f64> { ParametricSurface::u_period(self) }
+    #[inline(always)]
+    fn period_v(&self) -> Option<f64> { ParametricSurface::v_period(self) }
+}
+
+impl<S, T> v2::BoundedSurface for Processor<S, T>
+where
+    S: BoundedSurface<Point = Point3, Vector = Vector3>,
+    T: Transform<Point3> + SquareMatrix<Scalar = f64> + Clone,
+{
+    #[inline(always)]
+    fn range_tuple(&self) -> ((f64, f64), (f64, f64)) { BoundedSurface::range_tuple(self) }
+}
+
+impl<S, T> v2::ParametricSurface3D for Processor<S, T>
+where
+    S: ParametricSurface3D,
+    T: Transform<Point3> + SquareMatrix<Scalar = f64> + Clone,
+{
+    #[inline(always)]
+    fn normal(&self, u: f64, v: f64) -> Vector3 { ParametricSurface3D::normal(self, u, v) }
+}
+
+impl<E, T> v2::SearchParameter<v2::D1<f64>> for Processor<E, T>
+where
+    E: SearchParameter<D1> + BoundedCurve,
+    <E as SearchParameter<D1>>::Point: EuclideanSpace,
+    T: Transform<<E as SearchParameter<D1>>::Point>,
+{
+    type Point = <E as SearchParameter<D1>>::Point;
+    #[inline(always)]
+    fn search_parameter<H: Into<v2::SearchParameterHint1D<f64>>>(
+        &self,
+        pt: Self::Point,
+        _: H,
+        trials: usize,
+    ) -> Option<f64> {
+        SearchParameter::<D1>::search_parameter(self, pt, None, trials)
+    }
+}
+
+impl<P, E, T> v2::SearchNearestParameter<v2::D1<f64>> for Processor<E, T>
+where
+    E: BoundedCurve<Point = P> + SearchNearestParameter<D1, Point = P>,
+    P: EuclideanSpace<Scalar = f64, Diff = E::Vector>,
+    E::Vector: InnerSpace<Scalar = f64> + Tolerance,
+    T: Transform<P> + Clone,
+{
+    type Point = P;
+    #[inline(always)]
+    fn search_nearest_parameter<H: Into<v2::SearchParameterHint1D<f64>>>(
+        &self,
+        pt: P,
+        _: H,
+        trials: usize,
+    ) -> Option<f64> {
+        SearchNearestParameter::<D1>::search_nearest_parameter(self, pt, None, trials)
+    }
+}
+
+impl<E, T> v2::SearchParameter<v2::D2<f64>> for Processor<E, T>
+where
+    E: SearchParameter<D2>,
+    E::Point: EuclideanSpace,
+    T: Transform<E::Point>,
+{
+    type Point = E::Point;
+    #[inline(always)]
+    fn search_parameter<H: Into<v2::SearchParameterHint2D<f64>>>(
+        &self,
+        pt: E::Point,
+        _: H,
+        trials: usize,
+    ) -> Option<(f64, f64)> {
+        SearchParameter::<D2>::search_parameter(self, pt, None, trials)
+    }
+}
+
+impl<P, E, T> v2::SearchNearestParameter<v2::D2<f64>> for Processor<E, T>
+where
+    E: ParametricSurface<Point = P> + SearchNearestParameter<D2, Point = P>,
+    P: EuclideanSpace<Scalar = f64, Diff = E::Vector> + MetricSpace<Metric = f64> + Tolerance,
+    E::Vector: SearchNearestParameterVector<Point = P>,
+    T: Transform<P> + SquareMatrix<Scalar = f64> + Clone,
+{
+    type Point = P;
+    #[inline(always)]
+    fn search_nearest_parameter<H: Into<v2::SearchParameterHint2D<f64>>>(
+        &self,
+        pt: P,
+        _: H,
+        trials: usize,
+    ) -> Option<(f64, f64)> {
+        SearchNearestParameter::<D2>::search_nearest_parameter(self, pt, None, trials)
+    }
+}
+
 impl<E, T> Deref for Processor<E, T> {
     type Target = E;
     #[inline(always)]
@@ -358,10 +491,7 @@ where C: ParameterDivision1D<Point = Point2> + BoundedCurve<Point = Point2>
         let a = self.transform;
         let range = match self.orientation {
             true => range,
-            false => (
-                self.get_curve_parameter(range.1),
-                self.get_curve_parameter(range.0),
-            ),
+            false => (self.curve_parameter(range.1), self.curve_parameter(range.0)),
         };
         let (_, k, _) = a
             .iwasawa_decomposition()
@@ -376,7 +506,7 @@ where C: ParameterDivision1D<Point = Point2> + BoundedCurve<Point = Point2>
         if !self.orientation {
             params
                 .iter_mut()
-                .for_each(|t| *t = self.get_curve_parameter(*t));
+                .for_each(|t| *t = self.curve_parameter(*t));
             points.reverse();
         }
         (params, points)
@@ -391,10 +521,7 @@ where C: ParameterDivision1D<Point = Point3> + BoundedCurve<Point = Point3>
         let a = self.transform;
         let range = match self.orientation {
             true => range,
-            false => (
-                self.get_curve_parameter(range.1),
-                self.get_curve_parameter(range.0),
-            ),
+            false => (self.curve_parameter(range.1), self.curve_parameter(range.0)),
         };
         let (_, k, _) = a
             .iwasawa_decomposition()
@@ -410,7 +537,7 @@ where C: ParameterDivision1D<Point = Point3> + BoundedCurve<Point = Point3>
         if !self.orientation {
             params
                 .iter_mut()
-                .for_each(|t| *t = self.get_curve_parameter(*t));
+                .for_each(|t| *t = self.curve_parameter(*t));
             points.reverse();
         }
         (params, points)
@@ -486,7 +613,7 @@ where
         let t = self
             .entity
             .search_parameter(inv.transform_point(point), hint, trials)?;
-        Some(self.get_curve_parameter(t))
+        Some(self.curve_parameter(t))
     }
 }
 
@@ -534,7 +661,7 @@ where
         let hint =
             self.entity
                 .search_nearest_parameter(inv.transform_point(point), hint, trials)?;
-        let hint = self.get_curve_parameter(hint);
+        let hint = self.curve_parameter(hint);
         algo::curve::search_nearest_parameter(self, point, hint, trials)
     }
 }

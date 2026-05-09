@@ -44,13 +44,25 @@ pub mod decorators;
 /// T-Spline and T-NURCC surface types.
 pub mod t_spline;
 
+/// [`DeterministicContentHash`](monstertruck_core::DeterministicContentHash) impls for geometry types.
+mod content_hash_impls;
+
+/// Trait for extracting an exact polynomial B-spline surface representation.
+mod bspline_conversion;
+mod parameter_boundary;
+
 /// re-export all modules.
 pub mod prelude {
     use crate::*;
     pub use base::*;
+    pub use bspline_conversion::{
+        SupportsExactPatchDomains, TryIntoBsplineSurface, TryIntoHomogeneousBsplineCurve,
+        TryIntoHomogeneousBsplineSurface,
+    };
     pub use decorators::*;
     pub use errors::*;
     pub use nurbs::*;
+    pub use parameter_boundary::BoundaryCurve2D;
     pub use specifieds::*;
     pub use t_spline::*;
 }

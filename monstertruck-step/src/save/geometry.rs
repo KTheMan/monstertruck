@@ -1,7 +1,10 @@
 use super::{Result, *};
 use monstertruck_geometry::prelude::*;
 use monstertruck_mesh::PolylineCurve;
-use monstertruck_modeling::{Curve as ModelingCurve, Surface as ModelingSurface};
+use monstertruck_modeling::{
+    Conic2D as ModelingConic2D, Curve as ModelingCurve, Curve2D as ModelingCurve2D,
+    Surface as ModelingSurface,
+};
 
 impl DisplayByStep for Point2 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
@@ -123,7 +126,7 @@ impl<P> DisplayByStep for BsplineCurve<P>
 where P: Copy + ConstStepLength + DisplayByStep
 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
-        let (knots, multi) = self.knot_vec().to_single_multi();
+        let (knots, multi) = self.knot_vector().to_single_multi();
         let control_points_instances = self
             .control_points()
             .iter()
@@ -154,7 +157,7 @@ where
     V::Point: ConstStepLength + DisplayByStep,
 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
-        let (knots, multi) = self.knot_vec().to_single_multi();
+        let (knots, multi) = self.knot_vector().to_single_multi();
         let control_points_instances = self
             .control_points()
             .iter()
@@ -365,7 +368,7 @@ where
         ))?;
         self.leader().fmt(curve_idx, f)?;
         self.surface0().fmt(surface0_idx, f)?;
-        self.surface1().fmt(surface0_idx, f)
+        self.surface1().fmt(surface1_idx, f)
     }
 }
 
@@ -373,6 +376,60 @@ impl<C: StepLength, S0: StepLength, S1: StepLength> StepLength for IntersectionC
     #[inline(always)]
     fn step_length(&self) -> usize {
         1 + self.leader().step_length()
+            + self.surface0().step_length()
+            + self.surface1().step_length()
+    }
+}
+
+impl<C, S0, S1, T0, T1> DisplayByStep for SurfaceCurve<C, S0, S1, T0, T1>
+where
+    C: StepLength + DisplayByStep,
+    S0: StepLength + DisplayByStep,
+    S1: StepLength + DisplayByStep,
+    T0: StepLength + DisplayByStep,
+    T1: StepLength + DisplayByStep,
+{
+    fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
+        let curve_idx = idx + 1;
+        let boundary0_idx = curve_idx + self.leader().step_length();
+        let boundary1_idx = boundary0_idx + self.boundary0().map_or(0, StepLength::step_length);
+        let surface0_idx = boundary1_idx + self.boundary1().map_or(0, StepLength::step_length);
+        let surface1_idx = surface0_idx + self.surface0().step_length();
+        let assoc0 = self
+            .boundary0()
+            .map(|_| format!("#{boundary0_idx}"))
+            .unwrap_or_else(|| format!("#{surface0_idx}"));
+        let assoc1 = self
+            .boundary1()
+            .map(|_| format!("#{boundary1_idx}"))
+            .unwrap_or_else(|| format!("#{surface1_idx}"));
+        f.write_fmt(format_args!(
+            "#{idx} = INTERSECTION_CURVE('', #{curve_idx}, ({assoc0}, {assoc1}), .CURVE_3D.);\n"
+        ))?;
+        self.leader().fmt(curve_idx, f)?;
+        if let Some(boundary) = self.boundary0() {
+            boundary.fmt(boundary0_idx, f)?;
+        }
+        if let Some(boundary) = self.boundary1() {
+            boundary.fmt(boundary1_idx, f)?;
+        }
+        self.surface0().fmt(surface0_idx, f)?;
+        self.surface1().fmt(surface1_idx, f)
+    }
+}
+
+impl<C, S0, S1, T0, T1> StepLength for SurfaceCurve<C, S0, S1, T0, T1>
+where
+    C: StepLength,
+    S0: StepLength,
+    S1: StepLength,
+    T0: StepLength,
+    T1: StepLength,
+{
+    fn step_length(&self) -> usize {
+        1 + self.leader().step_length()
+            + self.boundary0().map_or(0, StepLength::step_length)
+            + self.boundary1().map_or(0, StepLength::step_length)
             + self.surface0().step_length()
             + self.surface1().step_length()
     }
@@ -434,12 +491,61 @@ impl<C: StepCurve, S> StepCurve for ParameterCurve<C, S> {
     fn same_sense(&self) -> bool { self.curve().same_sense() }
 }
 
+impl DisplayByStep for ModelingConic2D {
+    fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
+        match self {
+            ModelingConic2D::Ellipse(x) => DisplayByStep::fmt(x, idx, f),
+            ModelingConic2D::Hyperbola(x) => DisplayByStep::fmt(x, idx, f),
+            ModelingConic2D::Parabola(x) => DisplayByStep::fmt(x, idx, f),
+        }
+    }
+}
+
+impl StepLength for ModelingConic2D {
+    fn step_length(&self) -> usize {
+        match self {
+            ModelingConic2D::Ellipse(x) => x.step_length(),
+            ModelingConic2D::Hyperbola(x) => x.step_length(),
+            ModelingConic2D::Parabola(x) => x.step_length(),
+        }
+    }
+}
+
+impl StepCurve for ModelingConic2D {}
+
+impl DisplayByStep for ModelingCurve2D {
+    fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
+        match self {
+            ModelingCurve2D::Line(x) => DisplayByStep::fmt(x, idx, f),
+            ModelingCurve2D::Polyline(x) => DisplayByStep::fmt(x, idx, f),
+            ModelingCurve2D::Conic(x) => DisplayByStep::fmt(x, idx, f),
+            ModelingCurve2D::BsplineCurve(x) => DisplayByStep::fmt(x, idx, f),
+            ModelingCurve2D::NurbsCurve(x) => DisplayByStep::fmt(x, idx, f),
+        }
+    }
+}
+
+impl StepLength for ModelingCurve2D {
+    fn step_length(&self) -> usize {
+        match self {
+            ModelingCurve2D::Line(_) => Line::<Point2>::LENGTH,
+            ModelingCurve2D::Polyline(x) => x.step_length(),
+            ModelingCurve2D::Conic(x) => x.step_length(),
+            ModelingCurve2D::BsplineCurve(x) => x.step_length(),
+            ModelingCurve2D::NurbsCurve(x) => x.step_length(),
+        }
+    }
+}
+
+impl StepCurve for ModelingCurve2D {}
+
 impl DisplayByStep for ModelingCurve {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         match self {
             ModelingCurve::Line(x) => DisplayByStep::fmt(x, idx, f),
             ModelingCurve::BsplineCurve(x) => DisplayByStep::fmt(x, idx, f),
             ModelingCurve::NurbsCurve(x) => DisplayByStep::fmt(x, idx, f),
+            ModelingCurve::ParameterCurve(x) => DisplayByStep::fmt(x, idx, f),
             ModelingCurve::IntersectionCurve(x) => DisplayByStep::fmt(x, idx, f),
         }
     }
@@ -451,6 +557,7 @@ impl StepLength for ModelingCurve {
             ModelingCurve::Line(_) => Line::<Point3>::LENGTH,
             ModelingCurve::BsplineCurve(x) => x.step_length(),
             ModelingCurve::NurbsCurve(x) => x.step_length(),
+            ModelingCurve::ParameterCurve(x) => x.step_length(),
             ModelingCurve::IntersectionCurve(x) => x.step_length(),
         }
     }
@@ -663,7 +770,7 @@ impl<V> StepLength for NurbsSurface<V> {
 }
 impl<V> StepSurface for NurbsSurface<V> {}
 
-impl<C> DisplayByStep for ExtrudedCurve<C, Vector3>
+impl<C> DisplayByStep for ExtrusionSurface<C, Vector3>
 where C: StepLength + DisplayByStep
 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
@@ -678,20 +785,20 @@ where C: StepLength + DisplayByStep
         ))
     }
 }
-impl<C: StepLength> StepLength for ExtrudedCurve<C, Vector3> {
+impl<C: StepLength> StepLength for ExtrusionSurface<C, Vector3> {
     fn step_length(&self) -> usize { 1 + self.entity_curve().step_length() + Vector3::LENGTH }
 }
-impl<C: ConstStepLength> ConstStepLength for ExtrudedCurve<C, Vector3> {
+impl<C: ConstStepLength> ConstStepLength for ExtrusionSurface<C, Vector3> {
     const LENGTH: usize = 1 + C::LENGTH + Vector3::LENGTH;
 }
-impl<C> StepSurface for ExtrudedCurve<C, Vector3> {}
+impl<C> StepSurface for ExtrusionSurface<C, Vector3> {}
 
-impl<C, T: One> StepSurface for Processor<ExtrudedCurve<C, Vector3>, T> {
+impl<C, T: One> StepSurface for Processor<ExtrusionSurface<C, Vector3>, T> {
     #[inline(always)]
     fn same_sense(&self) -> bool { self.orientation() }
 }
 
-impl<C> DisplayByStep for RevolutedCurve<C>
+impl<C> DisplayByStep for RevolutionSurface<C>
 where C: StepLength + DisplayByStep
 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
@@ -710,21 +817,21 @@ where C: StepLength + DisplayByStep
     }
 }
 
-impl<C: StepLength> StepLength for RevolutedCurve<C> {
+impl<C: StepLength> StepLength for RevolutionSurface<C> {
     #[inline(always)]
     fn step_length(&self) -> usize { 4 + self.entity_curve().step_length() }
 }
 
-impl<C: ConstStepLength> ConstStepLength for RevolutedCurve<C> {
+impl<C: ConstStepLength> ConstStepLength for RevolutionSurface<C> {
     const LENGTH: usize = 4 + C::LENGTH;
 }
 
-impl<C> StepSurface for RevolutedCurve<C> {
+impl<C> StepSurface for RevolutionSurface<C> {
     #[inline(always)]
     fn same_sense(&self) -> bool { false }
 }
 
-impl<C> DisplayByStep for Processor<RevolutedCurve<C>, Matrix4>
+impl<C> DisplayByStep for Processor<RevolutionSurface<C>, Matrix4>
 where C: StepLength + Transformed<Matrix4> + DisplayByStep
 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
@@ -744,15 +851,15 @@ where C: StepLength + Transformed<Matrix4> + DisplayByStep
         let curve = surface.entity_curve().transformed(*transform);
         let axis = k.transform_vector(surface.axis());
         let origin = transform.transform_point(surface.origin());
-        let surface = RevolutedCurve::by_revolution(curve, origin, axis);
+        let surface = RevolutionSurface::by_revolution(curve, origin, axis);
         DisplayByStep::fmt(&surface, idx, f)
     }
 }
-impl<C: StepLength> StepLength for Processor<RevolutedCurve<C>, Matrix4> {
+impl<C: StepLength> StepLength for Processor<RevolutionSurface<C>, Matrix4> {
     fn step_length(&self) -> usize { self.entity().step_length() }
 }
 
-impl<C, T: One> StepSurface for Processor<RevolutedCurve<C>, T> {
+impl<C, T: One> StepSurface for Processor<RevolutionSurface<C>, T> {
     #[inline(always)]
     fn same_sense(&self) -> bool { !self.orientation() }
 }
@@ -763,8 +870,15 @@ impl DisplayByStep for ModelingSurface {
             ModelingSurface::Plane(x) => DisplayByStep::fmt(x, idx, f),
             ModelingSurface::BsplineSurface(x) => DisplayByStep::fmt(x, idx, f),
             ModelingSurface::NurbsSurface(x) => DisplayByStep::fmt(x, idx, f),
-            ModelingSurface::RevolutedCurve(x) => DisplayByStep::fmt(x, idx, f),
-            ModelingSurface::TSplineSurface(tmesh) => {
+            ModelingSurface::RevolutionSurface(x) => {
+                if let Some(bsp) = x.try_into_homogeneous_bspline_surface() {
+                    let nurbs = NurbsSurface::new(bsp);
+                    DisplayByStep::fmt(&nurbs, idx, f)
+                } else {
+                    DisplayByStep::fmt(x, idx, f)
+                }
+            }
+            ModelingSurface::TsplineSurface(tmesh) => {
                 let bsp = tmesh.to_bspline_surface(4);
                 DisplayByStep::fmt(&bsp, idx, f)
             }
@@ -778,8 +892,14 @@ impl StepLength for ModelingSurface {
             ModelingSurface::Plane(_) => Plane::LENGTH,
             ModelingSurface::BsplineSurface(x) => x.step_length(),
             ModelingSurface::NurbsSurface(x) => x.step_length(),
-            ModelingSurface::RevolutedCurve(x) => x.entity().step_length(),
-            ModelingSurface::TSplineSurface(tmesh) => {
+            ModelingSurface::RevolutionSurface(x) => {
+                if let Some(bsp) = x.try_into_homogeneous_bspline_surface() {
+                    NurbsSurface::new(bsp).step_length()
+                } else {
+                    x.entity().step_length()
+                }
+            }
+            ModelingSurface::TsplineSurface(tmesh) => {
                 let bsp = tmesh.to_bspline_surface(4);
                 bsp.step_length()
             }

@@ -40,7 +40,7 @@ use crate::errors::{Error, Result};
 /// compat::make_curves_compatible(&mut curves).unwrap();
 ///
 /// assert_eq!(curves[0].degree(), curves[1].degree());
-/// assert_eq!(curves[0].knot_vec(), curves[1].knot_vec());
+/// assert_eq!(curves[0].knot_vector(), curves[1].knot_vector());
 /// ```
 pub fn make_curves_compatible<P>(curves: &mut [BsplineCurve<P>]) -> Result<()>
 where P: ControlPoint<f64> + Tolerance {
@@ -130,7 +130,7 @@ where P: ControlPoint<f64> + Tolerance {
 ///
 /// assert_eq!(surfaces[0].udegree(), surfaces[1].udegree());
 /// assert_eq!(surfaces[0].vdegree(), surfaces[1].vdegree());
-/// assert_eq!(surfaces[0].knot_vecs(), surfaces[1].knot_vecs());
+/// assert_eq!(surfaces[0].knot_vectors(), surfaces[1].knot_vectors());
 /// ```
 pub fn make_surfaces_compatible<P>(surfaces: &mut [BsplineSurface<P>]) -> Result<()>
 where P: ControlPoint<f64> + Tolerance {
@@ -322,7 +322,7 @@ mod tests {
             vec![Vector2::new(0.0, 0.0), Vector2::new(1.0, 1.0)],
         )];
         make_curves_compatible(&mut curves).unwrap();
-        assert_eq!(curves[0].knot_vec().as_slice(), &[0.0, 0.0, 1.0, 1.0]);
+        assert_eq!(curves[0].knot_vector().as_slice(), &[0.0, 0.0, 1.0, 1.0]);
     }
 
     #[test]
@@ -351,7 +351,7 @@ mod tests {
         let mut curves = vec![c0, c1];
         make_curves_compatible(&mut curves).unwrap();
 
-        assert_eq!(curves[0].knot_vec(), curves[1].knot_vec());
+        assert_eq!(curves[0].knot_vector(), curves[1].knot_vector());
         assert_eq!(curves[0].degree(), curves[1].degree());
         // Shape is preserved.
         assert!(curves[0].near2_as_curve(&org0));
@@ -381,7 +381,7 @@ mod tests {
 
         assert_eq!(curves[0].degree(), curves[1].degree());
         assert_eq!(curves[0].degree(), 3);
-        assert_eq!(curves[0].knot_vec(), curves[1].knot_vec());
+        assert_eq!(curves[0].knot_vector(), curves[1].knot_vector());
         assert!(curves[0].near2_as_curve(&org0));
         assert!(curves[1].near2_as_curve(&org1));
     }
@@ -419,8 +419,8 @@ mod tests {
         // All must share the same degree and knot vector.
         assert_eq!(curves[0].degree(), curves[1].degree());
         assert_eq!(curves[1].degree(), curves[2].degree());
-        assert_eq!(curves[0].knot_vec(), curves[1].knot_vec());
-        assert_eq!(curves[1].knot_vec(), curves[2].knot_vec());
+        assert_eq!(curves[0].knot_vector(), curves[1].knot_vector());
+        assert_eq!(curves[1].knot_vector(), curves[2].knot_vector());
         // Shapes preserved.
         assert!(curves[0].near2_as_curve(&org0));
         assert!(curves[1].near2_as_curve(&org1));
@@ -473,7 +473,7 @@ mod tests {
 
         assert_eq!(surfaces[0].udegree(), surfaces[1].udegree());
         assert_eq!(surfaces[0].vdegree(), surfaces[1].vdegree());
-        assert_eq!(surfaces[0].knot_vecs(), surfaces[1].knot_vecs());
+        assert_eq!(surfaces[0].knot_vectors(), surfaces[1].knot_vectors());
         assert!(surfaces[0].near2_as_surface(&org0));
         assert!(surfaces[1].near2_as_surface(&org1));
     }

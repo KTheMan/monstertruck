@@ -1,5 +1,9 @@
 use crate::*;
 use monstertruck_topology::{compress::*, *};
+
+#[cfg(not(target_arch = "wasm32"))]
+use rayon::prelude::*;
+
 use spade::{iterators::*, *};
 
 /// Tessellation output primitive preference.
@@ -296,7 +300,7 @@ pub trait RobustMeshableShape {
     /// ]
     /// .into();
     /// // revoluted curve
-    /// let surface_raw = RevolutedCurve::by_revolution(
+    /// let surface_raw = RevolutionSurface::by_revolution(
     ///     Curve::Line(Line(p[2], p[0])),
     ///     Point3::origin(),
     ///     Vector3::unit_z(),
@@ -348,7 +352,10 @@ pub fn robust_triangulation_with<C: PolylineableCurve, S: RobustMeshableSurface>
 }
 
 /// Tessellates a [`CompressedShell`] with a [`TessellationOptions`].
-pub fn cshell_triangulation_with<C: PolylineableCurve, S: MeshableSurface>(
+pub fn cshell_triangulation_with<
+    C: PolylineableCurve + ParameterBoundary2D<S>,
+    S: MeshableSurface,
+>(
     shell: &CompressedShell<Point3, C, S>,
     options: TessellationOptions,
 ) -> CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>> {
@@ -358,13 +365,50 @@ pub fn cshell_triangulation_with<C: PolylineableCurve, S: MeshableSurface>(
 }
 
 /// Tessellates a [`CompressedShell`] with robust parameter search and a [`TessellationOptions`].
-pub fn robust_cshell_triangulation_with<C: PolylineableCurve, S: RobustMeshableSurface>(
+pub fn robust_cshell_triangulation_with<
+    C: PolylineableCurve + ParameterBoundary2D<S>,
+    S: RobustMeshableSurface,
+>(
     shell: &CompressedShell<Point3, C, S>,
     options: TessellationOptions,
 ) -> CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>> {
     nonpositive_tolerance!(options.tolerance);
     let sp = triangulation::search_nearest_parameter_sp::<S>(options.search_trials);
     triangulation::cshell_tessellation(shell, options.tolerance, sp, options.quad)
+}
+
+/// Tessellates a [`CompressedTrimmedShell`] with a [`TessellationOptions`].
+pub fn trimmed_cshell_triangulation_with<
+    C: PolylineableCurve + ParameterBoundary2D<S> + ExactParameterBoundary2D<S>,
+    S: MeshableSurface,
+    T: triangulation::ExactTrimBoundary2D + Parallelizable,
+>(
+    shell: &CompressedTrimmedShell<Point3, C, S, T>,
+    options: TessellationOptions,
+) -> CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>>
+where
+    <C as ExactParameterBoundary2D<S>>::BoundaryCurve: triangulation::ExactTrimBoundary2D,
+{
+    nonpositive_tolerance!(options.tolerance);
+    let sp = triangulation::search_parameter_sp::<S>(options.search_trials);
+    triangulation::trimmed_cshell_tessellation(shell, options.tolerance, sp, options.quad)
+}
+
+/// Tessellates a [`CompressedTrimmedShell`] with robust parameter search and a [`TessellationOptions`].
+pub fn robust_trimmed_cshell_triangulation_with<
+    C: PolylineableCurve + ParameterBoundary2D<S> + ExactParameterBoundary2D<S>,
+    S: RobustMeshableSurface,
+    T: triangulation::ExactTrimBoundary2D + Parallelizable,
+>(
+    shell: &CompressedTrimmedShell<Point3, C, S, T>,
+    options: TessellationOptions,
+) -> CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>>
+where
+    <C as ExactParameterBoundary2D<S>>::BoundaryCurve: triangulation::ExactTrimBoundary2D,
+{
+    nonpositive_tolerance!(options.tolerance);
+    let sp = triangulation::search_nearest_parameter_sp::<S>(options.search_trials);
+    triangulation::trimmed_cshell_tessellation(shell, options.tolerance, sp, options.quad)
 }
 
 impl<C: PolylineableCurve, S: MeshableSurface> MeshableShape for Shell<Point3, C, S> {
@@ -396,28 +440,44 @@ impl<C: PolylineableCurve, S: RobustMeshableSurface> RobustMeshableShape for She
 impl<C: PolylineableCurve, S: MeshableSurface> MeshableShape for Solid<Point3, C, S> {
     type MeshedShape = Solid<Point3, PolylineCurve, Option<PolygonMesh>>;
     fn triangulation(&self, tolerance: f64) -> Self::MeshedShape {
+        #[cfg(not(target_arch = "wasm32"))]
+        let boundaries = self
+            .boundaries()
+            .par_iter()
+            .map(|shell| shell.triangulation(tolerance))
+            .collect::<Vec<_>>();
+        #[cfg(target_arch = "wasm32")]
         let boundaries = self
             .boundaries()
             .iter()
             .map(|shell| shell.triangulation(tolerance))
             .collect::<Vec<_>>();
-        Solid::new(boundaries)
+        Solid::new_unchecked(boundaries)
     }
 }
 
 impl<C: PolylineableCurve, S: RobustMeshableSurface> RobustMeshableShape for Solid<Point3, C, S> {
     type MeshedShape = Solid<Point3, PolylineCurve, Option<PolygonMesh>>;
     fn robust_triangulation(&self, tolerance: f64) -> Self::MeshedShape {
+        #[cfg(not(target_arch = "wasm32"))]
+        let boundaries = self
+            .boundaries()
+            .par_iter()
+            .map(|shell| shell.robust_triangulation(tolerance))
+            .collect::<Vec<_>>();
+        #[cfg(target_arch = "wasm32")]
         let boundaries = self
             .boundaries()
             .iter()
             .map(|shell| shell.robust_triangulation(tolerance))
             .collect::<Vec<_>>();
-        Solid::new(boundaries)
+        Solid::new_unchecked(boundaries)
     }
 }
 
-impl<C: PolylineableCurve, S: MeshableSurface> MeshableShape for CompressedShell<Point3, C, S> {
+impl<C: PolylineableCurve + ParameterBoundary2D<S>, S: MeshableSurface> MeshableShape
+    for CompressedShell<Point3, C, S>
+{
     type MeshedShape = CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>>;
     fn triangulation(&self, tolerance: f64) -> Self::MeshedShape {
         cshell_triangulation_with(
@@ -430,7 +490,7 @@ impl<C: PolylineableCurve, S: MeshableSurface> MeshableShape for CompressedShell
     }
 }
 
-impl<C: PolylineableCurve, S: RobustMeshableSurface> RobustMeshableShape
+impl<C: PolylineableCurve + ParameterBoundary2D<S>, S: RobustMeshableSurface> RobustMeshableShape
     for CompressedShell<Point3, C, S>
 {
     type MeshedShape = CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>>;
@@ -445,29 +505,149 @@ impl<C: PolylineableCurve, S: RobustMeshableSurface> RobustMeshableShape
     }
 }
 
-impl<C: PolylineableCurve, S: MeshableSurface> MeshableShape for CompressedSolid<Point3, C, S> {
+impl<C, S, T> MeshableShape for CompressedTrimmedShell<Point3, C, S, T>
+where
+    C: PolylineableCurve + ParameterBoundary2D<S> + ExactParameterBoundary2D<S>,
+    S: MeshableSurface,
+    T: triangulation::ExactTrimBoundary2D + Parallelizable,
+    <C as ExactParameterBoundary2D<S>>::BoundaryCurve: triangulation::ExactTrimBoundary2D,
+{
+    type MeshedShape = CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>>;
+    fn triangulation(&self, tolerance: f64) -> Self::MeshedShape {
+        trimmed_cshell_triangulation_with(
+            self,
+            TessellationOptions {
+                tolerance,
+                ..Default::default()
+            },
+        )
+    }
+}
+
+impl<C, S, T> RobustMeshableShape for CompressedTrimmedShell<Point3, C, S, T>
+where
+    C: PolylineableCurve + ParameterBoundary2D<S> + ExactParameterBoundary2D<S>,
+    S: RobustMeshableSurface,
+    T: triangulation::ExactTrimBoundary2D + Parallelizable,
+    <C as ExactParameterBoundary2D<S>>::BoundaryCurve: triangulation::ExactTrimBoundary2D,
+{
+    type MeshedShape = CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>>;
+    fn robust_triangulation(&self, tolerance: f64) -> Self::MeshedShape {
+        robust_trimmed_cshell_triangulation_with(
+            self,
+            TessellationOptions {
+                tolerance,
+                ..Default::default()
+            },
+        )
+    }
+}
+
+impl<C: PolylineableCurve + ParameterBoundary2D<S>, S: MeshableSurface> MeshableShape
+    for CompressedSolid<Point3, C, S>
+{
     type MeshedShape = CompressedSolid<Point3, PolylineCurve, Option<PolygonMesh>>;
     fn triangulation(&self, tolerance: f64) -> Self::MeshedShape {
+        #[cfg(not(target_arch = "wasm32"))]
+        let boundaries = self
+            .boundaries
+            .par_iter()
+            .map(|shell| shell.triangulation(tolerance))
+            .collect::<Vec<_>>();
+        #[cfg(target_arch = "wasm32")]
         let boundaries = self
             .boundaries
             .iter()
             .map(|shell| shell.triangulation(tolerance))
             .collect::<Vec<_>>();
-        CompressedSolid { boundaries }
+        CompressedSolid {
+            boundaries,
+            id_allocator: None,
+            attributes: None,
+        }
     }
 }
 
-impl<C: PolylineableCurve, S: RobustMeshableSurface> RobustMeshableShape
+impl<C: PolylineableCurve + ParameterBoundary2D<S>, S: RobustMeshableSurface> RobustMeshableShape
     for CompressedSolid<Point3, C, S>
 {
     type MeshedShape = CompressedSolid<Point3, PolylineCurve, Option<PolygonMesh>>;
     fn robust_triangulation(&self, tolerance: f64) -> Self::MeshedShape {
+        #[cfg(not(target_arch = "wasm32"))]
+        let boundaries = self
+            .boundaries
+            .par_iter()
+            .map(|shell| shell.robust_triangulation(tolerance))
+            .collect::<Vec<_>>();
+        #[cfg(target_arch = "wasm32")]
         let boundaries = self
             .boundaries
             .iter()
             .map(|shell| shell.robust_triangulation(tolerance))
             .collect::<Vec<_>>();
-        CompressedSolid { boundaries }
+        CompressedSolid {
+            boundaries,
+            id_allocator: None,
+            attributes: None,
+        }
+    }
+}
+
+impl<C, S, T> MeshableShape for CompressedTrimmedSolid<Point3, C, S, T>
+where
+    C: PolylineableCurve + ParameterBoundary2D<S> + ExactParameterBoundary2D<S>,
+    S: MeshableSurface,
+    T: triangulation::ExactTrimBoundary2D + Parallelizable,
+    <C as ExactParameterBoundary2D<S>>::BoundaryCurve: triangulation::ExactTrimBoundary2D,
+{
+    type MeshedShape = CompressedSolid<Point3, PolylineCurve, Option<PolygonMesh>>;
+    fn triangulation(&self, tolerance: f64) -> Self::MeshedShape {
+        #[cfg(not(target_arch = "wasm32"))]
+        let boundaries = self
+            .boundaries
+            .par_iter()
+            .map(|shell| shell.triangulation(tolerance))
+            .collect::<Vec<_>>();
+        #[cfg(target_arch = "wasm32")]
+        let boundaries = self
+            .boundaries
+            .iter()
+            .map(|shell| shell.triangulation(tolerance))
+            .collect::<Vec<_>>();
+        CompressedSolid {
+            boundaries,
+            id_allocator: None,
+            attributes: None,
+        }
+    }
+}
+
+impl<C, S, T> RobustMeshableShape for CompressedTrimmedSolid<Point3, C, S, T>
+where
+    C: PolylineableCurve + ParameterBoundary2D<S> + ExactParameterBoundary2D<S>,
+    S: RobustMeshableSurface,
+    T: triangulation::ExactTrimBoundary2D + Parallelizable,
+    <C as ExactParameterBoundary2D<S>>::BoundaryCurve: triangulation::ExactTrimBoundary2D,
+{
+    type MeshedShape = CompressedSolid<Point3, PolylineCurve, Option<PolygonMesh>>;
+    fn robust_triangulation(&self, tolerance: f64) -> Self::MeshedShape {
+        #[cfg(not(target_arch = "wasm32"))]
+        let boundaries = self
+            .boundaries
+            .par_iter()
+            .map(|shell| shell.robust_triangulation(tolerance))
+            .collect::<Vec<_>>();
+        #[cfg(target_arch = "wasm32")]
+        let boundaries = self
+            .boundaries
+            .iter()
+            .map(|shell| shell.robust_triangulation(tolerance))
+            .collect::<Vec<_>>();
+        CompressedSolid {
+            boundaries,
+            id_allocator: None,
+            attributes: None,
+        }
     }
 }
 

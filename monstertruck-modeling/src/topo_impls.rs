@@ -44,7 +44,7 @@ pub(super) fn connect_edges<
         true => vec![edge0.clone(), edge3, edge1.inverse(), edge2.inverse()].into(),
         false => vec![edge0.inverse(), edge2, edge1.clone(), edge3.inverse()].into(),
     };
-    let mut face = Face::debug_new(vec![wire], surface);
+    let mut face = Face::new_unchecked(vec![wire], surface);
     if !edge0.orientation() {
         face.invert();
     }
@@ -72,7 +72,7 @@ fn sub_connect_wires<P: Clone, C: Clone, S: Clone, CP: Fn(&P, &P) -> C, CC: Fn(&
         false => Wire::from(vec![edge2, edge1.clone(), edge3.inverse(), edge0.inverse()]),
     };
     let surface = create_surface(edge0, edge1, connect_curves);
-    let mut face = Face::debug_new(vec![wire], surface);
+    let mut face = Face::new_unchecked(vec![wire], surface);
     if !ori {
         face.invert();
     }

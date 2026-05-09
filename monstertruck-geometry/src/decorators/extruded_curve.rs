@@ -2,7 +2,7 @@ use super::*;
 use algo::surface::SearchParameterVector;
 use monstertruck_traits::ParametricCurve as PcurveTrait;
 
-impl<C, V: Copy> ExtrudedCurve<C, V> {
+impl<C, V: Copy> ExtrusionSurface<C, V> {
     /// Creates a linear extruded curve by extrusion.
     #[inline(always)]
     pub const fn by_extrusion(curve: C, vector: V) -> Self { Self { curve, vector } }
@@ -19,7 +19,7 @@ impl<C, V: Copy> ExtrudedCurve<C, V> {
     pub const fn extruding_vector(&self) -> V { self.vector }
 }
 
-impl<C> ParametricSurface for ExtrudedCurve<C, C::Vector>
+impl<C> ParametricSurface for ExtrusionSurface<C, C::Vector>
 where
     C: PcurveTrait,
     C::Point: EuclideanSpace<Scalar = f64, Diff = C::Vector>,
@@ -59,21 +59,68 @@ where
     fn u_period(&self) -> Option<f64> { self.curve.period() }
 }
 
-impl<C: ParametricCurve3D> ParametricSurface3D for ExtrudedCurve<C, Vector3> {
+impl<C: ParametricCurve3D> ParametricSurface3D for ExtrusionSurface<C, Vector3> {
     #[inline(always)]
     fn normal(&self, u: f64, _: f64) -> C::Vector {
         self.curve.der(u).cross(self.vector).normalize()
     }
 }
 
-impl<C, V> BoundedSurface for ExtrudedCurve<C, V>
+impl<C, V> BoundedSurface for ExtrusionSurface<C, V>
 where
     C: BoundedCurve,
     Self: ParametricSurface,
 {
 }
 
-impl<C: ParameterDivision1D, V> ParameterDivision2D for ExtrudedCurve<C, V> {
+// -- v2 scalar-generic impls ------------------------------------------------
+
+use monstertruck_traits::v2;
+
+impl<C> v2::ParametricSurface for ExtrusionSurface<C, C::Vector>
+where
+    C: PcurveTrait,
+    C::Point: EuclideanSpace<Scalar = f64, Diff = C::Vector>,
+    C::Vector: VectorSpace<Scalar = f64>,
+{
+    type Scalar = f64;
+    type Point = C::Point;
+    type Vector = C::Vector;
+
+    #[inline(always)]
+    fn evaluate(&self, u: f64, v: f64) -> C::Point { ParametricSurface::evaluate(self, u, v) }
+    #[inline(always)]
+    fn derivative_u(&self, u: f64, v: f64) -> C::Vector {
+        ParametricSurface::derivative_u(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_v(&self, u: f64, v: f64) -> C::Vector {
+        ParametricSurface::derivative_v(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_uu(&self, u: f64, v: f64) -> C::Vector {
+        ParametricSurface::derivative_uu(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_uv(&self, u: f64, v: f64) -> C::Vector {
+        ParametricSurface::derivative_uv(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_vv(&self, u: f64, v: f64) -> C::Vector {
+        ParametricSurface::derivative_vv(self, u, v)
+    }
+    #[inline(always)]
+    fn period_u(&self) -> Option<f64> { ParametricSurface::u_period(self) }
+    #[inline(always)]
+    fn period_v(&self) -> Option<f64> { ParametricSurface::v_period(self) }
+}
+
+impl<C: ParametricCurve3D + PcurveTrait> v2::ParametricSurface3D for ExtrusionSurface<C, Vector3> {
+    #[inline(always)]
+    fn normal(&self, u: f64, _: f64) -> Vector3 { ParametricSurface3D::normal(self, u, 0.0) }
+}
+
+impl<C: ParameterDivision1D, V> ParameterDivision2D for ExtrusionSurface<C, V> {
     #[inline(always)]
     fn parameter_division(
         &self,
@@ -87,7 +134,7 @@ impl<C: ParameterDivision1D, V> ParameterDivision2D for ExtrudedCurve<C, V> {
     }
 }
 
-impl<P, C> SearchParameter<D2> for ExtrudedCurve<C, P::Diff>
+impl<P, C> SearchParameter<D2> for ExtrusionSurface<C, P::Diff>
 where
     P: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64> + Tolerance,
     P::Diff: SearchParameterVector<Point = P>,
@@ -114,7 +161,9 @@ where
     }
 }
 
-impl<C: ParametricCurve3D + BoundedCurve> SearchNearestParameter<D2> for ExtrudedCurve<C, Vector3> {
+impl<C: ParametricCurve3D + BoundedCurve> SearchNearestParameter<D2>
+    for ExtrusionSurface<C, Vector3>
+{
     type Point = Point3;
     #[inline(always)]
     fn search_nearest_parameter<H: Into<SearchParameterHint2D>>(
@@ -136,7 +185,40 @@ impl<C: ParametricCurve3D + BoundedCurve> SearchNearestParameter<D2> for Extrude
     }
 }
 
-impl<C: Invertible> Invertible for ExtrudedCurve<C, Vector3> {
+impl<P, C> v2::SearchParameter<v2::D2<f64>> for ExtrusionSurface<C, P::Diff>
+where
+    P: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64> + Tolerance,
+    P::Diff: SearchParameterVector<Point = P>,
+    C: PcurveTrait<Point = P, Vector = P::Diff> + BoundedCurve,
+{
+    type Point = P;
+    #[inline(always)]
+    fn search_parameter<H: Into<v2::SearchParameterHint2D<f64>>>(
+        &self,
+        pt: P,
+        _: H,
+        trials: usize,
+    ) -> Option<(f64, f64)> {
+        SearchParameter::<D2>::search_parameter(self, pt, None, trials)
+    }
+}
+
+impl<C: ParametricCurve3D + BoundedCurve> v2::SearchNearestParameter<v2::D2<f64>>
+    for ExtrusionSurface<C, Vector3>
+{
+    type Point = Point3;
+    #[inline(always)]
+    fn search_nearest_parameter<H: Into<v2::SearchParameterHint2D<f64>>>(
+        &self,
+        pt: Point3,
+        _: H,
+        trials: usize,
+    ) -> Option<(f64, f64)> {
+        SearchNearestParameter::<D2>::search_nearest_parameter(self, pt, None, trials)
+    }
+}
+
+impl<C: Invertible> Invertible for ExtrusionSurface<C, Vector3> {
     #[inline(always)]
     fn invert(&mut self) { self.curve.invert() }
     #[inline(always)]
@@ -148,7 +230,7 @@ impl<C: Invertible> Invertible for ExtrudedCurve<C, Vector3> {
     }
 }
 
-impl<C: Transformed<Matrix4>> Transformed<Matrix4> for ExtrudedCurve<C, Vector3> {
+impl<C: Transformed<Matrix4>> Transformed<Matrix4> for ExtrusionSurface<C, Vector3> {
     fn transform_by(&mut self, trans: Matrix4) {
         self.curve.transform_by(trans);
         self.vector = trans.transform_vector(self.vector);
@@ -161,18 +243,18 @@ impl<C: Transformed<Matrix4>> Transformed<Matrix4> for ExtrudedCurve<C, Vector3>
     }
 }
 
-impl From<ExtrudedCurve<Line<Point3>, Vector3>> for Plane {
+impl From<ExtrusionSurface<Line<Point3>, Vector3>> for Plane {
     fn from(
-        ExtrudedCurve {
+        ExtrusionSurface {
             curve: Line(o, p),
             vector,
-        }: ExtrudedCurve<Line<Point3>, Vector3>,
+        }: ExtrusionSurface<Line<Point3>, Vector3>,
     ) -> Self {
         Self::new(o, p, o + vector)
     }
 }
 
-impl ToSameGeometry<Plane> for ExtrudedCurve<Line<Point3>, Vector3> {
+impl ToSameGeometry<Plane> for ExtrusionSurface<Line<Point3>, Vector3> {
     fn to_same_geometry(&self) -> Plane { (*self).into() }
 }
 
@@ -182,7 +264,7 @@ fn extrude_line() {
     let q = Point3::new(2.0, 3.0, 4.0);
     let v = Vector3::new(-1.0, 1.0, -4.0);
     let line = Line(p, q);
-    let extruded = ExtrudedCurve::by_extrusion(line, v);
+    let extruded = ExtrusionSurface::by_extrusion(line, v);
     let plane = Plane::new(p, q, p + v);
     assert_near!(extruded.subs(0.3, 0.6), plane.subs(0.3, 0.6));
 }

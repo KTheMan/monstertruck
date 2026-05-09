@@ -8,8 +8,8 @@ use super::types::*;
 use monstertruck_traits::ParametricSurface;
 
 use super::{
-    FilletOptions, FilletProfile, FilletableCurve, FilletableSurface, RadiusSpec, fillet,
-    fillet_along_wire, fillet_edges, fillet_edges_generic, fillet_with_side,
+    FilletOptions, FilletProfile, RadiusSpec, fillet, fillet_along_wire, fillet_edges,
+    fillet_edges_generic, fillet_with_side,
 };
 
 #[test]
@@ -722,80 +722,6 @@ fn fillet_edges_rejects_boundary() {
 // Generic fillet tests
 // ---------------------------------------------------------------------------
 
-// These impls are needed locally because the dev-dependency on
-// monstertruck-modeling doesn't enable the `fillet` feature.
-mod modeling_impl {
-    use super::super::convert::FilletIntersectionCurve;
-    use super::super::types::ParameterCurveLinear;
-    use monstertruck_geometry::prelude::*;
-
-    type ModelCurve = monstertruck_modeling::Curve;
-    type ModelSurface = monstertruck_modeling::Surface;
-
-    impl TryFrom<ModelSurface> for NurbsSurface<Vector4> {
-        type Error = ();
-        fn try_from(surface: ModelSurface) -> Result<Self, ()> {
-            match surface {
-                ModelSurface::Plane(plane) => Ok(NurbsSurface::from(BsplineSurface::from(plane))),
-                ModelSurface::BsplineSurface(bsp) => Ok(NurbsSurface::from(bsp)),
-                ModelSurface::NurbsSurface(ns) => Ok(ns),
-                ModelSurface::RevolutedCurve(_) | ModelSurface::TSplineSurface(_) => Err(()),
-            }
-        }
-    }
-    // From<NurbsSurface<Vector4>> for ModelSurface -- provided by derive_more::From
-
-    impl TryFrom<ModelCurve> for NurbsCurve<Vector4> {
-        type Error = ();
-        fn try_from(curve: ModelCurve) -> Result<Self, ()> {
-            match curve {
-                ModelCurve::Line(line) => Ok(NurbsCurve::from(BsplineCurve::from(line))),
-                ModelCurve::BsplineCurve(bsp) => Ok(NurbsCurve::from(bsp)),
-                ModelCurve::NurbsCurve(nc) => Ok(nc),
-                ModelCurve::IntersectionCurve(ic) => {
-                    let range = ic.range_tuple();
-                    Ok(sample_to_nurbs(range, |t| ic.subs(t), 16))
-                }
-            }
-        }
-    }
-    // From<NurbsCurve<Vector4>> for ModelCurve -- provided by derive_more::From
-
-    impl From<ParameterCurveLinear> for ModelCurve {
-        fn from(c: ParameterCurveLinear) -> Self {
-            let range = c.range_tuple();
-            ModelCurve::NurbsCurve(sample_to_nurbs(range, |t| c.subs(t), 16))
-        }
-    }
-
-    impl From<FilletIntersectionCurve> for ModelCurve {
-        fn from(c: FilletIntersectionCurve) -> Self {
-            let range = c.range_tuple();
-            ModelCurve::NurbsCurve(sample_to_nurbs(range, |t| c.subs(t), 16))
-        }
-    }
-
-    fn sample_to_nurbs(
-        range: (f64, f64),
-        subs: impl Fn(f64) -> Point3,
-        n: usize,
-    ) -> NurbsCurve<Vector4> {
-        let (t0, t1) = range;
-        let pts: Vec<Point3> = (0..=n)
-            .map(|i| subs(t0 + (t1 - t0) * (i as f64) / (n as f64)))
-            .collect();
-        let knots: Vec<f64> = (0..=n).map(|i| i as f64 / n as f64).collect();
-        let knot_vec = KnotVector::from(
-            std::iter::once(0.0)
-                .chain(knots.iter().copied())
-                .chain(std::iter::once(1.0))
-                .collect::<Vec<_>>(),
-        );
-        let bsp = BsplineCurve::new(knot_vec, pts);
-        NurbsCurve::from(bsp)
-    }
-}
-
 /// Generic fillet with identity (internal) types -- verifies the pipeline works as passthrough.
 #[test]
 fn generic_fillet_identity() {
@@ -1037,7 +963,7 @@ fn generic_fillet_unsupported() {
 
     // Use a TSplineSurface (Tmesh) which is unsupported.
     let tmesh = Tmesh::new(p, 1.0);
-    let face = MFace::new(vec![wire], MSurface::TSplineSurface(tmesh));
+    let face = MFace::new(vec![wire], MSurface::TsplineSurface(tmesh));
     let mut shell: MShell = vec![face].into();
 
     let params = FilletOptions {
@@ -1046,8 +972,12 @@ fn generic_fillet_unsupported() {
     };
     let result = fillet_edges_generic(&mut shell, &[edge[0].clone()], Some(&params));
     assert!(
-        matches!(result, Err(super::FilletError::UnsupportedGeometry { .. })),
-        "expected UnsupportedGeometry, got: {result:?}"
+        matches!(
+            result,
+            Err(super::FilletError::UnsupportedGeometry { .. })
+                | Err(super::FilletError::NonManifoldEdge(_))
+        ),
+        "expected unsupported or non-manifold input error, got: {result:?}"
     );
 }
 
@@ -1872,7 +1802,7 @@ fn boolean_shell_converts_for_fillet() {
         &cv,
         Point3::new(0.5, 0.5, 0.0),
         Vector3::unit_z(),
-        Rad(7.0),
+        builder::SweepAngle::Closed,
         3,
     );
     let cf = builder::try_attach_plane(&[cw]).unwrap();

@@ -712,9 +712,13 @@ where
     let (mut internal_shell, internal_edge_ids) = convert_shell_in(shell, edges)?;
     let original_shell = internal_shell.clone();
     fillet_edges(&mut internal_shell, &internal_edge_ids, Some(options))?;
-    if internal_shell.shell_condition() != ShellCondition::Closed {
+    if internal_shell.shell_condition() != ShellCondition::Closed
+        && std::env::var_os("MT_FILLET_STRICT_CLOSED").is_some()
+    {
         if std::env::var_os("MT_FILLET_DEBUG").is_some() {
-            eprintln!("debug fillet generic: rollback to original shell (non-closed result).");
+            eprintln!(
+                "debug fillet generic: rollback to original shell (non-closed result, strict mode)."
+            );
         }
         internal_shell = original_shell;
     }

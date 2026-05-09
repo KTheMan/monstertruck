@@ -1,7 +1,12 @@
 #![cfg(feature = "polynomial")]
 
 use algo::surface;
-use monstertruck_core::{cgmath64::*, tolerance::*, *};
+use monstertruck_core::{
+    InnerSpace, MetricSpace, assert_near2,
+    cgmath::EuclideanSpace,
+    cgmath64::{Point2, Point3, Vector2, Vector3},
+    tolerance::*,
+};
 use monstertruck_traits::{polynomial::*, *};
 
 #[test]

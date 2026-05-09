@@ -52,7 +52,7 @@ fn main() {
     }
 }
 
-fn step_to_mesh<'a>(table: &Table) -> Vec<MeshedCShell> {
+fn step_to_mesh(table: &Table) -> Vec<MeshedCShell> {
     let assy = table.step_assy().unwrap();
 
     let node_map = |ProductEntity {
@@ -68,13 +68,12 @@ fn step_to_mesh<'a>(table: &Table) -> Vec<MeshedCShell> {
                         .map_err(|err| eprintln!("failed to convert solid: {err}"))
                         .ok()?
                         .boundaries
-                } else if let Some(step_shells) = table.shell_based_surface_model.get(idx) {
+                } else {
+                    let step_shells = table.shell_based_surface_model.get(idx)?;
                     table
                         .to_compressed_shells(step_shells)
                         .map_err(|err| eprintln!("failed to convert shells: {err}"))
                         .ok()?
-                } else {
-                    return None;
                 };
                 let meshed_shells = shells
                     .into_iter()
@@ -101,7 +100,6 @@ fn step_to_mesh<'a>(table: &Table) -> Vec<MeshedCShell> {
 
     meshed_assy
         .top_nodes()
-        .into_iter()
         .flat_map(|top| meshed_assy.paths_iter(top.index()))
         .flat_map(|path| {
             let matrix = path.matrix();
@@ -114,9 +112,9 @@ fn step_to_mesh<'a>(table: &Table) -> Vec<MeshedCShell> {
                     edge.curve.transform_by(matrix);
                 });
                 shell.faces.iter_mut().for_each(|face| {
-                    face.surface
-                        .as_mut()
-                        .map(|surface| surface.transform_by(matrix));
+                    if let Some(surface) = face.surface.as_mut() {
+                        surface.transform_by(matrix);
+                    }
                 });
                 shell
             })
@@ -176,6 +174,7 @@ fn output_vtk(polyshells: Vec<MeshedCShell>, path: &Path) {
                  vertices,
                  edges,
                  faces,
+                 ..
              }| {
                 let faces = faces
                     .into_iter()
@@ -191,6 +190,9 @@ fn output_vtk(polyshells: Vec<MeshedCShell>, path: &Path) {
                     vertices,
                     edges,
                     faces,
+                    vertex_stable_ids: None,
+                    edge_stable_ids: None,
+                    face_stable_ids: None,
                 }
                 .to_data_set() else {
                     unreachable!()

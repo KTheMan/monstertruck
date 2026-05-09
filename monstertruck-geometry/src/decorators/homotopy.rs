@@ -185,7 +185,7 @@ where P: ControlPoint<f64> + Tolerance
         bspcurve0.syncro_degree(&mut bspcurve1);
         bspcurve0.syncro_knots(&mut bspcurve1);
 
-        let knot_vector_u = bspcurve0.knot_vec().clone();
+        let knot_vector_u = bspcurve0.knot_vector().clone();
         let knot_vector_v = KnotVector::from(vec![0.0, 0.0, 1.0, 1.0]);
         let control_points: Vec<Vec<_>> = (0..bspcurve0.control_points().len())
             .map(|i| vec![*bspcurve0.control_point(i), *bspcurve1.control_point(i)])

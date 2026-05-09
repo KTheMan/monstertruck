@@ -96,7 +96,12 @@ impl<P> BsplineSurface<P> {
             false => Self::new_unchecked(knot_vecs, control_points),
         }
     }
-    /// Returns the reference of the knot vectors
+    /// Returns the reference of the knot vectors.
+    #[inline(always)]
+    pub const fn knot_vectors(&self) -> &(KnotVector, KnotVector) { &self.knot_vecs }
+
+    /// Renamed to [`knot_vectors`](Self::knot_vectors).
+    #[deprecated(note = "renamed to knot_vectors")]
     #[inline(always)]
     pub const fn knot_vecs(&self) -> &(KnotVector, KnotVector) { &self.knot_vecs }
 
@@ -312,7 +317,7 @@ impl<P> BsplineSurface<P> {
     /// let bspsurface = BsplineSurface::new(knot_vecs, control_points);
     /// let bspcurve = bspsurface.column_curve(1);
     ///
-    /// assert_eq!(bspcurve.knot_vec(), &KnotVector::bezier_knot(2));
+    /// assert_eq!(bspcurve.knot_vector(), &KnotVector::bezier_knot(2));
     /// assert_eq!(
     ///     bspcurve.control_points(),
     ///     &vec![Vector3::new(0.0, 1.0, 0.0), Vector3::new(1.0, 1.0, 1.0), Vector3::new(2.0, 1.0, 2.0)],
@@ -338,7 +343,7 @@ impl<P> BsplineSurface<P> {
     /// let bspsurface = BsplineSurface::new(knot_vecs, control_points);
     /// let bspcurve = bspsurface.row_curve(1);
     ///
-    /// assert_eq!(bspcurve.knot_vec(), &KnotVector::bezier_knot(1));
+    /// assert_eq!(bspcurve.knot_vector(), &KnotVector::bezier_knot(1));
     /// assert_eq!(
     ///     bspcurve.control_points(),
     ///     &vec![Vector3::new(1.0, 0.0, 1.0), Vector3::new(1.0, 1.0, 1.0)],
@@ -355,7 +360,7 @@ impl<P> BsplineSurface<P> {
 impl<P: ControlPoint<f64>> BsplineSurface<P> {
     /// Returns the closure of substitution.
     #[inline(always)]
-    pub fn get_closure(&self) -> impl Fn(f64, f64) -> P + '_ { move |u, v| self.subs(u, v) }
+    pub fn closure(&self) -> impl Fn(f64, f64) -> P + '_ { move |u, v| self.subs(u, v) }
 
     #[inline(always)]
     fn udelta_control_points(&self, i: usize, j: usize) -> P::Diff {
@@ -996,7 +1001,7 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineSurface<P> {
             let mut curve = BsplineCurve::new(knot_vec, control_points);
             curve.elevate_degree();
             if i == 0 {
-                new_knot_vec = curve.knot_vec().clone();
+                new_knot_vec = curve.knot_vector().clone();
             }
             *vec = curve.control_points;
         }
@@ -1384,7 +1389,7 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineSurface<P> {
 
         bspcurve0.syncro_knots(&mut bspcurve1);
 
-        let knot_vector_u = bspcurve0.knot_vec().clone();
+        let knot_vector_u = bspcurve0.knot_vector().clone();
         let knot_vector_v = KnotVector::from(vec![0.0, 0.0, 1.0, 1.0]);
         let control_points: Vec<Vec<_>> = (0..bspcurve0.control_points().len())
             .map(|i| vec![*bspcurve0.control_point(i), *bspcurve1.control_point(i)])
@@ -1408,7 +1413,7 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineSurface<P> {
     /// # Examples
     ///
     /// ```
-    /// use truck_geometry::prelude::*;
+    /// use monstertruck_geometry::prelude::*;
     ///
     /// let c0 = BsplineCurve::new(
     ///     KnotVector::bezier_knot(2),
@@ -1441,7 +1446,7 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineSurface<P> {
             // Degenerate: single curve → constant surface in v.
             let c = &mut curves[0];
             c.knot_normalize();
-            let knot_vector_u = c.knot_vec().clone();
+            let knot_vector_u = c.knot_vector().clone();
             let knot_vector_v = KnotVector::from(vec![0.0, 0.0, 1.0, 1.0]);
             let control_points: Vec<Vec<_>> =
                 c.control_points().iter().map(|p| vec![*p, *p]).collect();
@@ -1465,7 +1470,7 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineSurface<P> {
         v_knots.push(1.0);
         let knot_vector_v = KnotVector::from(v_knots);
 
-        let knot_vector_u = curves[0].knot_vec().clone();
+        let knot_vector_u = curves[0].knot_vector().clone();
         let control_points: Vec<Vec<P>> = (0..m)
             .map(|j| curves.iter().map(|c| *c.control_point(j)).collect())
             .collect();
@@ -1488,7 +1493,7 @@ impl BsplineSurface<Point3> {
     /// # Examples
     ///
     /// ```
-    /// use truck_geometry::prelude::*;
+    /// use monstertruck_geometry::prelude::*;
     ///
     /// // Sweep a small circle profile along a straight rail (should approximate extrusion).
     /// let rail = BsplineCurve::new(
@@ -1563,7 +1568,7 @@ impl BsplineSurface<Point3> {
     /// # Examples
     ///
     /// ```
-    /// use truck_geometry::prelude::*;
+    /// use monstertruck_geometry::prelude::*;
     ///
     /// // Two parallel straight rails separated along x.
     /// let rail1 = BsplineCurve::new(
@@ -1654,7 +1659,7 @@ impl BsplineSurface<Point3> {
     /// # Examples
     ///
     /// ```
-    /// use truck_geometry::prelude::*;
+    /// use monstertruck_geometry::prelude::*;
     ///
     /// // Two parallel straight rails.
     /// let rail1 = BsplineCurve::new(
@@ -1752,7 +1757,7 @@ impl BsplineSurface<Point3> {
                     .map(|(a, b)| *a + (*b - *a) * v)
                     .collect();
 
-                BsplineCurve::new_unchecked(s1.knot_vec().clone(), blended_cp)
+                BsplineCurve::new_unchecked(s1.knot_vector().clone(), blended_cp)
             })
             .collect();
 
@@ -1810,7 +1815,7 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineSurface<P> {
     /// # Examples
     ///
     /// ```
-    /// use truck_geometry::prelude::*;
+    /// use monstertruck_geometry::prelude::*;
     ///
     /// // Two u-curves and two v-curves forming a bilinear patch.
     /// let u0 = BsplineCurve::new(
@@ -1907,7 +1912,7 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineSurface<P> {
             })
             .collect();
 
-        BsplineSurface::new_unchecked(surfaces[0].knot_vecs().clone(), result_cp)
+        BsplineSurface::new_unchecked(surfaces[0].knot_vectors().clone(), result_cp)
     }
 
     /// Creates a surface by its boundary.
@@ -1987,7 +1992,7 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineSurface<P> {
         curve3.optimize();
         curve1.syncro_knots(&mut curve3);
 
-        let knot_vecs = (curve0.knot_vec().clone(), curve3.knot_vec().clone());
+        let knot_vecs = (curve0.knot_vector().clone(), curve3.knot_vector().clone());
         let mut control_points = vec![curve3.control_points().clone()];
         let n = curve0.control_points().len();
         let m = curve3.control_points().len();
@@ -2187,6 +2192,102 @@ impl ParametricSurface3D for BsplineSurface<Point3> {}
 
 impl<V> BoundedSurface for BsplineSurface<V> where BsplineSurface<V>: ParametricSurface {}
 
+// -- v2 scalar-generic impls ------------------------------------------------
+
+use monstertruck_core::scalar::HasScalar;
+use monstertruck_traits::v2;
+
+impl<P> v2::ParametricSurface for BsplineSurface<P>
+where P: HasScalar<Scalar = f64> + ControlPoint<f64>
+{
+    type Scalar = f64;
+    type Point = P;
+    type Vector = P::Diff;
+
+    #[inline(always)]
+    fn evaluate(&self, u: Self::Scalar, v: Self::Scalar) -> P {
+        ParametricSurface::evaluate(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_u(&self, u: Self::Scalar, v: Self::Scalar) -> P::Diff {
+        ParametricSurface::derivative_u(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_v(&self, u: Self::Scalar, v: Self::Scalar) -> P::Diff {
+        ParametricSurface::derivative_v(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_uu(&self, u: Self::Scalar, v: Self::Scalar) -> P::Diff {
+        ParametricSurface::derivative_uu(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_uv(&self, u: Self::Scalar, v: Self::Scalar) -> P::Diff {
+        ParametricSurface::derivative_uv(self, u, v)
+    }
+    #[inline(always)]
+    fn derivative_vv(&self, u: Self::Scalar, v: Self::Scalar) -> P::Diff {
+        ParametricSurface::derivative_vv(self, u, v)
+    }
+    #[inline(always)]
+    fn period_u(&self) -> Option<Self::Scalar> { ParametricSurface::u_period(self) }
+    #[inline(always)]
+    fn period_v(&self) -> Option<Self::Scalar> { ParametricSurface::v_period(self) }
+}
+
+impl<P> v2::BoundedSurface for BsplineSurface<P>
+where
+    P: HasScalar<Scalar = f64> + ControlPoint<f64>,
+    Self: ParametricSurface + BoundedSurface,
+{
+    #[inline(always)]
+    fn range_tuple(&self) -> ((Self::Scalar, Self::Scalar), (Self::Scalar, Self::Scalar)) {
+        BoundedSurface::range_tuple(self)
+    }
+}
+
+impl v2::ParametricSurface3D for BsplineSurface<Point3> {}
+
+impl<P> v2::SearchNearestParameter<v2::D2<f64>> for BsplineSurface<P>
+where
+    P: HasScalar<Scalar = f64>
+        + ControlPoint<f64>
+        + EuclideanSpace<Scalar = f64, Diff = <P as ControlPoint<f64>>::Diff>
+        + MetricSpace<Metric = f64>,
+    <P as ControlPoint<f64>>::Diff: SearchNearestParameterVector<Point = P>,
+{
+    type Point = P;
+    #[inline(always)]
+    fn search_nearest_parameter<H: Into<v2::SearchParameterHint2D<f64>>>(
+        &self,
+        pt: P,
+        _: H,
+        trials: usize,
+    ) -> Option<(f64, f64)> {
+        SearchNearestParameter::<D2>::search_nearest_parameter(self, pt, None, trials)
+    }
+}
+
+impl<P> v2::SearchParameter<v2::D2<f64>> for BsplineSurface<P>
+where
+    P: HasScalar<Scalar = f64>
+        + ControlPoint<f64>
+        + EuclideanSpace<Scalar = f64, Diff = <P as ControlPoint<f64>>::Diff>
+        + MetricSpace<Metric = f64>
+        + Tolerance,
+    <P as ControlPoint<f64>>::Diff: SearchParameterVector<Point = P>,
+{
+    type Point = P;
+    #[inline(always)]
+    fn search_parameter<H: Into<v2::SearchParameterHint2D<f64>>>(
+        &self,
+        pt: P,
+        _: H,
+        trials: usize,
+    ) -> Option<(f64, f64)> {
+        SearchParameter::<D2>::search_parameter(self, pt, None, trials)
+    }
+}
+
 impl<V: Clone> Invertible for BsplineSurface<V> {
     #[inline(always)]
     fn invert(&mut self) { self.swap_axes(); }
@@ -2258,7 +2359,7 @@ impl IncludeCurve<BsplineCurve<Point2>> for BsplineSurface<Point2> {
         let knot_vector_u = self.knot_vector_u();
         let knot_vector_v = self.knot_vector_v();
         let degree = curve.degree() * 6;
-        let (knots, _) = curve.knot_vec().to_single_multi();
+        let (knots, _) = curve.knot_vector().to_single_multi();
         for i in 1..knots.len() {
             for j in 1..=degree {
                 let p = j as f64 / degree as f64;
@@ -2293,7 +2394,7 @@ impl IncludeCurve<BsplineCurve<Point3>> for BsplineSurface<Point3> {
         let knot_vector_u = self.knot_vector_u();
         let knot_vector_v = self.knot_vector_v();
         let degree = curve.degree() * 6;
-        let (knots, _) = curve.knot_vec().to_single_multi();
+        let (knots, _) = curve.knot_vector().to_single_multi();
         for i in 1..knots.len() {
             for j in 1..=degree {
                 let p = j as f64 / degree as f64;
@@ -2319,7 +2420,7 @@ impl IncludeCurve<BsplineCurve<Point3>> for BsplineSurface<Point3> {
 
 impl IncludeCurve<NurbsCurve<Vector4>> for BsplineSurface<Point3> {
     fn include(&self, curve: &NurbsCurve<Vector4>) -> bool {
-        let pt = curve.subs(curve.knot_vec()[0]);
+        let pt = curve.subs(curve.knot_vector()[0]);
         let mut hint = algo::surface::presearch(self, pt, self.range_tuple(), PRESEARCH_DIVISION);
         hint = match algo::surface::search_parameter(self, pt, hint, INCLUDE_CURVE_TRIALS) {
             Some(got) => got,
@@ -2328,7 +2429,7 @@ impl IncludeCurve<NurbsCurve<Vector4>> for BsplineSurface<Point3> {
         let knot_vector_u = self.knot_vector_u();
         let knot_vector_v = self.knot_vector_v();
         let degree = curve.degree() * 6;
-        let (knots, _) = curve.knot_vec().to_single_multi();
+        let (knots, _) = curve.knot_vector().to_single_multi();
         for i in 1..knots.len() {
             for j in 1..=degree {
                 let p = j as f64 / degree as f64;
