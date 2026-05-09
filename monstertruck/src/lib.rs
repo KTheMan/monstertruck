@@ -7,7 +7,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! monstertruck = { version = "0.1", features = ["full"] }
+//! monstertruck = { version = "0.2", features = ["full"] }
 //! ```
 
 pub use monstertruck_core as core;

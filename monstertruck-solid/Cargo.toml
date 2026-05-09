@@ -1,11 +1,11 @@
 [package]
 name = "monstertruck-solid"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Moritz Moeller <virtualritz@protonmail.com>"]
 edition = "2024"
 description = "Boolean operations, fillets, and shape healing for solids"
-homepage = "https://github.com/virtualritz/truck"
-repository = "https://github.com/virtualritz/truck"
+homepage = "https://github.com/virtualritz/monstertruck"
+repository = "https://github.com/virtualritz/monstertruck"
 license = "Apache-2.0"
 
 [features]

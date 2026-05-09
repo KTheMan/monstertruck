@@ -1,4 +1,4 @@
-import init, * as Truck from "./truck_js.js";
+import init, * as Truck from "./monstertruck_wasm.js";
 await init();
 
 const cw = 768;

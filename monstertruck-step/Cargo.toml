@@ -1,11 +1,11 @@
 [package]
 name = "monstertruck-step"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Yoshinori Tanimura <tanimura@ricos.co.jp>", "Moritz Moeller <virtualritz@protonmail.com>"]
 edition = "2024"
 description = "STEP file import and export"
-homepage = "https://github.com/virtualritz/truck"
-repository = "https://github.com/virtualritz/truck"
+homepage = "https://github.com/virtualritz/monstertruck"
+repository = "https://github.com/virtualritz/monstertruck"
 license = "Apache-2.0"
 
 keywords = ["truck", "graphics"]

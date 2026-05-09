@@ -9,7 +9,7 @@ Enable only what you need, or use `full` for everything.
 
 ```toml
 [dependencies]
-monstertruck = { version = "0.1", features = ["full"] }
+monstertruck = { version = "0.2", features = ["full"] }
 ```
 
 ### Example – spheres on cube corners with booleans and fillet
@@ -26,7 +26,13 @@ use std::f64::consts::PI;
 
 fn sphere(center: Point3, radius: f64) -> Solid {
     let top = builder::vertex(Point3::new(0.0, radius, 0.0));
-    let wire: Wire = builder::revolve(&top, Point3::origin(), Vector3::unit_x(), Rad(PI), 3);
+    let wire: Wire = builder::revolve(
+        &top,
+        Point3::origin(),
+        Vector3::unit_x(),
+        builder::SweepAngle::Partial(Rad(PI)),
+        3,
+    );
     let shell = builder::cone(&wire, Vector3::unit_y(), Rad(7.0), 4);
     builder::translated(&Solid::new(vec![shell]), center.to_vec())
 }

@@ -7,7 +7,7 @@ STEP file import and export.
 ## Quick Start
 
 ```rust
-use monstertruck_step::r#in::{*, step_geometry::*};
+use monstertruck_step::load::{*, step_geometry::*};
 
 // Parse a STEP file
 let step_string = std::fs::read_to_string("model.step").unwrap();

@@ -24,7 +24,7 @@ let pt = curve.evaluate(0.5); // dispatches to Line::evaluate
 Users do not need to depend on this crate directly:
 
 ```toml
-monstertruck-traits = { version = "0.1", features = ["derive"] }
+monstertruck-traits = { version = "0.2", features = ["derive"] }
 ```
 
 ## License
