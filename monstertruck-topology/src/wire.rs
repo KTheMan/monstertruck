@@ -71,7 +71,7 @@ impl<P, C> Wire<P, C> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), ()]);
     /// let mut wire = Wire::new();
     /// assert_eq!(wire.front_vertex(), None);
     /// wire.push_back(Edge::new(&v[1], &v[2], ()));
@@ -90,7 +90,7 @@ impl<P, C> Wire<P, C> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), ()]);
     /// let mut wire = Wire::new();
     /// assert_eq!(wire.back_vertex(), None);
     /// wire.push_back(Edge::new(&v[1], &v[2], ()));
@@ -103,7 +103,7 @@ impl<P, C> Wire<P, C> {
     /// Returns vertices at both ends.
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(); 3]);
+    /// let v = Vertex::from_points(&[(); 3]);
     /// let mut wire = Wire::new();
     /// assert_eq!(wire.back_vertex(), None);
     /// wire.push_back(Edge::new(&v[1], &v[2], ()));
@@ -126,7 +126,7 @@ impl<P, C> Wire<P, C> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(); 7]);
+    /// let v = Vertex::from_points(&[(); 7]);
     /// let mut wire = Wire::new();
     /// for i in 0..6 {
     ///    wire.push_back(Edge::new(&v[i], &v[i + 1], ()));
@@ -151,7 +151,7 @@ impl<P, C> Wire<P, C> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(); 4]);
+    /// let v = Vertex::from_points(&[(); 4]);
     /// let mut wire = Wire::from(vec![
     ///     Edge::new(&v[3], &v[2], ()),
     ///     Edge::new(&v[2], &v[1], ()),
@@ -172,7 +172,7 @@ impl<P, C> Wire<P, C> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(); 4]);
+    /// let v = Vertex::from_points(&[(); 4]);
     /// let mut wire = Wire::from(vec![
     ///     Edge::new(&v[3], &v[2], ()),
     ///     Edge::new(&v[2], &v[1], ()),
@@ -194,7 +194,7 @@ impl<P, C> Wire<P, C> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(); 4]);
+    /// let v = Vertex::from_points(&[(); 4]);
     /// let mut wire = Wire::from(vec![
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[2], &v[3], ()),
@@ -226,7 +226,7 @@ impl<P, C> Wire<P, C> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(); 4]);
+    /// let v = Vertex::from_points(&[(); 4]);
     /// let mut wire = Wire::from(vec![
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[2], &v[3], ()),
@@ -253,7 +253,7 @@ impl<P, C> Wire<P, C> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(); 4]);
+    /// let v = Vertex::from_points(&[(); 4]);
     /// let edge0 = Edge::new(&v[0], &v[1], ());
     /// let edge1 = Edge::new(&v[1], &v[2], ());
     /// let edge2 = Edge::new(&v[2], &v[3], ());
@@ -282,7 +282,7 @@ impl<P, C> Wire<P, C> {
     /// ```
     /// use monstertruck_topology::*;
     ///
-    /// let v = Vertex::news(&[(), (), (), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), (), (), ()]);
     /// let edge0 = Edge::new(&v[0], &v[1], ());
     /// let edge1 = Edge::new(&v[1], &v[2], ());
     /// let edge2 = Edge::new(&v[2], &v[3], ());
@@ -317,7 +317,7 @@ impl<P, C> Wire<P, C> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(), (), (), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), (), (), ()]);
     /// let edge0 = Edge::new(&v[0], &v[1], 0);
     /// let edge1 = Edge::new(&v[1], &v[3], 1);
     /// let edge2 = Edge::new(&v[3], &v[4], 2);
@@ -341,7 +341,7 @@ impl<P, C> Wire<P, C> {
     /// Returns `false` and `self` will not be changed if the end vertices of `self[idx]` and the ones of `wire` is not the same.
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(), (), (), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), (), (), ()]);
     /// let edge0 = Edge::new(&v[0], &v[1], 0);
     /// let edge1 = Edge::new(&v[1], &v[3], 1);
     /// let edge2 = Edge::new(&v[3], &v[4], 2);
@@ -445,7 +445,7 @@ impl<P, C> Wire<P, C> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[0, 1, 2, 3, 4]);
+    /// let v = Vertex::from_points(&[0, 1, 2, 3, 4]);
     /// let wire0: Wire<usize, usize> = vec![
     ///     Edge::new(&v[0], &v[1], 100),
     ///     Edge::new(&v[2], &v[1], 110).inverse(),
@@ -510,7 +510,7 @@ impl<P, C> Wire<P, C> {
     /// ```
     /// use monstertruck_topology::*;
     /// use WireDisplayFormat as WDF;
-    /// let v = Vertex::news(&[0, 1, 2, 3, 4]);
+    /// let v = Vertex::from_points(&[0, 1, 2, 3, 4]);
     /// let wire: Wire<usize, usize> = vec![
     ///     Edge::new(&v[0], &v[1], 100),
     ///     Edge::new(&v[2], &v[1], 110).inverse(),
@@ -641,7 +641,7 @@ pub type EdgeParallelIntoIter<P, C> = <VecDeque<Edge<P, C>> as IntoParallelItera
 /// Fundamentally, the iterator runs over all the vertices in a wire.
 /// ```
 /// use monstertruck_topology::*;
-/// let v = Vertex::news(&[(); 6]);
+/// let v = Vertex::from_points(&[(); 6]);
 /// let wire = Wire::from(vec![
 ///     Edge::new(&v[0], &v[1], ()),
 ///     Edge::new(&v[2], &v[3], ()),
@@ -660,7 +660,7 @@ pub type EdgeParallelIntoIter<P, C> = <VecDeque<Edge<P, C>> as IntoParallelItera
 /// If a pair of adjacent edges share one vertex, the iterator run only one time at the shared vertex.
 /// ```
 /// use monstertruck_topology::*;
-/// let v = Vertex::news(&[(); 6]);
+/// let v = Vertex::from_points(&[(); 6]);
 /// let wire = Wire::from(vec![
 ///     Edge::new(&v[0], &v[1], ()),
 ///     Edge::new(&v[2], &v[3], ()),
@@ -679,7 +679,7 @@ pub type EdgeParallelIntoIter<P, C> = <VecDeque<Edge<P, C>> as IntoParallelItera
 /// If the wire is cyclic, the iterator does not arrive at the last vertex.
 /// ```
 /// use monstertruck_topology::*;
-/// let v = Vertex::news(&[(); 5]);
+/// let v = Vertex::from_points(&[(); 5]);
 /// let wire = Wire::from(vec![
 ///     Edge::new(&v[0], &v[1], ()),
 ///     Edge::new(&v[1], &v[2], ()),

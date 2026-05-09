@@ -8,7 +8,7 @@
 //! monstertruck_topology::prelude!((), (), ());
 //!
 //! // Create vertices. A tetrahedron has four vertices.
-//! let v = Vertex::news(&[(); 4]);
+//! let v = Vertex::from_points(&[(); 4]);
 //!
 //! // Create edges. Vertex is implemented the Copy trait.
 //! let edge = [
@@ -119,7 +119,7 @@ pub struct Vertex<P> {
 /// An edge is uniquely identified by their `id`.
 /// ```
 /// use monstertruck_topology::*;
-/// let v = Vertex::news(&[(), ()]);
+/// let v = Vertex::from_points(&[(), ()]);
 /// let edge0 = Edge::new(&v[0], &v[1], ());
 /// let edge1 = Edge::new(&v[0], &v[1], ());
 /// assert_ne!(edge0.id(), edge1.id());
@@ -148,7 +148,7 @@ pub struct Wire<P, C> {
 /// A face is uniquely identified by their `id`.
 /// ```
 /// use monstertruck_topology::*;
-/// let v = Vertex::news(&[(), ()]);
+/// let v = Vertex::from_points(&[(), ()]);
 /// let edge0 = Edge::new(&v[0], &v[1], ());
 /// let edge1 = Edge::new(&v[1], &v[0], ());
 /// let wire = wire![&edge0, &edge1];
@@ -221,7 +221,7 @@ pub type VertexId<P> = Id<Mutex<P>>;
 /// # Examples
 /// ```
 /// use monstertruck_topology::*;
-/// let v = Vertex::news(&[(), ()]);
+/// let v = Vertex::from_points(&[(), ()]);
 /// let edge0 = Edge::new(&v[0], &v[1], ());
 /// let edge1 = edge0.inverse();
 /// assert_ne!(edge0, edge1);
@@ -233,7 +233,7 @@ pub type EdgeId<C> = Id<Mutex<C>>;
 /// # Examples
 /// ```
 /// use monstertruck_topology::*;
-/// let v = Vertex::news(&[(); 3]);
+/// let v = Vertex::from_points(&[(); 3]);
 /// let wire = Wire::from(vec![
 ///     Edge::new(&v[0], &v[1], ()),
 ///     Edge::new(&v[1], &v[2], ()),
@@ -249,25 +249,13 @@ pub type EdgeId<C> = Id<Mutex<C>>;
 /// ```
 pub type FaceId<S> = Id<Mutex<S>>;
 
-/// Renamed to [`VertexId`] per RFC 430 (C-CASE).
-#[deprecated(note = "renamed to VertexId per RFC 430 (C-CASE)")]
-pub type VertexID<P> = VertexId<P>;
-
-/// Renamed to [`EdgeId`] per RFC 430 (C-CASE).
-#[deprecated(note = "renamed to EdgeId per RFC 430 (C-CASE)")]
-pub type EdgeID<C> = EdgeId<C>;
-
-/// Renamed to [`FaceId`] per RFC 430 (C-CASE).
-#[deprecated(note = "renamed to FaceId per RFC 430 (C-CASE)")]
-pub type FaceID<S> = FaceId<S>;
-
 /// configuration for vertex display format.
 #[derive(Clone, Copy, Debug)]
 pub enum VertexDisplayFormat {
     /// Display all data like `Vertex { id: 0x123456789ab, entity: [0.0, 1.0] }`.
     Full,
     /// Display id like `Vertex(0x123456789ab)`.
-    IDTuple,
+    IdTuple,
     /// Display entity point like `Vertex([0.0, 1.0])`.
     PointTuple,
     /// Display only entity point like `[0.0, 1.0]`.
@@ -457,7 +445,7 @@ pub mod imported;
 /// # Example
 /// ```
 /// use monstertruck_topology::*;
-/// let v: Vec<Vertex<()>> = Vertex::news([(); 3]);
+/// let v: Vec<Vertex<()>> = Vertex::from_points([(); 3]);
 /// let wire: Wire<(), ()> = wire![
 ///     Edge::new(&v[0], &v[1], ()),
 ///     Edge::new(&v[1], &v[2], ()),
@@ -472,7 +460,7 @@ macro_rules! wire { ($($t:tt)*) => { $crate::Wire::from_iter([$($t)*]) }; }
 /// # Example
 /// ```
 /// use monstertruck_topology::*;
-/// let v: Vec<Vertex<()>> = Vertex::news([(); 4]);
+/// let v: Vec<Vertex<()>> = Vertex::from_points([(); 4]);
 /// let wire0: Wire<(), ()> = wire![
 ///     Edge::new(&v[0], &v[1], ()),
 ///     Edge::new(&v[1], &v[2], ()),

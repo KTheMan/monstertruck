@@ -132,7 +132,7 @@ fn sample_curve_to_nurbs(curve: &(impl ParametricCurve3D + BoundedCurve)) -> Nur
     let samples = 16usize;
     let points: Vec<Point3> = (0..=samples)
         .map(|i| t0 + (t1 - t0) * (i as f64) / (samples as f64))
-        .map(|t| curve.subs(t))
+        .map(|t| curve.evaluate(t))
         .collect();
     let knots: Vec<f64> = (0..=samples).map(|i| i as f64 / samples as f64).collect();
     let knot_vec = KnotVector::from(
@@ -203,7 +203,7 @@ fn curve2d_from_sampled_boundary(points: Vec<Point2>) -> Option<Curve2D> {
         let line = Line(front, back);
         let is_linear = points.iter().copied().all(|point| {
             line.search_nearest_parameter(point, None, 1)
-                .is_some_and(|t| line.subs(t).near(&point))
+                .is_some_and(|t| line.evaluate(t).near(&point))
         });
         if is_linear {
             Some(Curve2D::Line(line))
@@ -232,8 +232,8 @@ fn same_surface(lhs: &Surface, rhs: &Surface) -> bool {
         [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0), (0.5, 0.5)]
             .into_iter()
             .all(|(s, t)| {
-                let lp = lhs.subs(lu0 + (lu1 - lu0) * s, lv0 + (lv1 - lv0) * t);
-                let rp = rhs.subs(ru0 + (ru1 - ru0) * s, rv0 + (rv1 - rv0) * t);
+                let lp = lhs.evaluate(lu0 + (lu1 - lu0) * s, lv0 + (lv1 - lv0) * t);
+                let rp = rhs.evaluate(ru0 + (ru1 - ru0) * s, rv0 + (rv1 - rv0) * t);
                 lp.near(&rp)
             })
     } else {
@@ -1143,7 +1143,7 @@ impl SearchNearestParameter<D2> for Surface {
                     }
                 };
                 algo::surface::search_nearest_parameter(rotted, point, hint, trials).or_else(|| {
-                    let candidate = rotted.subs(hint.0, hint.1);
+                    let candidate = rotted.evaluate(hint.0, hint.1);
                     if candidate.near(&point) {
                         Some(hint)
                     } else {

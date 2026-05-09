@@ -29,22 +29,31 @@ fn polysurface() {
         for j in 0..5 {
             let v = j as f64;
             assert_eq!(
-                poly.subs(u, v)[0],
+                poly.evaluate(u, v)[0],
                 (2.0 * u * u + 3.0 * u + 1.0) * (4.0 * v * v - 6.0 * v + 2.0)
             );
             assert_eq!(
-                poly.uder(u, v)[0],
+                poly.derivative_u(u, v)[0],
                 (4.0 * u + 3.0) * (4.0 * v * v - 6.0 * v + 2.0)
             );
             assert_eq!(
-                poly.vder(u, v)[0],
+                poly.derivative_v(u, v)[0],
                 (2.0 * u * u + 3.0 * u + 1.0) * (8.0 * v - 6.0)
             );
-            assert_eq!(poly.uuder(u, v)[0], 4.0 * (4.0 * v * v - 6.0 * v + 2.0));
-            assert_eq!(poly.uvder(u, v)[0], (4.0 * u + 3.0) * (8.0 * v - 6.0));
-            assert_eq!(poly.vvder(u, v)[0], (2.0 * u * u + 3.0 * u + 1.0) * 8.0);
-            assert!(poly.normal(u, v).dot(poly.uder(u, v)).so_small());
-            assert!(poly.normal(u, v).dot(poly.vder(u, v)).so_small());
+            assert_eq!(
+                poly.derivative_uu(u, v)[0],
+                4.0 * (4.0 * v * v - 6.0 * v + 2.0)
+            );
+            assert_eq!(
+                poly.derivative_uv(u, v)[0],
+                (4.0 * u + 3.0) * (8.0 * v - 6.0)
+            );
+            assert_eq!(
+                poly.derivative_vv(u, v)[0],
+                (2.0 * u * u + 3.0 * u + 1.0) * 8.0
+            );
+            assert!(poly.normal(u, v).dot(poly.derivative_u(u, v)).so_small());
+            assert!(poly.normal(u, v).dot(poly.derivative_v(u, v)).so_small());
 
             let eps = 1.0e-4;
             let normal_uder_approx =
@@ -88,11 +97,11 @@ fn exec_polysurface_snp_on_surface() -> bool {
     let poly = PolynomialSurface::by_tensor(curve0, curve1);
     let u = 10.0 * rand::random::<f64>() - 5.0;
     let v = 10.0 * rand::random::<f64>() - 5.0;
-    let pt = poly.subs(u, v);
+    let pt = poly.evaluate(u, v);
     let u0 = u + 0.2 * rand::random::<f64>() - 0.1;
     let v0 = v + 0.2 * rand::random::<f64>() - 0.1;
     match algo::surface::search_nearest_parameter(&poly, pt, (u0, v0), 100) {
-        Some(res) => match poly.subs(res.0, res.1).near(&pt) {
+        Some(res) => match poly.evaluate(res.0, res.1).near(&pt) {
             true => true,
             false => {
                 eprintln!(
@@ -149,11 +158,11 @@ fn exec_polysurface_sp_on_surface() -> bool {
     let poly = PolynomialSurface::by_tensor(curve0, curve1);
     let u = 10.0 * rand::random::<f64>() - 5.0;
     let v = 10.0 * rand::random::<f64>() - 5.0;
-    let pt = poly.subs(u, v);
+    let pt = poly.evaluate(u, v);
     let u0 = u + 2.0 * rand::random::<f64>() - 1.0;
     let v0 = v + 2.0 * rand::random::<f64>() - 1.0;
     match algo::surface::search_parameter(&poly, pt, (u0, v0), 100) {
-        Some(res) => match poly.subs(res.0, res.1).near(&pt) {
+        Some(res) => match poly.evaluate(res.0, res.1).near(&pt) {
             true => true,
             false => {
                 eprintln!(
@@ -212,7 +221,7 @@ fn exec_polysurface_intersection_point() -> bool {
 
     match surface::search_intersection_parameter(&surface, (0.5, 0.5), &curve, 0.0, 100) {
         Some(((x, y), z)) => {
-            let (p, q) = (surface.subs(x, y), curve.subs(z));
+            let (p, q) = (surface.evaluate(x, y), curve.evaluate(z));
             p.near(&q) && x.near(&a) && y.near(&b) && p.z.near(&z)
         }
         None => false,
@@ -253,14 +262,14 @@ fn exec_polysurface_division() -> bool {
             let p = i as f64 / 3.0;
             let q = j as f64 / 3.0;
             let pt0 = Point3::from_vec(
-                poly.subs(u[0], v[0]).to_vec() * (1.0 - p) * (1.0 - q)
-                    + poly.subs(u[1], v[0]).to_vec() * p * (1.0 - q)
-                    + poly.subs(u[0], v[1]).to_vec() * (1.0 - p) * q
-                    + poly.subs(u[1], v[1]).to_vec() * p * q,
+                poly.evaluate(u[0], v[0]).to_vec() * (1.0 - p) * (1.0 - q)
+                    + poly.evaluate(u[1], v[0]).to_vec() * p * (1.0 - q)
+                    + poly.evaluate(u[0], v[1]).to_vec() * (1.0 - p) * q
+                    + poly.evaluate(u[1], v[1]).to_vec() * p * q,
             );
             let u = u[0] * (1.0 - p) + u[1] * p;
             let v = v[0] * (1.0 - q) + v[1] * q;
-            let pt1 = poly.subs(u, v);
+            let pt1 = poly.evaluate(u, v);
             if pt0.distance(pt1) > 0.2 {
                 return false;
             }

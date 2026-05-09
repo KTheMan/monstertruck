@@ -71,18 +71,18 @@ fn shell_bounding_box(shell: &CShell) -> BoundingBox<Point3> {
         let (t0, t1) = edge.curve.range_tuple();
         (0..=4).for_each(|i| {
             let t = t0 + (t1 - t0) * i as f64 / 4.0;
-            bdd.push(edge.curve.subs(t));
+            bdd.push(edge.curve.evaluate(t));
         });
     });
     shell.faces.iter().for_each(|face| {
         let (urange, vrange) = face.surface.try_range_tuple();
         if let (Some((u0, u1)), Some((v0, v1))) = (urange, vrange) {
             [
-                face.surface.subs(u0, v0),
-                face.surface.subs(u1, v0),
-                face.surface.subs(u0, v1),
-                face.surface.subs(u1, v1),
-                face.surface.subs((u0 + u1) * 0.5, (v0 + v1) * 0.5),
+                face.surface.evaluate(u0, v0),
+                face.surface.evaluate(u1, v0),
+                face.surface.evaluate(u0, v1),
+                face.surface.evaluate(u1, v1),
+                face.surface.evaluate((u0 + u1) * 0.5, (v0 + v1) * 0.5),
             ]
             .into_iter()
             .for_each(|point| {

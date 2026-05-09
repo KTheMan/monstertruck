@@ -16,7 +16,7 @@ impl<P, C, S> Face<P, C, S> {
     /// ```
     /// use monstertruck_topology::*;
     /// use errors::Error;
-    /// let v = Vertex::news(&[(); 4]);
+    /// let v = Vertex::from_points(&[(); 4]);
     /// let mut wire = Wire::from(vec![
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[2], ()),
@@ -89,7 +89,7 @@ impl<P, C, S> Face<P, C, S> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(); 3]);
+    /// let v = Vertex::from_points(&[(); 3]);
     /// let wire = Wire::from(vec![
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[2], ()),
@@ -116,7 +116,7 @@ impl<P, C, S> Face<P, C, S> {
     /// Consumes `self` and returns the entity of its boundaries.
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), ()]);
     /// let wire = Wire::from(vec![
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[2], ()),
@@ -144,7 +144,7 @@ impl<P, C, S> Face<P, C, S> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), ()]);
     /// let wire = Wire::from(vec![
     ///      Edge::new(&v[0], &v[1], ()),
     ///      Edge::new(&v[1], &v[2], ()),
@@ -167,7 +167,7 @@ impl<P, C, S> Face<P, C, S> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), ()]);
     /// let wire = Wire::from(vec![
     ///      Edge::new(&v[0], &v[1], ()),
     ///      Edge::new(&v[1], &v[2], ()),
@@ -194,7 +194,7 @@ impl<P, C, S> Face<P, C, S> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), ()]);
     /// let wire = Wire::from(vec![
     ///      Edge::new(&v[0], &v[1], ()),
     ///      Edge::new(&v[1], &v[2], ()),
@@ -244,7 +244,7 @@ impl<P, C, S> Face<P, C, S> {
     /// ```
     /// # fn main() -> anyhow::Result<()> {
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(), (), (), (), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), (), (), (), ()]);
     /// let wire0 = Wire::from(vec![
     ///      Edge::new(&v[0], &v[1], ()),
     ///      Edge::new(&v[1], &v[2], ()),
@@ -267,7 +267,7 @@ impl<P, C, S> Face<P, C, S> {
     /// ```
     /// # fn main() -> anyhow::Result<()> {
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(), (), (), (), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), (), (), (), ()]);
     /// let wire0 = Wire::from(vec![
     ///      Edge::new(&v[0], &v[1], ()),
     ///      Edge::new(&v[1], &v[2], ()),
@@ -299,7 +299,7 @@ impl<P, C, S> Face<P, C, S> {
     /// ```
     /// # fn main() -> anyhow::Result<()> {
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(), (), (), (), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), (), (), (), ()]);
     /// let wire0 = Wire::from(vec![
     ///      Edge::new(&v[0], &v[1], ()),
     ///      Edge::new(&v[1], &v[2], ()),
@@ -344,7 +344,7 @@ impl<P, C, S> Face<P, C, S> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(), (), (), (), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), (), (), (), ()]);
     /// let wire0 = Wire::from(vec![
     ///      Edge::new(&v[0], &v[1], ()),
     ///      Edge::new(&v[1], &v[2], ()),
@@ -364,7 +364,7 @@ impl<P, C, S> Face<P, C, S> {
     /// 1. If the face is inverted, then the added wire is inverted as absolute boundary.
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(), (), (), (), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), (), (), (), ()]);
     /// let wire0 = Wire::from(vec![
     ///      Edge::new(&v[0], &v[1], ()),
     ///      Edge::new(&v[1], &v[2], ()),
@@ -393,7 +393,7 @@ impl<P, C, S> Face<P, C, S> {
     /// 2. This method renew the face id.
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(), (), (), (), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), (), (), (), ()]);
     /// let wire0 = Wire::from(vec![
     ///      Edge::new(&v[0], &v[1], ()),
     ///      Edge::new(&v[1], &v[2], ()),
@@ -446,7 +446,7 @@ impl<P, C, S> Face<P, C, S> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[0, 1, 2, 3, 4, 5, 6]);
+    /// let v = Vertex::from_points(&[0, 1, 2, 3, 4, 5, 6]);
     /// let wire0 = Wire::from(vec![
     ///     Edge::new(&v[0], &v[1], 100),
     ///     Edge::new(&v[1], &v[2], 200),
@@ -531,7 +531,7 @@ impl<P, C, S> Face<P, C, S> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), ()]);
     /// let wire = Wire::from(vec![
     ///      Edge::new(&v[0], &v[1], ()),
     ///      Edge::new(&v[1], &v[2], ()),
@@ -559,7 +559,7 @@ impl<P, C, S> Face<P, C, S> {
     /// ```
     /// use monstertruck_topology::*;
     /// use monstertruck_topology::errors::Error;
-    /// let v = Vertex::news(&[(), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), ()]);
     /// let wire = Wire::from(vec![
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[2], ()),
@@ -590,7 +590,7 @@ impl<P, C, S> Face<P, C, S> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(); 3]);
+    /// let v = Vertex::from_points(&[(); 3]);
     /// let wire = Wire::from(vec![
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[2], ()),
@@ -610,7 +610,7 @@ impl<P, C, S> Face<P, C, S> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(); 3]);
+    /// let v = Vertex::from_points(&[(); 3]);
     /// let wire = Wire::from(vec![
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[2], ()),
@@ -632,7 +632,7 @@ impl<P, C, S> Face<P, C, S> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(); 3]);
+    /// let v = Vertex::from_points(&[(); 3]);
     /// let wire = Wire::from(vec![
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[2], ()),
@@ -661,7 +661,7 @@ impl<P, C, S> Face<P, C, S> {
     /// ```
     /// use monstertruck_topology::*;
     /// use monstertruck_topology::errors::Error;
-    /// let v = Vertex::news(&[(), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), ()]);
     /// let wire = Wire::from(vec![
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[2], ()),
@@ -694,7 +694,7 @@ impl<P, C, S> Face<P, C, S> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news([(); 4]);
+    /// let v = Vertex::from_points([(); 4]);
     /// let shared_edge = Edge::new(&v[0], &v[1], ());
     /// let another_edge = Edge::new(&v[0], &v[1], ());
     /// let inversed_edge = shared_edge.inverse();
@@ -720,7 +720,7 @@ impl<P, C, S> Face<P, C, S> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news([(); 5]);
+    /// let v = Vertex::from_points([(); 5]);
     /// let shared_edge = [
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[2], &v[3], ()),
@@ -802,7 +802,7 @@ impl<P, C, S> Face<P, C, S> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(), (), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), (), ()]);
     /// let wire = Wire::from(vec![
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[2], ()),
@@ -825,7 +825,7 @@ impl<P, C, S> Face<P, C, S> {
     /// - `self` does not include vertices of the end vertices of `edge`.
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(); 6]);
+    /// let v = Vertex::from_points(&[(); 6]);
     /// let wire0 = Wire::from(vec![
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[2], ()),
@@ -841,7 +841,7 @@ impl<P, C, S> Face<P, C, S> {
     /// ```
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(), (), (), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), (), (), ()]);
     /// let wire = Wire::from(vec![
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[2], ()),
@@ -859,7 +859,7 @@ impl<P, C, S> Face<P, C, S> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news([(); 5]);
+    /// let v = Vertex::from_points([(); 5]);
     /// let boundary = Wire::from([
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[2], ()),
@@ -928,7 +928,7 @@ impl<P, C, S> Face<P, C, S> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(); 8]);
+    /// let v = Vertex::from_points(&[(); 8]);
     /// let edge = vec![
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[2], ()),
@@ -1031,7 +1031,7 @@ impl<P, C, S> Face<P, C, S> {
     /// ```
     /// use monstertruck_topology::*;
     /// use FaceDisplayFormat as FDF;
-    /// let v = Vertex::news(&[0, 1, 2, 3, 4, 5]);
+    /// let v = Vertex::from_points(&[0, 1, 2, 3, 4, 5]);
     /// let edge = vec![
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[2], ()),
@@ -1156,7 +1156,7 @@ impl<P, C, S> Hash for Face<P, C, S> {
 /// # Examples
 /// ```
 /// use monstertruck_topology::*;
-/// let v = Vertex::news(&[(); 4]);
+/// let v = Vertex::from_points(&[(); 4]);
 /// let wire = Wire::from(vec![
 ///     Edge::new(&v[0], &v[1], ()),
 ///     Edge::new(&v[1], &v[2], ()),
@@ -1285,7 +1285,7 @@ impl<P: Debug, C: Debug, S: Debug> Debug for DebugDisplay<'_, Face<P, C, S>, Fac
 
 #[test]
 fn invert_mapped_face() {
-    let v = Vertex::news([0, 1, 2, 3, 4, 5, 6]);
+    let v = Vertex::from_points([0, 1, 2, 3, 4, 5, 6]);
     let wire0 = Wire::from(vec![
         Edge::new(&v[0], &v[1], 100),
         Edge::new(&v[1], &v[2], 200),

@@ -1,7 +1,7 @@
 //! Fillet an edge on a boolean (AND) result.
 //!
 //! Builds the same punched-cube as `punched-cube-shapeops`, then fillets
-//! one of the remaining cube edges to demonstrate `fillet_edges_generic`
+//! one of the remaining cube edges to demonstrate `fillet_edges`
 //! working on shells that contain `IntersectionCurve` edges.
 
 use monstertruck_modeling::*;

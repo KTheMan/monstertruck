@@ -2,8 +2,8 @@
 //!
 //! Provides rolling-ball fillet operations: single-edge fillets,
 //! fillets with side face updates, and fillets along open or closed wire chains.
-//! The [`fillet_edges`] function provides a high-level API that automatically
-//! resolves face adjacency from edge IDs.
+//! The [`fillet_edges`] function provides a high-level API for selected edges.
+//! The [`fillet_edges_by_id`] function resolves face adjacency from edge IDs.
 
 #[allow(private_interfaces)]
 mod edge_select;
@@ -21,8 +21,8 @@ mod types;
 mod tests;
 
 pub use convert::{FilletIntersectionCurve, FilletableCurve, FilletableSurface};
-pub use edge_select::{fillet_edges, fillet_edges_generic};
+pub use edge_select::{fillet_edges, fillet_edges_by_id};
 pub use error::FilletError;
 pub use ops::{fillet, fillet_along_wire, fillet_with_side};
-pub use params::{FilletOptions, FilletProfile, RadiusSpec};
+pub use params::{FilletOptions, FilletProfile, FilletRadius};
 pub use types::ParameterCurveLinear;

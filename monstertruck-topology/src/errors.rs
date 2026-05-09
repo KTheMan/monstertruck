@@ -27,7 +27,7 @@ pub enum Error {
     /// ```
     /// use monstertruck_topology::*;
     /// use monstertruck_topology::errors::Error;
-    /// let v = Vertex::news(&[(), ()]);
+    /// let v = Vertex::from_points(&[(), ()]);
     /// let wire: Wire<(), ()> = vec![Edge::new(&v[0], &v[1], ())].into();
     /// assert_eq!(Face::try_new(vec![wire], ()), Err(Error::NotClosedWire));
     /// ```
@@ -38,7 +38,7 @@ pub enum Error {
     /// ```
     /// use monstertruck_topology::*;
     /// use monstertruck_topology::errors::Error;
-    /// let v = Vertex::news(&[(); 4]);
+    /// let v = Vertex::from_points(&[(); 4]);
     /// let wire: Wire<(), ()> = vec![
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[2], ()),
@@ -67,7 +67,7 @@ pub enum Error {
     /// ```
     /// use monstertruck_topology::*;
     /// use monstertruck_topology::errors::Error;
-    /// let v = Vertex::news(&[(), (), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), (), ()]);
     /// let wire = vec![
     ///     Wire::from(vec![Edge::new(&v[0], &v[1], ()), Edge::new(&v[1], &v[0], ())]),
     ///     Wire::from(vec![Edge::new(&v[2], &v[3], ()), Edge::new(&v[3], &v[2], ())]),
@@ -82,7 +82,7 @@ pub enum Error {
     /// ```
     /// use monstertruck_topology::*;
     /// use monstertruck_topology::errors::Error;
-    /// let v = Vertex::news(&[(), ()]);
+    /// let v = Vertex::from_points(&[(), ()]);
     /// let wire = Wire::from(vec![Edge::new(&v[0], &v[1], ()), Edge::new(&v[1], &v[0], ())]);
     /// let shell: Shell<(), (), ()> = vec![Face::new(vec![wire], ())].into();
     /// assert_eq!(Solid::try_new(vec![shell]), Err(Error::NotClosedShell));
@@ -95,7 +95,7 @@ pub enum Error {
     /// // the wedge sum of two spheres
     /// use monstertruck_topology::*;
     /// use monstertruck_topology::errors::Error;
-    /// let v = Vertex::news(&[(), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), ()]);
     /// let edge = [
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[0], ()),

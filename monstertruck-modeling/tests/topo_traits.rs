@@ -77,7 +77,7 @@ fn test_face() -> Face<Point3, Line, Surface> {
         Point3::new(0.75, 0.0, 0.75),
         Point3::new(0.75, 0.0, 0.25),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
     let wire: Vec<Wire<_, _>> = vec![
         wire![
             Edge::new(&v[0], &v[1], Line(p[0], p[1])),
@@ -107,7 +107,7 @@ fn test_shell() -> Shell<Point3, Line, Surface> {
         Point3::new(0.75, 0.0, 0.75),
         Point3::new(0.75, 0.0, 0.25),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
     let e = [
         Edge::new(&v[0], &v[1], Line(p[0], p[1])),
         Edge::new(&v[1], &v[2], Line(p[1], p[2])),
@@ -173,7 +173,7 @@ fn wire_sweep() {
     let q = Point3::new(1.0, 0.0, 0.0);
     let r = Point3::new(2.0, 0.0, 0.0);
 
-    let v = Vertex::news([p, q, r]);
+    let v = Vertex::from_points([p, q, r]);
     let wire: Wire<_, _> = vec![
         Edge::new(&v[0], &v[1], Line(p, q)),
         Edge::new(&v[2], &v[1], Line(r, q)).inverse(),
@@ -205,7 +205,7 @@ fn face_sweep() {
     let o = Point3::new(0.5, 0.5, 0.5);
     shell.face_iter().for_each(|face| {
         let surface = face.oriented_surface();
-        let vec = surface.subs(0.5, 0.5) - o;
+        let vec = surface.evaluate(0.5, 0.5) - o;
         let normal = surface.normal(0.5, 0.5);
 
         let is_side_plane = vec.y.so_small();
@@ -232,7 +232,7 @@ fn face_sweep() {
     let o = Point3::new(0.5, 0.5, 0.5);
     shell.face_iter().for_each(|face| {
         let surface = face.oriented_surface();
-        let vec = surface.subs(0.5, 0.5) - o;
+        let vec = surface.evaluate(0.5, 0.5) - o;
         let normal = surface.normal(0.5, 0.5);
 
         let is_side_plane = vec.y.so_small();
@@ -265,7 +265,7 @@ fn shell_sweep() {
     assert!(shell.edge_iter().all(|edge| consistent_line(&edge)));
     shell.face_iter().for_each(|face| {
         let surface = face.oriented_surface();
-        let p = surface.subs(0.5, 0.5);
+        let p = surface.evaluate(0.5, 0.5);
         let normal = surface.normal(0.5, 0.5);
 
         let is_left_side = p.z < 1.0;
@@ -363,7 +363,7 @@ fn wire_multi_sweep() {
     let q = Point3::new(1.0, 0.0, 0.0);
     let r = Point3::new(2.0, 0.0, 0.0);
 
-    let v = Vertex::news([p, q, r]);
+    let v = Vertex::from_points([p, q, r]);
     let wire: Wire<_, _> = vec![
         Edge::new(&v[0], &v[1], Line(p, q)),
         Edge::new(&v[2], &v[1], Line(r, q)).inverse(),
@@ -394,7 +394,7 @@ fn face_multi_sweep() {
     assert!(shell.edge_iter().all(|edge| consistent_line(&edge)));
     shell.face_iter().for_each(|face| {
         let surface = face.oriented_surface();
-        let p = surface.subs(0.5, 0.5);
+        let p = surface.evaluate(0.5, 0.5);
         let y = if p.y < 1.0 { 0.5 } else { 1.5 };
         let vec = p - Point3::new(0.5, y, 0.5);
         let normal = surface.normal(0.5, 0.5);
@@ -422,7 +422,7 @@ fn face_multi_sweep() {
     assert!(shell.edge_iter().all(|edge| consistent_line(&edge)));
     shell.face_iter().for_each(|face| {
         let surface = face.oriented_surface();
-        let p = surface.subs(0.5, 0.5);
+        let p = surface.evaluate(0.5, 0.5);
         let y = if p.y < 1.0 { 0.5 } else { 1.5 };
         let vec = p - Point3::new(0.5, y, 0.5);
         let normal = surface.normal(0.5, 0.5);
@@ -457,7 +457,7 @@ fn shell_multi_sweep() {
     assert!(shell.edge_iter().all(|edge| consistent_line(&edge)));
     shell.face_iter().for_each(|face| {
         let surface = face.oriented_surface();
-        let p = surface.subs(0.5, 0.5);
+        let p = surface.evaluate(0.5, 0.5);
         let normal = surface.normal(0.5, 0.5);
 
         let is_left_side = p.z < 1.0;
@@ -561,7 +561,7 @@ fn edge_closed_sweep() {
     assert_eq!(shell.shell_condition(), ShellCondition::Oriented);
     shell.face_iter().for_each(|face| {
         let surface = face.oriented_surface();
-        let p = surface.subs(0.5, 0.5);
+        let p = surface.evaluate(0.5, 0.5);
         let vec = Vector3::new(p.x, 0.0, p.z);
         let normal = surface.normal(0.5, 0.5);
         assert_near!(vec * f64::sqrt(2.0), normal);
@@ -579,7 +579,7 @@ fn edge_closed_sweep() {
     assert_eq!(shell.shell_condition(), ShellCondition::Oriented);
     shell.face_iter().for_each(|face| {
         let surface = face.oriented_surface();
-        let p = surface.subs(0.5, 0.5);
+        let p = surface.evaluate(0.5, 0.5);
         let vec = Vector3::new(p.x, 0.0, p.z);
         let normal = surface.normal(0.5, 0.5);
         assert_near!(-vec * f64::sqrt(2.0), normal);
@@ -594,7 +594,7 @@ fn wire_closed_sweep() {
         Point3::new(0.0, 1.0, 1.0),
         Point3::new(0.0, 0.0, 1.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
     let wire: Wire<_, _> = vec![
         Edge::new(&v[0], &v[1], Line(p[0], p[1])),
         Edge::new(&v[2], &v[1], Line(p[2], p[1])).inverse(),
@@ -612,7 +612,7 @@ fn wire_closed_sweep() {
     assert_eq!(shell.shell_condition(), ShellCondition::Oriented);
     shell.face_iter().for_each(|face| {
         let surface = face.oriented_surface();
-        let p = surface.subs(0.5, 0.5);
+        let p = surface.evaluate(0.5, 0.5);
         let vec = Vector3::new(p.x, 0.0, p.z);
         let normal = surface.normal(0.5, 0.5);
         assert_near!(vec * f64::sqrt(2.0), normal);
@@ -632,7 +632,7 @@ fn face_closed_sweep() {
         Point3::new(0.0, 0.75, 1.25),
         Point3::new(0.0, 0.75, 1.75),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
     let face = Face::new(
         vec![
             wire![
@@ -662,7 +662,7 @@ fn face_closed_sweep() {
     assert!(shell.edge_iter().all(|e| consistent_line(&e)));
     shell.face_iter().for_each(|face| {
         let surface = face.oriented_surface();
-        let p = surface.subs(0.5, 0.5);
+        let p = surface.evaluate(0.5, 0.5);
         let normal = surface.normal(0.5, 0.5);
         let vec = Vector3::new(p.x, 0.0, p.z);
         let (expected_normal, expected_area) = match (p.y.near(&0.5), vec.magnitude() > 1.0) {
@@ -682,7 +682,7 @@ fn face_closed_sweep() {
     assert!(shell.edge_iter().all(|e| consistent_line(&e)));
     shell.face_iter().for_each(|face| {
         let surface = face.oriented_surface();
-        let p = surface.subs(0.5, 0.5);
+        let p = surface.evaluate(0.5, 0.5);
         let normal = surface.normal(0.5, 0.5);
         let vec = Vector3::new(p.x, 0.0, p.z);
         let (expected_normal, expected_area) = match (p.y.near(&0.5), vec.magnitude() > 1.0) {
@@ -711,7 +711,7 @@ fn face_closed_sweep() {
     assert!(shell.edge_iter().all(|e| consistent_line(&e)));
     shell.face_iter().for_each(|face| {
         let surface = face.oriented_surface();
-        let p = surface.subs(0.5, 0.5);
+        let p = surface.evaluate(0.5, 0.5);
         let normal = surface.normal(0.5, 0.5);
         let vec = Vector3::new(p.x, 0.0, p.z);
         let (expected_normal, expected_area) = match (p.y.near(&0.5), vec.magnitude() > 1.0) {
@@ -731,7 +731,7 @@ fn face_closed_sweep() {
     assert!(shell.edge_iter().all(|e| consistent_line(&e)));
     shell.face_iter().for_each(|face| {
         let surface = face.oriented_surface();
-        let p = surface.subs(0.5, 0.5);
+        let p = surface.evaluate(0.5, 0.5);
         let normal = surface.normal(0.5, 0.5);
         let vec = Vector3::new(p.x, 0.0, p.z);
         let (expected_normal, expected_area) = match (p.y.near(&0.5), vec.magnitude() > 1.0) {
@@ -763,7 +763,7 @@ fn shell_closed_sweep() {
         Point3::new(0.0, 0.75, 1.25),
         Point3::new(0.0, 0.75, 1.75),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
     let e = [
         Edge::new(&v[0], &v[1], Line(p[0], p[1])),
         Edge::new(&v[1], &v[2], Line(p[1], p[2])),
@@ -804,7 +804,7 @@ fn shell_closed_sweep() {
     assert!(shell.edge_iter().all(|e| consistent_line(&e)));
     shell.face_iter().for_each(|face| {
         let surface = face.oriented_surface();
-        let p = surface.subs(0.5, 0.5);
+        let p = surface.evaluate(0.5, 0.5);
         let normal = surface.normal(0.5, 0.5);
 
         let vec = Vector3::new(p.x, 0.0, p.z);

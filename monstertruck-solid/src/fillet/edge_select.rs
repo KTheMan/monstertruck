@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use monstertruck_geometry::prelude::{NurbsSurface, Point3, Vector4};
 use monstertruck_topology::shell::ShellCondition;
+use monstertruck_topology::{Edge as TopologyEdge, Shell as TopologyShell};
 use monstertruck_traits::{
     BoundedCurve, ParametricCurve, ParametricSurface, SearchNearestParameter,
 };
@@ -10,7 +11,7 @@ use smallvec::SmallVec;
 use super::convert::{FilletableCurve, FilletableSurface, convert_shell_in, convert_shell_out};
 use super::error::FilletError;
 use super::ops;
-use super::params::{FilletOptions, RadiusSpec};
+use super::params::{FilletOptions, FilletRadius};
 use super::types::*;
 
 type Result<T> = std::result::Result<T, FilletError>;
@@ -47,7 +48,7 @@ fn sampled_curve_distance_squared(curve: &Curve, point: Point3, sample_count: us
     (0..=sample_count)
         .map(|i| {
             let t = t0 + (t1 - t0) * (i as f64) / (sample_count as f64);
-            squared_distance(curve.subs(t), point)
+            squared_distance(curve.evaluate(t), point)
         })
         .fold(f64::INFINITY, f64::min)
 }
@@ -404,13 +405,13 @@ fn apply_single_edge_fillet(
 /// Resolves face adjacency automatically and dispatches to
 /// [`fillet`](super::fillet)/[`fillet_with_side`](super::fillet_with_side)
 /// for single edges or [`fillet_along_wire`](super::fillet_along_wire) for multi-edge chains.
-pub fn fillet_edges(
+pub fn fillet_edges_by_id(
     shell: &mut Shell,
     edge_ids: &[EdgeId],
-    params: Option<&FilletOptions>,
+    options: Option<&FilletOptions>,
 ) -> Result<()> {
     let default_options = FilletOptions::default();
-    let options = params.unwrap_or(&default_options);
+    let options = options.unwrap_or(&default_options);
 
     // Validate all requested edges exist and are manifold up-front.
     {
@@ -424,7 +425,7 @@ pub fn fillet_edges(
     }
 
     // Validate per-edge radius count.
-    if let RadiusSpec::PerEdge(ref radii) = options.radius
+    if let FilletRadius::PerEdge(ref radii) = options.radius
         && radii.len() != edge_ids.len()
     {
         return Err(FilletError::PerEdgeRadiusMismatch {
@@ -435,16 +436,16 @@ pub fn fillet_edges(
 
     // Reject edges that are too short for the requested fillet radius.
     {
-        let variable_radius_upper_bound = if let RadiusSpec::Variable(f) = &options.radius {
+        let variable_radius_upper_bound = if let FilletRadius::Variable(f) = &options.radius {
             sampled_variable_radius_upper_bound(f.as_ref(), 32)
         } else {
             0.0
         };
         for (i, &eid) in edge_ids.iter().enumerate() {
             let effective_radius = match &options.radius {
-                RadiusSpec::Constant(r) => *r,
-                RadiusSpec::Variable(_) => variable_radius_upper_bound,
-                RadiusSpec::PerEdge(radii) => radii[i],
+                FilletRadius::Constant(r) => *r,
+                FilletRadius::Variable(_) => variable_radius_upper_bound,
+                FilletRadius::PerEdge(radii) => radii[i],
             };
             let edge = shell
                 .edge_iter()
@@ -555,10 +556,10 @@ pub fn fillet_edges(
 
         if chain.edge_ids.len() == 1 {
             let chain_opts;
-            let opts = if let RadiusSpec::PerEdge(radii) = &options.radius {
+            let opts = if let FilletRadius::PerEdge(radii) = &options.radius {
                 let original_eid = chain.edge_ids[0];
                 chain_opts = FilletOptions {
-                    radius: RadiusSpec::Constant(radii[edge_id_to_idx[&original_eid]]),
+                    radius: FilletRadius::Constant(radii[edge_id_to_idx[&original_eid]]),
                     divisions: options.divisions,
                     profile: options.profile.clone(),
                 };
@@ -597,7 +598,7 @@ pub fn fillet_edges(
             };
 
             let chain_opts;
-            let opts = if let RadiusSpec::PerEdge(radii) = &options.radius {
+            let opts = if let FilletRadius::PerEdge(radii) = &options.radius {
                 let chain_radii: Vec<f64> = wire
                     .edge_iter()
                     .map(|edge| {
@@ -609,7 +610,7 @@ pub fn fillet_edges(
                     })
                     .collect::<Result<_>>()?;
                 chain_opts = FilletOptions {
-                    radius: RadiusSpec::PerEdge(chain_radii),
+                    radius: FilletRadius::PerEdge(chain_radii),
                     divisions: options.divisions,
                     profile: options.profile.clone(),
                 };
@@ -659,9 +660,9 @@ pub fn fillet_edges(
                     fallback_used_ids.insert(resolved_eid);
 
                     let single_edge_opts;
-                    let opts = if let RadiusSpec::PerEdge(radii) = &options.radius {
+                    let opts = if let FilletRadius::PerEdge(radii) = &options.radius {
                         single_edge_opts = FilletOptions {
-                            radius: RadiusSpec::Constant(radii[edge_id_to_idx[&original_eid]]),
+                            radius: FilletRadius::Constant(radii[edge_id_to_idx[&original_eid]]),
                             divisions: options.divisions,
                             profile: options.profile.clone(),
                         };
@@ -695,23 +696,23 @@ pub fn fillet_edges(
 
 /// Fillets the specified edges of a shell with arbitrary curve/surface types.
 ///
-/// Converts the shell to internal NURBS types, runs [`fillet_edges`], and
+/// Converts the shell to internal NURBS types, runs [`fillet_edges_by_id`], and
 /// converts back. This is the main entry point for external callers whose
 /// shells use types like `monstertruck_modeling::Curve` / `monstertruck_modeling::Surface`.
-pub fn fillet_edges_generic<C, S>(
-    shell: &mut monstertruck_topology::Shell<Point3, C, S>,
-    edges: &[monstertruck_topology::Edge<Point3, C>],
-    params: Option<&FilletOptions>,
+pub fn fillet_edges<C, S>(
+    shell: &mut TopologyShell<Point3, C, S>,
+    edges: &[TopologyEdge<Point3, C>],
+    options: Option<&FilletOptions>,
 ) -> Result<()>
 where
     C: FilletableCurve,
     S: FilletableSurface,
 {
     let default_options = FilletOptions::default();
-    let options = params.unwrap_or(&default_options);
+    let options = options.unwrap_or(&default_options);
     let (mut internal_shell, internal_edge_ids) = convert_shell_in(shell, edges)?;
     let original_shell = internal_shell.clone();
-    fillet_edges(&mut internal_shell, &internal_edge_ids, Some(options))?;
+    fillet_edges_by_id(&mut internal_shell, &internal_edge_ids, Some(options))?;
     if internal_shell.shell_condition() != ShellCondition::Closed
         && std::env::var_os("MT_FILLET_STRICT_CLOSED").is_some()
     {

@@ -38,7 +38,7 @@ pub(super) fn cut_face_by_bezier(
             10,
         );
         let (t0, t1) = search_closest_parameter(&bezier, &curve, hint, 100)?;
-        let v0 = Vertex::new(bezier.subs(t0));
+        let v0 = Vertex::new(bezier.evaluate(t0));
         bezier = bezier.cut(t0);
         front_edge.not_strictly_cut_with_parameter(&v0, t1)?.0
     };
@@ -52,7 +52,7 @@ pub(super) fn cut_face_by_bezier(
             10,
         );
         let (t0, t1) = search_closest_parameter(&bezier, &curve, hint, 100)?;
-        let v1 = Vertex::new(bezier.subs(t0));
+        let v1 = Vertex::new(bezier.evaluate(t0));
         bezier.cut(t0);
         back_edge.not_strictly_cut_with_parameter(&v1, t1)?.1
     };

@@ -116,14 +116,14 @@ proptest::proptest! {
         const N: usize = 10;
         for i in 0..=N {
             let t = i as f64 / N as f64;
-            let p = uc.subs(t).to_vec();
-            let v = uc.der(t);
+            let p = uc.evaluate(t).to_vec();
+            let v = uc.derivative(t);
             prop_assert_near!(p.magnitude2(), 1.0, "{w0} {w1} {p:?} {angle}");
             prop_assert!(p.z.so_small2());
             prop_assert!(p.x * v.y - p.y * v.x > 0.0, "minus area {:?}", uc.control_point(1));
         }
-        prop_assert_near!(uc.subs(0.0), Point3::new(1.0, 0.0, 0.0));
-        prop_assert_near!(uc.subs(1.0), Point3::new(f64::cos(angle), f64::sin(angle), 0.0));
+        prop_assert_near!(uc.evaluate(0.0), Point3::new(1.0, 0.0, 0.0));
+        prop_assert_near!(uc.evaluate(1.0), Point3::new(f64::cos(angle), f64::sin(angle), 0.0));
     }
 }
 
@@ -144,7 +144,7 @@ pub(super) fn composite_line_bezier(
     let curve = ParameterCurve::new(line, surface.non_rationalized());
     let degree = surface.udegree() + surface.vdegree();
     let points = (0..=degree)
-        .map(|i| curve.subs(i as f64 / degree as f64))
+        .map(|i| curve.evaluate(i as f64 / degree as f64))
         .collect::<Vec<_>>();
     interpolate_bezier(&points)
 }
@@ -194,8 +194,8 @@ impl RelaySphere {
         (u, v): (f64, f64),
         (p, q): (Point3, Point3),
     ) -> Option<(Point3, (f64, f64))> {
-        let uder = surface.uder(u, v);
-        let vder = surface.vder(u, v);
+        let uder = surface.derivative_u(u, v);
+        let vder = surface.derivative_v(u, v);
         let d = q - p;
         let uu = uder.dot(uder);
         let uv = uder.dot(vder);
@@ -204,7 +204,7 @@ impl RelaySphere {
         let vec = Vector2::new(uder.dot(d), vder.dot(d));
         let del = mat.invert()? * vec;
         let (u, v) = (u + del.x, v + del.y);
-        Some((surface.subs(u, v), (u, v)))
+        Some((surface.evaluate(u, v), (u, v)))
     }
 
     pub(super) fn generate(
@@ -280,7 +280,12 @@ pub(super) fn relay_spheres(
             .find_map(|offset| {
                 let b = a + offset;
                 let t = (1.0 - b) * t0 + b * t1;
-                RelaySphere::generate((curve.subs(t), curve.der(t)), surface0, surface1, radius(b))
+                RelaySphere::generate(
+                    (curve.evaluate(t), curve.derivative(t)),
+                    surface0,
+                    surface1,
+                    radius(b),
+                )
             })
     };
     let range = match extend {
@@ -326,7 +331,7 @@ pub(super) fn expand_fillet(
         let fillet_wires = iter
             .map(|(i, (p0, p1))| {
                 let t = i as f64 / (cpts0.len() - 1) as f64;
-                let transit = transit_line.subs(t);
+                let transit = transit_line.evaluate(t);
                 circle_arc_by_three_points(*p0, *p1, transit)
             })
             .collect::<Vec<_>>();
@@ -443,7 +448,7 @@ pub(super) fn expand_ridge(
             .enumerate()
             .map(|(i, (p0, p1))| {
                 let t = i as f64 / (cpts0.len() - 1) as f64;
-                let transit = transit_line.subs(t);
+                let transit = transit_line.evaluate(t);
                 BsplineCurve::new(
                     KnotVector::uniform_knot(1, 2),
                     vec![*p0, transit.to_homogeneous(), *p1],
@@ -547,7 +552,7 @@ pub(super) fn expand_custom(
             .enumerate()
             .map(|(i, (p0, p1))| {
                 let t = i as f64 / (cpts0.len() - 1) as f64;
-                let transit = transit_line.subs(t);
+                let transit = transit_line.evaluate(t);
                 map_profile_to_3d(p0, p1, transit, profile)
             })
             .collect();

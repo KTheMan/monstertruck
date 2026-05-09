@@ -15,7 +15,7 @@ fn fillet_box_edge() {
         Point3::new(1.0, 1.0, 0.0),
         Point3::new(0.0, 1.0, 0.0),
     ];
-    let v: Vec<Vertex> = Vertex::news(p);
+    let v: Vec<Vertex> = Vertex::from_points(p);
 
     let line_edge =
         |i: usize, j: usize| -> Edge { Edge::new(&v[i], &v[j], Curve::Line(Line(p[i], p[j]))) };
@@ -68,7 +68,7 @@ fn fillet_box_edge() {
     let initial_face_count = shell.len();
 
     let params = FilletOptions {
-        radius: RadiusSpec::Constant(0.4),
+        radius: FilletRadius::Constant(0.4),
         ..Default::default()
     };
     fillet_edges(&mut shell, &[edge[5].clone()], Some(&params)).unwrap();

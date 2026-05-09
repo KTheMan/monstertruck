@@ -148,7 +148,7 @@ where UnitCircle<P>: ParametricCurve<Point = P>
                 range.0 * (1.0 - t) + range.1 * t
             })
             .collect::<Vec<_>>();
-        let pts = params.iter().map(|t| self.subs(*t)).collect();
+        let pts = params.iter().map(|t| self.evaluate(*t)).collect();
         (params, pts)
     }
 }

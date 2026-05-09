@@ -6,12 +6,6 @@ use std::fmt::Debug;
 /// Maximum order that guarantees differential calculations
 pub const MAX_DER_ORDER: usize = 31;
 
-/// Backward-compatible alias for [`CurveDerivatives`].
-pub type CurveDers<V> = CurveDerivatives<V>;
-
-/// Backward-compatible alias for [`SurfaceDerivatives`].
-pub type SurfaceDers<V> = SurfaceDerivatives<V>;
-
 /// Calculation results of curve differentiation
 #[derive(Clone, Copy, PartialEq)]
 pub struct CurveDerivatives<V> {
@@ -58,13 +52,6 @@ impl<V> CurveDerivatives<V> {
             array,
             max_order: self.max_order - 1,
         }
-    }
-
-    /// Returns derivative values.
-    #[inline]
-    pub fn der(&self) -> Self
-    where V: Zero + Copy {
-        self.derivative()
     }
 
     /// Returns the multi-orders derivations of the rational curve.
@@ -116,13 +103,6 @@ impl<V> CurveDerivatives<V> {
         }
     }
 
-    /// Returns rationalized derivatives.
-    #[inline]
-    pub fn rat_ders(&self) -> CurveDerivatives<<V::Point as EuclideanSpace>::Diff>
-    where V: Homogeneous {
-        self.rational_derivatives()
-    }
-
     /// Returns the multi-orders derivations of the magnitude of the curve of vector.
     /// # Examples
     /// ```
@@ -171,15 +151,6 @@ impl<V> CurveDerivatives<V> {
             array: evals,
             max_order: self.max_order,
         }
-    }
-
-    /// Returns derivatives of magnitudes.
-    #[inline]
-    pub fn abs_ders(&self) -> CurveDerivatives<V::Scalar>
-    where
-        V: InnerSpace,
-        V::Scalar: BaseFloat, {
-        self.absolute_derivatives()
     }
 
     /// Returns the `order`-order derivation of multiple function.
@@ -234,23 +205,6 @@ impl<V> CurveDerivatives<V> {
         })
     }
 
-    /// Returns the `order`-order combinatorial derivative.
-    #[inline]
-    pub fn combinatorial_der<W, U, B>(
-        &self,
-        other: &CurveDerivatives<W>,
-        binomial: B,
-        order: usize,
-    ) -> U
-    where
-        V: Copy,
-        W: Copy,
-        U: std::ops::Add + std::ops::Mul<f64, Output = U> + Zero,
-        B: Fn(V, W) -> U,
-    {
-        self.combinatorial_derivative(other, binomial, order)
-    }
-
     /// Returns the ders of multiple function.
     /// # Examples
     /// ```
@@ -301,22 +255,6 @@ impl<V> CurveDerivatives<V> {
             .collect()
     }
 
-    /// Returns combinatorial derivatives up to the maximum order.
-    #[inline]
-    pub fn combinatorial_ders<W, U, B>(
-        &self,
-        other: &CurveDerivatives<W>,
-        binomial: B,
-    ) -> CurveDerivatives<U>
-    where
-        V: Copy,
-        W: Copy,
-        U: std::ops::Add + std::ops::Mul<f64, Output = U> + Zero + Copy,
-        B: Fn(V, W) -> U,
-    {
-        self.combinatorial_derivatives(other, binomial)
-    }
-
     /// Returns the result of element-wise operation.
     /// # Examples
     /// ```
@@ -347,22 +285,6 @@ impl<V> CurveDerivatives<V> {
             .zip(other.iter())
             .map(|(&v, &w)| binomial(v, w))
             .collect()
-    }
-
-    /// Returns element-wise derivatives.
-    #[inline]
-    pub fn element_wise_ders<W, U, B>(
-        &self,
-        other: &CurveDerivatives<W>,
-        binomial: B,
-    ) -> CurveDerivatives<U>
-    where
-        V: Copy,
-        W: Copy,
-        U: Copy + Zero,
-        B: Fn(V, W) -> U,
-    {
-        self.element_wise_derivatives(other, binomial)
     }
 
     /// Converts to an array
@@ -595,13 +517,6 @@ impl<V> SurfaceDerivatives<V> {
         }
     }
 
-    /// Returns derivatives in the `u` direction.
-    #[inline]
-    pub fn uder(&self) -> Self
-    where V: Zero + Copy {
-        self.derivative_u()
-    }
-
     /// Returns SurfaceDerivatives of v-derivative.
     /// # Examples
     /// ```
@@ -638,13 +553,6 @@ impl<V> SurfaceDerivatives<V> {
             array,
             max_order: self.max_order - 1,
         }
-    }
-
-    /// Returns derivatives in the `v` direction.
-    #[inline]
-    pub fn vder(&self) -> Self
-    where V: Zero + Copy {
-        self.derivative_v()
     }
 
     /// Returns the multi-orders derivations of the rational surface.
@@ -733,13 +641,6 @@ impl<V> SurfaceDerivatives<V> {
             array: evals,
             max_order: self.max_order,
         }
-    }
-
-    /// Returns rationalized derivatives.
-    #[inline]
-    pub fn rat_ders(&self) -> SurfaceDerivatives<<V::Point as EuclideanSpace>::Diff>
-    where V: Homogeneous {
-        self.rational_derivatives()
     }
 
     /// Returns the derivation of composite curve.
@@ -863,19 +764,6 @@ impl<V> SurfaceDerivatives<V> {
         let iter = res[1..].iter_mut().enumerate();
         iter.for_each(|(i, o)| *o = self.composite_derivative(curve_ders, i + 1));
         res
-    }
-
-    /// Returns composite derivatives up to the maximum order.
-    #[inline]
-    pub fn composite_ders(
-        &self,
-        curve_ders: &CurveDerivatives<Vector2<V::Scalar>>,
-    ) -> CurveDerivatives<V>
-    where
-        V: VectorSpace,
-        V::Scalar: BaseFloat,
-    {
-        self.composite_derivatives(curve_ders)
     }
 
     /// Returns the result of element-wise operation.

@@ -37,7 +37,7 @@ type Result<T> = StdResult<T, Error>;
 /// let reparam = fair::reparameterize_arc_length(&curve, 10).unwrap();
 /// // At u=0.5 in arc-length parameterization, we should be at the
 /// // midpoint of the curve by arc length.
-/// let mid = reparam.subs(0.5);
+/// let mid = reparam.evaluate(0.5);
 /// // The midpoint should be near x=1 (the apex of the parabola).
 /// assert!((mid.x - 1.0).abs() < 0.15, "mid.x = {}", mid.x);
 /// ```
@@ -60,7 +60,7 @@ where
         .map(|i| t_start + (t_end - t_start) * i as f64 / (n_samples - 1) as f64)
         .collect();
 
-    let points: Vec<P> = sample_params.iter().map(|&t| curve.subs(t)).collect();
+    let points: Vec<P> = sample_params.iter().map(|&t| curve.evaluate(t)).collect();
 
     let mut arc_lengths = Vec::with_capacity(n_samples);
     arc_lengths.push(0.0);
@@ -129,7 +129,7 @@ where
 /// // Fair to a smoother cubic with fewer control points.
 /// let smooth = fair::fair_curve(&noisy, 3, 5, 30).unwrap();
 /// // The smoothed curve should still roughly follow the original path.
-/// let mid = smooth.subs(0.5);
+/// let mid = smooth.evaluate(0.5);
 /// assert!((mid.x - 4.0).abs() < 1.0, "mid.x = {}", mid.x);
 /// ```
 pub fn fair_curve<P>(
@@ -157,7 +157,7 @@ where
         .map(|i| {
             let u = i as f64 / (n_control_points - 1) as f64;
             let t = t_start + (t_end - t_start) * u;
-            (u, curve.subs(t))
+            (u, curve.evaluate(t))
         })
         .collect();
 
@@ -177,7 +177,7 @@ mod tests {
         );
         let reparam = reparameterize_arc_length(&line, 20).unwrap();
         // At u=0.5, we should be at the midpoint.
-        let mid = reparam.subs(0.5);
+        let mid = reparam.evaluate(0.5);
         assert!((mid.x - 1.5).abs() < 0.1, "expected x~1.5, got {}", mid.x,);
         assert!((mid.y - 2.0).abs() < 0.1, "expected y~2.0, got {}", mid.y,);
     }
@@ -203,8 +203,8 @@ mod tests {
         // The smoothed curve has fewer control points.
         assert_eq!(smooth.control_points().len(), 5);
         // Endpoints should still be approximately preserved.
-        let start = smooth.subs(0.0);
-        let end = smooth.subs(1.0);
+        let start = smooth.evaluate(0.0);
+        let end = smooth.evaluate(1.0);
         assert!((start.x - 0.0).abs() < 0.2, "start.x = {}", start.x,);
         assert!((end.x - 8.0).abs() < 0.2, "end.x = {}", end.x,);
     }

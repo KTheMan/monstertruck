@@ -44,7 +44,7 @@ fn main() {
         row.iter().enumerate().for_each(|(j, &expected)| {
             let u = j as f64 / 2.0;
             let v = i as f64 / 2.0;
-            let pt = surface.subs(u, v);
+            let pt = surface.evaluate(u, v);
             let err = ((pt.x - expected.x).powi(2)
                 + (pt.y - expected.y).powi(2)
                 + (pt.z - expected.z).powi(2))

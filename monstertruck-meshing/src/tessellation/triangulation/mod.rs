@@ -46,7 +46,7 @@ where
             .or_else(|| self.search_nearest_parameter(point, hint, 100))
             .or_else(|| self.search_parameter(point, None, 100))
             .or_else(|| self.search_nearest_parameter(point, None, 100))
-            .map(|t| (t, self.curve().subs(t)))
+            .map(|t| (t, self.curve().evaluate(t)))
     }
 }
 fn mesh_trace_enabled() -> bool { std::env::var_os("MT_MESH_TRACE").is_some() }
@@ -86,7 +86,7 @@ where
         tolerance,
     )
     .into_iter()
-    .map(|uv| surface.subs(uv.x, uv.y))
+    .map(|uv| surface.evaluate(uv.x, uv.y))
     .collect::<Vec<_>>();
     if points.len() < 2 {
         return None;
@@ -141,7 +141,7 @@ where
     } else {
         let points = filtered
             .iter()
-            .map(|uv| surface.subs(uv.x, uv.y))
+            .map(|uv| surface.evaluate(uv.x, uv.y))
             .collect::<Vec<_>>();
         let mut keep = vec![false; filtered.len()];
         keep[0] = true;
@@ -271,7 +271,7 @@ pub(super) fn shell_tessellation<'a, C, S>(
     shell: &Shell<Point3, C, S>,
     tolerance: f64,
     sp: impl SP<S>,
-    quad_config: QuadOptions,
+    primitive_config: TessellationPrimitiveOptions,
 ) -> MeshedShell
 where
     C: PolylineableCurve + 'a,
@@ -315,7 +315,7 @@ where
             face.orientation(),
             tolerance,
             &sp,
-            quad_config,
+            primitive_config,
         )
     };
     shell.face_par_iter().map(create_face).collect()
@@ -327,7 +327,7 @@ pub(super) fn shell_tessellation_single_thread<'a, C, S>(
     shell: &'a Shell<Point3, C, S>,
     tolerance: f64,
     sp: impl SP<S>,
-    quad_config: QuadOptions,
+    primitive_config: TessellationPrimitiveOptions,
 ) -> MeshedShell
 where
     C: PolylineableCurve + 'a,
@@ -373,18 +373,18 @@ where
             face.orientation(),
             tolerance,
             &sp,
-            quad_config,
+            primitive_config,
         )
     };
     shell.face_iter().map(create_face).collect()
 }
 
 /// Tessellates faces.
-pub(super) fn cshell_tessellation<'a, C, S>(
+pub(super) fn compressed_shell_tessellation<'a, C, S>(
     shell: &CompressedShell<Point3, C, S>,
     tolerance: f64,
     sp: impl SP<S>,
-    quad_config: QuadOptions,
+    primitive_config: TessellationPrimitiveOptions,
 ) -> MeshedCompressedShell
 where
     C: PolylineableCurve + ParameterBoundary2D<S> + 'a,
@@ -411,7 +411,7 @@ where
         let is_untrimmed = boundaries.iter().all(|wire| wire.is_empty());
         if is_untrimmed && let (Some(urange), Some(vrange)) = surface.try_range_tuple() {
             let polygon =
-                untrimmed_tessellation(surface, (urange, vrange), tolerance, quad_config.mode);
+                untrimmed_tessellation(surface, (urange, vrange), tolerance, primitive_config.mode);
             log_mesh_trace(face_idx, "untrimmed", "ok", face_start);
             return CompressedFace {
                 boundaries,
@@ -530,7 +530,7 @@ where
             );
             let mesh_start = Instant::now();
             let polygon =
-                trimming_tessellation(&surface, &boundary, tolerance, quad_config, face_idx);
+                trimming_tessellation(&surface, &boundary, tolerance, primitive_config, face_idx);
             log_mesh_trace(
                 face_idx,
                 "trimmed",
@@ -579,11 +579,11 @@ where
     }
 }
 
-pub(super) fn trimmed_cshell_tessellation<'a, C, S, T>(
+pub(super) fn compressed_trimmed_shell_tessellation<'a, C, S, T>(
     shell: &TrimmedShell<C, S, T>,
     tolerance: f64,
     sp: impl SP<S>,
-    quad_config: QuadOptions,
+    primitive_config: TessellationPrimitiveOptions,
 ) -> MeshedCompressedShell
 where
     C: PolylineableCurve + ParameterBoundary2D<S> + ExactParameterBoundary2D<S> + 'a,
@@ -668,7 +668,7 @@ where
         let is_untrimmed = boundaries.iter().all(|wire| wire.is_empty());
         if is_untrimmed && let (Some(urange), Some(vrange)) = surface.try_range_tuple() {
             let polygon =
-                untrimmed_tessellation(surface, (urange, vrange), tolerance, quad_config.mode);
+                untrimmed_tessellation(surface, (urange, vrange), tolerance, primitive_config.mode);
             log_mesh_trace(face_idx, "untrimmed", "ok", face_start);
             return CompressedFace {
                 boundaries,
@@ -815,7 +815,7 @@ where
             );
             let mesh_start = Instant::now();
             let polygon =
-                trimming_tessellation(surface, &boundary, tolerance, quad_config, face_idx);
+                trimming_tessellation(surface, &boundary, tolerance, primitive_config, face_idx);
             log_mesh_trace(
                 face_idx,
                 "trimmed",
@@ -870,7 +870,7 @@ fn shell_create_polygon<S: PreMeshableSurface>(
     orientation: bool,
     tolerance: f64,
     sp: impl SP<S>,
-    quad_config: QuadOptions,
+    primitive_config: TessellationPrimitiveOptions,
 ) -> Face<Point3, PolylineCurve, Option<PolygonMesh>> {
     // Fast path: untrimmed face with bounded surface domain.
     let is_untrimmed = wires.iter().all(|w| w.is_empty());
@@ -880,7 +880,7 @@ fn shell_create_polygon<S: PreMeshableSurface>(
                 surface,
                 (urange, vrange),
                 tolerance,
-                quad_config.mode,
+                primitive_config.mode,
             ))
         } else {
             None
@@ -895,7 +895,7 @@ fn shell_create_polygon<S: PreMeshableSurface>(
             .collect::<Option<Vec<_>>>();
         preboundary.map(|preboundary| {
             let boundary = PolyBoundary::new(preboundary, &surface, tolerance);
-            trimming_tessellation(surface, &boundary, tolerance, quad_config, usize::MAX)
+            trimming_tessellation(surface, &boundary, tolerance, primitive_config, usize::MAX)
         })
     };
     let mut new_face = Face::new_unchecked(wires, polygon);
@@ -921,7 +921,12 @@ fn par_bench() {
 
     let instant = Instant::now();
     (0..100).for_each(|_| {
-        let _shell = shell_tessellation(&shell, 0.01, by_search_parameter, QuadOptions::default());
+        let _shell = shell_tessellation(
+            &shell,
+            0.01,
+            by_search_parameter,
+            TessellationPrimitiveOptions::default(),
+        );
     });
     println!("{}ms", instant.elapsed().as_millis());
 
@@ -931,7 +936,7 @@ fn par_bench() {
             &shell,
             0.01,
             by_search_parameter,
-            QuadOptions::default(),
+            TessellationPrimitiveOptions::default(),
         );
     });
     println!("{}ms", instant.elapsed().as_millis());

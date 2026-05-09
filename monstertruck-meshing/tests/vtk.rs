@@ -156,7 +156,7 @@ fn wire() {
         Point3::new(1.0, 1.0, 0.0),
         Point3::new(0.0, 1.0, 0.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
     let q = Point3::new(2.0, 0.0, 0.0);
     let wire: Wire<Point3, PolylineCurve<Point3>> = vec![
         Edge::new(&v[0], &v[1], PolylineCurve(vec![p[0], p[1]])),
@@ -205,7 +205,7 @@ fn shell_topology() -> Shell<Point3, PolylineCurve<Point3>, PolygonMesh> {
         Point3::new(0.5, 0.75, 0.0),
         Point3::new(0.25, 0.5, 0.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
     let q = [
         Point3::new(0.75, 0.25, 0.0),
         Point3::new(0.75, 0.75, 0.0),

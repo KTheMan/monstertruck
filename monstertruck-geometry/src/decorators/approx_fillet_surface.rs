@@ -34,7 +34,7 @@ fn u_control_points<S: ParametricSurface3D>(
     weight: f64,
 ) -> (Vector4, Vector4) {
     let uv: Vector2 = basis.iter().zip(side_control_points).map(pmul).sum();
-    let sders = surface.ders(1, uv.x, uv.y);
+    let sders = surface.derivatives(1, uv.x, uv.y);
     let (p, uder, vder) = (sders[0][0], sders[1][0], sders[0][1]);
     let duv: Vector2 = dbasis.iter().zip(side_control_points).map(pmul).sum();
     let cder = (uder * duv.x + vder * duv.y).normalize();
@@ -72,46 +72,51 @@ const fn bezier_3rd_basis(n: usize, u: f64) -> [f64; 4] {
 
 mod subders {
     use super::*;
-    fn v_axis_ders(p_ders: &CurveDers<Vector3>) -> CurveDers<Vector3> {
-        let p_derders = p_ders.der();
-        let homog_ders = p_derders.element_wise_derivatives(&p_derders.abs_ders(), Vector3::extend);
-        homog_ders.rat_ders()
+    fn v_axis_ders(p_ders: &CurveDerivatives<Vector3>) -> CurveDerivatives<Vector3> {
+        let p_derders = p_ders.derivative();
+        let homog_ders =
+            p_derders.element_wise_derivatives(&p_derders.absolute_derivatives(), Vector3::extend);
+        homog_ders.rational_derivatives()
     }
-    fn n_ders(s_ders: &SurfaceDers<Vector3>, uv_ders: &CurveDers<Vector2>) -> CurveDers<Vector3> {
-        let uders = s_ders.uder().composite_ders(uv_ders);
-        let vders = s_ders.vder().composite_ders(uv_ders);
-        let lnders = uders.combinatorial_ders(&vders, Vector3::cross);
-        let homog = lnders.element_wise_derivatives(&lnders.abs_ders(), Vector3::extend);
-        homog.rat_ders()
+    fn n_ders(
+        s_ders: &SurfaceDerivatives<Vector3>,
+        uv_ders: &CurveDerivatives<Vector2>,
+    ) -> CurveDerivatives<Vector3> {
+        let uders = s_ders.derivative_u().composite_derivatives(uv_ders);
+        let vders = s_ders.derivative_v().composite_derivatives(uv_ders);
+        let lnders = uders.combinatorial_derivatives(&vders, Vector3::cross);
+        let homog =
+            lnders.element_wise_derivatives(&lnders.absolute_derivatives(), Vector3::extend);
+        homog.rational_derivatives()
     }
     fn wq_ders(
-        w_ders: &CurveDers<f64>,
-        p_ders: &CurveDers<Vector3>,
-        b_ders: &CurveDers<Vector2>,
-        n_ders: &CurveDers<Vector3>,
-    ) -> CurveDers<Vector3> {
+        w_ders: &CurveDerivatives<f64>,
+        p_ders: &CurveDerivatives<Vector3>,
+        b_ders: &CurveDerivatives<Vector2>,
+        n_ders: &CurveDerivatives<Vector3>,
+    ) -> CurveDerivatives<Vector3> {
         use std::ops::Add;
         let v_axis_ders = v_axis_ders(p_ders);
-        let u_axis_ders = v_axis_ders.combinatorial_ders(n_ders, Vector3::cross);
-        let wp_ders = w_ders.combinatorial_ders(p_ders, |w, p| w * p);
-        let aders = b_ders.combinatorial_ders(&u_axis_ders, |v, p| v[0] * p) / 3.0;
-        let bders = b_ders.combinatorial_ders(&v_axis_ders, |v, p| v[1] * p) / 3.0;
+        let u_axis_ders = v_axis_ders.combinatorial_derivatives(n_ders, Vector3::cross);
+        let wp_ders = w_ders.combinatorial_derivatives(p_ders, |w, p| w * p);
+        let aders = b_ders.combinatorial_derivatives(&u_axis_ders, |v, p| v[0] * p) / 3.0;
+        let bders = b_ders.combinatorial_derivatives(&v_axis_ders, |v, p| v[1] * p) / 3.0;
         wp_ders
             .element_wise_derivatives(&aders, Add::add)
             .element_wise_derivatives(&bders, Add::add)
     }
-    fn lift_p_ders(p_ders: &CurveDers<Vector3>) -> CurveDers<Vector4> {
-        let mut w_ders = CurveDers::<f64>::new(p_ders.max_order());
+    fn lift_p_ders(p_ders: &CurveDerivatives<Vector3>) -> CurveDerivatives<Vector4> {
+        let mut w_ders = CurveDerivatives::<f64>::new(p_ders.max_order());
         w_ders[0] = 1.0;
         p_ders.element_wise_derivatives(&w_ders, Vector3::extend)
     }
     pub fn control_points_ders(
-        s_ders: &SurfaceDers<Vector3>,
-        uv_ders: &CurveDers<Vector2>,
-        b_ders: &CurveDers<Vector2>,
-        w_ders: &CurveDers<f64>,
-    ) -> (CurveDers<Vector4>, CurveDers<Vector4>) {
-        let p_ders = s_ders.composite_ders(uv_ders);
+        s_ders: &SurfaceDerivatives<Vector3>,
+        uv_ders: &CurveDerivatives<Vector2>,
+        b_ders: &CurveDerivatives<Vector2>,
+        w_ders: &CurveDerivatives<f64>,
+    ) -> (CurveDerivatives<Vector4>, CurveDerivatives<Vector4>) {
+        let p_ders = s_ders.composite_derivatives(uv_ders);
         let lift_p_ders = lift_p_ders(&p_ders);
         let wq_ders = wq_ders(w_ders, &p_ders, b_ders, &n_ders(s_ders, uv_ders));
         let lift_q_ders = wq_ders.element_wise_derivatives(w_ders, |x, y| x.extend(y));
@@ -126,11 +131,11 @@ where
 {
     type Point = Point3;
     type Vector = Vector3;
-    fn derivatives(&self, max_order: usize, u: f64, v: f64) -> SurfaceDers<Vector3> {
+    fn derivatives(&self, max_order: usize, u: f64, v: f64) -> SurfaceDerivatives<Vector3> {
         let degree = self.vdegree();
         let [mut uv0_ders, mut uv1_ders, mut b0_ders, mut b1_ders] =
-            [CurveDers::<Vector2>::new(max_order + 1); 4];
-        let mut w_ders = CurveDers::<f64>::new(max_order + 1);
+            [CurveDerivatives::<Vector2>::new(max_order + 1); 4];
+        let mut w_ders = CurveDerivatives::<f64>::new(max_order + 1);
         (0..=max_order + 1).for_each(|order| {
             let basis = self.knot_vec.bspline_basis_functions(degree, order, v);
             uv0_ders[order] = basis.iter().zip(&self.side_control_points0).map(pmul).sum();
@@ -149,7 +154,7 @@ where
         let (lift_p1_ders, lift_q1_ders) =
             subders::control_points_ders(&s1_ders, &uv1_ders, &b1_ders, &w_ders);
 
-        let mut homog_ders = SurfaceDers::<Vector4>::new(max_order);
+        let mut homog_ders = SurfaceDerivatives::<Vector4>::new(max_order);
         homog_ders.slice_iter_mut().enumerate().for_each(|(m, o)| {
             o.iter_mut().enumerate().for_each(|(n, o)| {
                 let basis = bezier_3rd_basis(m, u);
@@ -159,7 +164,7 @@ where
                     + lift_p1_ders[n] * basis[3];
             });
         });
-        homog_ders.rat_ders()
+        homog_ders.rational_derivatives()
     }
     fn derivative_mn(&self, m: usize, n: usize, u: f64, v: f64) -> Self::Vector {
         self.derivatives(m + n, u, v)[m][n]
@@ -276,8 +281,8 @@ where
                 nurbs.elevate_degree();
                 raw_weights.push((v, Point1::new(nurbs.control_point(1).w)));
 
-                let der0 = nurbs.der(0.0);
-                let cder0 = pcurve0.der(v).normalize();
+                let der0 = nurbs.derivative(0.0);
+                let cder0 = pcurve0.derivative(v).normalize();
                 let uv0 = cc.contact_point0().uv;
                 let n0 = fillet_surface.surface0.normal(uv0.x, uv0.y);
                 let handle0 = cder0.cross(n0);
@@ -288,8 +293,8 @@ where
                 let vec0 = mat0.invert().unwrap() * der0;
                 raw_tangent_vecs0.push((v, vec0.truncate()));
 
-                let der1 = -nurbs.der(1.0);
-                let cder1 = pcurve1.der(v).normalize();
+                let der1 = -nurbs.derivative(1.0);
+                let cder1 = pcurve1.derivative(v).normalize();
                 let uv1 = cc.contact_point1().uv;
                 let n1 = fillet_surface.surface1.normal(uv1.x, uv1.y);
                 let handle1 = cder1.cross(n1);
@@ -322,7 +327,8 @@ where
                     // SAFETY: `v` is the midpoint of two consecutive valid contact
                     // circle parameters, so `contact_circle` succeeds.
                     let cc = fillet_surface.contact_circle(v).unwrap();
-                    let is_far = |t: f64| approx.subs(t, v).distance2(cc.subs(t)) < tol * tol;
+                    let is_far =
+                        |t: f64| approx.evaluate(t, v).distance2(cc.evaluate(t)) < tol * tol;
                     match [0.0, 0.5, 1.0].into_iter().all(is_far) {
                         true => None,
                         false => Some((v, cc)),
@@ -377,8 +383,11 @@ mod tests {
             ],
         ));
 
-        prop_assert_near!(surface.subs(u, v), nurbs_surface.subs(u, v));
-        prop_assert_near!(surface.ders(3, u, v), nurbs_surface.ders(3, u, v));
+        prop_assert_near!(surface.evaluate(u, v), nurbs_surface.evaluate(u, v));
+        prop_assert_near!(
+            surface.derivatives(3, u, v),
+            nurbs_surface.derivatives(3, u, v)
+        );
     }
 
     #[property_test]
@@ -413,16 +422,16 @@ mod tests {
             weights: vec![1.0, 2.0, 1.0],
         };
 
-        let pt = surface.subs(u, v);
-        let ders = surface.ders(3, u, v);
+        let pt = surface.evaluate(u, v);
+        let ders = surface.derivatives(3, u, v);
         assert_near!(pt.to_vec(), ders[0][0]);
 
         const EPS: f64 = 1.0e-4;
 
-        let upders = surface.ders(2, u + EPS, v);
-        let umders = surface.ders(2, u - EPS, v);
+        let upders = surface.derivatives(2, u + EPS, v);
+        let umders = surface.derivatives(2, u - EPS, v);
         let calc_uders = upders.element_wise_derivatives(&umders, |x, y| x - y) / (2.0 * EPS);
-        let res_uders = ders.uder();
+        let res_uders = ders.derivative_u();
 
         let iter = res_uders
             .slice_iter()
@@ -432,10 +441,10 @@ mod tests {
             prop_assert!((a - b).magnitude() < 10.0 * EPS);
         }
 
-        let vpders = surface.ders(2, u, v + EPS);
-        let vmders = surface.ders(2, u, v - EPS);
+        let vpders = surface.derivatives(2, u, v + EPS);
+        let vmders = surface.derivatives(2, u, v - EPS);
         let calc_vders = vpders.element_wise_derivatives(&vmders, |x, y| x - y) / (2.0 * EPS);
-        let res_vders = ders.vder();
+        let res_vders = ders.derivative_v();
 
         let iter = res_vders
             .slice_iter()
@@ -445,11 +454,11 @@ mod tests {
             prop_assert!((a - b).magnitude() < 10.0 * EPS);
         }
 
-        let pt0 = surface.subs(0.0, v);
+        let pt0 = surface.evaluate(0.0, v);
         let (u0, v0) = surface0.search_parameter(pt0, (0.5, 0.5), 100).unwrap();
         assert_near!(surface.normal(0.0, v), surface0.normal(u0, v0));
 
-        let pt1 = surface.subs(1.0, v);
+        let pt1 = surface.evaluate(1.0, v);
         let (u1, v1) = surface1.search_parameter(pt1, (0.5, 0.5), 100).unwrap();
         assert_near!(surface.normal(1.0, v), surface1.normal(u1, v1));
     }

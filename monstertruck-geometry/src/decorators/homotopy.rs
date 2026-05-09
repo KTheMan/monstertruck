@@ -35,13 +35,13 @@ where
     fn derivative_mn(&self, m: usize, n: usize, u: f64, v: f64) -> Self::Vector {
         match (m, n) {
             (_, 0) => {
-                let v0 = self.curve0.der_n(m, u);
-                let v1 = self.curve1.der_n(m, u);
+                let v0 = self.curve0.derivative_n(m, u);
+                let v1 = self.curve1.derivative_n(m, u);
                 v0 + (v1 - v0) * v
             }
             (_, 1) => {
-                let v0 = self.curve0.der_n(m, u);
-                let v1 = self.curve1.der_n(m, u);
+                let v0 = self.curve0.derivative_n(m, u);
+                let v1 = self.curve1.derivative_n(m, u);
                 v1 - v0
             }
             _ => Self::Vector::zero(),
@@ -55,8 +55,8 @@ where
     }
     #[inline(always)]
     fn derivative_u(&self, u: f64, v: f64) -> Self::Vector {
-        let v0 = self.curve0.der(u);
-        let v1 = self.curve1.der(u);
+        let v0 = self.curve0.derivative(u);
+        let v1 = self.curve1.derivative(u);
         v0 + (v1 - v0) * v
     }
     #[inline(always)]
@@ -65,13 +65,13 @@ where
     }
     #[inline(always)]
     fn derivative_uu(&self, u: f64, v: f64) -> Self::Vector {
-        let v0 = self.curve0.der2(u);
-        let v1 = self.curve1.der2(u);
+        let v0 = self.curve0.derivative_2(u);
+        let v1 = self.curve1.derivative_2(u);
         v0 + (v1 - v0) * v
     }
     #[inline(always)]
     fn derivative_uv(&self, u: f64, _: f64) -> Self::Vector {
-        self.curve1.der(u) - self.curve0.der(u)
+        self.curve1.derivative(u) - self.curve0.derivative(u)
     }
     #[inline(always)]
     fn derivative_vv(&self, _: f64, _: f64) -> Self::Vector { Self::Vector::zero() }

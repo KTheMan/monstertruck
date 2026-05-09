@@ -232,7 +232,7 @@ impl<V: Homogeneous<Scalar = f64>> NurbsSurface<V> {
 impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>> NurbsSurface<V> {
     /// Returns the closure of substitution.
     #[inline(always)]
-    pub fn closure(&self) -> impl Fn(f64, f64) -> V::Point + '_ { move |u, v| self.subs(u, v) }
+    pub fn closure(&self) -> impl Fn(f64, f64) -> V::Point + '_ { move |u, v| self.evaluate(u, v) }
 }
 
 impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>> NurbsSurface<V>
@@ -508,7 +508,7 @@ where
     ///     vec![Vector3::new(0.0, 3.0, 1.0), Vector3::new(1.0, 7.0, 2.0), Vector3::new(1.0, 3.0, 1.0)],
     /// ];
     /// let surface = NurbsSurface::new(BsplineSurface::new(knot_vecs, control_points));
-    /// let pt = surface.subs(0.3, 0.7);
+    /// let pt = surface.evaluate(0.3, 0.7);
     /// let (u, v) = surface.search_nearest_parameter(pt, Some((0.5, 0.5)), 100).unwrap();
     /// assert!(u.near(&0.3) && v.near(&0.7));
     /// ```
@@ -573,27 +573,27 @@ impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>> ParametricSurfa
             (0..=m)
                 .for_each(|i| (0..=n).for_each(|j| ders[i][j] = self.0.derivative_mn(i, j, u, v)));
             let ders = std::array::from_fn::<_, 8, _>(|i| &ders[i][..=n]);
-            multi_rat_der(&ders[..=m])
+            multi_rational_derivative(&ders[..=m])
         } else {
             let ders = (0..=m)
                 .map(|i| (0..=n).map(|j| self.0.derivative_mn(i, j, u, v)).collect())
                 .collect::<Vec<Vec<_>>>();
-            multi_rat_der(&ders)
+            multi_rational_derivative(&ders)
         }
     }
     #[inline(always)]
     fn evaluate(&self, u: f64, v: f64) -> V::Point { self.0.evaluate(u, v).to_point() }
     #[inline(always)]
     fn derivative_u(&self, u: f64, v: f64) -> Self::Vector {
-        rat_der(&[self.0.evaluate(u, v), self.0.derivative_u(u, v)])
+        rational_derivative(&[self.0.evaluate(u, v), self.0.derivative_u(u, v)])
     }
     #[inline(always)]
     fn derivative_v(&self, u: f64, v: f64) -> <V::Point as EuclideanSpace>::Diff {
-        rat_der(&[self.0.evaluate(u, v), self.0.derivative_v(u, v)])
+        rational_derivative(&[self.0.evaluate(u, v), self.0.derivative_v(u, v)])
     }
     #[inline(always)]
     fn derivative_uu(&self, u: f64, v: f64) -> <V::Point as EuclideanSpace>::Diff {
-        rat_der(&[
+        rational_derivative(&[
             self.0.evaluate(u, v),
             self.0.derivative_u(u, v),
             self.0.derivative_uu(u, v),
@@ -601,14 +601,14 @@ impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>> ParametricSurfa
     }
     #[inline(always)]
     fn derivative_uv(&self, u: f64, v: f64) -> <V::Point as EuclideanSpace>::Diff {
-        multi_rat_der(&[
+        multi_rational_derivative(&[
             [self.0.evaluate(u, v), self.0.derivative_v(u, v)],
             [self.0.derivative_u(u, v), self.0.derivative_uv(u, v)],
         ])
     }
     #[inline(always)]
     fn derivative_vv(&self, u: f64, v: f64) -> <V::Point as EuclideanSpace>::Diff {
-        rat_der(&[
+        rational_derivative(&[
             self.0.evaluate(u, v),
             self.0.derivative_v(u, v),
             self.0.derivative_vv(u, v),
@@ -623,7 +623,7 @@ impl ParametricSurface3D for NurbsSurface<Vector4> {
         let pt = self.0.evaluate(u, v);
         let ud = self.0.derivative_u(u, v);
         let vd = self.0.derivative_v(u, v);
-        let n = rat_der(&[pt, ud]).cross(rat_der(&[pt, vd]));
+        let n = rational_derivative(&[pt, ud]).cross(rational_derivative(&[pt, vd]));
         if n.magnitude2() > TOLERANCE2 {
             return n.normalize();
         }
@@ -647,7 +647,7 @@ impl ParametricSurface3D for NurbsSurface<Vector4> {
             let pt2 = self.0.evaluate(u2, v2);
             let ud2 = self.0.derivative_u(u2, v2);
             let vd2 = self.0.derivative_v(u2, v2);
-            let n2 = rat_der(&[pt2, ud2]).cross(rat_der(&[pt2, vd2]));
+            let n2 = rational_derivative(&[pt2, ud2]).cross(rational_derivative(&[pt2, vd2]));
             if n2.magnitude2() > TOLERANCE2 {
                 sum += n2.normalize();
                 count += 1;
@@ -772,7 +772,7 @@ where
 impl IncludeCurve<NurbsCurve<Vector3>> for NurbsSurface<Vector3> {
     #[inline(always)]
     fn include(&self, curve: &NurbsCurve<Vector3>) -> bool {
-        let pt = curve.subs(curve.knot_vector()[0]);
+        let pt = curve.evaluate(curve.knot_vector()[0]);
         let mut hint = match self.search_parameter(pt, None, INCLUDE_CURVE_TRIALS) {
             Some(got) => got,
             None => return false,
@@ -785,12 +785,12 @@ impl IncludeCurve<NurbsCurve<Vector3>> for NurbsSurface<Vector3> {
             for j in 1..=degree {
                 let p = j as f64 / degree as f64;
                 let t = knots[i - 1] * (1.0 - p) + knots[i] * p;
-                let pt = curve.subs(t);
+                let pt = curve.evaluate(t);
                 hint = match self.search_parameter(pt, Some(hint), INCLUDE_CURVE_TRIALS) {
                     Some(got) => got,
                     None => return false,
                 };
-                if !self.subs(hint.0, hint.1).near(&pt)
+                if !self.evaluate(hint.0, hint.1).near(&pt)
                     || hint.0 < knot_vector_u[0] - TOLERANCE
                     || hint.0 - knot_vector_u[0] > knot_vector_u.range_length() + TOLERANCE
                     || hint.1 < knot_vector_v[0] - TOLERANCE
@@ -820,12 +820,12 @@ impl IncludeCurve<BsplineCurve<Point3>> for NurbsSurface<Vector4> {
             for j in 1..=degree {
                 let p = j as f64 / degree as f64;
                 let t = knots[i - 1] * (1.0 - p) + knots[i] * p;
-                let pt = curve.subs(t);
+                let pt = curve.evaluate(t);
                 hint = match self.search_parameter(pt, Some(hint), INCLUDE_CURVE_TRIALS) {
                     Some(got) => got,
                     None => return false,
                 };
-                if !self.subs(hint.0, hint.1).near(&pt)
+                if !self.evaluate(hint.0, hint.1).near(&pt)
                     || hint.0 < knot_vector_u[0] - TOLERANCE
                     || hint.0 - knot_vector_u[0] > knot_vector_u.range_length() + TOLERANCE
                     || hint.1 < knot_vector_v[0] - TOLERANCE
@@ -855,12 +855,12 @@ impl IncludeCurve<NurbsCurve<Vector4>> for NurbsSurface<Vector4> {
             for j in 1..=degree {
                 let p = j as f64 / degree as f64;
                 let t = knots[i - 1] * (1.0 - p) + knots[i] * p;
-                let pt = curve.subs(t);
+                let pt = curve.evaluate(t);
                 hint = match self.search_parameter(pt, Some(hint), INCLUDE_CURVE_TRIALS) {
                     Some(got) => got,
                     None => return false,
                 };
-                if !self.subs(hint.0, hint.1).near(&pt)
+                if !self.evaluate(hint.0, hint.1).near(&pt)
                     || hint.0 < knot_vector_u[0] - TOLERANCE
                     || hint.0 - knot_vector_u[0] > knot_vector_u.range_length() + TOLERANCE
                     || hint.1 < knot_vector_v[0] - TOLERANCE
@@ -896,7 +896,7 @@ where
     <V::Point as EuclideanSpace>::Diff: SearchParameterVector<Point = V::Point>,
 {
     type Point = V::Point;
-    /// Search the parameter `(u, v)` such that `self.subs(u, v).rational_projection()` is near `pt`.
+    /// Search the parameter `(u, v)` such that `self.evaluate(u, v).rational_projection()` is near `pt`.
     /// If cannot find, then return `None`.
     /// # Examples
     /// ```
@@ -911,9 +911,9 @@ where
     /// let bspsurface = BsplineSurface::new((knot_vec.clone(), knot_vec), control_points);
     /// let surface = NurbsSurface::new(bspsurface);
     ///
-    /// let pt = surface.subs(0.3, 0.7);
+    /// let pt = surface.evaluate(0.3, 0.7);
     /// let (u, v) = surface.search_parameter(pt, Some((0.5, 0.5)), 100).unwrap();
-    /// assert_near!(surface.subs(u, v), pt);
+    /// assert_near!(surface.evaluate(u, v), pt);
     /// ```
     fn search_parameter<H: Into<SearchParameterHint2D>>(
         &self,

@@ -43,9 +43,9 @@ where
     S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
 {
     let function = move |Vector4 { x, y, z, w }| {
-        let ders0 = surface0.ders(1, x, y);
+        let ders0 = surface0.derivatives(1, x, y);
         let (pt0, uder0, vder0) = (ders0[0][0], ders0[1][0], ders0[0][1]);
-        let ders1 = surface1.ders(1, z, w);
+        let ders1 = surface1.derivatives(1, z, w);
         let (pt1, uder1, vder1) = (ders1[0][0], ders1[1][0], ders1[0][1]);
         CalcOutput {
             value: (pt0 - pt1).extend(plane_normal.dot((pt0 + pt1) / 2.0 - plane_point.to_vec())),
@@ -63,8 +63,8 @@ where
     let Vector4 { x, y, z, w } = match res {
         Ok(res) => res,
         Err(_) => {
-            let pt0 = surface0.subs(x, y);
-            let pt1 = surface1.subs(z, w);
+            let pt0 = surface0.evaluate(x, y);
+            let pt1 = surface1.evaluate(z, w);
             let n0 = surface0.normal(x, y);
             let n1 = surface1.normal(z, w);
             // Newton's method may fail when the Jacobian is singular, which happens
@@ -79,7 +79,7 @@ where
             }
         }
     };
-    let point = surface0.subs(x, y).midpoint(surface1.subs(z, w));
+    let point = surface0.evaluate(x, y).midpoint(surface1.evaluate(z, w));
     Some((point, Point2::new(x, y), Point2::new(z, w)))
 }
 
@@ -189,14 +189,14 @@ where
     /// - the uv coordinate on `self.surface1()`
     #[inline(always)]
     pub fn search_triple(&self, t: f64, trials: usize) -> Option<(Point3, Point2, Point2)> {
-        let point = self.leader.subs(t);
+        let point = self.leader.evaluate(t);
         double_projection(
             self.surface0(),
             None,
             self.surface1(),
             None,
             point,
-            self.leader.der(t),
+            self.leader.derivative(t),
             trials,
         )
         .or_else(|| self.search_nearest_point(point, None, None, trials))
@@ -214,7 +214,7 @@ where
     ) -> Option<(Point3, Point2, Point2)> {
         let (surface0, surface1) = (self.surface0(), self.surface1());
         let function = |Vector4 { x, y, z, w }| {
-            let ders0 = surface0.ders(2, x, y);
+            let ders0 = surface0.derivatives(2, x, y);
             let (pt0, uder0, vder0, uuder0, uvder0, vvder0) = (
                 ders0[0][0],
                 ders0[1][0],
@@ -223,7 +223,7 @@ where
                 ders0[1][1],
                 ders0[0][2],
             );
-            let ders1 = surface1.ders(2, z, w);
+            let ders1 = surface1.derivatives(2, z, w);
             let (pt1, uder1, vder1, uuder1, uvder1, vvder1) = (
                 ders1[0][0],
                 ders1[1][0],
@@ -253,7 +253,7 @@ where
         let (z, w) = hint1.or_else(|| surface1.search_nearest_parameter(point, hint1, trials))?;
         let Vector4 { x, y, z, w } =
             newton::solve(function, Vector4 { x, y, z, w }, trials).ok()?;
-        let point = surface0.subs(x, y).midpoint(surface1.subs(z, w));
+        let point = surface0.evaluate(x, y).midpoint(surface1.evaluate(z, w));
         Some((point, Point2::new(x, y), Point2::new(z, w)))
     }
 }
@@ -270,14 +270,14 @@ where
     /// - the uv coordinate on `self.surface1()`
     #[inline(always)]
     pub fn search_triple(&self, t: f64, trials: usize) -> Option<(Point3, Point2, Point2)> {
-        let point = self.leader.subs(t);
+        let point = self.leader.evaluate(t);
         double_projection(
             self.surface0(),
             None,
             self.surface1(),
             None,
             point,
-            self.leader.der(t),
+            self.leader.derivative(t),
             trials,
         )
         .or_else(|| self.search_nearest_point(point, None, None, trials))
@@ -304,11 +304,11 @@ where
 
 #[derive(Clone, Copy, Debug)]
 struct DerRoutineImmutableArgs {
-    s0ders: SurfaceDers<Vector3>,
+    s0ders: SurfaceDerivatives<Vector3>,
     s0normal: Vector3,
-    s1ders: SurfaceDers<Vector3>,
+    s1ders: SurfaceDerivatives<Vector3>,
     s1normal: Vector3,
-    leaders: CurveDers<Vector3>,
+    leaders: CurveDerivatives<Vector3>,
 }
 
 fn curve_der_n(
@@ -316,13 +316,15 @@ fn curve_der_n(
     s0normal: Vector3,
     sum1: Vector3,
     s1normal: Vector3,
-    leaders: &CurveDers<Vector3>,
-    cders: &CurveDers<Vector3>,
+    leaders: &CurveDerivatives<Vector3>,
+    cders: &CurveDerivatives<Vector3>,
     n: usize,
 ) -> Vector3 {
     let mat = Matrix3::from_cols(s0normal, s1normal, leaders[1]).transpose();
-    let sub = leaders.element_wise_ders(cders, |x, y| x - y);
-    let suml = leaders.der().combinatorial_der(&sub, Vector3::dot, n);
+    let sub = leaders.element_wise_derivatives(cders, |x, y| x - y);
+    let suml = leaders
+        .derivative()
+        .combinatorial_derivative(&sub, Vector3::dot, n);
     let b = Vector3::new(s0normal.dot(sum0), s1normal.dot(sum1), suml);
     // SAFETY: the matrix columns are two surface normals and the leader curve tangent,
     // which are linearly independent at a transversal intersection point.
@@ -353,9 +355,9 @@ fn der_routine(
         s1normal,
         leaders,
     }: &DerRoutineImmutableArgs,
-    uv0ders: &mut CurveDers<Vector2>,
-    uv1ders: &mut CurveDers<Vector2>,
-    cders: &mut CurveDers<Vector3>,
+    uv0ders: &mut CurveDerivatives<Vector2>,
+    uv1ders: &mut CurveDerivatives<Vector2>,
+    cders: &mut CurveDerivatives<Vector3>,
     n: usize,
 ) {
     let sum0 = s0ders.composite_der(uv0ders, n);
@@ -379,15 +381,15 @@ where
         if let (Bound::Included(t0), Bound::Included(_)) = self.leader.parameter_range()
             && t.near(&t0)
         {
-            self.leader.subs(t0)
+            self.leader.evaluate(t0)
         } else if let (Bound::Included(_), Bound::Included(t1)) = self.leader.parameter_range()
             && t.near(&t1)
         {
-            self.leader.subs(t1)
+            self.leader.evaluate(t1)
         } else {
             self.search_triple(t, 100)
                 .map(|triple| triple.0)
-                .unwrap_or_else(|| self.leader.subs(t))
+                .unwrap_or_else(|| self.leader.evaluate(t))
         }
     }
     fn derivative(&self, t: f64) -> Vector3 {
@@ -396,10 +398,10 @@ where
             surface1,
             leader,
         } = self;
-        let [l, l_der, l_der2] = leader.ders(2, t).to_array::<3>();
+        let [l, l_der, l_der2] = leader.derivatives(2, t).to_array::<3>();
         let (c, uv0, uv1) = match self.search_triple(t, 100) {
             Some(triple) => triple,
-            None => return leader.der(t),
+            None => return leader.derivative(t),
         };
         let (n0, n1) = (surface0.normal(uv0.x, uv0.y), surface1.normal(uv1.x, uv1.y));
         let n = n0.cross(n1);
@@ -417,21 +419,21 @@ where
         }
         self.derivatives(n, t)[n]
     }
-    fn derivatives(&self, n: usize, t: f64) -> CurveDers<Vector3> {
+    fn derivatives(&self, n: usize, t: f64) -> CurveDerivatives<Vector3> {
         let (c, uv0, uv1) = match self.search_triple(t, 100) {
             Some(triple) => triple,
             None => {
-                let leader_ders = self.leader.ders(n, t);
-                let mut cders = CurveDers::new(n);
+                let leader_ders = self.leader.derivatives(n, t);
+                let mut cders = CurveDerivatives::new(n);
                 (0..=n).for_each(|i| cders[i] = leader_ders[i]);
                 return cders;
             }
         };
-        let mut uv0ders = CurveDers::new(n);
+        let mut uv0ders = CurveDerivatives::new(n);
         uv0ders[0] = uv0.to_vec();
-        let mut uv1ders = CurveDers::new(n);
+        let mut uv1ders = CurveDerivatives::new(n);
         uv1ders[0] = uv1.to_vec();
-        let mut cders = CurveDers::new(n);
+        let mut cders = CurveDerivatives::new(n);
         cders[0] = c.to_vec();
 
         let IntersectionCurve {
@@ -440,11 +442,11 @@ where
             leader,
         } = self;
         let info = DerRoutineImmutableArgs {
-            s0ders: surface0.ders(n, uv0.x, uv0.y),
+            s0ders: surface0.derivatives(n, uv0.x, uv0.y),
             s0normal: surface0.normal(uv0.x, uv0.y),
-            s1ders: surface1.ders(n, uv1.x, uv1.y),
+            s1ders: surface1.derivatives(n, uv1.x, uv1.y),
             s1normal: surface1.normal(uv1.x, uv1.y),
-            leaders: leader.ders(n + 1, t),
+            leaders: leader.derivatives(n + 1, t),
         };
         (1..=n).for_each(|i| der_routine(&info, &mut uv0ders, &mut uv1ders, &mut cders, i));
         cders
@@ -517,7 +519,7 @@ where
         let t = self
             .leader()
             .search_nearest_parameter(point, hint, trials)?;
-        let pt = self.subs(t);
+        let pt = self.evaluate(t);
         match pt.near(&point) {
             true => Some(t),
             false => None,
@@ -562,7 +564,7 @@ impl<C: BoundedCurve> IntersectionCurve<C, Plane, Plane> {
     #[inline]
     pub fn optimize(&self) -> Line<C::Point> {
         let (s, t) = self.leader.range_tuple();
-        Line(self.leader.subs(s), self.leader.subs(t))
+        Line(self.leader.evaluate(s), self.leader.evaluate(t))
     }
 }
 
@@ -608,7 +610,7 @@ where
         )
         .derivative_n(n, t)
     }
-    fn derivatives(&self, n: usize, t: f64) -> CurveDers<Vector3> {
+    fn derivatives(&self, n: usize, t: f64) -> CurveDerivatives<Vector3> {
         IntersectionCurve::new(
             self.surface0.clone(),
             self.surface1.clone(),
@@ -789,8 +791,8 @@ mod double_projection_tests {
             let p = Point3::origin() + t * n;
             let (q, p0, p1) = double_projection(&plane0, None, &plane1, None, p, n, 100)
                 .unwrap_or_else(|| panic!("plane0: {plane0:?}\nplane1: {plane1:?}\n p: {p:?}"));
-            prop_assert_near!(q, plane0.subs(p0.x, p0.y));
-            prop_assert_near!(q, plane1.subs(p1.x, p1.y));
+            prop_assert_near!(q, plane0.evaluate(p0.x, p0.y));
+            prop_assert_near!(q, plane1.evaluate(p1.x, p1.y));
             if let Some(o) = o {
                 prop_assert_near!(q.distance2(o), t * t);
             } else {
@@ -819,8 +821,8 @@ mod double_projection_tests {
         let n = Vector3::new(-f64::sin(t), f64::cos(t), 0.0);
         let (q, p0, p1) = double_projection(&sphere0, None, &sphere1, None, p, n, 100)
             .unwrap_or_else(|| panic!("p: {p:?}"));
-        prop_assert_near!(q, sphere0.subs(p0.x, p0.y));
-        prop_assert_near!(q, sphere1.subs(p1.x, p1.y));
+        prop_assert_near!(q, sphere0.evaluate(p0.x, p0.y));
+        prop_assert_near!(q, sphere1.evaluate(p1.x, p1.y));
         prop_assert_near!(q, Point3::new(f64::cos(t), f64::sin(t), 0.0));
         Ok(())
     }

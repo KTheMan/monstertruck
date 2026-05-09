@@ -127,6 +127,5 @@ pub mod text;
 /// Requires the `fillet` feature flag. Re-exports from [`monstertruck_solid`].
 #[cfg(feature = "fillet")]
 pub use monstertruck_solid::{
-    FilletError, FilletIntersectionCurve, FilletOptions, FilletProfile, RadiusSpec,
-    fillet_edges_generic as fillet_edges,
+    FilletError, FilletIntersectionCurve, FilletOptions, FilletProfile, FilletRadius, fillet_edges,
 };

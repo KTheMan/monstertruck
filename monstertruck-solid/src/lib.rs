@@ -22,7 +22,7 @@ pub use transversal::{
 mod alternative;
 pub mod fillet;
 pub use fillet::{
-    FilletError, FilletIntersectionCurve, FilletOptions, FilletProfile, FilletableCurve,
-    FilletableSurface, ParameterCurveLinear, RadiusSpec, fillet, fillet_along_wire, fillet_edges,
-    fillet_edges_generic, fillet_with_side,
+    FilletError, FilletIntersectionCurve, FilletOptions, FilletProfile, FilletRadius,
+    FilletableCurve, FilletableSurface, ParameterCurveLinear, fillet, fillet_along_wire,
+    fillet_edges, fillet_edges_by_id, fillet_with_side,
 };

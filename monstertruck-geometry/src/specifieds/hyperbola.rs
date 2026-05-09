@@ -140,8 +140,8 @@ impl SearchNearestParameter<D1> for UnitHyperbola<Point2> {
             })
             // SAFETY: distances are non-negative finite `f64`, so `partial_cmp` always returns `Some`.
             .min_by(|s, t| {
-                p.distance2(self.subs(*s))
-                    .partial_cmp(&p.distance2(self.subs(*t)))
+                p.distance2(self.evaluate(*s))
+                    .partial_cmp(&p.distance2(self.evaluate(*t)))
                     .unwrap()
             })?;
         Some(f64::asinh(y))
@@ -173,7 +173,7 @@ impl SearchParameter<D1> for UnitHyperbola<Point2> {
         _: usize,
     ) -> Option<f64> {
         // Verify that p lies on the unit hyperbola (cosh(t), sinh(t)).
-        // The naive check `p.near(&self.subs(asinh(p.y)))` fails for large
+        // The naive check `p.near(&self.evaluate(asinh(p.y)))` fails for large
         // |t| because the absolute difference between two independently
         // computed cosh values can vastly exceed the fixed tolerance, even
         // when the relative error is at machine-epsilon level.

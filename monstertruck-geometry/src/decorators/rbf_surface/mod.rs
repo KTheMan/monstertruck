@@ -47,29 +47,29 @@ impl<C, S0, S1, R> RbfSurface<C, S0, S1, R> {
     }
 }
 
-/// trait for radius function
+/// Trait for radius functions.
 pub trait RadiusFunction: Clone {
-    /// Returns the `n`th order derivation.
-    fn der_n(&self, n: usize, t: f64) -> f64;
-    /// Substitutes the parameter `t`.
+    /// Returns the `n`-th derivative at parameter `t`.
+    fn derivative_n(&self, n: usize, t: f64) -> f64;
+    /// Evaluates the radius at parameter `t`.
     #[inline]
-    fn subs(&self, t: f64) -> f64 { self.der_n(0, t) }
-    /// Returns the derivation.
+    fn evaluate(&self, t: f64) -> f64 { self.derivative_n(0, t) }
+    /// Returns the first derivative at parameter `t`.
     #[inline]
-    fn der(&self, t: f64) -> f64 { self.der_n(1, t) }
-    /// Returns the 2nd-order derivation.
+    fn derivative(&self, t: f64) -> f64 { self.derivative_n(1, t) }
+    /// Returns the second derivative at parameter `t`.
     #[inline]
-    fn der2(&self, t: f64) -> f64 { self.der_n(2, t) }
-    /// Substitutes the higher-order derivations to `out`.
+    fn derivative_2(&self, t: f64) -> f64 { self.derivative_n(2, t) }
+    /// Returns all derivatives at parameter `t` with order `0..=max_order`.
     #[inline]
-    fn ders(&self, max_order: usize, t: f64) -> CurveDers<f64> {
-        (0..=max_order).map(|n| self.der_n(n, t)).collect()
+    fn derivatives(&self, max_order: usize, t: f64) -> CurveDerivatives<f64> {
+        (0..=max_order).map(|n| self.derivative_n(n, t)).collect()
     }
 }
 
 impl RadiusFunction for f64 {
     #[inline]
-    fn der_n(&self, n: usize, _: f64) -> f64 {
+    fn derivative_n(&self, n: usize, _: f64) -> f64 {
         match n {
             0 => *self,
             _ => 0.0,
@@ -81,7 +81,9 @@ macro_rules! impl_radius_1dim {
     ($ty: ty) => {
         impl RadiusFunction for $ty {
             #[inline]
-            fn der_n(&self, n: usize, t: f64) -> f64 { PcurveTrait::der_n(self, n, t).x }
+            fn derivative_n(&self, n: usize, t: f64) -> f64 {
+                PcurveTrait::derivative_n(self, n, t).x
+            }
         }
     };
 }
@@ -130,10 +132,10 @@ where
 {
     fn sub_der_mn(&self, m: usize, n: usize, u: f64, cc: ContactCircle) -> Vector3 {
         match (m, n) {
-            (_, 0) => cc.der_n(m, u),
-            (0, 1) => self.vder_info(cc, 1).vder(u),
-            (1, 1) => self.vder_info(cc, 1).uvder(u),
-            (0, 2) => self.vder_info(cc, 2).vvder(u),
+            (_, 0) => cc.derivative_n(m, u),
+            (0, 1) => self.vder_info(cc, 1).derivative_v(u),
+            (1, 1) => self.vder_info(cc, 1).derivative_uv(u),
+            (0, 2) => self.vder_info(cc, 2).derivative_vv(u),
             _ => unimplemented!("higher order derivation of RbfSurface is not implemented."),
         }
     }
@@ -151,9 +153,9 @@ where
     // SAFETY (all `contact_circle().unwrap()` below): the `ParametricSurface` trait
     // requires `v` to lie within the parameter range of the edge curve, where a valid
     // contact circle always exists.
-    fn derivatives(&self, max_order: usize, u: f64, v: f64) -> SurfaceDers<Vector3> {
+    fn derivatives(&self, max_order: usize, u: f64, v: f64) -> SurfaceDerivatives<Vector3> {
         let cc = self.contact_circle(v).unwrap();
-        let mut out = SurfaceDers::new(max_order);
+        let mut out = SurfaceDerivatives::new(max_order);
         (0..=max_order).for_each(|i| {
             (0..=max_order - i).for_each(|j| {
                 out[i][j] = self.sub_der_mn(i, j, u, cc);
@@ -165,18 +167,23 @@ where
         self.sub_der_mn(m, n, u, self.contact_circle(v).unwrap())
     }
     fn evaluate(&self, u: f64, v: f64) -> Point3 { self.contact_circle(v).unwrap().evaluate(u) }
-    fn derivative_u(&self, u: f64, v: f64) -> Vector3 { self.contact_circle(v).unwrap().der(u) }
+    fn derivative_u(&self, u: f64, v: f64) -> Vector3 {
+        self.contact_circle(v).unwrap().derivative(u)
+    }
     fn derivative_v(&self, u: f64, v: f64) -> Vector3 {
-        self.vder_info(self.contact_circle(v).unwrap(), 1).vder(u)
+        self.vder_info(self.contact_circle(v).unwrap(), 1)
+            .derivative_v(u)
     }
     fn derivative_uu(&self, u: f64, v: f64) -> Self::Vector {
-        self.contact_circle(v).unwrap().der2(u)
+        self.contact_circle(v).unwrap().derivative_2(u)
     }
     fn derivative_uv(&self, u: f64, v: f64) -> Self::Vector {
-        self.vder_info(self.contact_circle(v).unwrap(), 1).uvder(u)
+        self.vder_info(self.contact_circle(v).unwrap(), 1)
+            .derivative_uv(u)
     }
     fn derivative_vv(&self, u: f64, v: f64) -> Self::Vector {
-        self.vder_info(self.contact_circle(v).unwrap(), 2).vvder(u)
+        self.vder_info(self.contact_circle(v).unwrap(), 2)
+            .derivative_vv(u)
     }
     fn parameter_range(&self) -> (ParameterRange, ParameterRange) {
         use std::ops::Bound::*;
@@ -279,14 +286,14 @@ where
 {
     type Point = Point3;
     type Vector = Vector3;
-    fn derivatives(&self, n: usize, t: f64) -> CurveDers<Vector3> {
+    fn derivatives(&self, n: usize, t: f64) -> CurveDerivatives<Vector3> {
         if n == 0 {
-            // SAFETY: a single-element array always produces a valid `CurveDers`.
-            return CurveDers::try_from([self.evaluate(t).to_vec()]).unwrap();
+            // SAFETY: a single-element array always produces a valid `CurveDerivatives`.
+            return CurveDerivatives::try_from([self.evaluate(t).to_vec()]).unwrap();
         }
         // SAFETY: `t` is within the edge curve parameter range, so `contact_circle` succeeds.
         let cc = self.surface.contact_circle(t).unwrap();
-        let rders = self.surface.radius.ders(n, t);
+        let rders = self.surface.radius.derivatives(n, t);
         let cc_ders = self.surface.sub_center_contacts_ders(cc, &rders, n);
         match self.index {
             0 => cc_ders.contact0_ders,

@@ -452,10 +452,11 @@ fn process_one_pair_of_shells<C: ShapeOpsCurve<S>, S: ShapeOpsSurface>(
                 .map(|i| ((mask >> i) & 1) == 1)
                 .collect();
             if let Some(candidate_score) = evaluate(&candidate)
-                && candidate_score < best_score {
-                    best_score = candidate_score;
-                    best_assignments = candidate;
-                }
+                && candidate_score < best_score
+            {
+                best_score = candidate_score;
+                best_assignments = candidate;
+            }
         });
         assignments = best_assignments;
     } else if unknown_faces.len() <= 24 {
@@ -466,11 +467,12 @@ fn process_one_pair_of_shells<C: ShapeOpsCurve<S>, S: ShapeOpsSurface>(
                 let mut candidate = assignments.clone();
                 candidate[index] = !candidate[index];
                 if let Some(candidate_score) = evaluate(&candidate)
-                    && candidate_score < best_score {
-                        assignments = candidate;
-                        best_score = candidate_score;
-                        improved = true;
-                    }
+                    && candidate_score < best_score
+                {
+                    assignments = candidate;
+                    best_score = candidate_score;
+                    improved = true;
+                }
             });
         }
     }

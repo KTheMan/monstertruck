@@ -308,7 +308,7 @@ impl<P: Debug, C: Debug, S: Debug> Debug for DebugDisplay<'_, Solid<P, C, S>, So
 #[cfg(test)]
 pub(super) fn cube() -> Solid<(), (), ()> {
     use crate::*;
-    let v = Vertex::news([(); 8]);
+    let v = Vertex::from_points([(); 8]);
     let edge = [
         Edge::new(&v[0], &v[1], ()), // 0
         Edge::new(&v[1], &v[2], ()), // 1

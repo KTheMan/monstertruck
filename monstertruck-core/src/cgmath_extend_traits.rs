@@ -144,15 +144,15 @@ pub trait Homogeneous: VectorSpace {
 /// // the projected curve: \bar{c}(t) = (t, t^2, t^3)
 /// // the 1st ord. deri. of the proj'ed curve: \bar{c}''(t) = (1, 2t, 3t^2)
 /// let ans_der1 = Vector3::new(1.0, 2.0 * t, 3.0 * t * t);
-/// assert_eq!(rat_der(&[pt, der]), ans_der1);
+/// assert_eq!(rational_derivative(&[pt, der]), ans_der1);
 /// // the 2nd ord. deri. of the proj'ed curve: \bar{c}''(t) = (0, 2, 6t)
 /// let ans_der2 = Vector3::new(0.0, 2.0, 6.0 * t);
-/// assert_eq!(rat_der(&[pt, der, der2]), ans_der2);
+/// assert_eq!(rational_derivative(&[pt, der, der2]), ans_der2);
 /// // the 3rd ord. deri. of the proj'ed curve: \bar{c}''(t) = (0, 0, 6)
 /// let ans_der3 = Vector3::new(0.0, 0.0, 6.0);
-/// assert_eq!(rat_der(&[pt, der, der2, der3]), ans_der3);
+/// assert_eq!(rational_derivative(&[pt, der, der2, der3]), ans_der3);
 /// ```
-pub fn rat_der<V: Homogeneous>(ders: &[V]) -> <V::Point as EuclideanSpace>::Diff {
+pub fn rational_derivative<V: Homogeneous>(ders: &[V]) -> <V::Point as EuclideanSpace>::Diff {
     let zero = <V::Point as EuclideanSpace>::Diff::zero();
     let len = ders.len();
     if len == 0 {
@@ -173,11 +173,11 @@ pub fn rat_der<V: Homogeneous>(ders: &[V]) -> <V::Point as EuclideanSpace>::Diff
         d2 / sw - d * (dw / sw2 * two) + s * (dw * dw * two / (sw2 * sw) - d2w / sw2)
     } else if len < 32 {
         let mut evals = [zero; 32];
-        rat_ders(ders, &mut evals);
+        rational_derivatives(ders, &mut evals);
         evals[ders.len() - 1]
     } else {
         let mut evals = vec![zero; ders.len()];
-        rat_ders(ders, &mut evals);
+        rational_derivatives(ders, &mut evals);
         evals[ders.len() - 1]
     }
 }
@@ -197,7 +197,7 @@ pub fn rat_der<V: Homogeneous>(ders: &[V]) -> <V::Point as EuclideanSpace>::Diff
 ///     Vector4::new(0.0, 6.0, 24.0 * t, 0.0), // 3rd-order
 /// ];
 /// let mut evals = [Vector3::zero(); 4];
-/// rat_ders(&ders, &mut evals);
+/// rational_derivatives(&ders, &mut evals);
 ///
 /// // the projected curve: \bar{c}(t) = (t, t^2, t^3)
 /// let ans = [
@@ -208,7 +208,10 @@ pub fn rat_der<V: Homogeneous>(ders: &[V]) -> <V::Point as EuclideanSpace>::Diff
 /// ];
 /// assert_eq!(evals, ans);
 /// ```
-pub fn rat_ders<V: Homogeneous>(ders: &[V], evals: &mut [<V::Point as EuclideanSpace>::Diff]) {
+pub fn rational_derivatives<V: Homogeneous>(
+    ders: &[V],
+    evals: &mut [<V::Point as EuclideanSpace>::Diff],
+) {
     assert!(
         evals.len() >= ders.len(),
         "evals must be no shorter than ders."
@@ -260,9 +263,9 @@ pub fn rat_ders<V: Homogeneous>(ders: &[V], evals: &mut [<V::Point as EuclideanS
 /// ];
 ///
 /// // the projected surface: \bar{s}(u, v) = (u^2 v^2, u v^3, v)
-/// assert_eq!(multi_rat_der(&ders), Vector3::new(4.0, 0.0, 0.0));
+/// assert_eq!(multi_rational_derivative(&ders), Vector3::new(4.0, 0.0, 0.0));
 /// ```
-pub fn multi_rat_der<V, A>(ders: &[A]) -> <V::Point as EuclideanSpace>::Diff
+pub fn multi_rational_derivative<V, A>(ders: &[A]) -> <V::Point as EuclideanSpace>::Diff
 where
     V: Homogeneous,
     A: AsRef<[V]>, {
@@ -276,21 +279,21 @@ where
     } else if (m, n) == (1, 1) {
         ders[0].as_ref()[0].to_point().to_vec()
     } else if m == 1 {
-        rat_der(ders[0].as_ref())
+        rational_derivative(ders[0].as_ref())
     } else if (m, n) == (2, 1) {
-        rat_der(&[ders[0].as_ref()[0], ders[1].as_ref()[0]])
+        rational_derivative(&[ders[0].as_ref()[0], ders[1].as_ref()[0]])
     } else if n == 1 && m < 32 {
         let mut vders = [V::zero(); 32];
         for (vder, array) in vders.iter_mut().zip(ders) {
             *vder = array.as_ref()[0];
         }
-        rat_der(&vders[..m])
+        rational_derivative(&vders[..m])
     } else if n == 1 {
         let mut vders = vec![V::zero(); m];
         for (vder, array) in vders.iter_mut().zip(ders) {
             *vder = array.as_ref()[0];
         }
-        rat_der(&vders)
+        rational_derivative(&vders)
     } else if (m, n) == (2, 2) {
         // SAFETY: The integer 2 is representable in any numeric type.
         let two = <V::Scalar as num_traits::NumCast>::from(2).unwrap();
@@ -304,11 +307,11 @@ where
         uv / sw - u * (vw / sw2) - v * (uw / sw2) + s * (uw * vw * two / (sw2 * sw) - uvw / sw2)
     } else if m < 8 && n < 8 {
         let mut evals = [[zero; 8]; 8];
-        multi_rat_ders(ders, &mut evals);
+        multi_rational_derivatives(ders, &mut evals);
         evals[m - 1][n - 1]
     } else {
         let mut evals = vec![vec![zero; m]; n];
-        multi_rat_ders(ders, &mut evals);
+        multi_rational_derivatives(ders, &mut evals);
         evals[m - 1][n - 1]
     }
 }
@@ -351,7 +354,7 @@ where
 /// ];
 /// // evals must be initialized by zero.
 /// let mut evals = [[Vector3::zero(); 3]; 3];
-/// multi_rat_ders(&ders, &mut evals);
+/// multi_rational_derivatives(&ders, &mut evals);
 ///
 /// // the projected surface: \bar{s}(u, v) = (u^2 v^2, u v^3, v)
 /// let ans: [[Vector3; 3]; 3] = [
@@ -382,7 +385,7 @@ where
 /// ];
 /// assert_eq!(evals, ans);
 /// ```
-pub fn multi_rat_ders<V, A0, A1>(ders: &[A0], evals: &mut [A1])
+pub fn multi_rational_derivatives<V, A0, A1>(ders: &[A0], evals: &mut [A1])
 where
     V: Homogeneous,
     A0: AsRef<[V]>,
@@ -456,14 +459,14 @@ impl<S: BaseFloat> Homogeneous for Vector4<S> {
 /// ];
 /// let mut evals = [0.0; 4];
 ///
-/// abs_ders(&ders, &mut evals);
+/// absolute_derivatives(&ders, &mut evals);
 ///
 /// assert_near!(evals[0], 1.0 + t * t);
 /// assert_near!(evals[1], 2.0 * t);
 /// assert_near!(evals[2], 2.0);
 /// assert_near!(evals[3], 0.0);
 /// ```
-pub fn abs_ders<V>(ders: &[V], evals: &mut [f64])
+pub fn absolute_derivatives<V>(ders: &[V], evals: &mut [f64])
 where V: InnerSpace<Scalar = f64> {
     assert!(
         evals.len() >= ders.len(),

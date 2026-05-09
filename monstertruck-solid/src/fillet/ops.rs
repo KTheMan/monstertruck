@@ -3,7 +3,7 @@ use monstertruck_geometry::prelude::*;
 
 use super::error::FilletError;
 use super::geometry::*;
-use super::params::{FilletOptions, FilletProfile, RadiusSpec};
+use super::params::{FilletOptions, FilletProfile, FilletRadius};
 use super::topology::*;
 use super::types::*;
 
@@ -50,12 +50,12 @@ pub fn fillet(
             make_with_extend(radius, true).or_else(|| make_with_extend(radius, false))
         };
         match &options.radius {
-            RadiusSpec::Constant(r) => {
+            FilletRadius::Constant(r) => {
                 let r = *r;
                 make(&|_| r)
             }
-            RadiusSpec::Variable(f) => make(f.as_ref()),
-            RadiusSpec::PerEdge(radii) => match radii.first() {
+            FilletRadius::Variable(f) => make(f.as_ref()),
+            FilletRadius::PerEdge(radii) => match radii.first() {
                 Some(&r) => make(&|_| r),
                 None => None,
             },
@@ -159,7 +159,7 @@ pub fn fillet_along_wire(shell: &mut Shell, wire: &Wire, options: &FilletOptions
     // Validate variable radius constraint for closed wire fillets.
     // Open wires don't wrap around, so f(0) ≈ f(1) is only needed for closed wires.
     if wire.is_closed()
-        && let RadiusSpec::Variable(f) = &options.radius
+        && let FilletRadius::Variable(f) = &options.radius
         && !f(0.0).near2(&f(1.0))
     {
         return Err(FilletError::VariableRadiusUnsupported);
@@ -176,7 +176,7 @@ pub fn fillet_along_wire(shell: &mut Shell, wire: &Wire, options: &FilletOptions
         .ok_or(FilletError::AdjacentFacesNotFound)?;
 
     let mut fillet_surfaces = match &options.radius {
-        RadiusSpec::Constant(r) => {
+        FilletRadius::Constant(r) => {
             let r = *r;
             fillet_surfaces_along_wire(
                 shell,
@@ -188,7 +188,7 @@ pub fn fillet_along_wire(shell: &mut Shell, wire: &Wire, options: &FilletOptions
                 &options.profile,
             )
         }
-        RadiusSpec::Variable(f) => fillet_surfaces_along_wire(
+        FilletRadius::Variable(f) => fillet_surfaces_along_wire(
             shell,
             wire,
             shared_face_index,
@@ -197,7 +197,7 @@ pub fn fillet_along_wire(shell: &mut Shell, wire: &Wire, options: &FilletOptions
             division,
             &options.profile,
         ),
-        RadiusSpec::PerEdge(radii) => {
+        FilletRadius::PerEdge(radii) => {
             if radii.len() != wire.len() {
                 return Err(FilletError::PerEdgeRadiusMismatch {
                     given: radii.len(),

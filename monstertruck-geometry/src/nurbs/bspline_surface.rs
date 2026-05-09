@@ -360,7 +360,7 @@ impl<P> BsplineSurface<P> {
 impl<P: ControlPoint<f64>> BsplineSurface<P> {
     /// Returns the closure of substitution.
     #[inline(always)]
-    pub fn closure(&self) -> impl Fn(f64, f64) -> P + '_ { move |u, v| self.subs(u, v) }
+    pub fn closure(&self) -> impl Fn(f64, f64) -> P + '_ { move |u, v| self.evaluate(u, v) }
 
     #[inline(always)]
     fn udelta_control_points(&self, i: usize, j: usize) -> P::Diff {
@@ -403,7 +403,7 @@ impl<P: ControlPoint<f64>> BsplineSurface<P> {
     ///     for j in 0..=N {
     ///         let v = (j as f64) / (N as f64);
     ///         assert_near2!(
-    ///             uderivation.subs(u, v),
+    ///             uderivation.evaluate(u, v),
     ///             Vector2::new(0.0, 4.0 * v * (1.0 - v) + 1.0),
     ///         );
     ///     }
@@ -451,7 +451,7 @@ impl<P: ControlPoint<f64>> BsplineSurface<P> {
     ///     for j in 0..=N {
     ///         let v = (j as f64) / (N as f64);
     ///         assert_near2!(
-    ///             vderivation.subs(u, v),
+    ///             vderivation.evaluate(u, v),
     ///             Vector2::new(1.0, -2.0 * (2.0 * u - 1.0) * (2.0 * v - 1.0)),
     ///         );
     ///     }
@@ -514,7 +514,7 @@ impl<P: ControlPoint<f64>> BsplineSurface<P> {
                     for j1 in 0..division1 {
                         let v =
                             self.knot_vecs.1[i1 - 1] + delta1 * (j1 as f64) / (division1 as f64);
-                        if !ord(&self.subs(u, v), &other.subs(u, v)) {
+                        if !ord(&self.evaluate(u, v), &other.evaluate(u, v)) {
                             return false;
                         }
                     }
@@ -647,8 +647,8 @@ impl<V: Tolerance> BsplineSurface<V> {
     /// let mut bspsurface = BsplineSurface::new((knot_vector_u, knot_vector_v), control_points);
     ///
     /// // bspsurface is not constant.
-    /// assert_eq!(bspsurface.subs(0.0, 0.0), Vector2::new(0.0, 0.0));
-    /// assert_ne!(bspsurface.subs(0.5, 0.5), Vector2::new(0.0, 0.0));
+    /// assert_eq!(bspsurface.evaluate(0.0, 0.0), Vector2::new(0.0, 0.0));
+    /// assert_ne!(bspsurface.evaluate(0.5, 0.5), Vector2::new(0.0, 0.0));
     ///
     /// // bspsurface.is_const() is true.
     /// assert!(bspsurface.is_const());
@@ -1151,14 +1151,14 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineSurface<P> {
     ///     for j in 0..=N {
     ///         let u = 0.68 * (i as f64) / (N as f64);
     ///         let v = 1.0 * (j as f64) / (N as f64);
-    ///         assert_near2!(bspsurface.subs(u, v), part0.subs(u, v));
+    ///         assert_near2!(bspsurface.evaluate(u, v), part0.evaluate(u, v));
     ///     }
     /// }
     /// for i in 0..=N {
     ///     for j in 0..=N {
     ///         let u = 0.68 + 0.32 * (i as f64) / (N as f64);
     ///         let v = 1.0 * (j as f64) / (N as f64);
-    ///         assert_near2!(bspsurface.subs(u, v), part1.subs(u, v));
+    ///         assert_near2!(bspsurface.evaluate(u, v), part1.evaluate(u, v));
     ///     }
     /// }
     /// ```
@@ -1248,14 +1248,14 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineSurface<P> {
     ///     for j in 0..=N {
     ///         let u = 1.0 * (i as f64) / (N as f64);
     ///         let v = 0.68 * (j as f64) / (N as f64);
-    ///         assert_near2!(bspsurface.subs(u, v), part0.subs(u, v));
+    ///         assert_near2!(bspsurface.evaluate(u, v), part0.evaluate(u, v));
     ///     }
     /// }
     /// for i in 0..=N {
     ///     for j in 0..=N {
     ///         let u = 1.0 * (i as f64) / (N as f64);
     ///         let v = 0.68 + 0.32 * (j as f64) / (N as f64);
-    ///         assert_near2!(bspsurface.subs(u, v), part1.subs(u, v));
+    ///         assert_near2!(bspsurface.evaluate(u, v), part1.evaluate(u, v));
     ///     }
     /// }
     /// ```
@@ -1290,11 +1290,11 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineSurface<P> {
     /// let bnd_box = BoundingBox::from_iter(&[Vector2::new(0.2, 0.3), Vector2::new(0.8, 0.6)]);
     /// let curve = bspsurface.sectional_curve(bnd_box);
     /// const N: usize = 100;
-    /// assert_near2!(curve.subs(0.0), bspsurface.subs(0.2, 0.3));
-    /// assert_near2!(curve.subs(1.0), bspsurface.subs(0.8, 0.6));
+    /// assert_near2!(curve.evaluate(0.0), bspsurface.evaluate(0.2, 0.3));
+    /// assert_near2!(curve.evaluate(1.0), bspsurface.evaluate(0.8, 0.6));
     /// for i in 0..=N {
     ///     let t = i as f64 / N as f64;
-    ///     let pt = curve.subs(t);
+    ///     let pt = curve.evaluate(t);
     ///     assert_near2!(pt[1], pt[0] * 0.5 - 0.1);
     ///     assert_near2!(pt[2], pt[0] * pt[0] + pt[1] * pt[1]);
     /// }
@@ -1430,12 +1430,12 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineSurface<P> {
     /// let surface = BsplineSurface::skin(vec![c0, c1, c2]);
     /// // At v=0, v=0.5, v=1 the surface reproduces the three section curves.
     /// // Endpoints are exact.
-    /// assert_near2!(surface.subs(0.0, 0.0), Vector2::new(0.0, 0.0));
-    /// assert_near2!(surface.subs(1.0, 0.0), Vector2::new(1.0, 0.0));
-    /// assert_near2!(surface.subs(0.0, 0.5), Vector2::new(0.0, 1.0));
-    /// assert_near2!(surface.subs(1.0, 0.5), Vector2::new(1.0, 1.0));
-    /// assert_near2!(surface.subs(0.0, 1.0), Vector2::new(0.0, 2.0));
-    /// assert_near2!(surface.subs(1.0, 1.0), Vector2::new(1.0, 2.0));
+    /// assert_near2!(surface.evaluate(0.0, 0.0), Vector2::new(0.0, 0.0));
+    /// assert_near2!(surface.evaluate(1.0, 0.0), Vector2::new(1.0, 0.0));
+    /// assert_near2!(surface.evaluate(0.0, 0.5), Vector2::new(0.0, 1.0));
+    /// assert_near2!(surface.evaluate(1.0, 0.5), Vector2::new(1.0, 1.0));
+    /// assert_near2!(surface.evaluate(0.0, 1.0), Vector2::new(0.0, 2.0));
+    /// assert_near2!(surface.evaluate(1.0, 1.0), Vector2::new(1.0, 2.0));
     /// ```
     pub fn skin(mut curves: Vec<BsplineCurve<P>>) -> BsplineSurface<P> {
         assert!(
@@ -1506,11 +1506,11 @@ impl BsplineSurface<Point3> {
     /// );
     /// let surface = BsplineSurface::sweep_rail(profile, &rail, 3);
     /// // At v=0 (rail start), the surface reproduces the profile.
-    /// assert_near2!(surface.subs(0.0, 0.0), Point3::new(-1.0, 0.0, 0.0));
-    /// assert_near2!(surface.subs(1.0, 0.0), Point3::new(1.0, 0.0, 0.0));
+    /// assert_near2!(surface.evaluate(0.0, 0.0), Point3::new(-1.0, 0.0, 0.0));
+    /// assert_near2!(surface.evaluate(1.0, 0.0), Point3::new(1.0, 0.0, 0.0));
     /// // At v=1 (rail end), the profile is translated to the rail endpoint.
-    /// assert_near2!(surface.subs(0.0, 1.0), Point3::new(-1.0, 0.0, 5.0));
-    /// assert_near2!(surface.subs(1.0, 1.0), Point3::new(1.0, 0.0, 5.0));
+    /// assert_near2!(surface.evaluate(0.0, 1.0), Point3::new(-1.0, 0.0, 5.0));
+    /// assert_near2!(surface.evaluate(1.0, 1.0), Point3::new(1.0, 0.0, 5.0));
     /// ```
     pub fn sweep_rail(
         profile: BsplineCurve<Point3>,
@@ -1520,14 +1520,14 @@ impl BsplineSurface<Point3> {
         assert!(n_sections >= 2, "sweep_rail requires at least 2 sections");
 
         let (t_start, t_end) = rail.range_tuple();
-        let rail_origin = rail.subs(t_start);
+        let rail_origin = rail.evaluate(t_start);
         let tangent0 = rail.derivative(t_start);
         let t0_len = tangent0.magnitude();
 
         let sections: Vec<BsplineCurve<Point3>> = (0..n_sections)
             .map(|i| {
                 let t = t_start + (t_end - t_start) * i as f64 / (n_sections - 1) as f64;
-                let rail_pt = rail.subs(t);
+                let rail_pt = rail.evaluate(t);
                 let tangent_i = rail.derivative(t);
                 let translation = rail_pt - rail_origin;
 
@@ -1586,11 +1586,11 @@ impl BsplineSurface<Point3> {
     /// );
     /// let surface = BsplineSurface::birail1(profile, &rail1, &rail2, 3);
     /// // At v=0 (rail start), corners match.
-    /// assert_near2!(surface.subs(0.0, 0.0), Point3::new(-1.0, 0.0, 0.0));
-    /// assert_near2!(surface.subs(1.0, 0.0), Point3::new(1.0, 0.0, 0.0));
+    /// assert_near2!(surface.evaluate(0.0, 0.0), Point3::new(-1.0, 0.0, 0.0));
+    /// assert_near2!(surface.evaluate(1.0, 0.0), Point3::new(1.0, 0.0, 0.0));
     /// // At v=1 (rail end), corners match.
-    /// assert_near2!(surface.subs(0.0, 1.0), Point3::new(-1.0, 0.0, 5.0));
-    /// assert_near2!(surface.subs(1.0, 1.0), Point3::new(1.0, 0.0, 5.0));
+    /// assert_near2!(surface.evaluate(0.0, 1.0), Point3::new(-1.0, 0.0, 5.0));
+    /// assert_near2!(surface.evaluate(1.0, 1.0), Point3::new(1.0, 0.0, 5.0));
     /// ```
     pub fn birail1(
         profile: BsplineCurve<Point3>,
@@ -1602,16 +1602,16 @@ impl BsplineSurface<Point3> {
 
         let (r_start, r_end) = rail1.range_tuple();
         let (u_start, u_end) = profile.range_tuple();
-        let p_start = profile.subs(u_start);
-        let p_end = profile.subs(u_end);
+        let p_start = profile.evaluate(u_start);
+        let p_end = profile.evaluate(u_end);
         let chord = p_end - p_start;
         let chord_len = chord.magnitude();
 
         let sections: Vec<BsplineCurve<Point3>> = (0..n_sections)
             .map(|i| {
                 let t = r_start + (r_end - r_start) * i as f64 / (n_sections - 1) as f64;
-                let r1_pt = rail1.subs(t);
-                let r2_pt = rail2.subs(t);
+                let r1_pt = rail1.evaluate(t);
+                let r2_pt = rail2.evaluate(t);
                 let target_chord = r2_pt - r1_pt;
                 let target_len = target_chord.magnitude();
 
@@ -1681,10 +1681,10 @@ impl BsplineSurface<Point3> {
     /// );
     /// let surface = BsplineSurface::birail2(profile1, profile2, &rail1, &rail2, 3);
     /// // Corners.
-    /// assert_near2!(surface.subs(0.0, 0.0), Point3::new(0.0, 0.0, 0.0));
-    /// assert_near2!(surface.subs(1.0, 0.0), Point3::new(2.0, 0.0, 0.0));
-    /// assert_near2!(surface.subs(0.0, 1.0), Point3::new(0.0, 0.0, 4.0));
-    /// assert_near2!(surface.subs(1.0, 1.0), Point3::new(2.0, 0.0, 4.0));
+    /// assert_near2!(surface.evaluate(0.0, 0.0), Point3::new(0.0, 0.0, 0.0));
+    /// assert_near2!(surface.evaluate(1.0, 0.0), Point3::new(2.0, 0.0, 0.0));
+    /// assert_near2!(surface.evaluate(0.0, 1.0), Point3::new(0.0, 0.0, 4.0));
+    /// assert_near2!(surface.evaluate(1.0, 1.0), Point3::new(2.0, 0.0, 4.0));
     /// ```
     pub fn birail2(
         profile1: BsplineCurve<Point3>,
@@ -1698,14 +1698,14 @@ impl BsplineSurface<Point3> {
         let (r_start, r_end) = rail1.range_tuple();
 
         let (u1_start, u1_end) = profile1.range_tuple();
-        let p1_start = profile1.subs(u1_start);
-        let p1_end = profile1.subs(u1_end);
+        let p1_start = profile1.evaluate(u1_start);
+        let p1_end = profile1.evaluate(u1_end);
         let chord1 = p1_end - p1_start;
         let chord1_len = chord1.magnitude();
 
         let (u2_start, u2_end) = profile2.range_tuple();
-        let p2_start = profile2.subs(u2_start);
-        let p2_end = profile2.subs(u2_end);
+        let p2_start = profile2.evaluate(u2_start);
+        let p2_end = profile2.evaluate(u2_end);
         let chord2 = p2_end - p2_start;
         let chord2_len = chord2.magnitude();
 
@@ -1718,8 +1718,8 @@ impl BsplineSurface<Point3> {
             .map(|i| {
                 let v = i as f64 / (n_sections - 1) as f64;
                 let t = r_start + (r_end - r_start) * v;
-                let r1_pt = rail1.subs(t);
-                let r2_pt = rail2.subs(t);
+                let r1_pt = rail1.evaluate(t);
+                let r2_pt = rail2.evaluate(t);
                 let target_chord = r2_pt - r1_pt;
                 let target_len = target_chord.magnitude();
 
@@ -1843,10 +1843,10 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineSurface<P> {
     ///     vec![v0, v1],
     ///     &points,
     /// );
-    /// assert_near2!(gordon.subs(0.0, 0.0), Vector2::new(0.0, 0.0));
-    /// assert_near2!(gordon.subs(1.0, 0.0), Vector2::new(1.0, 0.0));
-    /// assert_near2!(gordon.subs(0.0, 1.0), Vector2::new(0.0, 1.0));
-    /// assert_near2!(gordon.subs(1.0, 1.0), Vector2::new(1.0, 1.0));
+    /// assert_near2!(gordon.evaluate(0.0, 0.0), Vector2::new(0.0, 0.0));
+    /// assert_near2!(gordon.evaluate(1.0, 0.0), Vector2::new(1.0, 0.0));
+    /// assert_near2!(gordon.evaluate(0.0, 1.0), Vector2::new(0.0, 1.0));
+    /// assert_near2!(gordon.evaluate(1.0, 1.0), Vector2::new(1.0, 1.0));
     /// ```
     pub fn gordon(
         u_curves: Vec<BsplineCurve<P>>,
@@ -1972,8 +1972,8 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineSurface<P> {
     ///     curve2.clone(),
     ///     curve3.clone()
     /// );
-    /// assert_ne!(surface.subs(0.0, 0.0), curve0.subs(0.0));
-    /// assert_eq!(surface.subs(0.0, 0.0), curve3.subs(1.0));
+    /// assert_ne!(surface.evaluate(0.0, 0.0), curve0.evaluate(0.0));
+    /// assert_eq!(surface.evaluate(0.0, 0.0), curve3.evaluate(1.0));
     /// ```
     pub fn by_boundary(
         mut curve0: BsplineCurve<P>,
@@ -2364,12 +2364,12 @@ impl IncludeCurve<BsplineCurve<Point2>> for BsplineSurface<Point2> {
             for j in 1..=degree {
                 let p = j as f64 / degree as f64;
                 let t = knots[i - 1] * (1.0 - p) + knots[i] * p;
-                let pt = ParametricCurve::subs(curve, t);
+                let pt = ParametricCurve::evaluate(curve, t);
                 hint = match algo::surface::search_parameter(self, pt, hint, INCLUDE_CURVE_TRIALS) {
                     Some(got) => got,
                     None => return false,
                 };
-                if !ParametricSurface::subs(self, hint.0, hint.1).near(&pt)
+                if !ParametricSurface::evaluate(self, hint.0, hint.1).near(&pt)
                     || hint.0 < knot_vector_u[0] - TOLERANCE
                     || hint.0 - knot_vector_u[0] > knot_vector_u.range_length() + TOLERANCE
                     || hint.1 < knot_vector_v[0] - TOLERANCE
@@ -2399,12 +2399,12 @@ impl IncludeCurve<BsplineCurve<Point3>> for BsplineSurface<Point3> {
             for j in 1..=degree {
                 let p = j as f64 / degree as f64;
                 let t = knots[i - 1] * (1.0 - p) + knots[i] * p;
-                let pt = ParametricCurve::subs(curve, t);
+                let pt = ParametricCurve::evaluate(curve, t);
                 hint = match algo::surface::search_parameter(self, pt, hint, INCLUDE_CURVE_TRIALS) {
                     Some(got) => got,
                     None => return false,
                 };
-                if !ParametricSurface::subs(self, hint.0, hint.1).near(&pt)
+                if !ParametricSurface::evaluate(self, hint.0, hint.1).near(&pt)
                     || hint.0 < knot_vector_u[0] - TOLERANCE
                     || hint.0 - knot_vector_u[0] > knot_vector_u.range_length() + TOLERANCE
                     || hint.1 < knot_vector_v[0] - TOLERANCE
@@ -2420,7 +2420,7 @@ impl IncludeCurve<BsplineCurve<Point3>> for BsplineSurface<Point3> {
 
 impl IncludeCurve<NurbsCurve<Vector4>> for BsplineSurface<Point3> {
     fn include(&self, curve: &NurbsCurve<Vector4>) -> bool {
-        let pt = curve.subs(curve.knot_vector()[0]);
+        let pt = curve.evaluate(curve.knot_vector()[0]);
         let mut hint = algo::surface::presearch(self, pt, self.range_tuple(), PRESEARCH_DIVISION);
         hint = match algo::surface::search_parameter(self, pt, hint, INCLUDE_CURVE_TRIALS) {
             Some(got) => got,
@@ -2434,12 +2434,12 @@ impl IncludeCurve<NurbsCurve<Vector4>> for BsplineSurface<Point3> {
             for j in 1..=degree {
                 let p = j as f64 / degree as f64;
                 let t = knots[i - 1] * (1.0 - p) + knots[i] * p;
-                let pt = curve.subs(t);
+                let pt = curve.evaluate(t);
                 hint = match algo::surface::search_parameter(self, pt, hint, INCLUDE_CURVE_TRIALS) {
                     Some(got) => got,
                     None => return false,
                 };
-                if !ParametricSurface::subs(self, hint.0, hint.1).near(&pt)
+                if !ParametricSurface::evaluate(self, hint.0, hint.1).near(&pt)
                     || hint.0 < knot_vector_u[0] - TOLERANCE
                     || hint.0 - knot_vector_u[0] > knot_vector_u.range_length() + TOLERANCE
                     || hint.1 < knot_vector_v[0] - TOLERANCE

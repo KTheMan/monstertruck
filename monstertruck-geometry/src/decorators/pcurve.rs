@@ -30,18 +30,18 @@ where
     S::Vector: VectorSpace<Scalar = f64> + ElementWise,
 {
     fn der3(&self, t: f64) -> S::Vector {
-        let cders = self.curve.ders(3, t);
+        let cders = self.curve.derivatives(3, t);
         let [Vector2 { x: u, y: v }, der, der2, der3] = cders.to_array::<4>();
         let surface = self.surface();
-        surface.der_mn(3, 0, u, v) * (der[0] * der[0] * der[0])
-            + surface.der_mn(2, 1, u, v) * (der[0] * der[0] * der[1] * 3.0)
-            + surface.der_mn(1, 2, u, v) * (der[0] * der[1] * der[1] * 3.0)
-            + surface.der_mn(0, 3, u, v) * (der[1] * der[1] * der[1])
-            + surface.uuder(u, v) * (der2[0] * der[0] * 3.0)
-            + surface.uvder(u, v) * ((der2[0] * der[1] + der2[1] * der[0]) * 3.0)
-            + surface.vvder(u, v) * (der2[1] * der[1] * 3.0)
-            + surface.uder(u, v) * der3[0]
-            + surface.vder(u, v) * der3[1]
+        surface.derivative_mn(3, 0, u, v) * (der[0] * der[0] * der[0])
+            + surface.derivative_mn(2, 1, u, v) * (der[0] * der[0] * der[1] * 3.0)
+            + surface.derivative_mn(1, 2, u, v) * (der[0] * der[1] * der[1] * 3.0)
+            + surface.derivative_mn(0, 3, u, v) * (der[1] * der[1] * der[1])
+            + surface.derivative_uu(u, v) * (der2[0] * der[0] * 3.0)
+            + surface.derivative_uv(u, v) * ((der2[0] * der[1] + der2[1] * der[0]) * 3.0)
+            + surface.derivative_vv(u, v) * (der2[1] * der[1] * 3.0)
+            + surface.derivative_u(u, v) * der3[0]
+            + surface.derivative_v(u, v) * der3[1]
     }
 }
 
@@ -65,39 +65,40 @@ where
             3 => return self.der3(t),
             _ => {}
         }
-        let cders = self.curve.ders(n, t);
+        let cders = self.curve.derivatives(n, t);
         let Vector2 { x: u, y: v } = cders[0];
 
-        let sders = self.surface.ders(n, u, v);
+        let sders = self.surface.derivatives(n, u, v);
         sders.composite_der(&cders, n)
     }
-    fn derivatives(&self, n: usize, t: f64) -> CurveDers<Self::Vector> {
+    fn derivatives(&self, n: usize, t: f64) -> CurveDerivatives<Self::Vector> {
         if n > MAX_DER_ORDER {
             panic!("the order of derivation must be under {MAX_DER_ORDER}.");
         }
-        let cders = self.curve.ders(n, t);
+        let cders = self.curve.derivatives(n, t);
         let Vector2 { x: u, y: v } = cders[0];
-        let sders = self.surface.ders(n, u, v);
-        sders.composite_ders(&cders)
+        let sders = self.surface.derivatives(n, u, v);
+        sders.composite_derivatives(&cders)
     }
     #[inline(always)]
     fn evaluate(&self, t: f64) -> Self::Point {
-        let pt = self.curve.subs(t);
-        self.surface.subs(pt[0], pt[1])
+        let pt = self.curve.evaluate(t);
+        self.surface.evaluate(pt[0], pt[1])
     }
     #[inline(always)]
     fn derivative(&self, t: f64) -> Self::Vector {
-        let [pt, der] = self.curve.ders(1, t).to_array::<2>();
-        self.surface.uder(pt[0], pt[1]) * der[0] + self.surface.vder(pt[0], pt[1]) * der[1]
+        let [pt, der] = self.curve.derivatives(1, t).to_array::<2>();
+        self.surface.derivative_u(pt[0], pt[1]) * der[0]
+            + self.surface.derivative_v(pt[0], pt[1]) * der[1]
     }
     #[inline(always)]
     fn derivative_2(&self, t: f64) -> Self::Vector {
-        let [pt, der, der2] = self.curve.ders(2, t).to_array::<3>();
-        self.surface.uuder(pt[0], pt[1]) * (der[0] * der[0])
-            + self.surface.uvder(pt[0], pt[1]) * (der[0] * der[1] * 2.0)
-            + self.surface.vvder(pt[0], pt[1]) * (der[1] * der[1])
-            + self.surface.uder(pt[0], pt[1]) * der2[0]
-            + self.surface.vder(pt[0], pt[1]) * der2[1]
+        let [pt, der, der2] = self.curve.derivatives(2, t).to_array::<3>();
+        self.surface.derivative_uu(pt[0], pt[1]) * (der[0] * der[0])
+            + self.surface.derivative_uv(pt[0], pt[1]) * (der[0] * der[1] * 2.0)
+            + self.surface.derivative_vv(pt[0], pt[1]) * (der[1] * der[1])
+            + self.surface.derivative_u(pt[0], pt[1]) * der2[0]
+            + self.surface.derivative_v(pt[0], pt[1]) * der2[1]
     }
     #[inline(always)]
     fn parameter_range(&self) -> ParameterRange { self.curve.parameter_range() }
@@ -142,16 +143,16 @@ where
         let hint = hint.into();
         let shint = match hint {
             SearchParameterHint1D::Parameter(hint) => {
-                let p = self.curve.subs(hint);
+                let p = self.curve.evaluate(hint);
                 SearchParameterHint2D::Parameter(p.x, p.y)
             }
             SearchParameterHint1D::Range(x, y) => {
-                let p = self.curve.subs(y);
+                let p = self.curve.evaluate(y);
                 let ranges = (0..PRESEARCH_DIVISION).fold(
                     ((p.x, p.x), (p.y, p.y)),
                     |((x0, x1), (y0, y1)), i| {
                         let t = x + (y - x) * i as f64 / PRESEARCH_DIVISION as f64;
-                        let p = self.curve.subs(t);
+                        let p = self.curve.evaluate(t);
                         (
                             (f64::min(x0, p.x), f64::max(x1, p.x)),
                             (f64::min(y0, p.y), f64::max(y1, p.y)),

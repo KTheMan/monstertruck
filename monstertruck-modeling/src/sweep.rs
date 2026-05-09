@@ -55,7 +55,7 @@ where
     ///     fn mapping(self) -> impl Fn(&isize) -> isize { |i| *i + 100 }
     /// }
     ///
-    /// let v = Vertex::news([1, 2]);
+    /// let v = Vertex::from_points([1, 2]);
     /// let edge = Edge::new(&v[0], &v[1], 100);
     /// let face = edge.sweep(
     ///     Mapping,
@@ -118,7 +118,7 @@ where
     ///     fn mapping(self) -> impl Fn(&isize) -> isize { |j| *j + 100 }
     /// }
     ///
-    /// let v = Vertex::news(&[1, 2, 3, 4]);
+    /// let v = Vertex::from_points(&[1, 2, 3, 4]);
     /// let wire = Wire::from(vec![
     ///     Edge::new(&v[0], &v[1], 100),
     ///     Edge::new(&v[1], &v[2], 110),
@@ -199,7 +199,7 @@ where
     /// let connect_points: fn(&usize, &usize) -> isize = |i, j| (*i * 10 + *j) as isize;
     /// let connect_curves: fn(&isize, &isize) -> i64 = |i, j| (*i * 100 + *j) as i64;
     ///
-    /// let v = Vertex::news(&[1, 2]);
+    /// let v = Vertex::from_points(&[1, 2]);
     /// let edge = Edge::new(&v[0], &v[1], 12);
     /// let face = edge.sweep(Mapping(2, 22, 0), connect_points, connect_curves);
     /// let solid = face.sweep(Mapping(4, 44, 3333), connect_points, connect_curves);

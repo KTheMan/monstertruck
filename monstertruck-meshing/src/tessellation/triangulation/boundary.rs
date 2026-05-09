@@ -51,7 +51,7 @@ impl PolyBoundaryPiece {
             .into_iter()
             .map(|(u, v)| {
                 previous = Some((u, v));
-                SurfacePoint::from((Point2::new(u, v), surface.subs(u, v)))
+                SurfacePoint::from((Point2::new(u, v), surface.evaluate(u, v)))
             })
             .collect();
         Self::from_surface_points(vec)
@@ -361,8 +361,8 @@ impl PolyBoundaryPiece {
     }
 
     fn parameter_seed_score<S: PreMeshableSurface>(surface: &S, (u, v): (f64, f64)) -> f64 {
-        let uder = surface.uder(u, v);
-        let vder = surface.vder(u, v);
+        let uder = surface.derivative_u(u, v);
+        let vder = surface.derivative_v(u, v);
         uder.dot(uder) + vder.dot(vder)
     }
 
@@ -387,12 +387,12 @@ impl PolyBoundaryPiece {
                     .and_then(|uv| Self::normalize_uv(surface, uv, *previous))
                     .map(|(u, v)| {
                         let points = if let Some((u0, v0)) = *previous {
-                            if !u0.near(&u) && surface.uder(u0, v0).so_small() {
+                            if !u0.near(&u) && surface.derivative_u(u0, v0).so_small() {
                                 vec![
                                     SurfacePoint::from((Point2::new(u, v0), pt)),
                                     SurfacePoint::from((Point2::new(u, v), pt)),
                                 ]
-                            } else if !v0.near(&v) && surface.vder(u0, v0).so_small() {
+                            } else if !v0.near(&v) && surface.derivative_v(u0, v0).so_small() {
                                 vec![
                                     SurfacePoint::from((Point2::new(u0, v), pt)),
                                     SurfacePoint::from((Point2::new(u, v), pt)),
@@ -476,7 +476,7 @@ impl PolyBoundaryPiece {
         let last = *vec.last().unwrap();
         if !vec[0].near(&last) {
             let Point2 { x: u0, y: v0 } = last.uv;
-            if surface.uder(u0, v0).so_small() || surface.vder(u0, v0).so_small() {
+            if surface.derivative_u(u0, v0).so_small() || surface.derivative_v(u0, v0).so_small() {
                 vec.push(vec[0]);
             }
         }
@@ -556,7 +556,7 @@ pub(super) fn surface_point_with_cache(
 ) -> SurfacePoint {
     let point = *point_cache
         .entry(uv_key(uv))
-        .or_insert_with(|| surface.subs(uv.x, uv.y));
+        .or_insert_with(|| surface.evaluate(uv.x, uv.y));
     (uv, point).into()
 }
 
@@ -871,7 +871,7 @@ fn polyline_on_surface(
     let (vec, _) = pcurve.parameter_division(pcurve.range_tuple(), tolerance);
     vec.into_iter()
         .map(|t| {
-            let uv = line.subs(t);
+            let uv = line.evaluate(t);
             surface_point_with_cache(&surface, uv, point_cache)
         })
         .collect()

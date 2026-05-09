@@ -70,7 +70,7 @@ impl<C: ParametricCurve3D> ParametricSurface for RevolutionSurface<C> {
         };
         let u_part = match m {
             0 => self.curve.evaluate(u) - self.origin(),
-            _ => self.curve.der_n(m, u),
+            _ => self.curve.derivative_n(m, u),
         };
         let v_part = from_axis_angle_derivation(n, self.axis(), Rad(v));
         v_part * u_part + center
@@ -83,7 +83,7 @@ impl<C: ParametricCurve3D> ParametricSurface for RevolutionSurface<C> {
     }
     #[inline(always)]
     fn derivative_u(&self, u: f64, v: f64) -> Vector3 {
-        self.revolution.rotation_matrix(v) * self.curve.der(u)
+        self.revolution.rotation_matrix(v) * self.curve.derivative(u)
     }
     #[inline(always)]
     fn derivative_v(&self, u: f64, v: f64) -> Vector3 {
@@ -93,7 +93,7 @@ impl<C: ParametricCurve3D> ParametricSurface for RevolutionSurface<C> {
     }
     #[inline(always)]
     fn derivative_uu(&self, u: f64, v: f64) -> Vector3 {
-        self.revolution.rotation_matrix(v) * self.curve.der2(u)
+        self.revolution.rotation_matrix(v) * self.curve.derivative_2(u)
     }
     #[inline(always)]
     fn derivative_vv(&self, u: f64, v: f64) -> Vector3 {
@@ -103,7 +103,7 @@ impl<C: ParametricCurve3D> ParametricSurface for RevolutionSurface<C> {
     }
     #[inline(always)]
     fn derivative_uv(&self, u: f64, v: f64) -> Vector3 {
-        let u_part = self.curve.der(u);
+        let u_part = self.curve.derivative(u);
         let v_part = from_axis_angle_derivation(1, self.axis(), Rad(v));
         v_part * u_part
     }
@@ -128,7 +128,7 @@ impl<C: ParametricCurve3D + BoundedCurve> ParametricSurface3D for RevolutionSurf
             let pt = self.curve.evaluate(u);
             let radius = self.axis().cross(pt - self.origin());
             if radius.so_small() {
-                let uder = self.curve.der(u);
+                let uder = self.curve.derivative(u);
                 (uder, self.axis().cross(uder))
             } else {
                 (self.derivative_u(u, v), self.derivative_v(u, v))
@@ -137,7 +137,7 @@ impl<C: ParametricCurve3D + BoundedCurve> ParametricSurface3D for RevolutionSurf
             let pt = self.curve.evaluate(u);
             let radius = self.axis().cross(pt - self.origin());
             if radius.so_small() {
-                let uder = self.curve.der(u);
+                let uder = self.curve.derivative(u);
                 (uder, uder.cross(self.axis()))
             } else {
                 (self.derivative_u(u, v), self.derivative_v(u, v))
@@ -414,9 +414,9 @@ impl<C: ParametricCurve3D + BoundedCurve> SearchParameter<D2> for RevolutionSurf
                 SearchParameterHint2D::None => SearchParameterHint1D::None,
             };
             let t = proj_curve.search_parameter(p, hint0, trials)?;
-            let p = self.curve.subs(t);
+            let p = self.curve.evaluate(t);
             let ang = self.revolution.proj_angle(p, point);
-            match self.subs(t, ang).near(&point) {
+            match self.evaluate(t, ang).near(&point) {
                 true => Some((t, ang)),
                 false => None,
             }
@@ -463,7 +463,7 @@ impl<C: ParametricCurve3D + BoundedCurve> SearchNearestParameter<D2> for Revolut
                 SearchParameterHint2D::None => SearchParameterHint1D::None,
             };
             let t = proj_curve.search_nearest_parameter(p, hint0, trials)?;
-            let p = self.curve.subs(t);
+            let p = self.curve.evaluate(t);
             Some((t, self.revolution.proj_angle(p, point)))
         }
     }
@@ -479,7 +479,7 @@ where
     C0: ParametricCurve3D + BoundedCurve,
     C1: ParametricCurve3D + BoundedCurve,
 {
-    let first = curve.subs(knots[0]);
+    let first = curve.evaluate(knots[0]);
     let mut hint = match surface.search_parameter(first, None, INCLUDE_CURVE_TRIALS) {
         Some(hint) => hint,
         None => return false,
@@ -493,7 +493,7 @@ where
             })
         })
         .all(move |t| {
-            let pt = PcurveTrait::subs(curve, t);
+            let pt = PcurveTrait::evaluate(curve, t);
             surface
                 .search_parameter(pt, Some(hint), INCLUDE_CURVE_TRIALS)
                 .or_else(|| surface.search_parameter(pt, None, INCLUDE_CURVE_TRIALS))

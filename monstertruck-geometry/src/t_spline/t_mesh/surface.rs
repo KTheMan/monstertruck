@@ -249,7 +249,7 @@ impl ParametricSurface for Tmesh<Point3> {
     type Vector = Vector3;
 
     fn evaluate(&self, u: f64, v: f64) -> Point3 {
-        Tmesh::subs(self, u, v).expect("T-mesh evaluation failed")
+        Tmesh::try_evaluate(self, u, v).expect("T-mesh evaluation failed")
     }
 
     fn derivative_u(&self, u: f64, v: f64) -> Vector3 { self.derivative_mn(1, 0, u, v) }
@@ -526,7 +526,7 @@ impl Tmesh<Point3> {
             .map(|&u| {
                 v_grev
                     .iter()
-                    .map(|&v| ParametricSurface::subs(self, u, v))
+                    .map(|&v| ParametricSurface::evaluate(self, u, v))
                     .collect()
             })
             .collect();

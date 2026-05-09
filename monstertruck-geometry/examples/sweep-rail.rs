@@ -30,7 +30,7 @@ fn main() {
     println!("\nLeading edge (u=0) along rail:");
     for i in 0..=5 {
         let v = i as f64 / 5.0;
-        let pt = surface.subs(0.0, v);
+        let pt = surface.evaluate(0.0, v);
         println!("  v={:.1}: ({:.2}, {:.2}, {:.2})", v, pt.x, pt.y, pt.z);
     }
 }

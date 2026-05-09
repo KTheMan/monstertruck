@@ -25,11 +25,11 @@ impl TryFrom<Curve> for NurbsCurve<Vector4> {
             Curve::NurbsCurve(nc) => Ok(nc),
             Curve::ParameterCurve(pc) => {
                 let range = pc.range_tuple();
-                Ok(sample_to_nurbs(range, |t| pc.subs(t), 16))
+                Ok(sample_to_nurbs(range, |t| pc.evaluate(t), 16))
             }
             Curve::IntersectionCurve(ic) => {
                 let range = ic.range_tuple();
-                Ok(sample_to_nurbs(range, |t| ic.subs(t), 16))
+                Ok(sample_to_nurbs(range, |t| ic.evaluate(t), 16))
             }
         }
     }
@@ -49,19 +49,19 @@ impl From<ParameterCurveLinear> for Curve {
 impl From<FilletIntersectionCurve> for Curve {
     fn from(c: FilletIntersectionCurve) -> Self {
         let range = c.range_tuple();
-        Curve::NurbsCurve(sample_to_nurbs(range, |t| c.subs(t), 16))
+        Curve::NurbsCurve(sample_to_nurbs(range, |t| c.evaluate(t), 16))
     }
 }
 
 /// Sample a parametric curve into a degree-1 NURBS polyline approximation.
 fn sample_to_nurbs(
     range: (f64, f64),
-    subs: impl Fn(f64) -> Point3,
+    evaluate: impl Fn(f64) -> Point3,
     n: usize,
 ) -> NurbsCurve<Vector4> {
     let (t0, t1) = range;
     let pts: Vec<Point3> = (0..=n)
-        .map(|i| subs(t0 + (t1 - t0) * (i as f64) / (n as f64)))
+        .map(|i| evaluate(t0 + (t1 - t0) * (i as f64) / (n as f64)))
         .collect();
     let knots: Vec<f64> = (0..=n).map(|i| i as f64 / n as f64).collect();
     let knot_vec = KnotVector::from(

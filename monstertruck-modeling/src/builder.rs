@@ -73,7 +73,7 @@ pub fn vertices<P: Into<Point3>>(points: impl IntoIterator<Item = P>) -> Vec<Ver
 /// # const N: usize = 10;
 /// # for i in 0..=N {
 /// #     let t = i as f64 / N as f64;
-/// #     assert!(curve.subs(t).near2(&(pt0 + t * (pt1 - pt0))));
+/// #     assert!(curve.evaluate(t).near2(&(pt0 + t * (pt1 - pt0))));
 /// # }
 /// ```
 pub fn line<C>(vertex0: &Vertex, vertex1: &Vertex) -> Edge<C>
@@ -99,7 +99,7 @@ where Line<Point3>: ToSameGeometry<C> {
 /// # const N: usize = 10;
 /// # for i in 0..=N {
 /// #       let t = curve.knot_vector()[0] + curve.knot_vector().range_length() * i as f64 / N as f64;
-/// #       assert!(curve.subs(t).to_vec().magnitude().near(&1.0));
+/// #       assert!(curve.evaluate(t).to_vec().magnitude().near(&1.0));
 /// # }
 /// ```
 pub fn circle_arc<C>(vertex0: &Vertex, vertex1: &Vertex, transit: Point3) -> Edge<C>
@@ -125,7 +125,7 @@ where Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4>: ToSameGeometry<C> {
 /// # for i in 0..=N {
 /// #       let t = i as f64 / N as f64;
 /// #       let pt = Point3::new(t * 3.0, 6.0 * t * t * t - 9.0 * t * t + 3.0 * t, 0.0);
-/// #       assert!(curve.subs(t).near(&pt));
+/// #       assert!(curve.evaluate(t).near(&pt));
 /// # }
 /// ```
 pub fn bezier<C>(vertex0: &Vertex, vertex1: &Vertex, mut inter_points: Vec<Point3>) -> Edge<C>
@@ -160,7 +160,7 @@ where BsplineCurve<Point3>: ToSameGeometry<C> {
 /// #           let s = i as f64 / N as f64;
 /// #           let t = j as f64 / N as f64;
 /// #           let pt = Point3::new(s * (1.0 - t), t, s * t);
-/// #           assert!(surface.subs(s, t).near(&pt));
+/// #           assert!(surface.evaluate(s, t).near(&pt));
 /// #       }
 /// # }
 /// ```
@@ -437,7 +437,7 @@ where
                     let p0 = edge.front().point();
                     let curve = edge.curve();
                     let (t0, t1) = curve.range_tuple();
-                    let p1 = curve.subs((t0 + t1) / 2.0);
+                    let p1 = curve.evaluate((t0 + t1) / 2.0);
                     [p0, p1]
                 })
                 .collect()
@@ -582,7 +582,7 @@ where T: Sweep<Matrix4, LineConnector, ExtrudeConnector, Swept> {
 /// #       for j in 0..=N {
 /// #           let u = i as f64 / N as f64;
 /// #           let v = j as f64 / N as f64;
-/// #           let pt = surface.subs(u, v);
+/// #           let pt = surface.evaluate(u, v);
 /// #
 /// #           // this surface is a part of torus.
 /// #           let tmp = f64::sqrt(pt[0] * pt[0] + pt[2] * pt[2]) - 2.0;
@@ -644,7 +644,7 @@ where T: Sweep<Matrix4, LineConnector, ExtrudeConnector, Swept> {
 /// #    for j in 0..=N {
 /// #        let u = i as f64 / N as f64;
 /// #        let v = j as f64 / N as f64;
-/// #        let pt = surface.subs(u, v);
+/// #        let pt = surface.evaluate(u, v);
 /// #
 /// #        // the y coordinate is positive.
 /// #        //assert!(pt[1] >= 0.0);
@@ -801,7 +801,7 @@ where
         let mut curve = edge.curve();
         let (t0, t1) = curve.range_tuple();
         let t = (t0 + t1) * 0.5;
-        let v1 = Vertex::new(curve.subs(t));
+        let v1 = Vertex::new(curve.evaluate(t));
         let curve1 = curve.cut(t);
         wire.push_back(Edge::debug_new(&v0, &v1, curve));
         wire.push_back(Edge::debug_new(&v1, &v2, curve1));
@@ -889,7 +889,7 @@ mod partial_torus {
             panic!();
         };
         let (u, v) = ((u0 + u1) / 2.0, (v0 + v1) / 2.0);
-        let p = surface.subs(u, v);
+        let p = surface.evaluate(u, v);
         let q = Point3::from_vec(Vector3::new(p.x, p.y, 0.0).normalize() * 0.75);
         let n0 = sign * (p - q).normalize();
         let n1 = surface.normal(u, v);
@@ -904,7 +904,11 @@ mod partial_torus {
             .flat_map(|edge| {
                 let curve = edge.oriented_curve();
                 let (t0, t1) = curve.range_tuple();
-                [curve.subs(t0), curve.subs((t0 + t1) / 2.0), curve.subs(t1)]
+                [
+                    curve.evaluate(t0),
+                    curve.evaluate((t0 + t1) / 2.0),
+                    curve.evaluate(t1),
+                ]
             })
             .map(|p| surface.search_parameter(p, None, 100).unwrap())
             .collect::<Vec<_>>();

@@ -247,22 +247,22 @@ fn independent_intersection() {
         match bw.status() {
             ShapesOpStatus::Unknown => {
                 let curve = bw[0].oriented_curve();
-                assert_near!(curve.subs(0.0)[2], 1.0);
+                assert_near!(curve.evaluate(0.0)[2], 1.0);
                 assert!(flags[0]);
                 flags[0] = false;
             }
             ShapesOpStatus::And => {
                 let curve = bw[0].oriented_curve();
-                let pt = curve.subs(0.5) - Point3::origin();
-                let der = curve.der(0.5);
+                let pt = curve.evaluate(0.5) - Point3::origin();
+                let der = curve.derivative(0.5);
                 assert!(pt.cross(der)[2] > 0.0);
                 assert!(flags[1]);
                 flags[1] = false;
             }
             ShapesOpStatus::Or => {
                 let curve = bw[0].oriented_curve();
-                let pt = curve.subs(0.5) - Point3::origin();
-                let der = curve.der(0.5);
+                let pt = curve.evaluate(0.5) - Point3::origin();
+                let der = curve.derivative(0.5);
                 assert!(pt.cross(der)[2] < 0.0);
                 assert!(flags[2]);
                 flags[2] = false;
@@ -275,22 +275,22 @@ fn independent_intersection() {
         match bw.status() {
             ShapesOpStatus::Unknown => {
                 let curve = bw[0].oriented_curve();
-                assert_near!(curve.subs(0.0)[2], -1.0);
+                assert_near!(curve.evaluate(0.0)[2], -1.0);
                 assert!(flags[0]);
                 flags[0] = false;
             }
             ShapesOpStatus::Or => {
                 let curve = bw[0].oriented_curve();
-                let pt = curve.subs(0.5) - Point3::origin();
-                let der = curve.der(0.5);
+                let pt = curve.evaluate(0.5) - Point3::origin();
+                let der = curve.derivative(0.5);
                 assert!(pt.cross(der)[2] < 0.0);
                 assert!(flags[1]);
                 flags[1] = false;
             }
             ShapesOpStatus::And => {
                 let curve = bw[0].oriented_curve();
-                let pt = curve.subs(0.5) - Point3::origin();
-                let der = curve.der(0.5);
+                let pt = curve.evaluate(0.5) - Point3::origin();
+                let der = curve.derivative(0.5);
                 assert!(pt.cross(der)[2] > 0.0);
                 assert!(flags[2]);
                 flags[2] = false;

@@ -214,7 +214,7 @@ impl SearchParameter<D2> for Torus {
             true => 2.0 * PI - u,
             false => u,
         };
-        match self.subs(u, v).near(&point) {
+        match self.evaluate(u, v).near(&point) {
             true => Some((u, v)),
             false => None,
         }

@@ -22,9 +22,9 @@ fn intersection_curve_sphere_case() {
     let (t0, t1) = curve.range_tuple();
     for i in 0..=N {
         let t = t0 + (t1 - t0) * i as f64 / N as f64;
-        let pt = curve.subs(t);
+        let pt = curve.evaluate(t);
         assert_near!(pt.distance(Point3::origin()), 1.0);
-        let vec = curve.der(t);
+        let vec = curve.derivative(t);
         assert!(pt.dot(vec).so_small(), "{i} {t} {vec:?}");
         assert!(vec[2].so_small());
         let denom = if matches!(i, 0 | N) { 2.0 } else { 1.0 };
@@ -40,23 +40,23 @@ fn intersection_curve_sphere_case() {
     let theta = 2.0 * PI * rand::random::<f64>();
     let pt = Point3::new(f64::cos(theta), f64::sin(theta), 0.0);
     let t = curve.search_parameter(pt, None, 10).unwrap();
-    assert_near!(curve.subs(t), pt);
+    assert_near!(curve.evaluate(t), pt);
     let pt = Point3::new(1.1 * f64::cos(theta), 1.1 * f64::sin(theta), 0.0);
     assert!(curve.search_parameter(pt, None, 10).is_none());
     let t = curve.search_nearest_parameter(pt, None, 10).unwrap();
-    assert_near!(curve.subs(t).distance(pt), 0.1);
+    assert_near!(curve.evaluate(t).distance(pt), 0.1);
 
     let mut curve0 = curve.clone();
     let curve1 = curve0.cut(2.5);
     assert_near!(curve0.front(), curve.front());
-    assert_near!(curve0.back(), curve.subs(2.5));
-    assert_near!(curve1.front(), curve.subs(2.5));
+    assert_near!(curve0.back(), curve.evaluate(2.5));
+    assert_near!(curve1.front(), curve.evaluate(2.5));
     assert_near!(curve1.back(), curve.back());
     let mut curve0 = curve.clone();
     let curve1 = curve0.cut(2.0);
     assert_near!(curve0.front(), curve.front());
-    assert_near!(curve0.back(), curve.subs(2.0));
-    assert_near!(curve1.front(), curve.subs(2.0));
+    assert_near!(curve0.back(), curve.evaluate(2.0));
+    assert_near!(curve1.front(), curve.evaluate(2.0));
     assert_near!(curve1.back(), curve.back());
 }
 
@@ -104,7 +104,7 @@ fn collide_parabola() {
     for i in 0..N {
         let t1 = curve.range_tuple().1;
         let t = t1 * i as f64 / N as f64;
-        let pt = curve.subs(t);
+        let pt = curve.evaluate(t);
         assert_near!(pt.distance(Point3::origin()) * 0.5, f64::sqrt(0.5) * 0.5);
     }
 }

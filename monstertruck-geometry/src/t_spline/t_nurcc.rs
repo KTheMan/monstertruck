@@ -1766,14 +1766,14 @@ mod tests {
             tmesh.control_points().len()
         );
 
-        // Verify subs() produces valid (non-NaN) points at several locations.
+        // Verify `try_evaluate` produces valid (non-NaN) points at several locations.
         for &(u, v) in &[(0.25, 0.25), (0.5, 0.5), (0.75, 0.75), (0.1, 0.9)] {
             let p: Point3 = tmesh
-                .subs(u, v)
-                .unwrap_or_else(|e| panic!("subs({}, {}) failed: {}", u, v, e));
+                .try_evaluate(u, v)
+                .unwrap_or_else(|e| panic!("try_evaluate({}, {}) failed: {}", u, v, e));
             assert!(
                 !p.x.is_nan() && !p.y.is_nan() && !p.z.is_nan(),
-                "subs({}, {}) returned NaN: {:?}",
+                "try_evaluate({}, {}) returned NaN: {:?}",
                 u,
                 v,
                 p

@@ -68,7 +68,7 @@ impl<S: Clone> BoundaryCurveFromSamples<S> for ParameterCurve<BoundaryCurve2D, S
             let line = Line(front, back);
             let is_linear = points.iter().copied().all(|point| {
                 line.search_nearest_parameter(point, None, 1)
-                    .is_some_and(|t| line.subs(t).near(&point))
+                    .is_some_and(|t| line.evaluate(t).near(&point))
             });
             Some(ParameterCurve::new(
                 if is_linear {
@@ -120,7 +120,10 @@ fn exact_line_boundary_on_plane(
     let (u0, v0) = plane.search_parameter(line.front(), None, 1)?;
     let (u1, v1) = plane.search_parameter(line.back(), None, 1)?;
     let boundary = ParameterCurve::new(Line(Point2::new(u0, v0), Point2::new(u1, v1)), *plane);
-    boundary.subs(0.5).near(&line.subs(0.5)).then_some(boundary)
+    boundary
+        .evaluate(0.5)
+        .near(&line.evaluate(0.5))
+        .then_some(boundary)
 }
 
 fn exact_boundary_segment<C, B, P>(curve: &C, boundary: &B) -> Option<(f64, f64)>
@@ -140,7 +143,7 @@ where
         .into_iter()
         .all(|t| {
             boundary
-                .search_parameter(curve.subs(t), None, 100)
+                .search_parameter(curve.evaluate(t), None, 100)
                 .is_some()
         })
         .then(|| {

@@ -136,7 +136,7 @@ impl<P, C, S> Shell<P, C, S> {
     /// ```
     /// use monstertruck_topology::*;
     /// use monstertruck_topology::shell::ShellCondition;
-    /// let v = Vertex::news(&[(); 6]);
+    /// let v = Vertex::from_points(&[(); 6]);
     /// let edge = [
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[0], &v[2], ()),
@@ -205,7 +205,7 @@ impl<P, C, S> Shell<P, C, S> {
     /// ```
     /// use monstertruck_topology::*;
     /// use std::collections::HashSet;
-    /// let v = Vertex::news(&[(); 4]);
+    /// let v = Vertex::from_points(&[(); 4]);
     /// let edge = [
     ///     Edge::new(&v[0], &v[2], ()),
     ///     Edge::new(&v[0], &v[3], ()),
@@ -244,7 +244,7 @@ impl<P, C, S> Shell<P, C, S> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(); 6]);
+    /// let v = Vertex::from_points(&[(); 6]);
     /// let edge = [
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[0], &v[2], ()),
@@ -272,7 +272,7 @@ impl<P, C, S> Shell<P, C, S> {
     /// ```
     /// use monstertruck_topology::*;
     /// use shell::AdjacentFace;
-    /// let v = Vertex::news(&[(); 8]);
+    /// let v = Vertex::from_points(&[(); 8]);
     /// let edge = [
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[2], ()),
@@ -364,7 +364,7 @@ impl<P, C, S> Shell<P, C, S> {
     /// ```
     /// // An example of a connected shell
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(); 4]);
+    /// let v = Vertex::from_points(&[(); 4]);
     /// let shared_edge = Edge::new(&v[1], &v[2], ());
     /// let wire0 = wire![
     ///     &Edge::new(&v[0], &v[1], ()),
@@ -384,7 +384,7 @@ impl<P, C, S> Shell<P, C, S> {
     /// ```
     /// // An example of a non-connected shell
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(); 6]);
+    /// let v = Vertex::from_points(&[(); 6]);
     /// let wire0 = wire![
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[2], ()),
@@ -429,7 +429,7 @@ impl<P, C, S> Shell<P, C, S> {
     /// there is a pair of faces such that share vertices but not edges.
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(); 5]);
+    /// let v = Vertex::from_points(&[(); 5]);
     /// let wire0 = wire![
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[2], ()),
@@ -469,7 +469,7 @@ impl<P, C, S> Shell<P, C, S> {
     /// use monstertruck_topology::*;
     /// use monstertruck_topology::shell::ShellCondition;
     ///
-    /// let v = Vertex::news(&[(), (), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), (), ()]);
     /// let edge = [
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[1], &v[2], ()),
@@ -491,7 +491,7 @@ impl<P, C, S> Shell<P, C, S> {
     /// use monstertruck_topology::*;
     /// use monstertruck_topology::shell::*;
     ///
-    /// let v = Vertex::news(&[(); 7]);
+    /// let v = Vertex::from_points(&[(); 7]);
     /// let edge = [
     ///     Edge::new(&v[0], &v[1], ()), // 0
     ///     Edge::new(&v[0], &v[2], ()), // 1
@@ -583,7 +583,7 @@ impl<P, C, S> Shell<P, C, S> {
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[0, 1, 2, 3, 4, 5, 6]);
+    /// let v = Vertex::from_points(&[0, 1, 2, 3, 4, 5, 6]);
     /// let wire0 = Wire::from(vec![
     ///     Edge::new(&v[0], &v[1], 100),
     ///     Edge::new(&v[1], &v[2], 200),
@@ -790,7 +790,7 @@ impl<P, C, S> Shell<P, C, S> {
     /// use monstertruck_topology::shell::ShellCondition;
     /// use ShellDisplayFormat as SDF;
     ///
-    /// let v = Vertex::news(&[0, 1, 2, 3]);
+    /// let v = Vertex::from_points(&[0, 1, 2, 3]);
     /// let edge = [
     ///     Edge::new(&v[0], &v[1], ()), // 0
     ///     Edge::new(&v[1], &v[2], ()), // 1
@@ -948,7 +948,7 @@ pub enum ShellCondition {
     /// ```
     /// use monstertruck_topology::*;
     /// use monstertruck_topology::shell::ShellCondition;
-    /// let v = Vertex::news(&[(); 5]);
+    /// let v = Vertex::from_points(&[(); 5]);
     /// let edge = [
     ///    Edge::new(&v[0], &v[1], ()),
     ///    Edge::new(&v[0], &v[2], ()),
@@ -973,7 +973,7 @@ pub enum ShellCondition {
     /// ```
     /// use monstertruck_topology::*;
     /// use monstertruck_topology::shell::ShellCondition;
-    /// let v = Vertex::news(&[(); 6]);
+    /// let v = Vertex::from_points(&[(); 6]);
     /// let edge = [
     ///     Edge::new(&v[0], &v[1], ()),
     ///     Edge::new(&v[0], &v[2], ()),
@@ -1002,7 +1002,7 @@ pub enum ShellCondition {
     /// ```
     /// use monstertruck_topology::*;
     /// use monstertruck_topology::shell::ShellCondition;
-    /// let v = Vertex::news(&[(); 6]);
+    /// let v = Vertex::from_points(&[(); 6]);
     /// let edge = [
     ///     Edge::new(&v[0], &v[1] ,()),
     ///     Edge::new(&v[0], &v[2] ,()),
@@ -1031,7 +1031,7 @@ pub enum ShellCondition {
     /// ```
     /// use monstertruck_topology::*;
     /// use monstertruck_topology::shell::ShellCondition;
-    /// let v = Vertex::news(&[(); 8]);
+    /// let v = Vertex::from_points(&[(); 8]);
     /// let edge = [
     ///     Edge::new(&v[0], &v[1] ,()),
     ///     Edge::new(&v[1], &v[2] ,()),

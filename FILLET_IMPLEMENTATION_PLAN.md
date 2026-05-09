@@ -102,8 +102,8 @@ Use **canonical NURBS workspace** internally for fillet creation, then map back 
 
 API in `monstertruck-solid` (actual shape):
 
-- `fillet_edges(shell, edge_ids, params: Option<&FilletOptions>) -> Result<(), FilletError>`
-- `fillet_edges_generic(shell, edges, params: Option<&FilletOptions>) -> Result<(), FilletError>`
+- `fillet_edges_by_id(shell, edge_ids, options: Option<&FilletOptions>) -> Result<(), FilletError>`
+- `fillet_edges(shell, edges, options: Option<&FilletOptions>) -> Result<(), FilletError>`
 - `simple_fillet(face0, face1, edge_id, options: &FilletOptions) -> Result<(Face, Face, Face), FilletError>`
 - `fillet_with_side(face0, face1, edge_id, side0, side1, options: &FilletOptions) -> Result<..., FilletError>`
 - `fillet_along_wire(shell, wire, options: &FilletOptions) -> Result<(), FilletError>`
@@ -111,7 +111,7 @@ API in `monstertruck-solid` (actual shape):
 Core parameter types:
 
 - `FilletOptions` (was `FilletParams`)
-  - `radius: RadiusSpec`
+  - `radius: FilletRadius`
     - [x] `Constant(f64)`
     - [x] `Variable(Box<dyn Fn(f64) -> f64>)`
     - [ ] `PerEdge(Vec<...>)` (optional advanced mode)
@@ -119,7 +119,7 @@ Core parameter types:
     - [x] `Round`
     - [x] `Chamfer`
     - [x] `Ridge`
-    - [x] `Custom(BSplineCurve<Point2>)`
+    - [x] `Custom(BsplineCurve<Point2>)`
   - [ ] `extend_mode`, `corner_mode`, `integrate_mode`
   - [x] `division: NonZeroUsize`
 - [x] `FilletError` typed enum (no `eprintln!` paths)
@@ -169,7 +169,7 @@ Core parameter types:
 ### Tasks
 
 - [x] Implement edge-centric selection:
-  - [x] from explicit `EdgeID` list (`fillet_edges`)
+  - [x] from explicit `EdgeId` list (`fillet_edges`)
   - [x] from wire/chain helper (`fillet_along_wire`)
 - [x] Robustly resolve incident faces per edge (`build_edge_face_map`)
 - [x] Validate and reject:
@@ -193,7 +193,7 @@ Core parameter types:
 - [x] Build canonical conversion stage (`convert.rs`):
   - [x] `FilletableSurface` trait: `to_nurbs_surface()` / `from_nurbs_surface()`
   - [x] `FilletableCurve` trait: `to_nurbs_curve()` / `from_nurbs_curve()` / `from_pcurve()` / `from_intersection_curve()`
-- [x] `fillet_edges_generic` converts arbitrary types to internal NURBS, runs fillet, converts back
+- [x] `fillet_edges` converts arbitrary types to internal NURBS, runs fillet, converts back
 - [x] Preserve identity map: `convert_shell_in` / `convert_shell_out`
 
 ### Done criteria
@@ -212,7 +212,7 @@ Core parameter types:
   - [x] `cut_face_by_bezier` (topology.rs)
   - [x] `simple_fillet` (ops.rs)
   - [x] `fillet_along_wire` (ops.rs)
-- [x] Variable radius support (`RadiusSpec::Variable`)
+- [x] Variable radius support (`FilletRadius::Variable`)
 - [x] Implement closed-wire support:
   - [x] `fillet_along_wire_closed` with circular indexing
   - [x] Wrap-around seam averaging
@@ -243,7 +243,7 @@ Core parameter types:
   - [x] `expand_ridge` / `ridge_fillet_surface` in `geometry.rs`
   - [x] Ridge tests: `ridge_single_edge`, `ridge_semi_cube`, `ridge_closed_wire`
 - [x] Implement Custom profile
-  - [x] `Custom(BSplineCurve<Point2>)` variant in `FilletProfile`
+  - [x] `Custom(BsplineCurve<Point2>)` variant in `FilletProfile`
   - [x] Profile-driven patch generation (2D sweep)
   - [x] Custom profile tests: `custom_profile_linear`, `custom_profile_bump`
 
@@ -283,7 +283,7 @@ Core parameter types:
   - [x] `monstertruck-modeling/README.md:15`
   - [x] `monstertruck-modeling/examples/bottle.rs:5`
 - [x] Add/refresh example showing filleting after boolean -- `fillet-after-boolean.rs`
-- [x] Re-export: `fillet_edges_generic as fillet_edges`, `FilletError`, `FilletOptions`, `FilletProfile`, `RadiusSpec`, `FilletableCurve`, `FilletableSurface`
+- [x] Re-export: `fillet_edges`, `FilletError`, `FilletOptions`, `FilletProfile`, `FilletRadius`, `FilletableCurve`, `FilletableSurface`
 
 ### Done criteria
 
@@ -298,7 +298,7 @@ Core parameter types:
 - [x] Rename `FilletParams` → `FilletOptions`
 - [x] Change `division: usize` → `division: NonZeroUsize` (enforce invariants at API boundary)
 - [x] Consolidate low-level function signatures to take `&FilletOptions` instead of separate `(radius, division, profile)` args
-- [x] High-level `fillet_edges` / `fillet_edges_generic` take `Option<&FilletOptions>` with `unwrap_or(&default)`
+- [x] High-level `fillet_edges` and `fillet_edges_by_id` take `Option<&FilletOptions>` with `unwrap_or(&default)`
 - [x] `Default` impl for `FilletOptions`
 
 ---

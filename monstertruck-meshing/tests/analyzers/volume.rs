@@ -29,7 +29,7 @@ proptest! {
 
         prop_assume!(!volume.is_zero());
 
-        let v = Vertex::news(p);
+        let v = Vertex::from_points(p);
         let edge = array![i => builder::line(&v[i], &v[(i + 1) % 3]); 3];
         let face = builder::try_attach_plane(&[edge.to_vec().into()]).unwrap();
         let base_solid: Solid = builder::extrude(&face, h * Vector3::unit_z());

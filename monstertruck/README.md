@@ -21,7 +21,7 @@ for the full runnable version with STEP export.
 
 ```rust
 use monstertruck_modeling::*;
-use monstertruck_solid::{difference, fillet_edges, or, FilletOptions};
+use monstertruck_solid::{difference, fillet_edges_by_id, or, FilletOptions};
 use std::f64::consts::PI;
 
 fn sphere(center: Point3, radius: f64) -> Solid {
@@ -76,7 +76,7 @@ fn main() -> anyhow::Result<()> {
         .flat_map(|face| face.edge_iter())
         .map(|e| e.id())
         .collect();
-    fillet_edges(&mut shell, &edge_ids, Some(&FilletOptions::constant(0.05)))?;
+    fillet_edges_by_id(&mut shell, &edge_ids, Some(&FilletOptions::constant(0.05)))?;
 
     let result = Solid::new(vec![shell]);
     std::fs::write("output.json", serde_json::to_vec_pretty(&result)?)?;

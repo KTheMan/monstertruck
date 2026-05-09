@@ -32,18 +32,18 @@ where
         match (m, n) {
             (0, 0) => self.evaluate(u, v).to_vec(),
             (0, 1) => self.vector,
-            (_, 0) => self.curve.der_n(m, u),
+            (_, 0) => self.curve.derivative_n(m, u),
             _ => C::Vector::zero(),
         }
     }
     #[inline(always)]
     fn evaluate(&self, u: f64, v: f64) -> C::Point { self.curve.evaluate(u) + self.vector * v }
     #[inline(always)]
-    fn derivative_u(&self, u: f64, _: f64) -> C::Vector { self.curve.der(u) }
+    fn derivative_u(&self, u: f64, _: f64) -> C::Vector { self.curve.derivative(u) }
     #[inline(always)]
     fn derivative_v(&self, _: f64, _: f64) -> C::Vector { self.vector }
     #[inline(always)]
-    fn derivative_uu(&self, u: f64, _: f64) -> C::Vector { self.curve.der2(u) }
+    fn derivative_uu(&self, u: f64, _: f64) -> C::Vector { self.curve.derivative_2(u) }
     #[inline(always)]
     fn derivative_uv(&self, _: f64, _: f64) -> C::Vector { C::Vector::zero() }
     #[inline(always)]
@@ -62,7 +62,7 @@ where
 impl<C: ParametricCurve3D> ParametricSurface3D for ExtrusionSurface<C, Vector3> {
     #[inline(always)]
     fn normal(&self, u: f64, _: f64) -> C::Vector {
-        self.curve.der(u).cross(self.vector).normalize()
+        self.curve.derivative(u).cross(self.vector).normalize()
     }
 }
 
@@ -266,5 +266,5 @@ fn extrude_line() {
     let line = Line(p, q);
     let extruded = ExtrusionSurface::by_extrusion(line, v);
     let plane = Plane::new(p, q, p + v);
-    assert_near!(extruded.subs(0.3, 0.6), plane.subs(0.3, 0.6));
+    assert_near!(extruded.evaluate(0.3, 0.6), plane.evaluate(0.3, 0.6));
 }

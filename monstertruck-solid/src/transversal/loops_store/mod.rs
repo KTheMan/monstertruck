@@ -62,7 +62,7 @@ impl ShapesOpStatus {
         let (t0, t1) = curve.range_tuple();
         let t = (t0 + t1) / 2.0;
         let (_, pt0, pt1) = curve.search_triple(t, 100)?;
-        let der = curve.leader().der(t);
+        let der = curve.leader().derivative(t);
         let normal0 = curve.surface0().normal(pt0[0], pt0[1]);
         let normal1 = curve.surface1().normal(pt1[0], pt1[1]);
         match normal0.cross(der).dot(normal1) > 0.0 {
@@ -188,7 +188,7 @@ impl<P: Copy, C: Clone> Loops<P, C> {
                     .search_parameter(pt, None, 20)
                     .or_else(|| {
                         let t = curve.search_nearest_parameter(pt, None, 20)?;
-                        curve.subs(t).near(&pt).then_some(t)
+                        curve.evaluate(t).near(&pt).then_some(t)
                     })
                     .and_then(|t| {
                         let kind = ParameterKind::try_new(t, curve.range_tuple())?;
@@ -335,7 +335,7 @@ impl<C: Clone> Loops<Point3, C> {
             .filter_map(|edge| {
                 let curve = edge.curve();
                 let t = curve.search_nearest_parameter(pt, None, 20)?;
-                Some((curve.subs(t) - pt).magnitude2())
+                Some((curve.evaluate(t) - pt).magnitude2())
             })
             .min_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
     }
@@ -365,7 +365,7 @@ impl<C: Clone> Loops<Point3, C> {
                         ParameterKind::Back => curve.range_tuple().1,
                         ParameterKind::Inner(t) => t,
                     };
-                    let dist2 = (curve.subs(t) - pt).magnitude2();
+                    let dist2 = (curve.evaluate(t) - pt).magnitude2();
                     Some((dist2, i, j, kind))
                 })
                 .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal))
@@ -444,7 +444,7 @@ impl<C> LoopsStore<Point3, C> {
             }
             ParameterKind::Inner(t) => {
                 let edge = self[loops_index][wire_index][edge_index].absolute_clone();
-                let point = edge.curve().subs(t);
+                let point = edge.curve().evaluate(t);
                 v.set_point(point);
                 let edge_id = edge.id();
                 let (edge0, edge1) = edge.cut_with_parameter(v, t)?;
@@ -500,7 +500,7 @@ impl<C> LoopsStore<Point3, C> {
                     self.change_vertex(&old_vertex, v, emap);
                     return Some(());
                 }
-                v.set_point(curve.subs(t));
+                v.set_point(curve.evaluate(t));
                 let edge_id = edge.id();
                 let (edge0, edge1) = edge.cut_with_parameter(v, t)?;
                 let new_wire: Wire<_, _> = vec![edge0, edge1].into();
@@ -527,13 +527,13 @@ where
         return None;
     }
     let t = curve.search_nearest_parameter(point, curve_hint, 10)?;
-    let pt0 = curve.subs(t);
+    let pt0 = curve.evaluate(t);
     let (u, v) = surface.search_nearest_parameter(point, surface_hint, 10)?;
-    let pt1 = surface.subs(u, v);
+    let pt1 = surface.evaluate(u, v);
     if point.near(&pt0) && point.near(&pt1) && pt0.near(&pt1) {
         Some((point, t, Point2::new(u, v)))
     } else {
-        let l = curve.der(t);
+        let l = curve.derivative(t);
         let n = surface.normal(u, v);
         let denominator = l.dot(n);
         if denominator.near(&0.0) {

@@ -31,7 +31,7 @@ struct Revolution {
 ///     for j in 0..=N {
 ///         let u = i as f64 / N as f64;
 ///         let v = 2.0 * PI * j as f64 / N as f64;
-///         let pt: Vector3 = sphere.subs(u, v).to_vec();
+///         let pt: Vector3 = sphere.evaluate(u, v).to_vec();
 ///         assert_near2!(pt.magnitude2(), 1.0);
 ///         assert_near!(pt, sphere.normal(u, v));
 ///     }
@@ -42,10 +42,6 @@ pub struct RevolutionSurface<C> {
     curve: C,
     revolution: Revolution,
 }
-
-/// Renamed to [`RevolutionSurface`].
-#[deprecated(note = "renamed to RevolutionSurface")]
-pub type RevolutedCurve<C> = RevolutionSurface<C>;
 
 /// Surface constructed by linearly extruding a curve along a vector.
 ///
@@ -80,14 +76,14 @@ pub type RevolutedCurve<C> = RevolutionSurface<C>;
 ///         let u = i as f64 / N as f64;
 ///         let v = j as f64 / N as f64;
 ///         assert_near!(
-///             surface0.subs(u, v),
-///             ParametricSurface::subs(&surface1, u, v)
+///             surface0.evaluate(u, v),
+///             ParametricSurface::evaluate(&surface1, u, v)
 ///         );
-///         assert_near!(surface0.uder(u, v), surface1.uder(u, v));
-///         assert_near!(surface0.vder(u, v), surface1.vder(u, v));
-///         assert_near!(surface0.uuder(u, v), surface1.uuder(u, v));
-///         assert_near!(surface0.uvder(u, v), surface1.uvder(u, v));
-///         assert_near!(surface0.vvder(u, v), surface1.vvder(u, v));
+///         assert_near!(surface0.derivative_u(u, v), surface1.derivative_u(u, v));
+///         assert_near!(surface0.derivative_v(u, v), surface1.derivative_v(u, v));
+///         assert_near!(surface0.derivative_uu(u, v), surface1.derivative_uu(u, v));
+///         assert_near!(surface0.derivative_uv(u, v), surface1.derivative_uv(u, v));
+///         assert_near!(surface0.derivative_vv(u, v), surface1.derivative_vv(u, v));
 ///         assert_near!(surface0.normal(u, v), surface1.normal(u, v));
 ///     }
 /// }
@@ -97,10 +93,6 @@ pub struct ExtrusionSurface<C, V> {
     curve: C,
     vector: V,
 }
-
-/// Renamed to [`ExtrusionSurface`].
-#[deprecated(note = "renamed to ExtrusionSurface")]
-pub type ExtrudedCurve<C, V> = ExtrusionSurface<C, V>;
 
 /// invertible and transformable geometric element
 /// # Examples
@@ -122,14 +114,14 @@ pub type ExtrudedCurve<C, V> = ExtrusionSurface<C, V>;
 /// const N: usize = 100;
 /// for i in 0..=N {
 ///     let t = i as f64 / N as f64;
-///     assert_eq!(curve.subs(t), processed.subs(t));
+///     assert_eq!(curve.evaluate(t), processed.evaluate(t));
 /// }
 ///
 /// // Processed curve can inverted!
 /// processed.invert();
 /// for i in 0..=N {
 ///     let t = i as f64 / N as f64;
-///     assert_eq!(curve.subs(1.0 - t), processed.subs(t));
+///     assert_eq!(curve.evaluate(1.0 - t), processed.evaluate(t));
 /// }
 /// ```
 /// Surface processing example
@@ -146,7 +138,7 @@ pub type ExtrudedCurve<C, V> = ExtrusionSurface<C, V>;
 ///     for j in 0..=N {
 ///         let u = PI * i as f64 / N as f64;
 ///         let v = 2.0 * PI * j as f64 / N as f64;
-///         assert_eq!(sphere.subs(u, v), processed.subs(u, v));
+///         assert_eq!(sphere.evaluate(u, v), processed.evaluate(u, v));
 ///     }
 /// }
 ///
@@ -157,7 +149,7 @@ pub type ExtrudedCurve<C, V> = ExtrusionSurface<C, V>;
 ///     for j in 0..=N {
 ///         let u = PI * i as f64 / N as f64;
 ///         let v = 2.0 * PI * j as f64 / N as f64;
-///         assert_eq!(sphere.subs(u, v), processed.subs(v, u));
+///         assert_eq!(sphere.evaluate(u, v), processed.evaluate(v, u));
 ///     }
 /// }
 /// ```
@@ -200,7 +192,7 @@ pub struct Processor<E, T> {
 /// for i in 0..=N {
 ///     let t = i as f64 / N as f64;
 ///     assert_near!(
-///         pcurve.subs(t),
+///         pcurve.evaluate(t),
 ///         Point3::new(
 ///             (1.0 - t * t) * (1.0 - t * t),
 ///             (1.0 - t) * (1.0 - t),
@@ -208,23 +200,23 @@ pub struct Processor<E, T> {
 ///         ),
 ///     );
 ///     assert_near!(
-///         pcurve.der(t),
+///         pcurve.derivative(t),
 ///         Vector3::new(4.0 * t * (t * t - 1.0), 2.0 * (t - 1.0), -4.0 * t * t * t,),
 ///     );
 ///     assert_near!(
-///         pcurve.der2(t),
+///         pcurve.derivative_2(t),
 ///         Vector3::new(4.0 * (3.0 * t * t - 1.0), 2.0, -12.0 * t * t,),
 ///     );
 /// }
 ///
 /// let t = 0.675;
-/// let pt = pcurve.subs(t);
+/// let pt = pcurve.evaluate(t);
 /// assert_near!(pcurve.search_parameter(pt, None, 100).unwrap(), t);
 ///
 /// let pt = pt + Vector3::new(0.01, 0.06, -0.03);
 /// assert!(pcurve.search_parameter(pt, None, 100).is_none());
 /// let t = pcurve.search_nearest_parameter(pt, None, 100).unwrap();
-/// assert!(pcurve.der(t).dot(pcurve.subs(t) - pt).so_small());
+/// assert!(pcurve.derivative(t).dot(pcurve.evaluate(t) - pt).so_small());
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, SelfSameGeometry)]
 pub struct ParameterCurve<C, S> {
@@ -263,7 +255,7 @@ pub type PCurve<C, S> = ParameterCurve<C, S>;
 /// // All points of curve is on the upper half unit circle.
 /// for i in 0..=100 {
 ///     let t = i as f64 / 100.0;
-///     let p = intersection_curve.subs(t);
+///     let p = intersection_curve.evaluate(t);
 ///     assert_near!(p.distance2(Point3::origin()), 1.0);
 /// }
 ///
@@ -271,7 +263,7 @@ pub type PCurve<C, S> = ParameterCurve<C, S>;
 /// let coef = |i: usize| if matches!(i, 0 | 100) { 1.0 } else { 2.0 };
 /// let sum = (0..=100).fold(0.0, |sum, i| {
 ///     let t = i as f64 / 100.0;
-///     sum + intersection_curve.der(t).magnitude() * coef(i)
+///     sum + intersection_curve.derivative(t).magnitude() * coef(i)
 /// });
 /// let length = sum / 100.0 / 2.0;
 /// assert!(f64::abs(length - PI) < 1.0e-4 * PI);
@@ -323,12 +315,12 @@ pub struct TrimmedCurve<C> {
 /// for i in 0..=10 {
 ///     for j in 0..=10 {
 ///         let (u, v) = (i as f64 / 10.0, j as f64 / 10.0);
-///         assert_near!(homotopy.subs(u, v), surface(u, v));
-///         assert_near!(homotopy.uder(u, v), uder(v));
-///         assert_near!(homotopy.vder(u, v), vder(u));
-///         assert!(homotopy.uuder(u, v).so_small());
-///         assert_near!(homotopy.uvder(u, v), uvder);
-///         assert!(homotopy.vvder(u, v).so_small());
+///         assert_near!(homotopy.evaluate(u, v), surface(u, v));
+///         assert_near!(homotopy.derivative_u(u, v), uder(v));
+///         assert_near!(homotopy.derivative_v(u, v), vder(u));
+///         assert!(homotopy.derivative_uu(u, v).so_small());
+///         assert_near!(homotopy.derivative_uv(u, v), uvder);
+///         assert!(homotopy.derivative_vv(u, v).so_small());
 ///     }
 /// }
 /// ```

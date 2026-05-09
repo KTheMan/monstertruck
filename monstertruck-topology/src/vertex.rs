@@ -36,16 +36,16 @@ impl<P> Vertex<P> {
     #[inline(always)]
     pub fn set_stable_id(&mut self, id: StableId) { self.stable_id = id; }
 
-    /// Creates `len` distinct vertices and return them by vector.
+    /// Creates distinct vertices from points.
     /// # Examples
     /// ```
     /// use monstertruck_topology::*;
-    /// let v = Vertex::news(&[(), (), ()]);
+    /// let v = Vertex::from_points(&[(), (), ()]);
     /// assert_eq!(v.len(), 3);
     /// assert_ne!(v[0], v[2]);
     /// ```
     #[inline(always)]
-    pub fn news(points: impl AsRef<[P]>) -> Vec<Vertex<P>>
+    pub fn from_points(points: impl AsRef<[P]>) -> Vec<Vertex<P>>
     where P: Copy {
         points.as_ref().iter().map(|p| Vertex::new(*p)).collect()
     }
@@ -148,7 +148,7 @@ impl<P> Vertex<P> {
     ///     format!("Vertex {{ id: {:?}, entity: [0, 2] }}", v.id()),
     /// );
     /// assert_eq!(
-    ///     format!("{:?}", v.display(VDF::IDTuple)),
+    ///     format!("{:?}", v.display(VDF::IdTuple)),
     ///     format!("Vertex({:?})", v.id()),
     /// );
     /// assert_eq!(
@@ -202,7 +202,7 @@ impl<P: Debug> Debug for DebugDisplay<'_, Vertex<P>, VertexDisplayFormat> {
                 .field("id", &Arc::as_ptr(&self.entity.point))
                 .field("entity", &MutexFmt(&self.entity.point))
                 .finish(),
-            VertexDisplayFormat::IDTuple => {
+            VertexDisplayFormat::IdTuple => {
                 f.debug_tuple("Vertex").field(&self.entity.id()).finish()
             }
             VertexDisplayFormat::PointTuple => f
@@ -234,7 +234,7 @@ fn vertex_default_stable_id_is_unassigned() {
 
 #[test]
 fn edge_stable_id_survives_inverse() {
-    let v = Vertex::news([(), ()]);
+    let v = Vertex::from_points([(), ()]);
     let mut edge = Edge::new(&v[0], &v[1], ());
     edge.set_stable_id(StableId::new(42));
     let inv = edge.inverse();
@@ -244,7 +244,7 @@ fn edge_stable_id_survives_inverse() {
 #[test]
 fn face_stable_id_survives_clone() {
     use crate::Wire;
-    let v = Vertex::news([(), (), ()]);
+    let v = Vertex::from_points([(), (), ()]);
     let wire = Wire::from(vec![
         Edge::new(&v[0], &v[1], ()),
         Edge::new(&v[1], &v[2], ()),
@@ -258,7 +258,7 @@ fn face_stable_id_survives_clone() {
 
 #[test]
 fn solid_alloc_id() {
-    let v = Vertex::news([(); 8]);
+    let v = Vertex::from_points([(); 8]);
     let edge = [
         Edge::new(&v[0], &v[1], ()),
         Edge::new(&v[1], &v[2], ()),

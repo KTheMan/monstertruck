@@ -317,7 +317,7 @@ fn curve2d_from_sampled_boundary(points: Vec<Point2>) -> Option<Curve2D> {
         let line = Line(front, back);
         let is_linear = points.iter().copied().all(|point| {
             line.search_nearest_parameter(point, None, 1)
-                .is_some_and(|t| line.subs(t).near(&point))
+                .is_some_and(|t| line.evaluate(t).near(&point))
         });
         if is_linear {
             Some(Curve2D::Line(line))

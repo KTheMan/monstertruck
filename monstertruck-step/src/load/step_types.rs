@@ -2371,25 +2371,3 @@ impl TryFrom<&ItemDefinedTransformation> for Matrix4 {
         Ok(mat2 * inv)
     }
 }
-
-// Deprecated aliases for types renamed per RFC 430 (C-CASE).
-#[deprecated(note = "renamed to BsplineCurveForm per RFC 430 (C-CASE)")]
-pub type BSplineCurveForm = BsplineCurveForm;
-#[deprecated(note = "renamed to BsplineCurveWithKnots per RFC 430 (C-CASE)")]
-pub type BSplineCurveWithKnots = BsplineCurveWithKnots;
-#[deprecated(note = "renamed to NonRationalBsplineCurve per RFC 430 (C-CASE)")]
-pub type NonRationalBSplineCurve = NonRationalBsplineCurve;
-#[deprecated(note = "renamed to RationalBsplineCurve per RFC 430 (C-CASE)")]
-pub type RationalBSplineCurve = RationalBsplineCurve;
-#[deprecated(note = "renamed to BsplineCurveAny per RFC 430 (C-CASE)")]
-pub type BSplineCurveAny = BsplineCurveAny;
-#[deprecated(note = "renamed to BsplineSurfaceAny per RFC 430 (C-CASE)")]
-pub type BSplineSurfaceAny = BsplineSurfaceAny;
-#[deprecated(note = "renamed to BsplineSurfaceForm per RFC 430 (C-CASE)")]
-pub type BSplineSurfaceForm = BsplineSurfaceForm;
-#[deprecated(note = "renamed to BsplineSurfaceWithKnots per RFC 430 (C-CASE)")]
-pub type BSplineSurfaceWithKnots = BsplineSurfaceWithKnots;
-#[deprecated(note = "renamed to NonRationalBsplineSurface per RFC 430 (C-CASE)")]
-pub type NonRationalBSplineSurface = NonRationalBsplineSurface;
-#[deprecated(note = "renamed to RationalBsplineSurface per RFC 430 (C-CASE)")]
-pub type RationalBSplineSurface = RationalBsplineSurface;

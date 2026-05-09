@@ -56,7 +56,7 @@ pub(super) fn untrimmed_tessellation<S>(
     surface: &S,
     range: ((f64, f64), (f64, f64)),
     tolerance: f64,
-    quad_mode: QuadMode,
+    primitive_mode: TessellationPrimitiveMode,
 ) -> PolygonMesh
 where
     S: PreMeshableSurface,
@@ -69,14 +69,14 @@ where
     let mut normals = Vec::with_capacity(nu * nv);
     for u in &udiv {
         for v in &vdiv {
-            positions.push(surface.subs(*u, *v));
+            positions.push(surface.evaluate(*u, *v));
             uv_coords.push(Vector2::new(*u, *v));
             normals.push(surface.normal(*u, *v));
         }
     }
     let idx = |i: usize, j: usize| -> usize { i * nv + j };
     let sv = |k: usize| -> StandardVertex { [k, k, k].into() };
-    let (tri_faces, quad_faces) = if quad_mode == QuadMode::Triangles {
+    let (tri_faces, quad_faces) = if primitive_mode == TessellationPrimitiveMode::Triangles {
         let tri_faces: Vec<[StandardVertex; 3]> = (0..nu - 1)
             .flat_map(|i| {
                 (0..nv - 1).flat_map(move |j| {
@@ -120,13 +120,13 @@ pub(super) fn trimming_tessellation<S>(
     surface: &S,
     polyboundary: &PolyBoundary,
     tolerance: f64,
-    quad_config: QuadOptions,
+    primitive_config: TessellationPrimitiveOptions,
     face_idx: usize,
 ) -> PolygonMesh
 where
     S: PreMeshableSurface,
 {
-    if quad_config.mode == QuadMode::IsoQuads {
+    if primitive_config.mode == TessellationPrimitiveMode::IsoQuads {
         if let Some(mut mesh) =
             iso_quad_trimmed_tessellation(surface, polyboundary, tolerance, face_idx)
         {
@@ -140,7 +140,7 @@ where
     } else {
         let mut mesh = cdt_trimming_tessellation(surface, polyboundary, tolerance, face_idx);
         ensure_winding_matches_normals(&mut mesh);
-        apply_quad_mode(&mut mesh, quad_config);
+        apply_primitive_mode(&mut mesh, primitive_config);
         mesh
     }
 }
@@ -223,7 +223,7 @@ where
     let sv = |k: usize| -> StandardVertex { [k, k, k].into() };
     let positions = udiv
         .iter()
-        .flat_map(|u| vdiv.iter().map(move |v| surface.subs(*u, *v)))
+        .flat_map(|u| vdiv.iter().map(move |v| surface.evaluate(*u, *v)))
         .collect::<Vec<_>>();
     let uv_coords = udiv
         .iter()
@@ -395,20 +395,26 @@ fn parameter_cell_index(parameters: &[f64], value: f64) -> Option<usize> {
     }
 }
 
-fn apply_quad_mode(mesh: &mut PolygonMesh, quad_config: QuadOptions) {
-    if quad_config.mode != QuadMode::Triangles {
-        mesh.quadrangulate(quad_config.plane_tolerance, quad_config.score_tolerance);
-        if quad_config.mode == QuadMode::AllQuads {
-            force_all_triangles_to_quads(mesh, quad_config);
+fn apply_primitive_mode(mesh: &mut PolygonMesh, primitive_config: TessellationPrimitiveOptions) {
+    if primitive_config.mode != TessellationPrimitiveMode::Triangles {
+        mesh.quadrangulate(
+            primitive_config.plane_tolerance,
+            primitive_config.score_tolerance,
+        );
+        if primitive_config.mode == TessellationPrimitiveMode::AllQuads {
+            force_all_triangles_to_quads(mesh, primitive_config);
         }
     }
 }
 
-fn force_all_triangles_to_quads(mesh: &mut PolygonMesh, quad_config: QuadOptions) {
+fn force_all_triangles_to_quads(
+    mesh: &mut PolygonMesh,
+    primitive_config: TessellationPrimitiveOptions,
+) {
     if mesh.tri_faces().is_empty() {
         return;
     }
-    let normal_blend_angle = quad_config.normal_blend_angle;
+    let normal_blend_angle = primitive_config.normal_blend_angle;
     let triangles = mesh.tri_faces().clone();
     let mut quadrangles = mesh.quad_faces().clone();
     let mut midpoint_cache = HashMap::<(VertexKey, VertexKey), StandardVertex>::default();
@@ -429,7 +435,7 @@ fn force_all_triangles_to_quads(mesh: &mut PolygonMesh, quad_config: QuadOptions
         ];
         let quality_ok = split_quads
             .into_iter()
-            .all(|quad| quad_passes_quality_gates(quad, quad_config));
+            .all(|quad| quad_passes_quality_gates(quad, primitive_config));
         if quality_ok {
             let midpoint01 = midpoint_for_edge(
                 mesh,
@@ -498,13 +504,17 @@ fn edge_key(vertex0: StandardVertex, vertex1: StandardVertex) -> (VertexKey, Ver
     }
 }
 
-fn quad_passes_quality_gates(quad: [Point3; 4], quad_config: QuadOptions) -> bool {
+fn quad_passes_quality_gates(
+    quad: [Point3; 4],
+    primitive_config: TessellationPrimitiveOptions,
+) -> bool {
     let area = quad_area(quad);
     let convex = is_convex_quad(quad);
     let corner_angles_ok = quad.iter().enumerate().all(|(index, _)| {
-        corner_angle(quad, index).is_some_and(|angle| angle <= quad_config.maximum_corner_angle)
+        corner_angle(quad, index)
+            .is_some_and(|angle| angle <= primitive_config.maximum_corner_angle)
     });
-    area >= quad_config.minimum_area && convex && corner_angles_ok
+    area >= primitive_config.minimum_area && convex && corner_angles_ok
 }
 
 fn quad_area(quad: [Point3; 4]) -> f64 {
@@ -780,7 +790,7 @@ fn triangulation_into_polymesh<'a>(
                 Some(point) => *point,
                 None => *surface_point_cache
                     .entry(key)
-                    .or_insert_with(|| surface.subs(p.x, p.y)),
+                    .or_insert_with(|| surface.evaluate(p.x, p.y)),
             };
             let normal = *normal_cache
                 .entry(key)

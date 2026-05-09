@@ -8,8 +8,8 @@ use super::types::*;
 use monstertruck_traits::ParametricSurface;
 
 use super::{
-    FilletOptions, FilletProfile, RadiusSpec, fillet, fillet_along_wire, fillet_edges,
-    fillet_edges_generic, fillet_with_side,
+    FilletOptions, FilletProfile, FilletRadius, fillet, fillet_along_wire, fillet_edges,
+    fillet_edges_by_id, fillet_with_side,
 };
 
 #[test]
@@ -81,7 +81,7 @@ fn create_fillet() {
     )
     .into();
 
-    let v = Vertex::news([
+    let v = Vertex::from_points([
         Point3::new(-1.0, 0.0, 0.0),
         Point3::new(1.0, 0.0, 0.0),
         Point3::new(1.0, 1.0, 1.0),
@@ -123,7 +123,7 @@ fn create_fillet() {
         &face1,
         shared_edge_id,
         &FilletOptions {
-            radius: RadiusSpec::Constant(0.3),
+            radius: FilletRadius::Constant(0.3),
             ..Default::default()
         },
     )
@@ -147,7 +147,7 @@ fn create_fillet_with_side() {
         Point3::new(1.0, 1.0, 0.0),
         Point3::new(0.0, 1.0, 0.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
 
     let line = |i: usize, j: usize| {
         let bsp = BsplineCurve::new(KnotVector::bezier_knot(1), vec![p[i], p[j]]);
@@ -204,7 +204,7 @@ fn create_fillet_with_side() {
         None,
         Some(&face[2]),
         &FilletOptions {
-            radius: RadiusSpec::Variable(Box::new(|t| 0.3 + 0.3 * t)),
+            radius: FilletRadius::Variable(Box::new(|t| 0.3 + 0.3 * t)),
             ..Default::default()
         },
     )
@@ -227,7 +227,7 @@ fn fillet_to_nurbs() {
         Point3::new(1.0, 0.0, 0.0),
         Point3::new(0.0, 1.0, 0.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
 
     let line = |i: usize, j: usize| {
         let bsp = BsplineCurve::new(KnotVector::bezier_knot(1), vec![p[i], p[j]]);
@@ -320,7 +320,7 @@ fn fillet_to_nurbs() {
         &shell[1],
         edge[1].id(),
         &FilletOptions {
-            radius: RadiusSpec::Constant(0.3),
+            radius: FilletRadius::Constant(0.3),
             ..Default::default()
         },
     )
@@ -344,7 +344,7 @@ fn fillet_semi_cube() {
         Point3::new(1.1, 1.1, 0.0),
         Point3::new(0.0, 1.1, 0.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
 
     let line = |i: usize, j: usize| {
         let bsp = BsplineCurve::new(KnotVector::bezier_knot(1), vec![p[i], p[j]]);
@@ -403,7 +403,7 @@ fn fillet_semi_cube() {
     obj::write(&poly, file).unwrap();
 
     let opts = FilletOptions {
-        radius: RadiusSpec::Constant(0.4),
+        radius: FilletRadius::Constant(0.4),
         ..Default::default()
     };
     let (face0, face1, face2, _, side1) = fillet_with_side(
@@ -442,7 +442,7 @@ fn fillet_semi_cube() {
         &mut shell,
         &boundary,
         &FilletOptions {
-            radius: RadiusSpec::Constant(0.2),
+            radius: FilletRadius::Constant(0.2),
             ..Default::default()
         },
     )
@@ -467,7 +467,7 @@ fn fillet_closed_wire_box_top() {
         Point3::new(1.0, 1.0, 0.0),
         Point3::new(0.0, 1.0, 0.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
 
     let line = |i: usize, j: usize| {
         let bsp = BsplineCurve::new(KnotVector::bezier_knot(1), vec![p[i], p[j]]);
@@ -539,7 +539,7 @@ fn fillet_closed_wire_box_top() {
         &mut shell,
         &closed_wire,
         &FilletOptions {
-            radius: RadiusSpec::Constant(0.2),
+            radius: FilletRadius::Constant(0.2),
             ..Default::default()
         },
     )
@@ -567,7 +567,7 @@ fn build_box_shell() -> (Shell, [Edge; 12], Vec<Vertex>) {
         Point3::new(1.0, 1.0, 0.0),
         Point3::new(0.0, 1.0, 0.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
 
     let line = |i: usize, j: usize| {
         let bsp = BsplineCurve::new(KnotVector::bezier_knot(1), vec![p[i], p[j]]);
@@ -634,10 +634,10 @@ fn fillet_edges_single_edge() {
     // Fillet edge[5] (shared by face 1: front and face 2: right),
     // same as the first fillet in fillet_semi_cube.
     let params = FilletOptions {
-        radius: RadiusSpec::Constant(0.4),
+        radius: FilletRadius::Constant(0.4),
         ..Default::default()
     };
-    fillet_edges(&mut shell, &[edge[5].id()], Some(&params)).unwrap();
+    fillet_edges_by_id(&mut shell, &[edge[5].id()], Some(&params)).unwrap();
 
     // fillet_with_side adds 1 fillet face.
     assert!(shell.len() > initial_face_count);
@@ -665,10 +665,10 @@ fn fillet_edges_rejects_missing() {
     };
 
     let params = FilletOptions {
-        radius: RadiusSpec::Constant(0.3),
+        radius: FilletRadius::Constant(0.3),
         ..Default::default()
     };
-    let result = fillet_edges(&mut shell, &[bogus.id()], Some(&params));
+    let result = fillet_edges_by_id(&mut shell, &[bogus.id()], Some(&params));
     assert!(matches!(result, Err(super::FilletError::EdgeNotFound)));
 }
 
@@ -681,7 +681,7 @@ fn fillet_edges_rejects_boundary() {
         Point3::new(1.0, 1.0, 0.0),
         Point3::new(0.0, 1.0, 0.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
     let line = |i: usize, j: usize| {
         let bsp = BsplineCurve::new(KnotVector::bezier_knot(1), vec![p[i], p[j]]);
         Edge::new(&v[i], &v[j], NurbsCurve::from(bsp).into())
@@ -708,10 +708,10 @@ fn fillet_edges_rejects_boundary() {
 
     // edge[0] is a boundary edge (shared by only 1 face).
     let params = FilletOptions {
-        radius: RadiusSpec::Constant(0.3),
+        radius: FilletRadius::Constant(0.3),
         ..Default::default()
     };
-    let result = fillet_edges(&mut shell, &[edge[0].id()], Some(&params));
+    let result = fillet_edges_by_id(&mut shell, &[edge[0].id()], Some(&params));
     assert!(matches!(
         result,
         Err(super::FilletError::NonManifoldEdge(1))
@@ -731,10 +731,10 @@ fn generic_fillet_identity() {
     let target_edge = shell.edge_iter().find(|e| e.id() == edge[5].id()).unwrap();
 
     let params = FilletOptions {
-        radius: RadiusSpec::Constant(0.4),
+        radius: FilletRadius::Constant(0.4),
         ..Default::default()
     };
-    fillet_edges_generic(&mut shell, &[target_edge], Some(&params)).unwrap();
+    fillet_edges(&mut shell, &[target_edge], Some(&params)).unwrap();
 
     assert!(shell.len() > initial_face_count);
     let _poly = shell.robust_triangulation(0.001).to_polygon();
@@ -761,7 +761,7 @@ fn generic_fillet_modeling_types() {
         Point3::new(1.0, 1.0, 0.0),
         Point3::new(0.0, 1.0, 0.0),
     ];
-    let v: Vec<MVertex> = MVertex::news(p);
+    let v: Vec<MVertex> = MVertex::from_points(p);
 
     let line_edge =
         |i: usize, j: usize| -> MEdge { MEdge::new(&v[i], &v[j], MCurve::Line(Line(p[i], p[j]))) };
@@ -815,10 +815,10 @@ fn generic_fillet_modeling_types() {
 
     // edge[5] is shared by face 1 (front) and face 2 (right).
     let params = FilletOptions {
-        radius: RadiusSpec::Constant(0.4),
+        radius: FilletRadius::Constant(0.4),
         ..Default::default()
     };
-    fillet_edges_generic(&mut shell, &[edge[5].clone()], Some(&params)).unwrap();
+    fillet_edges(&mut shell, &[edge[5].clone()], Some(&params)).unwrap();
 
     assert!(shell.len() > initial_face_count);
 }
@@ -844,7 +844,7 @@ fn generic_fillet_mixed_surfaces() {
         Point3::new(1.0, 1.0, 0.0),
         Point3::new(0.0, 1.0, 0.0),
     ];
-    let v: Vec<MVertex> = MVertex::news(p);
+    let v: Vec<MVertex> = MVertex::from_points(p);
 
     let line_edge =
         |i: usize, j: usize| -> MEdge { MEdge::new(&v[i], &v[j], MCurve::Line(Line(p[i], p[j]))) };
@@ -917,10 +917,10 @@ fn generic_fillet_mixed_surfaces() {
 
     // edge[5] is shared by face 1 (NurbsSurface) and face 2 (Plane).
     let params = FilletOptions {
-        radius: RadiusSpec::Constant(0.4),
+        radius: FilletRadius::Constant(0.4),
         ..Default::default()
     };
-    fillet_edges_generic(&mut shell, &[edge[5].clone()], Some(&params)).unwrap();
+    fillet_edges(&mut shell, &[edge[5].clone()], Some(&params)).unwrap();
 
     assert!(shell.len() > initial_face_count);
 }
@@ -942,7 +942,7 @@ fn generic_fillet_unsupported() {
         Point3::new(1.0, 1.0, 0.0),
         Point3::new(0.0, 1.0, 0.0),
     ];
-    let v: Vec<MVertex> = MVertex::news(p);
+    let v: Vec<MVertex> = MVertex::from_points(p);
 
     let line_edge =
         |i: usize, j: usize| -> MEdge { MEdge::new(&v[i], &v[j], MCurve::Line(Line(p[i], p[j]))) };
@@ -967,10 +967,10 @@ fn generic_fillet_unsupported() {
     let mut shell: MShell = vec![face].into();
 
     let params = FilletOptions {
-        radius: RadiusSpec::Constant(0.3),
+        radius: FilletRadius::Constant(0.3),
         ..Default::default()
     };
-    let result = fillet_edges_generic(&mut shell, &[edge[0].clone()], Some(&params));
+    let result = fillet_edges(&mut shell, &[edge[0].clone()], Some(&params));
     assert!(
         matches!(
             result,
@@ -995,7 +995,7 @@ fn fillet_edges_multi_chain() {
         Point3::new(1.0, 1.0, 0.0),
         Point3::new(0.0, 1.0, 0.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
 
     let line = |i: usize, j: usize| {
         let bsp = BsplineCurve::new(KnotVector::bezier_knot(1), vec![p[i], p[j]]);
@@ -1056,10 +1056,10 @@ fn fillet_edges_multi_chain() {
     // Fillet two independent edges belonging to different face pairs:
     // edge[5] (front-right) and edge[7] (top-left / back-left).
     let params = FilletOptions {
-        radius: RadiusSpec::Constant(0.3),
+        radius: FilletRadius::Constant(0.3),
         ..Default::default()
     };
-    fillet_edges(&mut shell, &[edge[5].id(), edge[7].id()], Some(&params)).unwrap();
+    fillet_edges_by_id(&mut shell, &[edge[5].id(), edge[7].id()], Some(&params)).unwrap();
 
     // Both fillets should add faces.
     assert!(
@@ -1073,7 +1073,7 @@ fn fillet_edges_multi_chain() {
     let _poly = shell.robust_triangulation(0.001).to_polygon();
 }
 
-/// Multi-chain test with monstertruck_modeling types via `fillet_edges_generic`.
+/// Multi-chain test with monstertruck_modeling types via `fillet_edges`.
 #[test]
 fn generic_fillet_multi_chain() {
     type MCurve = monstertruck_modeling::Curve;
@@ -1094,7 +1094,7 @@ fn generic_fillet_multi_chain() {
         Point3::new(1.0, 1.0, 0.0),
         Point3::new(0.0, 1.0, 0.0),
     ];
-    let v: Vec<MVertex> = MVertex::news(p);
+    let v: Vec<MVertex> = MVertex::from_points(p);
 
     let line_edge =
         |i: usize, j: usize| -> MEdge { MEdge::new(&v[i], &v[j], MCurve::Line(Line(p[i], p[j]))) };
@@ -1149,10 +1149,10 @@ fn generic_fillet_multi_chain() {
 
     // Fillet two independent edges from different face pairs.
     let params = FilletOptions {
-        radius: RadiusSpec::Constant(0.3),
+        radius: FilletRadius::Constant(0.3),
         ..Default::default()
     };
-    fillet_edges_generic(
+    fillet_edges(
         &mut shell,
         &[edge[5].clone(), edge[7].clone()],
         Some(&params),
@@ -1178,11 +1178,11 @@ fn chamfer_single_edge() {
     let initial_face_count = shell.len();
 
     let params = FilletOptions {
-        radius: RadiusSpec::Constant(0.4),
+        radius: FilletRadius::Constant(0.4),
         profile: FilletProfile::Chamfer,
         ..Default::default()
     };
-    fillet_edges(&mut shell, &[edge[5].id()], Some(&params)).unwrap();
+    fillet_edges_by_id(&mut shell, &[edge[5].id()], Some(&params)).unwrap();
 
     assert!(shell.len() > initial_face_count);
     let _poly = shell.robust_triangulation(0.001).to_polygon();
@@ -1201,7 +1201,7 @@ fn chamfer_semi_cube() {
         Point3::new(1.1, 1.1, 0.0),
         Point3::new(0.0, 1.1, 0.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
 
     let line = |i: usize, j: usize| {
         let bsp = BsplineCurve::new(KnotVector::bezier_knot(1), vec![p[i], p[j]]);
@@ -1255,7 +1255,7 @@ fn chamfer_semi_cube() {
     .into();
 
     let chamfer_opts = FilletOptions {
-        radius: RadiusSpec::Constant(0.4),
+        radius: FilletRadius::Constant(0.4),
         profile: FilletProfile::Chamfer,
         ..Default::default()
     };
@@ -1290,7 +1290,7 @@ fn chamfer_semi_cube() {
         &mut shell,
         &boundary,
         &FilletOptions {
-            radius: RadiusSpec::Constant(0.2),
+            radius: FilletRadius::Constant(0.2),
             profile: FilletProfile::Chamfer,
             ..Default::default()
         },
@@ -1313,7 +1313,7 @@ fn chamfer_closed_wire() {
         Point3::new(1.0, 1.0, 0.0),
         Point3::new(0.0, 1.0, 0.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
 
     let line = |i: usize, j: usize| {
         let bsp = BsplineCurve::new(KnotVector::bezier_knot(1), vec![p[i], p[j]]);
@@ -1382,7 +1382,7 @@ fn chamfer_closed_wire() {
         &mut shell,
         &closed_wire,
         &FilletOptions {
-            radius: RadiusSpec::Constant(0.2),
+            radius: FilletRadius::Constant(0.2),
             profile: FilletProfile::Chamfer,
             ..Default::default()
         },
@@ -1404,11 +1404,11 @@ fn ridge_single_edge() {
     let initial_face_count = shell.len();
 
     let params = FilletOptions {
-        radius: RadiusSpec::Constant(0.4),
+        radius: FilletRadius::Constant(0.4),
         profile: FilletProfile::Ridge,
         ..Default::default()
     };
-    fillet_edges(&mut shell, &[edge[5].id()], Some(&params)).unwrap();
+    fillet_edges_by_id(&mut shell, &[edge[5].id()], Some(&params)).unwrap();
 
     assert!(shell.len() > initial_face_count);
     let _poly = shell.robust_triangulation(0.001).to_polygon();
@@ -1427,7 +1427,7 @@ fn ridge_semi_cube() {
         Point3::new(1.1, 1.1, 0.0),
         Point3::new(0.0, 1.1, 0.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
 
     let line = |i: usize, j: usize| {
         let bsp = BsplineCurve::new(KnotVector::bezier_knot(1), vec![p[i], p[j]]);
@@ -1481,7 +1481,7 @@ fn ridge_semi_cube() {
     .into();
 
     let ridge_opts = FilletOptions {
-        radius: RadiusSpec::Constant(0.4),
+        radius: FilletRadius::Constant(0.4),
         profile: FilletProfile::Ridge,
         ..Default::default()
     };
@@ -1516,7 +1516,7 @@ fn ridge_semi_cube() {
         &mut shell,
         &boundary,
         &FilletOptions {
-            radius: RadiusSpec::Constant(0.2),
+            radius: FilletRadius::Constant(0.2),
             profile: FilletProfile::Ridge,
             ..Default::default()
         },
@@ -1539,7 +1539,7 @@ fn ridge_closed_wire() {
         Point3::new(1.0, 1.0, 0.0),
         Point3::new(0.0, 1.0, 0.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
 
     let line = |i: usize, j: usize| {
         let bsp = BsplineCurve::new(KnotVector::bezier_knot(1), vec![p[i], p[j]]);
@@ -1608,7 +1608,7 @@ fn ridge_closed_wire() {
         &mut shell,
         &closed_wire,
         &FilletOptions {
-            radius: RadiusSpec::Constant(0.2),
+            radius: FilletRadius::Constant(0.2),
             profile: FilletProfile::Ridge,
             ..Default::default()
         },
@@ -1634,11 +1634,11 @@ fn custom_profile_linear() {
         vec![Point2::new(0.0, 0.0), Point2::new(1.0, 0.0)],
     );
     let params = FilletOptions {
-        radius: RadiusSpec::Constant(0.4),
+        radius: FilletRadius::Constant(0.4),
         profile: FilletProfile::Custom(Box::new(profile)),
         ..Default::default()
     };
-    fillet_edges(&mut shell, &[edge[5].id()], Some(&params)).unwrap();
+    fillet_edges_by_id(&mut shell, &[edge[5].id()], Some(&params)).unwrap();
 
     assert!(shell.len() > initial_face_count);
     let _poly = shell.robust_triangulation(0.001).to_polygon();
@@ -1657,7 +1657,7 @@ fn variable_radius_closed_wire() {
         Point3::new(1.0, 1.0, 0.0),
         Point3::new(0.0, 1.0, 0.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
 
     let line = |i: usize, j: usize| {
         let bsp = BsplineCurve::new(KnotVector::bezier_knot(1), vec![p[i], p[j]]);
@@ -1725,7 +1725,9 @@ fn variable_radius_closed_wire() {
     // Variable radius: 0.15 at endpoints, peaks at ~0.20 at t=0.5.
     // f(0) ≈ f(1) ≈ 0.15, satisfying the closed-wire constraint.
     let opts = FilletOptions {
-        radius: RadiusSpec::Variable(Box::new(|t| 0.15 + 0.05 * (std::f64::consts::PI * t).sin())),
+        radius: FilletRadius::Variable(Box::new(|t| {
+            0.15 + 0.05 * (std::f64::consts::PI * t).sin()
+        })),
         ..Default::default()
     };
     fillet_along_wire(&mut shell, &closed_wire, &opts).unwrap();
@@ -1741,10 +1743,10 @@ fn fillet_rejects_degenerate_edge() {
 
     // The box edges are length 1.0. Request a radius of 0.6 → 2*0.6 = 1.2 > 1.0.
     let params = FilletOptions {
-        radius: RadiusSpec::Constant(0.6),
+        radius: FilletRadius::Constant(0.6),
         ..Default::default()
     };
-    let result = fillet_edges(&mut shell, &[edge[5].id()], Some(&params));
+    let result = fillet_edges_by_id(&mut shell, &[edge[5].id()], Some(&params));
     assert!(
         matches!(result, Err(super::FilletError::DegenerateEdge)),
         "expected DegenerateEdge, got: {result:?}"
@@ -1766,11 +1768,11 @@ fn custom_profile_bump() {
         ],
     );
     let params = FilletOptions {
-        radius: RadiusSpec::Constant(0.4),
+        radius: FilletRadius::Constant(0.4),
         profile: FilletProfile::Custom(Box::new(profile)),
         ..Default::default()
     };
-    fillet_edges(&mut shell, &[edge[5].id()], Some(&params)).unwrap();
+    fillet_edges_by_id(&mut shell, &[edge[5].id()], Some(&params)).unwrap();
 
     assert!(shell.len() > initial_face_count);
     let _poly = shell.robust_triangulation(0.001).to_polygon();
@@ -1860,7 +1862,7 @@ fn variable_radius_open_wire() {
         Point3::new(1.1, 1.1, 0.0),
         Point3::new(0.0, 1.1, 0.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
 
     let line = |i: usize, j: usize| {
         let bsp = BsplineCurve::new(KnotVector::bezier_knot(1), vec![p[i], p[j]]);
@@ -1914,7 +1916,7 @@ fn variable_radius_open_wire() {
     .into();
 
     let opts = FilletOptions {
-        radius: RadiusSpec::Constant(0.4),
+        radius: FilletRadius::Constant(0.4),
         ..Default::default()
     };
     let (face0, face1, face2, _, side1) = fillet_with_side(
@@ -1948,7 +1950,7 @@ fn variable_radius_open_wire() {
 
     // Variable radius where f(0)=0.1, f(1)=0.3 -- NOT equal, would fail on closed wire.
     let var_opts = FilletOptions {
-        radius: RadiusSpec::Variable(Box::new(|t| 0.1 + 0.2 * t)),
+        radius: FilletRadius::Variable(Box::new(|t| 0.1 + 0.2 * t)),
         ..Default::default()
     };
     fillet_along_wire(&mut shell, &boundary, &var_opts).unwrap();
@@ -1972,7 +1974,7 @@ fn cut_face_five_edge_boundary() {
             Point3::new(angle.cos(), angle.sin(), 0.0)
         })
         .collect();
-    let v = Vertex::news(&pts);
+    let v = Vertex::from_points(&pts);
 
     let line_edge = |i: usize, j: usize| {
         let bsp = BsplineCurve::new(KnotVector::bezier_knot(1), vec![pts[i], pts[j]]);
@@ -2051,7 +2053,7 @@ fn per_edge_radius_two_edges() {
         Point3::new(1.0, 1.0, 0.0),
         Point3::new(0.0, 1.0, 0.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
 
     let line = |i: usize, j: usize| {
         let bsp = BsplineCurve::new(KnotVector::bezier_knot(1), vec![p[i], p[j]]);
@@ -2109,10 +2111,10 @@ fn per_edge_radius_two_edges() {
 
     // Two independent edges with different radii.
     let params = FilletOptions {
-        radius: RadiusSpec::PerEdge(vec![0.3, 0.15]),
+        radius: FilletRadius::PerEdge(vec![0.3, 0.15]),
         ..Default::default()
     };
-    fillet_edges(&mut shell, &[edge[5].id(), edge[7].id()], Some(&params)).unwrap();
+    fillet_edges_by_id(&mut shell, &[edge[5].id(), edge[7].id()], Some(&params)).unwrap();
 
     assert!(
         shell.len() >= initial_face_count + 2,
@@ -2130,10 +2132,10 @@ fn per_edge_radius_mismatch() {
 
     // Provide 1 radius for 2 edges → mismatch.
     let params = FilletOptions {
-        radius: RadiusSpec::PerEdge(vec![0.3]),
+        radius: FilletRadius::PerEdge(vec![0.3]),
         ..Default::default()
     };
-    let result = fillet_edges(&mut shell, &[edge[5].id(), edge[6].id()], Some(&params));
+    let result = fillet_edges_by_id(&mut shell, &[edge[5].id(), edge[6].id()], Some(&params));
     assert!(
         matches!(
             result,
@@ -2154,10 +2156,10 @@ fn per_edge_radius_degenerate() {
     // edge[5] length ~1.0, radius 0.15 → ok (2*0.15=0.3 < 1.0).
     // edge[6] length ~1.0, radius 0.6 → too big (2*0.6=1.2 > 1.0).
     let params = FilletOptions {
-        radius: RadiusSpec::PerEdge(vec![0.15, 0.6]),
+        radius: FilletRadius::PerEdge(vec![0.15, 0.6]),
         ..Default::default()
     };
-    let result = fillet_edges(&mut shell, &[edge[5].id(), edge[6].id()], Some(&params));
+    let result = fillet_edges_by_id(&mut shell, &[edge[5].id(), edge[6].id()], Some(&params));
     assert!(
         matches!(result, Err(super::FilletError::DegenerateEdge)),
         "expected DegenerateEdge, got: {result:?}"
@@ -2181,7 +2183,7 @@ fn radius_error_bounds() {
         &shell[2],
         edge[5].id(),
         &FilletOptions {
-            radius: RadiusSpec::Constant(radius),
+            radius: FilletRadius::Constant(radius),
             ..Default::default()
         },
     )
@@ -2195,7 +2197,7 @@ fn radius_error_bounds() {
     // Points should be on that plane (dy≈0) at distance radius from face2 (dx≈radius).
     for j in 0..=n {
         let v = j as f64 / n as f64;
-        let pt = fillet_surface.subs(0.0, v);
+        let pt = fillet_surface.evaluate(0.0, v);
         let dy = pt.y.abs();
         let dx = (pt.x - 1.0).abs();
         assert!(dy < tol, "u=0 contact not on y=0 plane: dy={dy:.6}");
@@ -2209,7 +2211,7 @@ fn radius_error_bounds() {
     // Points should be on that plane (dx≈0) at distance radius from face1 (dy≈radius).
     for j in 0..=n {
         let v = j as f64 / n as f64;
-        let pt = fillet_surface.subs(1.0, v);
+        let pt = fillet_surface.evaluate(1.0, v);
         let dx = (pt.x - 1.0).abs();
         let dy = pt.y.abs();
         assert!(dx < tol, "u=1 contact not on x=1 plane: dx={dx:.6}");
@@ -2224,7 +2226,7 @@ fn radius_error_bounds() {
         for j in 0..=n {
             let u = i as f64 / n as f64;
             let v = j as f64 / n as f64;
-            let pt = fillet_surface.subs(u, v);
+            let pt = fillet_surface.evaluate(u, v);
             let dx = (pt.x - 1.0).abs();
             let dy = pt.y.abs();
             assert!(
@@ -2251,7 +2253,7 @@ fn continuity_at_wire_joins() {
         Point3::new(1.1, 1.1, 0.0),
         Point3::new(0.0, 1.1, 0.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
 
     let line = |i: usize, j: usize| {
         let bsp = BsplineCurve::new(KnotVector::bezier_knot(1), vec![p[i], p[j]]);
@@ -2305,7 +2307,7 @@ fn continuity_at_wire_joins() {
     .into();
 
     let opts = FilletOptions {
-        radius: RadiusSpec::Constant(0.4),
+        radius: FilletRadius::Constant(0.4),
         ..Default::default()
     };
     let (face0, face1, face2, _, side1) = fillet_with_side(
@@ -2340,7 +2342,7 @@ fn continuity_at_wire_joins() {
         &mut shell,
         &boundary,
         &FilletOptions {
-            radius: RadiusSpec::Constant(0.2),
+            radius: FilletRadius::Constant(0.2),
             ..Default::default()
         },
     )
@@ -2425,7 +2427,7 @@ fn build_5face_box() -> (Shell, [Edge; 12], Vec<Vertex>) {
         Point3::new(1.0, 1.0, 0.0),
         Point3::new(0.0, 1.0, 0.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
 
     let line = |i: usize, j: usize| {
         let bsp = BsplineCurve::new(KnotVector::bezier_knot(1), vec![p[i], p[j]]);
@@ -2494,7 +2496,7 @@ fn build_6face_box() -> (Shell, [Edge; 12], Vec<Vertex>) {
         Point3::new(1.0, 1.0, 0.0),
         Point3::new(0.0, 1.0, 0.0),
     ];
-    let v = Vertex::news(p);
+    let v = Vertex::from_points(p);
 
     let line = |i: usize, j: usize| {
         let bsp = BsplineCurve::new(KnotVector::bezier_knot(1), vec![p[i], p[j]]);
@@ -2563,10 +2565,10 @@ fn fillet_edges_cuboid_top_4() {
     let (mut shell, edge, _v) = build_5face_box();
     let top_ids: Vec<EdgeId> = (0..4).map(|i| edge[i].id()).collect();
     let opts = FilletOptions {
-        radius: RadiusSpec::Constant(0.2),
+        radius: FilletRadius::Constant(0.2),
         ..Default::default()
     };
-    fillet_edges(&mut shell, &top_ids, Some(&opts)).unwrap();
+    fillet_edges_by_id(&mut shell, &top_ids, Some(&opts)).unwrap();
     // 4 fillet faces added (one per edge in the closed wire).
     assert!(shell.len() >= 9, "expected >= 9 faces, got {}", shell.len());
     let _poly = shell.robust_triangulation(0.001).to_polygon();
@@ -2581,10 +2583,10 @@ fn fillet_edges_cuboid_top_and_bottom() {
         .map(|&i| edge[i].id())
         .collect();
     let opts = FilletOptions {
-        radius: RadiusSpec::Constant(0.15),
+        radius: FilletRadius::Constant(0.15),
         ..Default::default()
     };
-    fillet_edges(&mut shell, &ids, Some(&opts)).unwrap();
+    fillet_edges_by_id(&mut shell, &ids, Some(&opts)).unwrap();
     // 8 fillet faces added (4 per closed chain).
     assert!(
         shell.len() >= 14,
