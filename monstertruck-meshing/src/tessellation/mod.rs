@@ -118,6 +118,8 @@ pub trait MeshedShape {
     fn to_polygon(&self) -> PolygonMesh;
 }
 
+pub use triangulation::ExactTrimBoundary2D;
+
 impl MeshedShape for Shell<Point3, PolylineCurve, PolygonMesh> {
     fn to_polygon(&self) -> PolygonMesh {
         let mut polygon = PolygonMesh::default();
@@ -389,13 +391,13 @@ pub fn robust_compressed_shell_triangulation<
 pub fn compressed_trimmed_shell_triangulation<
     C: PolylineableCurve + ParameterBoundary2D<S> + ExactParameterBoundary2D<S>,
     S: MeshableSurface,
-    T: triangulation::ExactTrimBoundary2D + Parallelizable,
+    T: ExactTrimBoundary2D + Parallelizable,
 >(
     shell: &CompressedTrimmedShell<Point3, C, S, T>,
     options: TessellationOptions,
 ) -> CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>>
 where
-    <C as ExactParameterBoundary2D<S>>::BoundaryCurve: triangulation::ExactTrimBoundary2D,
+    <C as ExactParameterBoundary2D<S>>::BoundaryCurve: ExactTrimBoundary2D,
 {
     nonpositive_tolerance!(options.tolerance);
     let sp = triangulation::search_parameter_sp::<S>(options.search_trials);
@@ -411,13 +413,13 @@ where
 pub fn robust_compressed_trimmed_shell_triangulation<
     C: PolylineableCurve + ParameterBoundary2D<S> + ExactParameterBoundary2D<S>,
     S: RobustMeshableSurface,
-    T: triangulation::ExactTrimBoundary2D + Parallelizable,
+    T: ExactTrimBoundary2D + Parallelizable,
 >(
     shell: &CompressedTrimmedShell<Point3, C, S, T>,
     options: TessellationOptions,
 ) -> CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>>
 where
-    <C as ExactParameterBoundary2D<S>>::BoundaryCurve: triangulation::ExactTrimBoundary2D,
+    <C as ExactParameterBoundary2D<S>>::BoundaryCurve: ExactTrimBoundary2D,
 {
     nonpositive_tolerance!(options.tolerance);
     let sp = triangulation::search_nearest_parameter_sp::<S>(options.search_trials);
@@ -527,8 +529,8 @@ impl<C, S, T> MeshableShape for CompressedTrimmedShell<Point3, C, S, T>
 where
     C: PolylineableCurve + ParameterBoundary2D<S> + ExactParameterBoundary2D<S>,
     S: MeshableSurface,
-    T: triangulation::ExactTrimBoundary2D + Parallelizable,
-    <C as ExactParameterBoundary2D<S>>::BoundaryCurve: triangulation::ExactTrimBoundary2D,
+    T: ExactTrimBoundary2D + Parallelizable,
+    <C as ExactParameterBoundary2D<S>>::BoundaryCurve: ExactTrimBoundary2D,
 {
     type MeshedShape = CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>>;
     fn triangulation(&self, tolerance: f64) -> Self::MeshedShape {
@@ -546,8 +548,8 @@ impl<C, S, T> RobustMeshableShape for CompressedTrimmedShell<Point3, C, S, T>
 where
     C: PolylineableCurve + ParameterBoundary2D<S> + ExactParameterBoundary2D<S>,
     S: RobustMeshableSurface,
-    T: triangulation::ExactTrimBoundary2D + Parallelizable,
-    <C as ExactParameterBoundary2D<S>>::BoundaryCurve: triangulation::ExactTrimBoundary2D,
+    T: ExactTrimBoundary2D + Parallelizable,
+    <C as ExactParameterBoundary2D<S>>::BoundaryCurve: ExactTrimBoundary2D,
 {
     type MeshedShape = CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>>;
     fn robust_triangulation(&self, tolerance: f64) -> Self::MeshedShape {
@@ -615,8 +617,8 @@ impl<C, S, T> MeshableShape for CompressedTrimmedSolid<Point3, C, S, T>
 where
     C: PolylineableCurve + ParameterBoundary2D<S> + ExactParameterBoundary2D<S>,
     S: MeshableSurface,
-    T: triangulation::ExactTrimBoundary2D + Parallelizable,
-    <C as ExactParameterBoundary2D<S>>::BoundaryCurve: triangulation::ExactTrimBoundary2D,
+    T: ExactTrimBoundary2D + Parallelizable,
+    <C as ExactParameterBoundary2D<S>>::BoundaryCurve: ExactTrimBoundary2D,
 {
     type MeshedShape = CompressedSolid<Point3, PolylineCurve, Option<PolygonMesh>>;
     fn triangulation(&self, tolerance: f64) -> Self::MeshedShape {
@@ -644,8 +646,8 @@ impl<C, S, T> RobustMeshableShape for CompressedTrimmedSolid<Point3, C, S, T>
 where
     C: PolylineableCurve + ParameterBoundary2D<S> + ExactParameterBoundary2D<S>,
     S: RobustMeshableSurface,
-    T: triangulation::ExactTrimBoundary2D + Parallelizable,
-    <C as ExactParameterBoundary2D<S>>::BoundaryCurve: triangulation::ExactTrimBoundary2D,
+    T: ExactTrimBoundary2D + Parallelizable,
+    <C as ExactParameterBoundary2D<S>>::BoundaryCurve: ExactTrimBoundary2D,
 {
     type MeshedShape = CompressedSolid<Point3, PolylineCurve, Option<PolygonMesh>>;
     fn robust_triangulation(&self, tolerance: f64) -> Self::MeshedShape {

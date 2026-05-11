@@ -1,3 +1,8 @@
+use super::step_geometry::{
+    SurfaceCurve3D as StepSurfaceCurve3D,
+    SurfaceCurveAssociatedGeometry as StepSurfaceCurveAssociatedGeometry,
+    SurfaceCurveKind as StepSurfaceCurveKind,
+};
 use super::*;
 use monstertruck_topology::compress::*;
 
@@ -150,14 +155,54 @@ impl Table {
         surface: &Surface,
         orientation: bool,
     ) -> Option<step_geometry::StepParameterCurve> {
-        let mut trim_curve = step_geometry::StepParameterCurve::try_from(
-            step_geometry::CurveTrimRef::new(curve, surface),
-        )
-        .ok()?;
+        let mut trim_curve = match curve {
+            Curve3D::SurfaceCurve(surface_curve) => {
+                Self::seam_trim_curve_on(surface_curve, surface, orientation).or_else(|| {
+                    step_geometry::StepParameterCurve::try_from(step_geometry::CurveTrimRef::new(
+                        curve, surface,
+                    ))
+                    .ok()
+                })?
+            }
+            _ => step_geometry::StepParameterCurve::try_from(step_geometry::CurveTrimRef::new(
+                curve, surface,
+            ))
+            .ok()?,
+        };
         if !orientation {
             trim_curve.invert();
         }
         Some(trim_curve)
+    }
+
+    fn seam_trim_curve_on(
+        curve: &StepSurfaceCurve3D,
+        surface: &Surface,
+        orientation: bool,
+    ) -> Option<step_geometry::StepParameterCurve> {
+        (curve.kind() == StepSurfaceCurveKind::Seam)
+            .then(|| {
+                let curves = curve
+                    .associated_geometry()
+                    .iter()
+                    .filter_map(|geometry| match geometry {
+                        StepSurfaceCurveAssociatedGeometry::ParameterCurve(trim_curve)
+                            if trim_curve.surface().as_ref() == surface
+                                || StepSurfaceCurve3D::same_surface(
+                                    trim_curve.surface().as_ref(),
+                                    surface,
+                                ) =>
+                        {
+                            Some(trim_curve)
+                        }
+                        _ => None,
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>();
+                let index = usize::from(!orientation);
+                curves.get(index).or_else(|| curves.first()).cloned()
+            })
+            .flatten()
     }
 
     fn face_bound_to_edge_uses(
@@ -218,12 +263,9 @@ impl Table {
                     .into_owned(self)
                     .map_err(|e| eprintln!("{e}"))
                     .ok()?;
-                let mut surface = Surface::try_from(&step_surface)
+                let surface = Surface::try_from(&step_surface)
                     .map_err(|e| eprintln!("{e}"))
                     .ok()?;
-                if !face.same_sense {
-                    surface.invert()
-                }
                 let boundaries: Vec<_> = face
                     .bounds_holder(self)
                     .into_iter()
@@ -232,7 +274,7 @@ impl Table {
                 Some(CompressedFace {
                     surface,
                     boundaries,
-                    orientation,
+                    orientation: orientation == face.same_sense,
                 })
             })
             .collect()
@@ -253,12 +295,9 @@ impl Table {
                     .into_owned(self)
                     .map_err(|e| eprintln!("{e}"))
                     .ok()?;
-                let mut surface = Surface::try_from(&step_surface)
+                let surface = Surface::try_from(&step_surface)
                     .map_err(|e| eprintln!("{e}"))
                     .ok()?;
-                if !face.same_sense {
-                    surface.invert()
-                }
                 let boundaries = face
                     .bounds_holder(self)
                     .into_iter()
@@ -267,7 +306,7 @@ impl Table {
                 Some(CompressedTrimmedFace {
                     surface,
                     boundaries,
-                    orientation,
+                    orientation: orientation == face.same_sense,
                 })
             })
             .collect()
@@ -759,5 +798,62 @@ impl StepShell for ShellAnyHolder {
             ShellAnyHolder::OrientedShell(shell) => shell.to_compressed_trimmed_shell(table),
             ShellAnyHolder::Shell(shell) => shell.to_compressed_trimmed_shell(table),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::load::step_geometry::SurfaceCurveRepresentation as StepSurfaceCurveRepresentation;
+    use std::f64::consts::TAU;
+
+    fn cylinder_surface() -> Surface {
+        let axis = Vector3::unit_z();
+        let center = Point3::origin();
+        let point = Point3::new(1.0, 0.0, 0.0);
+        let line = Line(point, point + axis);
+        Surface::ElementarySurface(ElementarySurface::CylindricalSurface(Processor::new(
+            RevolutionSurface::by_revolution(line, center, axis),
+        )))
+    }
+
+    fn line_pcurve(surface: &Surface, u: f64) -> step_geometry::StepParameterCurve {
+        step_geometry::StepParameterCurve::new(
+            Box::new(Curve2D::Line(Line(
+                Point2::new(u, 0.0),
+                Point2::new(u, 1.0),
+            ))),
+            Box::new(surface.clone()),
+        )
+    }
+
+    fn seam_curve(surface: &Surface) -> Curve3D {
+        let leader = Curve3D::Line(Line(surface.evaluate(0.0, 0.0), surface.evaluate(0.0, 1.0)));
+        Curve3D::SurfaceCurve(SurfaceCurve3D::new(
+            StepSurfaceCurveKind::Seam,
+            Box::new(leader),
+            vec![
+                SurfaceCurveAssociatedGeometry::ParameterCurve(line_pcurve(surface, 0.0)),
+                SurfaceCurveAssociatedGeometry::ParameterCurve(line_pcurve(surface, TAU)),
+            ],
+            StepSurfaceCurveRepresentation::ParameterCurve1,
+        ))
+    }
+
+    #[test]
+    fn seam_curve_opposite_orientations_use_opposite_parameter_curves() {
+        let surface = cylinder_surface();
+        let curve = seam_curve(&surface);
+
+        let forward = Table::exact_trim_curve_on(&curve, &surface, true)
+            .expect("forward trim curve should exist");
+        let backward = Table::exact_trim_curve_on(&curve, &surface, false)
+            .expect("backward trim curve should exist");
+
+        let forward_start = forward.curve().evaluate(forward.curve().range_tuple().0);
+        let backward_start = backward.curve().evaluate(backward.curve().range_tuple().0);
+
+        assert!(forward_start.x.near(&0.0));
+        assert!(backward_start.x.near(&TAU));
     }
 }

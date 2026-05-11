@@ -5,10 +5,10 @@ use crate::Point2;
 use crate::filters::StructuringFilter;
 use array_macro::array;
 use handles::FixedVertexHandle;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use monstertruck_geometry::prelude::ParameterCurve;
 use rustc_hash::FxHashMap as HashMap;
-use std::time::Instant;
+use std::{collections::hash_map::Entry, env, iter, time::Instant};
 
 mod boundary;
 mod mesh;
@@ -22,8 +22,14 @@ type MeshedShell = Shell<Point3, PolylineCurve, Option<PolygonMesh>>;
 type MeshedCompressedShell = CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>>;
 type TrimmedShell<C, S, T> = CompressedTrimmedShell<Point3, C, S, T>;
 
+const MAX_LIFTED_TRIM_SUBDIVISION_DEPTH: usize = 16;
+
+/// Provides exact trim boundaries in surface parameter space.
 pub trait ExactTrimBoundary2D {
+    /// Samples the trim boundary in surface parameter space.
     fn exact_trim_boundary_2d(&self, tolerance: f64) -> Vec<Point2>;
+
+    /// Projects a point on the spatial boundary back onto this trim boundary.
     fn project_boundary_point(&self, _point: Point3, _hint: Option<f64>) -> Option<(f64, Point2)> {
         None
     }
@@ -32,13 +38,12 @@ pub trait ExactTrimBoundary2D {
 impl<C, S> ExactTrimBoundary2D for ParameterCurve<C, S>
 where
     C: ParametricCurve2D + BoundedCurve + ParameterDivision1D<Point = Point2>,
+    S: ParametricSurface3D,
     ParameterCurve<C, S>:
         SearchParameter<D1, Point = Point3> + SearchNearestParameter<D1, Point = Point3>,
 {
     fn exact_trim_boundary_2d(&self, tolerance: f64) -> Vec<Point2> {
-        self.curve()
-            .parameter_division(self.curve().range_tuple(), tolerance)
-            .1
+        lifted_trim_boundary_2d(self, tolerance)
     }
 
     fn project_boundary_point(&self, point: Point3, hint: Option<f64>) -> Option<(f64, Point2)> {
@@ -49,10 +54,84 @@ where
             .map(|t| (t, self.curve().evaluate(t)))
     }
 }
-fn mesh_trace_enabled() -> bool { std::env::var_os("MT_MESH_TRACE").is_some() }
+
+fn lifted_trim_boundary_2d<C, S>(trim_curve: &ParameterCurve<C, S>, tolerance: f64) -> Vec<Point2>
+where
+    C: ParametricCurve2D + BoundedCurve + ParameterDivision1D<Point = Point2>,
+    S: ParametricSurface3D, {
+    let (parameters, boundary) = trim_curve
+        .curve()
+        .parameter_division(trim_curve.curve().range_tuple(), tolerance);
+    if parameters.len() != boundary.len() || boundary.len() <= 1 {
+        boundary
+    } else {
+        let mut refined = Vec::with_capacity(boundary.len());
+        refined.push(boundary[0]);
+        parameters
+            .windows(2)
+            .zip(boundary.windows(2))
+            .for_each(|(parameters, boundary)| {
+                append_lifted_trim_segment(
+                    trim_curve,
+                    (parameters[0], boundary[0]),
+                    (parameters[1], boundary[1]),
+                    tolerance * tolerance,
+                    0,
+                    &mut refined,
+                );
+            });
+        refined
+    }
+}
+
+fn append_lifted_trim_segment<C, S>(
+    trim_curve: &ParameterCurve<C, S>,
+    front: (f64, Point2),
+    back: (f64, Point2),
+    tolerance2: f64,
+    depth: usize,
+    refined: &mut Vec<Point2>,
+) where
+    C: ParametricCurve2D,
+    S: ParametricSurface3D,
+{
+    let (front_parameter, front_uv) = front;
+    let (back_parameter, back_uv) = back;
+    if depth >= MAX_LIFTED_TRIM_SUBDIVISION_DEPTH || (back_parameter - front_parameter).so_small() {
+        refined.push(back_uv);
+    } else {
+        let middle_parameter = (front_parameter + back_parameter) * 0.5;
+        let middle_uv = trim_curve.curve().evaluate(middle_parameter);
+        let front_point = trim_curve.surface().evaluate(front_uv.x, front_uv.y);
+        let middle_point = trim_curve.surface().evaluate(middle_uv.x, middle_uv.y);
+        let back_point = trim_curve.surface().evaluate(back_uv.x, back_uv.y);
+        if point_segment_distance2(middle_point, front_point, back_point) > tolerance2 {
+            append_lifted_trim_segment(
+                trim_curve,
+                front,
+                (middle_parameter, middle_uv),
+                tolerance2,
+                depth + 1,
+                refined,
+            );
+            append_lifted_trim_segment(
+                trim_curve,
+                (middle_parameter, middle_uv),
+                back,
+                tolerance2,
+                depth + 1,
+                refined,
+            );
+        } else {
+            refined.push(back_uv);
+        }
+    }
+}
+
+fn mesh_trace_enabled() -> bool { env::var_os("MT_MESH_TRACE").is_some() }
 
 fn boundary_tolerance_candidates(tolerance: f64) -> Vec<f64> {
-    std::iter::successors(Some(tolerance), |current| {
+    iter::successors(Some(tolerance), |current| {
         let next = *current * 0.5;
         (next > TOLERANCE).then_some(next)
     })
@@ -67,6 +146,88 @@ fn fallback_polyline_curve<C: PolylineableCurve>(
 ) -> PolylineCurve {
     let curve = PolylineCurve::from_curve(&edge.curve, edge.curve.range_tuple(), tolerance);
     if orientation { curve } else { curve.inverse() }
+}
+
+fn densify_curve_parameters(mut parameters: Vec<f64>, min_points: usize) -> Vec<f64> {
+    if parameters.len() >= min_points || parameters.len() < 2 || min_points < 2 {
+        parameters
+    } else {
+        let intervals = parameters.len() - 1;
+        let extra = min_points - parameters.len();
+        parameters = parameters
+            .windows(2)
+            .enumerate()
+            .flat_map(|(interval, window)| {
+                let extra_before = interval * extra / intervals;
+                let extra_after = (interval + 1) * extra / intervals;
+                let splits = 1 + extra_after - extra_before;
+                (0..splits).map(move |index| {
+                    let weight = index as f64 / splits as f64;
+                    window[0] + (window[1] - window[0]) * weight
+                })
+            })
+            .chain(parameters.last().copied())
+            .collect();
+        parameters
+    }
+}
+
+fn fallback_polyline_curve_with_min_points<C: PolylineableCurve>(
+    edge: &CompressedEdge<C>,
+    orientation: bool,
+    tolerance: f64,
+    min_points: usize,
+) -> PolylineCurve {
+    let parameters = densify_curve_parameters(
+        edge.curve
+            .parameter_division(edge.curve.range_tuple(), tolerance)
+            .0,
+        min_points,
+    );
+    let curve = parameters
+        .into_iter()
+        .map(|parameter| edge.curve.evaluate(parameter))
+        .collect::<PolylineCurve>();
+    if orientation { curve } else { curve.inverse() }
+}
+
+fn oriented_edge_indices<'a>(
+    wire: &'a [CompressedEdgeIndex],
+    face_orientation: bool,
+) -> impl Iterator<Item = (usize, bool)> + 'a {
+    match face_orientation {
+        true => Either::Left(
+            wire.iter()
+                .map(|edge_idx| (edge_idx.index, edge_idx.orientation)),
+        ),
+        false => Either::Right(
+            wire.iter()
+                .rev()
+                .map(|edge_idx| (edge_idx.index, !edge_idx.orientation)),
+        ),
+    }
+}
+
+fn oriented_trimmed_edge_uses<'a, T>(
+    wire: &'a [CompressedEdgeUse<T>],
+    face_orientation: bool,
+) -> impl Iterator<Item = (usize, bool, Option<&'a T>)> + 'a {
+    match face_orientation {
+        true => Either::Left(wire.iter().map(|edge_use| {
+            (
+                edge_use.index,
+                edge_use.orientation,
+                edge_use.trim_curve.as_ref(),
+            )
+        })),
+        false => Either::Right(wire.iter().rev().map(|edge_use| {
+            (
+                edge_use.index,
+                !edge_use.orientation,
+                edge_use.trim_curve.as_ref(),
+            )
+        })),
+    }
 }
 
 fn polyline_from_trim_curve<S, T>(
@@ -181,7 +342,7 @@ fn resample_boundary(boundary: &[Point2], target_len: usize) -> Option<Vec<Point
     } else if target_len == 1 || boundary.len() == 1 {
         Some(vec![*boundary.first()?; target_len])
     } else {
-        let cumulative = std::iter::once(0.0)
+        let cumulative = iter::once(0.0)
             .chain(boundary.windows(2).scan(0.0, |length, window| {
                 *length += window[0].distance(window[1]);
                 Some(*length)
@@ -406,6 +567,7 @@ where
         let face_start = Instant::now();
         let boundaries = face.boundaries.clone();
         let surface = &face.surface;
+        let face_orientation = face.orientation;
 
         // Fast path: untrimmed face with bounded surface domain.
         let is_untrimmed = boundaries.iter().all(|wire| wire.is_empty());
@@ -420,33 +582,33 @@ where
             };
         }
 
-        let create_edge = |edge_idx: &CompressedEdgeIndex| match edge_idx.orientation {
-            true => Some(edges.get(edge_idx.index)?.curve.clone()),
-            false => Some(edges.get(edge_idx.index)?.curve.inverse()),
+        let create_edge = |(edge_index, edge_orientation): (usize, bool)| match edge_orientation {
+            true => Some(edges.get(edge_index)?.curve.clone()),
+            false => Some(edges.get(edge_index)?.curve.inverse()),
         };
         let create_boundary = |wire: &Vec<CompressedEdgeIndex>| {
             let exact_edges = |boundary_tolerance| {
-                wire.iter()
-                    .filter_map(|edge_idx| {
-                        let edge = shell.edges.get(edge_idx.index)?;
+                oriented_edge_indices(wire, face_orientation)
+                    .filter_map(|(edge_index, edge_orientation)| {
+                        let edge = shell.edges.get(edge_index)?;
                         let mut boundary = edge
                             .curve
                             .parameter_boundary_2d(surface, boundary_tolerance);
-                        if !edge_idx.orientation {
+                        if !edge_orientation {
                             boundary = boundary.map(|mut boundary| {
                                 boundary.reverse();
                                 boundary
                             });
                         }
                         let polyline = if boundary_tolerance.near(&tolerance) {
-                            match edge_idx.orientation {
-                                true => edges.get(edge_idx.index)?.curve.clone(),
-                                false => edges.get(edge_idx.index)?.curve.inverse(),
+                            match edge_orientation {
+                                true => edges.get(edge_index)?.curve.clone(),
+                                false => edges.get(edge_index)?.curve.inverse(),
                             }
                         } else {
-                            fallback_polyline_curve(edge, edge_idx.orientation, boundary_tolerance)
+                            fallback_polyline_curve(edge, edge_orientation, boundary_tolerance)
                         };
-                        Some((edge_idx.orientation, &edge.curve, boundary, polyline))
+                        Some((edge_orientation, &edge.curve, boundary, polyline))
                     })
                     .collect::<Vec<_>>()
             };
@@ -495,7 +657,8 @@ where
                         .find_map(create_exact_piece)
                 })
                 .or_else(|| {
-                    let wire_iter = wire.iter().filter_map(create_edge);
+                    let wire_iter =
+                        oriented_edge_indices(wire, face_orientation).filter_map(create_edge);
                     PolyBoundaryPiece::try_new(surface, wire_iter, &sp)
                 })
         };
@@ -606,19 +769,30 @@ where
             })
         })
         .fold(
-            HashMap::default(),
+            HashMap::<usize, PolylineCurve>::default(),
             |mut acc, (edge_idx, surface, trim_curve)| {
-                acc.entry(edge_idx).or_insert_with(|| {
-                    let edge = &shell.edges[edge_idx];
-                    polyline_from_trim_curve(
-                        surface,
-                        trim_curve,
-                        edge.vertices,
-                        &vertices,
-                        tolerance,
-                    )
-                    .unwrap_or_else(|| fallback_polyline_curve(edge, true, tolerance))
-                });
+                let edge = &shell.edges[edge_idx];
+                let candidate = polyline_from_trim_curve(
+                    surface,
+                    trim_curve,
+                    edge.vertices,
+                    &vertices,
+                    tolerance,
+                )
+                .map(|curve| {
+                    fallback_polyline_curve_with_min_points(edge, true, tolerance, curve.len())
+                })
+                .unwrap_or_else(|| fallback_polyline_curve(edge, true, tolerance));
+                match acc.entry(edge_idx) {
+                    Entry::Occupied(mut entry) => {
+                        if candidate.len() > entry.get().len() {
+                            entry.insert(candidate);
+                        }
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert(candidate);
+                    }
+                }
                 acc
             },
         );
@@ -664,6 +838,7 @@ where
             })
             .collect::<Vec<_>>();
         let surface = &face.surface;
+        let face_orientation = face.orientation;
 
         let is_untrimmed = boundaries.iter().all(|wire| wire.is_empty());
         if is_untrimmed && let (Some(urange), Some(vrange)) = surface.try_range_tuple() {
@@ -680,42 +855,47 @@ where
         let create_boundary = |wire: &Vec<CompressedEdgeUse<T>>| {
             let wire_start = Instant::now();
             let all_exact = wire.iter().all(|edge_use| edge_use.trim_curve.is_some());
-            let has_face_local_trims = wire.iter().any(|edge_use| edge_use.trim_curve.is_some());
+            let has_shared_edge_polyline = wire
+                .iter()
+                .any(|edge_use| exact_edge_polylines.contains_key(&edge_use.index));
             let direct_trim_piece = || {
                 PolyBoundaryPiece::try_new_from_trimmed(
                     surface,
-                    wire.iter().filter_map(|edge_use| {
-                        shell.edges.get(edge_use.index).map(|edge| {
-                            (
-                                edge_use.orientation,
-                                edge_use.trim_curve.as_ref(),
-                                &edge.curve,
-                            )
-                        })
-                    }),
+                    oriented_trimmed_edge_uses(wire, face_orientation).filter_map(
+                        |(edge_index, edge_orientation, trim_curve)| {
+                            shell
+                                .edges
+                                .get(edge_index)
+                                .map(|edge| (edge_orientation, trim_curve, &edge.curve))
+                        },
+                    ),
                     tolerance,
                 )
             };
             let aligned_trim_piece = || {
                 PolyBoundaryPiece::try_new_from_aligned_trimmed(
                     surface,
-                    wire.iter().filter_map(|edge_use| {
-                        shell.edges.get(edge_use.index).map(|edge| {
-                            let mut polyline = exact_edge_polylines
-                                .get(&edge_use.index)
-                                .cloned()
-                                .unwrap_or_else(|| fallback_polyline_curve(edge, true, tolerance));
-                            if !edge_use.orientation {
-                                polyline.invert();
-                            }
-                            (edge_use.trim_curve.as_ref(), &edge.curve, polyline)
-                        })
-                    }),
+                    oriented_trimmed_edge_uses(wire, face_orientation).filter_map(
+                        |(edge_index, edge_orientation, trim_curve)| {
+                            shell.edges.get(edge_index).map(|edge| {
+                                let mut polyline = exact_edge_polylines
+                                    .get(&edge_index)
+                                    .cloned()
+                                    .unwrap_or_else(|| {
+                                        fallback_polyline_curve(edge, true, tolerance)
+                                    });
+                                if !edge_orientation {
+                                    polyline.invert();
+                                }
+                                (trim_curve, &edge.curve, polyline)
+                            })
+                        },
+                    ),
                     &sp,
                     tolerance,
                 )
             };
-            let exact_piece = if has_face_local_trims {
+            let exact_piece = if has_shared_edge_polyline {
                 aligned_trim_piece().or_else(direct_trim_piece)
             } else {
                 direct_trim_piece().or_else(aligned_trim_piece)
@@ -730,27 +910,27 @@ where
                         .find_map(|boundary_tolerance| {
                             PolyBoundaryPiece::try_new_from_trimmed(
                                 surface,
-                                wire.iter().filter_map(|edge_use| {
-                                    shell.edges.get(edge_use.index).map(|edge| {
-                                        (
-                                            edge_use.orientation,
-                                            edge_use.trim_curve.as_ref(),
-                                            &edge.curve,
-                                        )
-                                    })
-                                }),
+                                oriented_trimmed_edge_uses(wire, face_orientation).filter_map(
+                                    |(edge_index, edge_orientation, trim_curve)| {
+                                        shell
+                                            .edges
+                                            .get(edge_index)
+                                            .map(|edge| (edge_orientation, trim_curve, &edge.curve))
+                                    },
+                                ),
                                 boundary_tolerance,
                             )
                             .or_else(|| {
-                                let wire_iter = wire.iter().filter_map(|edge_use| {
-                                    shell.edges.get(edge_use.index).map(|edge| {
-                                        fallback_polyline_curve(
-                                            edge,
-                                            edge_use.orientation,
-                                            boundary_tolerance,
-                                        )
-                                    })
-                                });
+                                let wire_iter = oriented_trimmed_edge_uses(wire, face_orientation)
+                                    .filter_map(|(edge_index, edge_orientation, _)| {
+                                        shell.edges.get(edge_index).map(|edge| {
+                                            fallback_polyline_curve(
+                                                edge,
+                                                edge_orientation,
+                                                boundary_tolerance,
+                                            )
+                                        })
+                                    });
                                 PolyBoundaryPiece::try_new(surface, wire_iter, &sp)
                             })
                         })
@@ -940,4 +1120,768 @@ fn par_bench() {
         );
     });
     println!("{}ms", instant.elapsed().as_millis());
+}
+
+#[cfg(test)]
+mod tests {
+    use std::f64::consts::{FRAC_PI_2, PI, TAU};
+
+    use super::{
+        boundary::{PolyBoundary, PolyBoundaryPiece, SurfacePoint},
+        mesh::trimming_tessellation,
+        *,
+    };
+    use monstertruck_geometry::prelude::{Line, Matrix4, Plane, Processor, RevolutionSurface};
+
+    #[derive(Clone, Debug)]
+    struct SampledTrim {
+        samples: Vec<Point2>,
+    }
+
+    impl ExactTrimBoundary2D for SampledTrim {
+        fn exact_trim_boundary_2d(&self, _: f64) -> Vec<Point2> { self.samples.clone() }
+    }
+
+    fn sampled_trim(samples: impl IntoIterator<Item = Point2>) -> SampledTrim {
+        SampledTrim {
+            samples: samples.into_iter().collect(),
+        }
+    }
+
+    fn square_piece(surface: &Plane, min: f64, max: f64, ccw: bool) -> PolyBoundaryPiece {
+        let mut boundary = vec![
+            Point2::new(min, min),
+            Point2::new(max, min),
+            Point2::new(max, max),
+            Point2::new(min, max),
+        ];
+        if !ccw {
+            boundary.reverse();
+        }
+        boundary.push(boundary[0]);
+        PolyBoundaryPiece(
+            boundary
+                .into_iter()
+                .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                .collect(),
+        )
+    }
+
+    fn cylinder_patch_piece(surface: &RevolutionSurface<Line<Point3>>) -> PolyBoundaryPiece {
+        let lower = (0..=16).map(|index| Point2::new(0.0, TAU * index as f64 / 16.0));
+        let right = [Point2::new(0.5, TAU), Point2::new(1.0, TAU)];
+        let upper = (0..=16)
+            .rev()
+            .map(|index| Point2::new(1.0, TAU * index as f64 / 16.0));
+        let left = [Point2::new(0.5, 0.0), Point2::new(0.0, 0.0)];
+        PolyBoundaryPiece(
+            lower
+                .chain(right)
+                .chain(upper)
+                .chain(left)
+                .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                .collect(),
+        )
+    }
+
+    fn cylinder_ring_piece(
+        surface: &RevolutionSurface<Line<Point3>>,
+        profile_parameter: f64,
+        reversed: bool,
+    ) -> PolyBoundaryPiece {
+        let mut boundary = (0..=16)
+            .map(|index| Point2::new(profile_parameter, TAU * index as f64 / 16.0))
+            .chain([Point2::new(profile_parameter, 0.0)])
+            .collect::<Vec<_>>();
+        if reversed {
+            boundary.reverse();
+        }
+        PolyBoundaryPiece(
+            boundary
+                .into_iter()
+                .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                .collect(),
+        )
+    }
+
+    fn shortened_cylinder_ring_piece(
+        surface: &RevolutionSurface<Line<Point3>>,
+        profile_parameter: f64,
+        reversed: bool,
+    ) -> PolyBoundaryPiece {
+        let mut boundary = (0..=16)
+            .map(|index| Point2::new(profile_parameter, TAU * 0.95 * index as f64 / 16.0))
+            .chain([Point2::new(profile_parameter, 0.0)])
+            .collect::<Vec<_>>();
+        if reversed {
+            boundary.reverse();
+        }
+        PolyBoundaryPiece(
+            boundary
+                .into_iter()
+                .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                .collect(),
+        )
+    }
+
+    fn step_cylinder_surface() -> Processor<RevolutionSurface<Line<Point3>>, Matrix4> {
+        let profile = Line(Point3::new(1.0, 0.0, 0.0), Point3::new(1.0, 0.0, 1.0));
+        let mut surface: Processor<_, Matrix4> = Processor::new(RevolutionSurface::by_revolution(
+            profile,
+            Point3::origin(),
+            Vector3::unit_z(),
+        ));
+        surface.invert();
+        surface
+    }
+
+    fn double_lap_step_cylinder_piece(
+        surface: &Processor<RevolutionSurface<Line<Point3>>, Matrix4>,
+    ) -> PolyBoundaryPiece {
+        let lower = (0..=16).map(|index| Point2::new(-TAU + TAU * index as f64 / 16.0, 0.0));
+        let right = [Point2::new(0.0, 1.0), Point2::new(TAU, 1.0)];
+        let upper = (0..=16)
+            .rev()
+            .map(|index| Point2::new(TAU * index as f64 / 16.0, 1.0));
+        let left = [Point2::new(0.0, 0.0), Point2::new(-TAU, 0.0)];
+        PolyBoundaryPiece(
+            lower
+                .chain(right)
+                .chain(upper)
+                .chain(left)
+                .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                .collect(),
+        )
+    }
+
+    fn shortened_step_cylinder_ring_piece(
+        surface: &Processor<RevolutionSurface<Line<Point3>>, Matrix4>,
+        height_parameter: f64,
+        reversed: bool,
+    ) -> PolyBoundaryPiece {
+        let mut boundary = (0..=16)
+            .map(|index| Point2::new(TAU * 0.95 * index as f64 / 16.0, height_parameter))
+            .chain([Point2::new(0.0, height_parameter)])
+            .collect::<Vec<_>>();
+        if reversed {
+            boundary.reverse();
+        }
+        PolyBoundaryPiece(
+            boundary
+                .into_iter()
+                .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                .collect(),
+        )
+    }
+
+    fn shifted_step_cylinder_ring_piece(
+        surface: &Processor<RevolutionSurface<Line<Point3>>, Matrix4>,
+        height_parameter: f64,
+        offset: f64,
+        reversed: bool,
+    ) -> PolyBoundaryPiece {
+        let mut boundary = (0..=16)
+            .map(|index| Point2::new(offset + TAU * 0.95 * index as f64 / 16.0, height_parameter))
+            .chain([Point2::new(offset, height_parameter)])
+            .collect::<Vec<_>>();
+        if reversed {
+            boundary.reverse();
+        }
+        PolyBoundaryPiece(
+            boundary
+                .into_iter()
+                .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                .collect(),
+        )
+    }
+
+    fn seam_crossing_step_cylinder_ring_piece(
+        surface: &Processor<RevolutionSurface<Line<Point3>>, Matrix4>,
+        height_parameter: f64,
+        reversed: bool,
+    ) -> PolyBoundaryPiece {
+        seam_crossing_step_cylinder_ring_piece_from(surface, height_parameter, PI, reversed)
+    }
+
+    fn seam_crossing_step_cylinder_ring_piece_from(
+        surface: &Processor<RevolutionSurface<Line<Point3>>, Matrix4>,
+        height_parameter: f64,
+        start_angle: f64,
+        reversed: bool,
+    ) -> PolyBoundaryPiece {
+        let mut boundary = (0..10)
+            .map(|index| {
+                Point2::new(
+                    (start_angle - TAU * index as f64 / 10.0).rem_euclid(TAU),
+                    height_parameter,
+                )
+            })
+            .chain([Point2::new(start_angle.rem_euclid(TAU), height_parameter)])
+            .collect::<Vec<_>>();
+        if reversed {
+            boundary.reverse();
+        }
+        PolyBoundaryPiece(
+            boundary
+                .into_iter()
+                .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                .collect(),
+        )
+    }
+
+    fn seam_crossing_step_cylinder_patch_piece(
+        surface: &Processor<RevolutionSurface<Line<Point3>>, Matrix4>,
+    ) -> PolyBoundaryPiece {
+        let upper = (0..=4)
+            .map(|index| Point2::new((TAU - FRAC_PI_2 * index as f64 / 4.0).rem_euclid(TAU), 1.0));
+        let left = [Point2::new(FRAC_PI_2 * 3.0, 0.0)];
+        let lower = (0..=4)
+            .rev()
+            .map(|index| Point2::new((TAU - FRAC_PI_2 * index as f64 / 4.0).rem_euclid(TAU), 0.0));
+        let close = [Point2::new(0.0, 1.0)];
+        PolyBoundaryPiece(
+            upper
+                .chain(left)
+                .chain(lower)
+                .chain(close)
+                .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn parameter_curve_trim_samples_curved_surface_lift() {
+        let profile = Line(Point3::new(0.25, 0.0, 0.0), Point3::new(0.25, 0.0, 1.0));
+        let surface =
+            RevolutionSurface::by_revolution(profile, Point3::origin(), Vector3::unit_z());
+        let trim = ParameterCurve::new(
+            Line(Point2::new(0.5, 0.0), Point2::new(0.5, FRAC_PI_2)),
+            surface,
+        );
+
+        let uv_points = trim.exact_trim_boundary_2d(0.01);
+        let lifted = uv_points
+            .iter()
+            .map(|uv| trim.surface().evaluate(uv.x, uv.y))
+            .collect::<Vec<_>>();
+        let length = lifted
+            .windows(2)
+            .map(|window| window[0].distance(window[1]))
+            .sum::<f64>();
+        let direct = lifted
+            .first()
+            .zip(lifted.last())
+            .map(|(front, back)| front.distance(*back))
+            .unwrap_or(0.0);
+
+        assert!(
+            uv_points.len() > 4,
+            "curved lifted trims need interior UV samples",
+        );
+        assert!(length / direct > 1.05);
+    }
+
+    #[test]
+    fn shared_polyline_preserves_exact_trim_samples() {
+        let profile = Line(Point3::new(2.5, 0.0, 0.0), Point3::new(2.5, 0.0, 1.0));
+        let mut surface: Processor<_, Matrix4> = Processor::new(RevolutionSurface::by_revolution(
+            profile,
+            Point3::origin(),
+            Vector3::unit_z(),
+        ));
+        surface.invert();
+        let trim = ParameterCurve::new(
+            Line(Point2::new(TAU * 0.75, 8.0), Point2::new(-TAU * 0.25, 8.0)),
+            surface,
+        );
+        let trim_points = trim.exact_trim_boundary_2d(0.138564065);
+        let polyline = polyline_from_trim_curve(
+            trim.surface(),
+            &trim,
+            (0, 1),
+            &[
+                trim.surface().evaluate(TAU * 0.75, 8.0),
+                trim.surface().evaluate(-TAU * 0.25, 8.0),
+            ],
+            0.138564065,
+        )
+        .expect("exact trim should produce a shared edge polyline");
+
+        assert_eq!(polyline.len(), trim_points.len());
+    }
+
+    #[test]
+    fn shared_polyline_densifies_topological_edge_curve() {
+        let surface = Plane::new(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, 1.0, 0.0),
+        );
+        let shell = CompressedTrimmedShell {
+            vertices: vec![Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0)],
+            edges: vec![CompressedEdge {
+                vertices: (0, 1),
+                curve: Line(Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0)),
+            }],
+            faces: vec![CompressedTrimmedFace {
+                boundaries: vec![vec![CompressedEdgeUse::from((
+                    0,
+                    true,
+                    Some(sampled_trim([
+                        Point2::new(0.0, 0.0),
+                        Point2::new(0.5, 1.0),
+                        Point2::new(1.0, 0.0),
+                    ])),
+                ))]],
+                orientation: true,
+                surface,
+            }],
+        };
+
+        let meshed = compressed_trimmed_shell_tessellation(
+            &shell,
+            0.01,
+            |surface: &Plane, point: Point3, _| surface.search_parameter(point, None, 100),
+            TessellationPrimitiveOptions::default(),
+        );
+        let middle = meshed.edges[0].curve[1];
+
+        assert_eq!(meshed.edges[0].curve.len(), 3);
+        assert!((middle.x - 0.5).abs() <= TOLERANCE);
+        assert!(middle.y.abs() <= TOLERANCE);
+    }
+
+    #[test]
+    fn trimmed_cshell_reuses_shared_edge_samples_for_exact_trims() {
+        let profile = Line(Point3::new(1.0, 0.0, 0.0), Point3::new(1.0, 0.0, 1.0));
+        let surface =
+            RevolutionSurface::by_revolution(profile, Point3::origin(), Vector3::unit_z());
+        let curve_on_surface = |front, back| ParameterCurve::new(Line(front, back), surface);
+        let vertices = vec![
+            surface.evaluate(0.0, 0.0),
+            surface.evaluate(0.0, FRAC_PI_2),
+            surface.evaluate(1.0, FRAC_PI_2),
+            surface.evaluate(1.0, 0.0),
+        ];
+        let edges = vec![
+            CompressedEdge {
+                vertices: (0, 1),
+                curve: curve_on_surface(Point2::new(0.0, 0.0), Point2::new(0.0, FRAC_PI_2)),
+            },
+            CompressedEdge {
+                vertices: (1, 2),
+                curve: curve_on_surface(Point2::new(0.0, FRAC_PI_2), Point2::new(1.0, FRAC_PI_2)),
+            },
+            CompressedEdge {
+                vertices: (2, 3),
+                curve: curve_on_surface(Point2::new(1.0, FRAC_PI_2), Point2::new(1.0, 0.0)),
+            },
+            CompressedEdge {
+                vertices: (3, 0),
+                curve: curve_on_surface(Point2::new(1.0, 0.0), Point2::new(0.0, 0.0)),
+            },
+        ];
+        let right = sampled_trim([Point2::new(0.0, FRAC_PI_2), Point2::new(1.0, FRAC_PI_2)]);
+        let top = sampled_trim([Point2::new(1.0, FRAC_PI_2), Point2::new(1.0, 0.0)]);
+        let left = sampled_trim([Point2::new(1.0, 0.0), Point2::new(0.0, 0.0)]);
+        let face_with_bottom = |bottom| CompressedTrimmedFace {
+            boundaries: vec![vec![
+                CompressedEdgeUse::from((0, true, Some(bottom))),
+                CompressedEdgeUse::from((1, true, Some(right.clone()))),
+                CompressedEdgeUse::from((2, true, Some(top.clone()))),
+                CompressedEdgeUse::from((3, true, Some(left.clone()))),
+            ]],
+            orientation: true,
+            surface,
+        };
+        let shell = CompressedTrimmedShell {
+            vertices,
+            edges,
+            faces: vec![
+                face_with_bottom(sampled_trim([
+                    Point2::new(0.0, 0.0),
+                    Point2::new(0.0, FRAC_PI_2 * 0.5),
+                    Point2::new(0.0, FRAC_PI_2),
+                ])),
+                face_with_bottom(sampled_trim([
+                    Point2::new(0.0, 0.0),
+                    Point2::new(0.0, FRAC_PI_2 * 0.25),
+                    Point2::new(0.0, FRAC_PI_2 * 0.5),
+                    Point2::new(0.0, FRAC_PI_2 * 0.75),
+                    Point2::new(0.0, FRAC_PI_2),
+                ])),
+            ],
+        };
+
+        let meshed = compressed_trimmed_shell_tessellation(
+            &shell,
+            0.01,
+            |_: &RevolutionSurface<Line<Point3>>, point: Point3, _| {
+                Some((point.z, point.y.atan2(point.x)))
+            },
+            TessellationPrimitiveOptions::default(),
+        );
+        let shared_edge_count = meshed.edges[0].curve.len();
+        let second_face = meshed.faces[1]
+            .surface
+            .as_ref()
+            .expect("trimmed face should mesh");
+        let bottom_angles = second_face
+            .positions()
+            .iter()
+            .filter(|point| point.z.abs() <= 1.0e-8)
+            .map(|point| point.y.atan2(point.x))
+            .fold(Vec::<f64>::new(), |mut acc, x| {
+                if !acc.iter().any(|known| (known - x).abs() <= 1.0e-8) {
+                    acc.push(x);
+                }
+                acc
+            });
+
+        assert!(shared_edge_count >= 5);
+        assert_eq!(bottom_angles.len(), shared_edge_count);
+    }
+
+    #[test]
+    fn trimmed_cylinder_patch_inserts_surface_rows_for_ruled_axis() {
+        let profile = Line(Point3::new(1.0, 0.0, 0.0), Point3::new(1.0, 0.0, 10.0));
+        let surface =
+            RevolutionSurface::by_revolution(profile, Point3::origin(), Vector3::unit_z());
+        let boundary = PolyBoundary::new(vec![cylinder_patch_piece(&surface)], &surface, 0.01);
+
+        let mesh = trimming_tessellation(
+            &surface,
+            &boundary,
+            0.01,
+            TessellationPrimitiveOptions::default(),
+            usize::MAX,
+        );
+
+        assert!(
+            mesh.uv_coords()
+                .iter()
+                .any(|uv| uv.x > 0.01 && uv.x < 0.99 && uv.y > 0.01 && uv.y < TAU - 0.01),
+            "trimmed cylinder mesh should include interior surface vertices",
+        );
+    }
+
+    #[test]
+    fn periodic_full_rings_pair_into_cylinder_strip() {
+        let profile = Line(Point3::new(1.0, 0.0, 0.0), Point3::new(1.0, 0.0, 10.0));
+        let surface =
+            RevolutionSurface::by_revolution(profile, Point3::origin(), Vector3::unit_z());
+        let boundary = PolyBoundary::new(
+            vec![
+                cylinder_ring_piece(&surface, 0.0, false),
+                cylinder_ring_piece(&surface, 1.0, true),
+            ],
+            &surface,
+            0.01,
+        );
+
+        assert_eq!(boundary.loops.len(), 1);
+        assert!(boundary.include(Point2::new(0.5, TAU * 0.5)));
+
+        let mesh = trimming_tessellation(
+            &surface,
+            &boundary,
+            0.01,
+            TessellationPrimitiveOptions::default(),
+            usize::MAX,
+        );
+
+        assert!(!mesh.tri_faces().is_empty());
+    }
+
+    #[test]
+    fn periodic_ring_closed_by_wrap_completes_to_full_period() {
+        let profile = Line(Point3::new(1.0, 0.0, 0.0), Point3::new(1.0, 0.0, 10.0));
+        let surface =
+            RevolutionSurface::by_revolution(profile, Point3::origin(), Vector3::unit_z());
+        let boundary = PolyBoundary::new(
+            vec![
+                shortened_cylinder_ring_piece(&surface, 0.0, false),
+                shortened_cylinder_ring_piece(&surface, 1.0, true),
+            ],
+            &surface,
+            0.01,
+        );
+
+        assert!(
+            boundary.uv_max.y - boundary.uv_min.y >= TAU - 0.01,
+            "wrapped full rings should open to one complete period",
+        );
+        assert!(
+            boundary.uv_max.y - boundary.uv_min.y <= TAU + 0.01,
+            "paired wrapped rings should not span multiple periods",
+        );
+        let middle_v = (boundary.uv_min.y + boundary.uv_max.y) * 0.5;
+        assert!(boundary.include(Point2::new(0.5, middle_v)));
+
+        let mesh = trimming_tessellation(
+            &surface,
+            &boundary,
+            0.01,
+            TessellationPrimitiveOptions::default(),
+            usize::MAX,
+        );
+
+        assert!(mesh.tri_faces().len() > 16);
+    }
+
+    #[test]
+    fn step_cylinder_ring_pair_compacts_to_one_period() {
+        let surface = step_cylinder_surface();
+        let boundary = PolyBoundary::new(
+            vec![
+                shortened_step_cylinder_ring_piece(&surface, 0.0, false),
+                shortened_step_cylinder_ring_piece(&surface, 1.0, true),
+            ],
+            &surface,
+            0.01,
+        );
+
+        assert!(
+            boundary.uv_max.x - boundary.uv_min.x <= TAU + 0.01,
+            "STEP-style paired rings should not span multiple angular periods",
+        );
+        let middle_u = (boundary.uv_min.x + boundary.uv_max.x) * 0.5;
+        assert!(boundary.include(Point2::new(middle_u, 0.5)));
+
+        let mesh = trimming_tessellation(
+            &surface,
+            &boundary,
+            0.01,
+            TessellationPrimitiveOptions::default(),
+            usize::MAX,
+        );
+
+        assert!(mesh.tri_faces().len() > 16);
+    }
+
+    #[test]
+    fn shifted_step_cylinder_ring_pair_compacts_to_one_period() {
+        let surface = step_cylinder_surface();
+        let boundary = PolyBoundary::new(
+            vec![
+                shifted_step_cylinder_ring_piece(&surface, 0.0, 0.0, false),
+                shifted_step_cylinder_ring_piece(&surface, 1.0, TAU, true),
+            ],
+            &surface,
+            0.01,
+        );
+
+        assert!(
+            boundary.uv_max.x - boundary.uv_min.x <= TAU + 0.01,
+            "shifted STEP-style paired rings should not span multiple angular periods",
+        );
+        let middle_u = (boundary.uv_min.x + boundary.uv_max.x) * 0.5;
+        assert!(boundary.include(Point2::new(middle_u, 0.5)));
+
+        let mesh = trimming_tessellation(
+            &surface,
+            &boundary,
+            0.01,
+            TessellationPrimitiveOptions::default(),
+            usize::MAX,
+        );
+
+        assert!(mesh.tri_faces().len() > 16);
+    }
+
+    #[test]
+    fn seam_crossing_step_cylinder_ring_pair_compacts_to_one_period() {
+        let surface = step_cylinder_surface();
+        let boundary = PolyBoundary::new(
+            vec![
+                seam_crossing_step_cylinder_ring_piece(&surface, 0.0, false),
+                seam_crossing_step_cylinder_ring_piece(&surface, 1.0, true),
+            ],
+            &surface,
+            0.01,
+        );
+
+        assert!(
+            boundary.uv_max.x - boundary.uv_min.x <= TAU + 0.01,
+            "seam-crossing STEP-style paired rings should not span multiple angular periods",
+        );
+        let middle_u = (boundary.uv_min.x + boundary.uv_max.x) * 0.5;
+        assert!(boundary.include(Point2::new(middle_u, 0.5)));
+
+        let mesh = trimming_tessellation(
+            &surface,
+            &boundary,
+            0.01,
+            TessellationPrimitiveOptions::default(),
+            usize::MAX,
+        );
+
+        assert!(mesh.tri_faces().len() > 16);
+    }
+
+    #[test]
+    fn mismatched_seam_step_cylinder_ring_pair_compacts_to_one_period() {
+        let surface = step_cylinder_surface();
+        let boundary = PolyBoundary::new(
+            vec![
+                seam_crossing_step_cylinder_ring_piece_from(&surface, 0.0, FRAC_PI_2 * 3.0, false),
+                seam_crossing_step_cylinder_ring_piece_from(&surface, 1.0, 0.0, true),
+            ],
+            &surface,
+            0.01,
+        );
+
+        assert!(
+            boundary.uv_max.x - boundary.uv_min.x <= TAU + 0.01,
+            "paired rings with mismatched seam starts should not span multiple angular periods",
+        );
+        let middle_u = (boundary.uv_min.x + boundary.uv_max.x) * 0.5;
+        assert!(boundary.include(Point2::new(middle_u, 0.5)));
+
+        let mesh = trimming_tessellation(
+            &surface,
+            &boundary,
+            0.01,
+            TessellationPrimitiveOptions::default(),
+            usize::MAX,
+        );
+
+        assert!(mesh.tri_faces().len() > 16);
+    }
+
+    #[test]
+    fn partial_periodic_loop_crossing_seam_compacts_to_short_arc() {
+        let surface = step_cylinder_surface();
+        let boundary = PolyBoundary::new(
+            vec![seam_crossing_step_cylinder_patch_piece(&surface)],
+            &surface,
+            0.01,
+        );
+
+        assert!(
+            boundary.uv_max.x - boundary.uv_min.x <= FRAC_PI_2 + 0.01,
+            "partial periodic loops crossing the seam should keep the short angular arc",
+        );
+        let middle_u = (boundary.uv_min.x + boundary.uv_max.x) * 0.5;
+        assert!(boundary.include(Point2::new(middle_u, 0.5)));
+
+        let mesh = trimming_tessellation(
+            &surface,
+            &boundary,
+            0.01,
+            TessellationPrimitiveOptions::default(),
+            usize::MAX,
+        );
+
+        assert!(mesh.tri_faces().len() > 16);
+    }
+
+    #[test]
+    fn periodic_cylinder_loop_spanning_two_laps_collapses_to_one_lap() {
+        let surface = step_cylinder_surface();
+        let boundary = PolyBoundary::new(
+            vec![double_lap_step_cylinder_piece(&surface)],
+            &surface,
+            0.01,
+        );
+
+        assert!(
+            boundary.uv_max.x - boundary.uv_min.x <= TAU + 0.01,
+            "periodic cylinder trim should not span two angular laps",
+        );
+        assert!(boundary.include(Point2::new(0.5 * TAU, 0.5)));
+
+        let mesh = trimming_tessellation(
+            &surface,
+            &boundary,
+            0.01,
+            TessellationPrimitiveOptions::default(),
+            usize::MAX,
+        );
+
+        assert!(!mesh.tri_faces().is_empty());
+    }
+
+    #[test]
+    fn trimming_tessellation_is_invariant_to_annulus_loop_winding() {
+        let surface = Plane::xy();
+        let canonical = PolyBoundary::new(
+            vec![
+                square_piece(&surface, 0.0, 1.0, true),
+                square_piece(&surface, 0.25, 0.75, false),
+            ],
+            &surface,
+            0.01,
+        );
+        let reversed = PolyBoundary::new(
+            vec![
+                square_piece(&surface, 0.0, 1.0, false),
+                square_piece(&surface, 0.25, 0.75, true),
+            ],
+            &surface,
+            0.01,
+        );
+
+        assert!(canonical.include(Point2::new(0.1, 0.1)));
+        assert!(!canonical.include(Point2::new(0.5, 0.5)));
+        assert!(reversed.include(Point2::new(0.1, 0.1)));
+        assert!(!reversed.include(Point2::new(0.5, 0.5)));
+
+        let canonical_mesh = trimming_tessellation(
+            &surface,
+            &canonical,
+            0.01,
+            TessellationPrimitiveOptions::default(),
+            usize::MAX,
+        );
+        let reversed_mesh = trimming_tessellation(
+            &surface,
+            &reversed,
+            0.01,
+            TessellationPrimitiveOptions::default(),
+            usize::MAX,
+        );
+
+        assert_eq!(
+            canonical_mesh.tri_faces().len(),
+            reversed_mesh.tri_faces().len(),
+        );
+        assert!(!canonical_mesh.tri_faces().is_empty());
+    }
+
+    #[test]
+    fn trimming_tessellation_is_invariant_to_single_loop_winding() {
+        let surface = Plane::xy();
+        let forward =
+            PolyBoundary::new(vec![square_piece(&surface, 0.0, 1.0, true)], &surface, 0.01);
+        let reversed = PolyBoundary::new(
+            vec![square_piece(&surface, 0.0, 1.0, false)],
+            &surface,
+            0.01,
+        );
+
+        assert!(forward.include(Point2::new(0.5, 0.5)));
+        assert!(reversed.include(Point2::new(0.5, 0.5)));
+
+        let forward_mesh = trimming_tessellation(
+            &surface,
+            &forward,
+            0.01,
+            TessellationPrimitiveOptions::default(),
+            usize::MAX,
+        );
+        let reversed_mesh = trimming_tessellation(
+            &surface,
+            &reversed,
+            0.01,
+            TessellationPrimitiveOptions::default(),
+            usize::MAX,
+        );
+
+        assert_eq!(
+            forward_mesh.tri_faces().len(),
+            reversed_mesh.tri_faces().len()
+        );
+        assert!(!forward_mesh.tri_faces().is_empty());
+    }
 }

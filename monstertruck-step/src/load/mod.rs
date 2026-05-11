@@ -182,19 +182,21 @@ impl Table {
                     let curve: SurfaceCurveParams = Deserialize::deserialize(&record.parameter)?;
                     self.surface_curve.insert(
                         *id,
-                        curve.into_holder(step_types::SurfaceCurveKind::Surface),
+                        curve.into_holder(step_types::SurfaceCurveEntityKind::Surface),
                     );
                 }
                 "SEAM_CURVE" => {
                     let curve: SurfaceCurveParams = Deserialize::deserialize(&record.parameter)?;
-                    self.surface_curve
-                        .insert(*id, curve.into_holder(step_types::SurfaceCurveKind::Seam));
+                    self.surface_curve.insert(
+                        *id,
+                        curve.into_holder(step_types::SurfaceCurveEntityKind::Seam),
+                    );
                 }
                 "INTERSECTION_CURVE" => {
                     let curve: SurfaceCurveParams = Deserialize::deserialize(&record.parameter)?;
                     self.surface_curve.insert(
                         *id,
-                        curve.into_holder(step_types::SurfaceCurveKind::Intersection),
+                        curve.into_holder(step_types::SurfaceCurveEntityKind::Intersection),
                     );
                 }
                 "PLANE" => {

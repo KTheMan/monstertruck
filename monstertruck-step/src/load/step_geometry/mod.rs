@@ -106,6 +106,24 @@ pub struct SurfaceCurve3D {
 }
 
 impl SurfaceCurve3D {
+    fn parameter_curve_matches_leader_on_surface(
+        &self,
+        curve: &StepParameterCurve,
+        surface: &Surface,
+    ) -> bool {
+        let (curve_min, curve_max) = curve.curve().range_tuple();
+        let (leader_min, leader_max) = self.leader().range_tuple();
+        let tolerance2 = (100.0 * TOLERANCE).powi(2).max(1.0e-12);
+        [0.0, 0.5, 1.0].into_iter().all(|fraction| {
+            let curve_t = curve_min + (curve_max - curve_min) * fraction;
+            let leader_t = leader_min + (leader_max - leader_min) * fraction;
+            let uv = curve.curve().evaluate(curve_t);
+            let surface_point = surface.evaluate(uv.x, uv.y);
+            let leader_point = self.leader().evaluate(leader_t);
+            surface_point.distance2(leader_point) <= tolerance2
+        })
+    }
+
     pub(crate) fn same_surface(lhs: &Surface, rhs: &Surface) -> bool {
         if lhs == rhs {
             true
@@ -163,13 +181,14 @@ impl SurfaceCurve3D {
     pub fn parameter_curve_on(&self, surface: &Surface) -> Option<&StepParameterCurve> {
         self.associated_geometry
             .iter()
-            .find_map(|entry| match entry {
-                SurfaceCurveAssociatedGeometry::ParameterCurve(curve)
-                    if Self::same_surface(curve.surface().as_ref(), surface) =>
-                {
-                    Some(curve)
-                }
+            .filter_map(|entry| match entry {
+                SurfaceCurveAssociatedGeometry::ParameterCurve(curve) => Some(curve),
                 _ => None,
+            })
+            .find(|curve| {
+                (curve.surface().as_ref() == surface
+                    || Self::same_surface(curve.surface().as_ref(), surface))
+                    && self.parameter_curve_matches_leader_on_surface(curve, surface)
             })
     }
 }
@@ -388,6 +407,35 @@ impl save::StepSurface for Processor<Sphere, Matrix4> {
 }
 
 mod sphere;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn surface_curve_rejects_invalid_pcurve_on_identical_surface() {
+        let surface = Surface::ElementarySurface(ElementarySurface::Plane(Plane::xy()));
+        let leader = Curve3D::Line(Line(Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0)));
+        let invalid_trim = ParameterCurve::new(
+            Box::new(Curve2D::Line(Line(
+                Point2::new(0.0, 1.0),
+                Point2::new(1.0, 1.0),
+            ))),
+            Box::new(surface.clone()),
+        );
+        let surface_curve = SurfaceCurve3D::new(
+            SurfaceCurveKind::Surface,
+            Box::new(leader),
+            vec![SurfaceCurveAssociatedGeometry::ParameterCurve(invalid_trim)],
+            SurfaceCurveRepresentation::Curve3D,
+        );
+
+        assert!(
+            surface_curve.parameter_curve_on(&surface).is_none(),
+            "Invalid face-local pcurves must not be accepted only because their surface entity matches."
+        );
+    }
+}
 
 /// Implementation required to apply a closed surface division to a shape parsed from a STEP file.
 mod from_pcurve {

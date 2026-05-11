@@ -1,6 +1,11 @@
+use std::iter;
+
 use super::*;
 use crate::common::FaceNormal;
 use boundary::{PolyBoundary, UvKey, uv_key};
+
+const MAX_SURFACE_SPAN_INTERVALS: usize = 32;
+const SURFACE_SPAN_TOLERANCE_FACTOR: f64 = 8.0;
 
 /// Ensures the mesh winding direction globally matches the stored vertex normals.
 ///
@@ -45,6 +50,54 @@ pub(super) fn boundary_segment_parameter(
         let projected = front + segment * parameter;
         (parameter > 0.0 && parameter < 1.0 && projected.distance(point) <= 1.0e-9)
             .then_some(parameter)
+    }
+}
+
+fn add_constraint_through_existing_vertices(
+    triangulation: &mut Cdt,
+    split_vertices: &[(FixedVertexHandle, Point2)],
+    front: (FixedVertexHandle, Point2),
+    back: (FixedVertexHandle, Point2),
+) {
+    if front.0 == back.0 {
+        return;
+    }
+    let mut chain = split_vertices
+        .iter()
+        .filter_map(|(handle, point)| {
+            if *handle == front.0 || *handle == back.0 {
+                None
+            } else {
+                boundary_segment_parameter(*point, front.1, back.1)
+                    .map(|parameter| (parameter, *handle))
+            }
+        })
+        .collect::<Vec<_>>();
+    chain.sort_by(|lhs, rhs| lhs.0.total_cmp(&rhs.0));
+    let handles = iter::once(front.0)
+        .chain(chain.into_iter().map(|(_, handle)| handle))
+        .chain(iter::once(back.0))
+        .collect::<Vec<_>>();
+    handles.windows(2).for_each(|window| {
+        if window[0] != window[1] && triangulation.can_add_constraint(window[0], window[1]) {
+            triangulation.add_constraint(window[0], window[1]);
+        }
+    });
+}
+
+fn surface_is_nearly_planar(surface: &impl PreMeshableSurface, boundary: &PolyBoundary) -> bool {
+    let u0 = boundary.uv_min.x;
+    let u1 = boundary.uv_max.x;
+    let v0 = boundary.uv_min.y;
+    let v1 = boundary.uv_max.y;
+    if ![u0, u1, v0, v1].into_iter().all(f64::is_finite) {
+        false
+    } else {
+        let center = ((u0 + u1) * 0.5, (v0 + v1) * 0.5);
+        let normal = surface.normal(center.0, center.1);
+        [(u0, v0), (u1, v0), (u0, v1), (u1, v1), center]
+            .into_iter()
+            .all(|(u, v)| normal.dot(surface.normal(u, v)) > 1.0 - 1.0e-6)
     }
 }
 
@@ -208,7 +261,12 @@ where
         (polyboundary.uv_min.y, polyboundary.uv_max.y),
     );
     let division_start = Instant::now();
-    let (udiv, vdiv) = surface.parameter_division(range, tolerance);
+    let (udiv, vdiv) = densify_surface_divisions(
+        &surface,
+        range,
+        surface.parameter_division(range, tolerance),
+        tolerance,
+    );
     log_mesh_trace(
         face_idx,
         "iso_division",
@@ -691,6 +749,87 @@ fn blend_normals(normal0: Vector3, normal1: Vector3, normal_blend_angle: f64) ->
     }
 }
 
+fn surface_axis_point<S: ParametricSurface3D>(
+    surface: &S,
+    axis: usize,
+    axis_value: f64,
+    other_value: f64,
+) -> Point3 {
+    if axis == 0 {
+        surface.evaluate(axis_value, other_value)
+    } else {
+        surface.evaluate(other_value, axis_value)
+    }
+}
+
+fn division_axis_length<S: ParametricSurface3D>(
+    surface: &S,
+    divisions: &[f64],
+    axis: usize,
+    other_value: f64,
+) -> f64 {
+    divisions
+        .windows(2)
+        .map(|window| {
+            surface_axis_point(surface, axis, window[0], other_value).distance(surface_axis_point(
+                surface,
+                axis,
+                window[1],
+                other_value,
+            ))
+        })
+        .sum()
+}
+
+fn desired_span_intervals(length: f64, tolerance: f64) -> usize {
+    let max_segment_length = f64::max(tolerance * SURFACE_SPAN_TOLERANCE_FACTOR, TOLERANCE);
+    if length.is_finite() && max_segment_length.is_finite() && max_segment_length > 0.0 {
+        f64::ceil(length / max_segment_length)
+            .max(1.0)
+            .min(MAX_SURFACE_SPAN_INTERVALS as f64) as usize
+    } else {
+        1
+    }
+}
+
+fn densify_divisions(
+    mut divisions: Vec<f64>,
+    range: (f64, f64),
+    desired_intervals: usize,
+) -> Vec<f64> {
+    if divisions.len() < 2 {
+        divisions = vec![range.0, range.1];
+    }
+    if let (Some(start), Some(end)) = (divisions.first().copied(), divisions.last().copied())
+        && desired_intervals > divisions.len().saturating_sub(1)
+        && start.is_finite()
+        && end.is_finite()
+        && !(end - start).so_small()
+    {
+        divisions = (0..=desired_intervals)
+            .map(|index| start + (end - start) * index as f64 / desired_intervals as f64)
+            .collect();
+    }
+    divisions
+}
+
+fn densify_surface_divisions<S: ParametricSurface3D>(
+    surface: &S,
+    range: ((f64, f64), (f64, f64)),
+    divisions: (Vec<f64>, Vec<f64>),
+    tolerance: f64,
+) -> (Vec<f64>, Vec<f64>) {
+    let (udiv, vdiv) = divisions;
+    let vmid = (range.1.0 + range.1.1) * 0.5;
+    let umid = (range.0.0 + range.0.1) * 0.5;
+    let u_length = division_axis_length(surface, &udiv, 0, vmid);
+    let v_length = division_axis_length(surface, &vdiv, 1, umid);
+    (
+        densify_divisions(udiv, range.0, desired_span_intervals(u_length, tolerance)),
+        densify_divisions(vdiv, range.1, desired_span_intervals(v_length, tolerance)),
+    )
+}
+
 /// Inserts parameter divisions into triangulation.
 fn insert_surface(
     triangulation: &mut Cdt,
@@ -703,8 +842,31 @@ fn insert_surface(
         (polyline.uv_min.x, polyline.uv_max.x),
         (polyline.uv_min.y, polyline.uv_max.y),
     );
+    if surface_is_nearly_planar(&surface, polyline) {
+        log_mesh_trace(
+            face_idx,
+            "parameter_division",
+            format!(
+                "range=({:.6},{:.6})x({:.6},{:.6}) planar_skip=true",
+                range.0.0, range.0.1, range.1.0, range.1.1,
+            ),
+            Instant::now(),
+        );
+        log_mesh_trace(
+            face_idx,
+            "insert_surface",
+            "inserted_points=0",
+            Instant::now(),
+        );
+        return;
+    }
     let division_start = Instant::now();
-    let (udiv, vdiv) = surface.parameter_division(range, tolerance);
+    let (udiv, vdiv) = densify_surface_divisions(
+        &surface,
+        range,
+        surface.parameter_division(range, tolerance),
+        tolerance,
+    );
     log_mesh_trace(
         face_idx,
         "parameter_division",
@@ -720,13 +882,26 @@ fn insert_surface(
         division_start,
     );
     let insert_start = Instant::now();
+    let split_vertices = triangulation
+        .vertices()
+        .map(|vertex| {
+            let point = *vertex.as_ref();
+            (vertex.fix(), Point2::new(point.x, point.y))
+        })
+        .collect::<Vec<_>>();
     let insert_res: Vec<Vec<Option<_>>> = udiv
         .into_iter()
         .map(|u| {
             vdiv.iter()
-                .map(|v| match polyline.include(Point2::new(u, *v)) {
-                    true => triangulation.insert(SPoint2::new(u, *v)).ok(),
-                    false => None,
+                .map(|v| {
+                    let uv = Point2::new(u, *v);
+                    match polyline.include(uv) {
+                        true => triangulation
+                            .insert(SPoint2::new(u, *v))
+                            .ok()
+                            .map(|handle| (handle, uv)),
+                        false => None,
+                    }
                 })
                 .collect()
         })
@@ -734,23 +909,17 @@ fn insert_surface(
     insert_res.windows(2).for_each(|vec| {
         vec[0].windows(2).zip(&vec[1]).for_each(|(a, z)| {
             if let Some(x) = a[0] {
-                if let Some(y) = a[1]
-                    && triangulation.can_add_constraint(x, y)
-                {
-                    triangulation.add_constraint(x, y);
+                if let Some(y) = a[1] {
+                    add_constraint_through_existing_vertices(triangulation, &split_vertices, x, y);
                 }
-                if let Some(z) = z
-                    && triangulation.can_add_constraint(x, *z)
-                {
-                    triangulation.add_constraint(x, *z);
+                if let Some(z) = z {
+                    add_constraint_through_existing_vertices(triangulation, &split_vertices, x, *z);
                 }
             }
         });
         let idx = vec[0].len() - 1;
-        if let (Some(x), Some(y)) = (vec[0][idx], vec[1][idx])
-            && triangulation.can_add_constraint(x, y)
-        {
-            triangulation.add_constraint(x, y);
+        if let (Some(x), Some(y)) = (vec[0][idx], vec[1][idx]) {
+            add_constraint_through_existing_vertices(triangulation, &split_vertices, x, y);
         }
     });
     let inserted_points = insert_res

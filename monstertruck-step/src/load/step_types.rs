@@ -920,7 +920,7 @@ pub enum PreferredSurfaceCurveRepresentation {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SurfaceCurveKind {
+pub enum SurfaceCurveEntityKind {
     #[default]
     Surface,
     Seam,
@@ -936,7 +936,7 @@ pub(crate) struct SurfaceCurveParams(
 );
 
 impl SurfaceCurveParams {
-    pub(crate) fn into_holder(self, kind: SurfaceCurveKind) -> SurfaceCurveHolder {
+    pub(crate) fn into_holder(self, kind: SurfaceCurveEntityKind) -> SurfaceCurveHolder {
         let SurfaceCurveParams(label, curve_3d, associated_geometry, master_representation) = self;
         SurfaceCurveHolder {
             label,
@@ -971,7 +971,7 @@ pub struct SurfaceCurve {
     associated_geometry: Vec<PcurveOrSurface>,
     master_representation: PreferredSurfaceCurveRepresentation,
     #[serde(skip)]
-    kind: SurfaceCurveKind,
+    kind: SurfaceCurveEntityKind,
 }
 
 impl TryFrom<&SurfaceCurve> for Curve3D {
@@ -1001,9 +1001,9 @@ impl TryFrom<&SurfaceCurve> for Curve3D {
             })
             .collect::<Result<Vec<_>, _>>()?;
         let kind = match value.kind {
-            SurfaceCurveKind::Surface => step_geometry::SurfaceCurveKind::Surface,
-            SurfaceCurveKind::Seam => step_geometry::SurfaceCurveKind::Seam,
-            SurfaceCurveKind::Intersection => step_geometry::SurfaceCurveKind::Intersection,
+            SurfaceCurveEntityKind::Surface => step_geometry::SurfaceCurveKind::Surface,
+            SurfaceCurveEntityKind::Seam => step_geometry::SurfaceCurveKind::Seam,
+            SurfaceCurveEntityKind::Intersection => step_geometry::SurfaceCurveKind::Intersection,
         };
         let master_representation = match value.master_representation {
             PreferredSurfaceCurveRepresentation::Curve3D => {
@@ -1219,6 +1219,14 @@ pub struct ConicalSurface {
     semi_angle: f64,
 }
 
+fn normalize_conical_semi_angle(semi_angle: f64) -> f64 {
+    if semi_angle.abs() > PI {
+        semi_angle.to_radians()
+    } else {
+        semi_angle
+    }
+}
+
 impl From<&ConicalSurface> for step_geometry::ConicalSurface {
     fn from(
         ConicalSurface {
@@ -1230,7 +1238,8 @@ impl From<&ConicalSurface> for step_geometry::ConicalSurface {
     ) -> Self {
         let mat = Matrix4::from(position);
         let p = Point3::new(*radius, 0.0, 0.0);
-        let v = Vector3::new(f64::tan(*semi_angle), 0.0, 1.0);
+        let semi_angle = normalize_conical_semi_angle(*semi_angle);
+        let v = Vector3::new(f64::tan(semi_angle), 0.0, 1.0);
         let rev =
             RevolutionSurface::by_revolution(Line(p, p + v), Point3::origin(), Vector3::unit_z());
         let mut processor = Processor::new(rev);
@@ -1899,9 +1908,11 @@ impl EdgeCurve {
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 let kind = match c.kind {
-                    SurfaceCurveKind::Surface => step_geometry::SurfaceCurveKind::Surface,
-                    SurfaceCurveKind::Seam => step_geometry::SurfaceCurveKind::Seam,
-                    SurfaceCurveKind::Intersection => step_geometry::SurfaceCurveKind::Intersection,
+                    SurfaceCurveEntityKind::Surface => step_geometry::SurfaceCurveKind::Surface,
+                    SurfaceCurveEntityKind::Seam => step_geometry::SurfaceCurveKind::Seam,
+                    SurfaceCurveEntityKind::Intersection => {
+                        step_geometry::SurfaceCurveKind::Intersection
+                    }
                 };
                 let master_representation = match c.master_representation {
                     PreferredSurfaceCurveRepresentation::Curve3D => {

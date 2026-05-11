@@ -8,20 +8,334 @@ use monstertruck_modeling::{
     Surface as ModelingSurface,
 };
 use monstertruck_traits::SnapCurveEndpoints;
+use std::env;
+
+#[cfg(test)]
+use std::f64::consts::TAU;
+
+fn sampled_parameter_boundary<C>(
+    curve: &C,
+    surface: &Surface,
+    tolerance: f64,
+) -> Option<Vec<Point2>>
+where
+    C: ParametricCurve3D + BoundedCurve + ParameterDivision1D<Point = Point3>,
+{
+    fn abs_diff(previous: f64) -> impl Fn(&f64, &f64) -> std::cmp::Ordering {
+        let distance = move |value: &f64| f64::abs(*value - previous);
+        // SAFETY: All compared values are finite after the finiteness check in
+        // `normalize_axis`.
+        move |lhs: &f64, rhs: &f64| distance(lhs).partial_cmp(&distance(rhs)).unwrap()
+    }
+
+    fn normalize_axis(
+        value: f64,
+        previous: Option<f64>,
+        period: Option<f64>,
+        range: Option<(f64, f64)>,
+    ) -> Option<f64> {
+        if !value.is_finite() {
+            None
+        } else if let Some(previous) = previous {
+            if let Some(period) = period {
+                (-2..=2)
+                    .map(|index| value + index as f64 * period)
+                    .min_by(abs_diff(previous))
+            } else if let Some(range) = range {
+                Some(clamp_near_range(value, range))
+            } else {
+                Some(value)
+            }
+        } else if let Some((min, max)) = range {
+            if let Some(period) = period {
+                let span = max - min;
+                if span.so_small() {
+                    Some(min)
+                } else {
+                    let mut normalized = value - f64::floor((value - min) / period) * period;
+                    if normalized < min {
+                        normalized += period;
+                    }
+                    if normalized > max {
+                        normalized -= period;
+                    }
+                    Some(normalized.clamp(min, max))
+                }
+            } else {
+                Some(clamp_near_range(value, (min, max)))
+            }
+        } else {
+            Some(value)
+        }
+    }
+
+    fn clamp_near_range(value: f64, (min, max): (f64, f64)) -> f64 {
+        if value < min && min - value < TOLERANCE {
+            min
+        } else if value > max && value - max < TOLERANCE {
+            max
+        } else {
+            value
+        }
+    }
+
+    let normalize_uv = |uv: Point2, previous: Option<(f64, f64)>| {
+        let (urange, vrange) = surface.try_range_tuple();
+        Some(Point2::new(
+            normalize_axis(uv.x, previous.map(|(u, _)| u), surface.u_period(), urange)?,
+            normalize_axis(uv.y, previous.map(|(_, v)| v), surface.v_period(), vrange)?,
+        ))
+    };
+    let points = curve.parameter_division(curve.range_tuple(), tolerance).1;
+    let project = |point: Point3, hint: Option<(f64, f64)>| {
+        surface
+            .search_parameter(point, hint, 100)
+            .or_else(|| surface.search_parameter(point, None, 100))
+            .or_else(|| surface.search_nearest_parameter(point, hint, 100))
+            .or_else(|| surface.search_nearest_parameter(point, None, 100))
+            .map(|(u, v)| Point2::new(u, v))
+    };
+    points
+        .iter()
+        .copied()
+        .scan(None, |hint, point| {
+            let uv = project(point, *hint).and_then(|uv| normalize_uv(uv, *hint));
+            *hint = uv.map(|uv| (uv.x, uv.y));
+            Some(uv)
+        })
+        .collect::<Option<Vec<_>>>()
+        .or_else(|| {
+            points
+                .into_iter()
+                .scan(None, |hint, point| {
+                    let uv = project(point, *hint).and_then(|uv| normalize_uv(uv, *hint));
+                    *hint = uv.map(|uv| (uv.x, uv.y));
+                    Some(uv)
+                })
+                .collect()
+        })
+}
 
 fn exact_parameter_curve_on(curve: &Curve3D, surface: &Surface) -> Option<StepParameterCurve> {
-    match curve {
-        Curve3D::ParameterCurve(curve)
+    match (curve, surface) {
+        (Curve3D::ParameterCurve(curve), surface)
             if SurfaceCurve3D::same_surface(curve.surface().as_ref(), surface) =>
         {
             Some(curve.clone())
         }
-        Curve3D::SurfaceCurve(curve) => curve.parameter_curve_on(surface).cloned(),
-        Curve3D::IntersectionCurve(curve)
+        (Curve3D::SurfaceCurve(curve), surface) => curve
+            .parameter_curve_on(surface)
+            .cloned()
+            .or_else(|| match surface {
+                Surface::ElementarySurface(ElementarySurface::Plane(_)) => {
+                    exact_parameter_curve_on(curve.leader(), surface)
+                }
+                _ => None,
+            }),
+        (Curve3D::Line(curve), Surface::ElementarySurface(ElementarySurface::Plane(plane))) => {
+            exact_line_parameter_curve_on_plane(curve, plane, surface)
+        }
+        (Curve3D::Conic(curve), surface) => exact_conic_parameter_curve_on(curve, surface),
+        (Curve3D::IntersectionCurve(curve), surface)
             if SurfaceCurve3D::same_surface(curve.surface0().as_ref(), surface)
                 || SurfaceCurve3D::same_surface(curve.surface1().as_ref(), surface) =>
         {
             exact_parameter_curve_on(curve.leader().as_ref(), surface)
+        }
+        _ => None,
+    }
+}
+
+fn projected_conic_transform_on_plane(transform: &Matrix4, plane: &Plane) -> Matrix3 {
+    let project = |point| {
+        let parameter = plane.parameter(transform.transform_point(point));
+        Point2::new(parameter.x, parameter.y)
+    };
+    let origin = project(Point3::origin());
+    let u_axis = project(Point3::new(1.0, 0.0, 0.0)) - origin;
+    let v_axis = project(Point3::new(0.0, 1.0, 0.0)) - origin;
+    Matrix3::from_cols(
+        Vector3::new(u_axis.x, u_axis.y, 0.0),
+        Vector3::new(v_axis.x, v_axis.y, 0.0),
+        Vector3::new(origin.x, origin.y, 1.0),
+    )
+}
+
+fn pcurve_matches_surface_curve<C>(curve: &C, trim: &Curve2D, surface: &Surface) -> bool
+where C: ParametricCurve3D<Point = Point3> + BoundedCurve {
+    let (t0, t1) = curve.range_tuple();
+    [
+        t0,
+        (3.0 * t0 + t1) * 0.25,
+        (t0 + t1) * 0.5,
+        (t0 + 3.0 * t1) * 0.25,
+        t1,
+    ]
+    .into_iter()
+    .all(|parameter| {
+        let uv = trim.evaluate(parameter);
+        surface
+            .evaluate(uv.x, uv.y)
+            .near(&curve.evaluate(parameter))
+    })
+}
+
+fn exact_ellipse_parameter_curve_on_plane(
+    curve: &Ellipse<Point3, Matrix4>,
+    plane: &Plane,
+    surface: &Surface,
+) -> Option<StepParameterCurve> {
+    let trimmed = TrimmedCurve::new(UnitCircle::new(), curve.entity().range());
+    let mut projected = Processor::with_transform(
+        trimmed,
+        projected_conic_transform_on_plane(curve.transform(), plane),
+    );
+    if !curve.orientation() {
+        projected.invert();
+    }
+    let trim = Curve2D::Conic(Conic2D::Ellipse(projected));
+    pcurve_matches_surface_curve(curve, &trim, surface)
+        .then(|| StepParameterCurve::new(Box::new(trim), Box::new(surface.clone())))
+}
+
+fn exact_hyperbola_parameter_curve_on_plane(
+    curve: &Hyperbola<Point3, Matrix4>,
+    plane: &Plane,
+    surface: &Surface,
+) -> Option<StepParameterCurve> {
+    let trimmed = TrimmedCurve::new(UnitHyperbola::new(), curve.entity().range());
+    let mut projected = Processor::with_transform(
+        trimmed,
+        projected_conic_transform_on_plane(curve.transform(), plane),
+    );
+    if !curve.orientation() {
+        projected.invert();
+    }
+    let trim = Curve2D::Conic(Conic2D::Hyperbola(projected));
+    pcurve_matches_surface_curve(curve, &trim, surface)
+        .then(|| StepParameterCurve::new(Box::new(trim), Box::new(surface.clone())))
+}
+
+fn exact_parabola_parameter_curve_on_plane(
+    curve: &Parabola<Point3, Matrix4>,
+    plane: &Plane,
+    surface: &Surface,
+) -> Option<StepParameterCurve> {
+    let trimmed = TrimmedCurve::new(UnitParabola::new(), curve.entity().range());
+    let mut projected = Processor::with_transform(
+        trimmed,
+        projected_conic_transform_on_plane(curve.transform(), plane),
+    );
+    if !curve.orientation() {
+        projected.invert();
+    }
+    let trim = Curve2D::Conic(Conic2D::Parabola(projected));
+    pcurve_matches_surface_curve(curve, &trim, surface)
+        .then(|| StepParameterCurve::new(Box::new(trim), Box::new(surface.clone())))
+}
+
+fn line_parameter_curve_to_pcurve(line: Line<Point2>, surface: &Surface) -> StepParameterCurve {
+    StepParameterCurve::new(Box::new(Curve2D::Line(line)), Box::new(surface.clone()))
+}
+
+fn exact_line_parameter_curve_on_plane(
+    curve: &Line<Point3>,
+    plane: &Plane,
+    surface: &Surface,
+) -> Option<StepParameterCurve> {
+    let front = plane.parameter(curve.front());
+    let back = plane.parameter(curve.back());
+    let trim = Curve2D::Line(Line(
+        Point2::new(front.x, front.y),
+        Point2::new(back.x, back.y),
+    ));
+    pcurve_matches_surface_curve(curve, &trim, surface)
+        .then(|| StepParameterCurve::new(Box::new(trim), Box::new(surface.clone())))
+}
+
+fn nearest_periodic_component(value: f64, reference: f64, period: Option<f64>) -> f64 {
+    period.map_or(value, |period| {
+        value + ((reference - value) / period).round() * period
+    })
+}
+
+fn nearest_periodic_surface_parameter(
+    point: Point2,
+    reference: Point2,
+    periods: (Option<f64>, Option<f64>),
+) -> Point2 {
+    Point2::new(
+        nearest_periodic_component(point.x, reference.x, periods.0),
+        nearest_periodic_component(point.y, reference.y, periods.1),
+    )
+}
+
+fn exact_line_parameter_curve_by_surface_search<C>(
+    curve: &C,
+    surface: &Surface,
+) -> Option<StepParameterCurve>
+where
+    C: ParametricCurve3D<Point = Point3> + BoundedCurve,
+{
+    let (t0, t1) = curve.range_tuple();
+    let periods = (surface.u_period(), surface.v_period());
+    let samples = [
+        t0,
+        (3.0 * t0 + t1) * 0.25,
+        (t0 + t1) * 0.5,
+        (t0 + 3.0 * t1) * 0.25,
+        t1,
+    ]
+    .into_iter()
+    .try_fold(Vec::with_capacity(5), |mut samples, parameter| {
+        let point = curve.evaluate(parameter);
+        let hint = samples
+            .last()
+            .map(|(_, uv): &(Point3, Point2)| (*uv).into());
+        let uv = surface.search_parameter(point, hint, 30)?;
+        let uv = Point2::from(uv);
+        let uv = samples
+            .last()
+            .map(|(_, reference): &(Point3, Point2)| {
+                nearest_periodic_surface_parameter(uv, *reference, periods)
+            })
+            .unwrap_or(uv);
+        samples.push((point, uv));
+        Some(samples)
+    })?;
+    let line = Line(samples.first()?.1, samples.last()?.1);
+    (!line.0.near(&line.1)).then_some(())?;
+    samples
+        .iter()
+        .all(|(point, uv)| {
+            line.search_nearest_parameter(*uv, None, 1)
+                .filter(|parameter| *parameter >= -TOLERANCE && *parameter <= 1.0 + TOLERANCE)
+                .map(|parameter| line.evaluate(parameter.clamp(0.0, 1.0)))
+                .is_some_and(|projected| {
+                    projected.distance2(*uv) <= TOLERANCE * TOLERANCE
+                        && surface.evaluate(projected.x, projected.y).near(point)
+                })
+        })
+        .then(|| line_parameter_curve_to_pcurve(line, surface))
+}
+
+fn exact_conic_parameter_curve_on(
+    curve: &Conic3D,
+    surface: &Surface,
+) -> Option<StepParameterCurve> {
+    match (curve, surface) {
+        (Conic3D::Ellipse(curve), Surface::ElementarySurface(ElementarySurface::Plane(plane))) => {
+            exact_ellipse_parameter_curve_on_plane(curve, plane, surface)
+        }
+        (
+            Conic3D::Hyperbola(curve),
+            Surface::ElementarySurface(ElementarySurface::Plane(plane)),
+        ) => exact_hyperbola_parameter_curve_on_plane(curve, plane, surface),
+        (Conic3D::Parabola(curve), Surface::ElementarySurface(ElementarySurface::Plane(plane))) => {
+            exact_parabola_parameter_curve_on_plane(curve, plane, surface)
+        }
+        (Conic3D::Ellipse(curve), _) => {
+            exact_line_parameter_curve_by_surface_search(curve, surface)
         }
         _ => None,
     }
@@ -41,7 +355,7 @@ impl SurfaceCurveAssociatedGeometry {
     fn surface(&self) -> &Surface {
         match self {
             SurfaceCurveAssociatedGeometry::ParameterCurve(curve) => curve.surface().as_ref(),
-            SurfaceCurveAssociatedGeometry::Surface(surface) => surface.as_ref(),
+            SurfaceCurveAssociatedGeometry::Surface(surface) => surface,
         }
     }
 }
@@ -189,7 +503,7 @@ impl ParameterDivision1D for Curve3D {
     type Point = Point3;
 
     fn parameter_division(&self, range: (f64, f64), tol: f64) -> (Vec<f64>, Vec<Self::Point>) {
-        let debug_profile = std::env::var("MT_PROFILE_CURVE_DIVISION").is_ok();
+        let debug_profile = env::var("MT_PROFILE_CURVE_DIVISION").is_ok();
         let started = std::time::Instant::now();
         let result = match self {
             Curve3D::Line(curve) => curve.parameter_division(range, tol),
@@ -271,31 +585,63 @@ impl TryIntoHomogeneousBsplineCurve for Curve3D {
 
 impl ParameterBoundary2D<Surface> for Curve3D {
     fn parameter_boundary_2d(&self, surface: &Surface, tolerance: f64) -> Option<Vec<Point2>> {
-        // TODO: Re-enable sampled boundary projection after `parameter_division` can return `Option` or `Result`.
-        // The old fallback can assert below `TOLERANCE` after transformed curve tolerance rescaling.
         match self {
-            Curve3D::ParameterCurve(curve) if curve.surface().as_ref() == surface => Some(
-                curve
-                    .curve()
-                    .parameter_division(curve.curve().range_tuple(), tolerance)
-                    .1,
-            ),
-            Curve3D::SurfaceCurve(curve) => {
-                curve.parameter_curve_on(surface).map(|parameter_curve| {
-                    parameter_curve
-                        .curve()
-                        .parameter_division(parameter_curve.curve().range_tuple(), tolerance)
-                        .1
-                })
+            Curve3D::ParameterCurve(curve) => {
+                if curve.surface().as_ref() == surface {
+                    Some(
+                        curve
+                            .curve()
+                            .parameter_division(curve.curve().range_tuple(), tolerance)
+                            .1,
+                    )
+                } else {
+                    sampled_parameter_boundary(curve, surface, tolerance)
+                }
             }
-            Curve3D::IntersectionCurve(curve) => exact_parameter_curve_on(curve.leader(), surface)
+            Curve3D::SurfaceCurve(curve) => curve
+                .parameter_curve_on(surface)
                 .map(|parameter_curve| {
                     parameter_curve
                         .curve()
                         .parameter_division(parameter_curve.curve().range_tuple(), tolerance)
                         .1
-                }),
-            _ => None,
+                })
+                .or_else(|| sampled_parameter_boundary(curve.leader(), surface, tolerance)),
+            Curve3D::IntersectionCurve(curve) => {
+                exact_parameter_curve_on(curve.leader().as_ref(), surface)
+                    .map(|parameter_curve| {
+                        parameter_curve
+                            .curve()
+                            .parameter_division(parameter_curve.curve().range_tuple(), tolerance)
+                            .1
+                    })
+                    .or_else(|| {
+                        sampled_parameter_boundary(curve.leader().as_ref(), surface, tolerance)
+                    })
+                    .or_else(|| {
+                        curve
+                            .leader()
+                            .parameter_division(curve.range_tuple(), tolerance)
+                            .0
+                            .into_iter()
+                            .map(|t| {
+                                let (_, uv0, uv1) = curve.search_triple(t, 100)?;
+                                if curve.surface0().as_ref() == surface {
+                                    Some(uv0)
+                                } else if curve.surface1().as_ref() == surface {
+                                    Some(uv1)
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect::<Option<Vec<_>>>()
+                    })
+            }
+            Curve3D::Line(_)
+            | Curve3D::Polyline(_)
+            | Curve3D::BsplineCurve(_)
+            | Curve3D::NurbsCurve(_) => sampled_parameter_boundary(self, surface, tolerance),
+            Curve3D::Conic(_) => None,
         }
     }
 }
@@ -626,6 +972,130 @@ impl ToSameGeometry<Surface> for RevolutionSurface<Curve3D> {
             _ => default(),
         }
     }
+}
+
+#[test]
+fn sampled_parameter_boundary_preserves_unbounded_cylinder_axis_parameter() {
+    let center = Point3::new(0.0, 0.0, 68.0);
+    let axis = Vector3::unit_z();
+    let radius = 0.3;
+    let p = center + radius * Vector3::unit_x();
+    let mut cylinder = Processor::new(RevolutionSurface::by_revolution(
+        Line(p, p + axis),
+        center,
+        axis,
+    ));
+    cylinder.invert();
+    let surface = Surface::ElementarySurface(ElementarySurface::CylindricalSurface(cylinder));
+    let curve = Line(
+        Point3::new(radius, 0.0, -6.25),
+        Point3::new(radius, 0.0, 6.25),
+    );
+
+    let boundary = sampled_parameter_boundary(&curve, &surface, 0.001).unwrap();
+    let max_abs = boundary
+        .iter()
+        .flat_map(|uv| [uv.x.abs(), uv.y.abs()])
+        .fold(0.0, f64::max);
+
+    assert!(max_abs > 10.0);
+}
+
+#[test]
+fn raw_conic_boundary_without_pcurve_returns_none() {
+    let curve = Curve3D::Conic(Conic3D::Ellipse(
+        Processor::new(TrimmedCurve::new(UnitCircle::<Point3>::new(), (0.0, TAU)))
+            .transformed(Matrix4::from_nonuniform_scale(100.0, 100.0, 100.0)),
+    ));
+    let surface = Surface::ElementarySurface(ElementarySurface::Plane(Plane::xy()));
+
+    assert!(curve.parameter_boundary_2d(&surface, 1.0e-5).is_none());
+}
+
+#[test]
+fn raw_line_boundary_without_pcurve_uses_sampled_projection() {
+    let curve = Curve3D::Line(Line(
+        Point3::new(0.25, 0.5, 0.0),
+        Point3::new(0.75, 0.5, 0.0),
+    ));
+    let surface = Surface::ElementarySurface(ElementarySurface::Plane(Plane::xy()));
+    let boundary = curve
+        .parameter_boundary_2d(&surface, 1.0e-5)
+        .expect("safe raw line projection should produce a parameter boundary.");
+
+    assert!(boundary.len() >= 2);
+    assert!(
+        boundary
+            .first()
+            .is_some_and(|point| point.near(&Point2::new(0.25, 0.5)))
+    );
+    assert!(
+        boundary
+            .last()
+            .is_some_and(|point| point.near(&Point2::new(0.75, 0.5)))
+    );
+}
+
+#[test]
+fn surface_curve_line_without_pcurve_converts_to_exact_pcurve() {
+    let leader = Curve3D::Line(Line(
+        Point3::new(0.25, 0.5, 0.0),
+        Point3::new(0.75, 0.5, 0.0),
+    ));
+    let curve = Curve3D::SurfaceCurve(SurfaceCurve3D::new(
+        SurfaceCurveKind::Surface,
+        Box::new(leader),
+        Vec::new(),
+        SurfaceCurveRepresentation::Curve3D,
+    ));
+    let surface = Surface::ElementarySurface(ElementarySurface::Plane(Plane::xy()));
+
+    let boundary = StepParameterCurve::try_from(CurveTrimRef::new(&curve, &surface))
+        .expect("surface curve leader should produce an exact parameter boundary.");
+
+    match boundary.curve().as_ref() {
+        Curve2D::Line(line) => {
+            assert!(line.front().near(&Point2::new(0.25, 0.5)));
+            assert!(line.back().near(&Point2::new(0.75, 0.5)));
+        }
+        curve => panic!("expected line boundary, got {curve:?}"),
+    }
+}
+
+#[test]
+fn surface_curve_line_without_pcurve_on_cylinder_stays_fallback_only() {
+    let axis = Vector3::unit_z();
+    let center = Point3::origin();
+    let point = Point3::new(1.0, 0.0, 0.0);
+    let profile = Line(point, point + axis);
+    let surface = Surface::ElementarySurface(ElementarySurface::CylindricalSurface(
+        Processor::new(RevolutionSurface::by_revolution(profile, center, axis)),
+    ));
+    let leader = Curve3D::Line(Line(surface.evaluate(0.0, 0.0), surface.evaluate(0.0, 1.0)));
+    let curve = Curve3D::SurfaceCurve(SurfaceCurve3D::new(
+        SurfaceCurveKind::Surface,
+        Box::new(leader),
+        Vec::new(),
+        SurfaceCurveRepresentation::Curve3D,
+    ));
+
+    assert!(StepParameterCurve::try_from(CurveTrimRef::new(&curve, &surface)).is_err());
+    assert!(curve.exact_parameter_boundary_2d(&surface).is_none());
+}
+
+#[test]
+fn raw_line_without_pcurve_on_cylinder_stays_fallback_only() {
+    let axis = Vector3::unit_z();
+    let center = Point3::origin();
+    let point = Point3::new(1.0, 0.0, 0.0);
+    let profile = Line(point, point + axis);
+    let surface = Surface::ElementarySurface(ElementarySurface::CylindricalSurface(
+        Processor::new(RevolutionSurface::by_revolution(profile, center, axis)),
+    ));
+    let curve = Curve3D::Line(Line(surface.evaluate(0.0, 0.0), surface.evaluate(0.0, 1.0)));
+
+    assert!(StepParameterCurve::try_from(CurveTrimRef::new(&curve, &surface)).is_err());
+    assert!(curve.exact_parameter_boundary_2d(&surface).is_none());
 }
 
 #[test]

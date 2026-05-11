@@ -1,5 +1,9 @@
 use super::*;
-use mesh::{boundary_segment_parameter, spade_round};
+use mesh::spade_round;
+
+const PERIODIC_LOOP_OTHER_AXIS_TOLERANCE: f64 = 1.0e-6;
+const SINGULAR_RADIUS_RELATIVE_TOLERANCE: f64 = 1.0e-6;
+const DEFAULT_SINGULAR_PARAMETER_PROBE: f64 = 1.0;
 
 #[derive(Clone, Copy, Debug, derive_more::Deref, derive_more::DerefMut)]
 pub(super) struct SurfacePoint {
@@ -13,10 +17,47 @@ impl From<(Point2, Point3)> for SurfacePoint {
     fn from((uv, point): (Point2, Point3)) -> Self { Self { point, uv } }
 }
 
+fn orient_boundary_to_edge<C, S>(
+    surface: &S,
+    boundary: &mut [Point2],
+    edge_curve: &C,
+    orientation: bool,
+) where
+    C: BoundedCurve<Point = Point3> + ParametricCurve3D,
+    S: ParametricSurface3D,
+{
+    let (edge_front, edge_back) = match orientation {
+        true => (edge_curve.front(), edge_curve.back()),
+        false => (edge_curve.back(), edge_curve.front()),
+    };
+    if edge_front.near(&edge_back) {
+        return;
+    }
+    if let (Some(front_uv), Some(back_uv)) = (boundary.first(), boundary.last()) {
+        let front_point = surface.evaluate(front_uv.x, front_uv.y);
+        let back_point = surface.evaluate(back_uv.x, back_uv.y);
+        let direct = front_point.distance2(edge_front) + back_point.distance2(edge_back);
+        let reversed = front_point.distance2(edge_back) + back_point.distance2(edge_front);
+        if reversed < direct {
+            boundary.reverse();
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub(super) struct PolyBoundaryPiece(pub(super) Vec<SurfacePoint>);
 
 impl PolyBoundaryPiece {
+    fn clamp_near_range(value: f64, (min, max): (f64, f64)) -> f64 {
+        if value < min && min - value < TOLERANCE {
+            min
+        } else if value > max && value - max < TOLERANCE {
+            max
+        } else {
+            value
+        }
+    }
+
     fn from_surface_points(mut vec: Vec<SurfacePoint>) -> Option<Self> {
         vec = vec
             .into_iter()
@@ -65,22 +106,29 @@ impl PolyBoundaryPiece {
     where
         S: PreMeshableSurface,
         T: ExactTrimBoundary2D + 'a,
-        C: ParameterBoundary2D<S> + ExactParameterBoundary2D<S> + 'a,
+        C: ParametricCurve3D
+            + BoundedCurve<Point = Point3>
+            + ParameterBoundary2D<S>
+            + ExactParameterBoundary2D<S>
+            + 'a,
         <C as ExactParameterBoundary2D<S>>::BoundaryCurve: ExactTrimBoundary2D,
     {
         wire.map(|(orientation, trim_curve, edge_curve)| {
-            let mut boundary = trim_curve
-                .map(|trim_curve| trim_curve.exact_trim_boundary_2d(tolerance))
-                .or_else(|| {
-                    edge_curve
-                        .exact_parameter_boundary_2d(surface)
-                        .map(|trim_curve| trim_curve.exact_trim_boundary_2d(tolerance))
-                })
-                .or_else(|| edge_curve.parameter_boundary_2d(surface, tolerance))
-                .map(|boundary| simplify_parameter_boundary(surface, boundary, tolerance))?;
-            if !orientation {
-                boundary.reverse();
-            }
+            let boundary = if let Some(trim_curve) = trim_curve {
+                let mut boundary = trim_curve.exact_trim_boundary_2d(tolerance);
+                orient_boundary_to_edge(surface, &mut boundary, edge_curve, orientation);
+                boundary
+            } else {
+                let mut boundary = edge_curve
+                    .exact_parameter_boundary_2d(surface)
+                    .map(|trim_curve| trim_curve.exact_trim_boundary_2d(tolerance))
+                    .or_else(|| edge_curve.parameter_boundary_2d(surface, tolerance))?;
+                if !orientation {
+                    boundary.reverse();
+                }
+                boundary
+            };
+            let boundary = simplify_parameter_boundary(surface, boundary, tolerance);
             Some(boundary)
         })
         .collect::<Option<Vec<Vec<Point2>>>>()
@@ -193,6 +241,81 @@ impl PolyBoundaryPiece {
         })
     }
 
+    fn aligned_boundary_piece<S: PreMeshableSurface>(
+        surface: &S,
+        boundary: &[Point2],
+        polyline: &PolylineCurve,
+        previous: Option<SurfacePoint>,
+    ) -> Option<(Vec<SurfacePoint>, Option<SurfacePoint>)> {
+        let mut next_previous = previous;
+        let piece = resample_boundary(boundary, polyline.len())?
+            .into_iter()
+            .zip(polyline.iter().copied())
+            .map(|(uv, point)| {
+                let (u, v) = Self::normalize_uv(
+                    surface,
+                    (uv.x, uv.y),
+                    next_previous.as_ref().map(|point| (point.x, point.y)),
+                )?;
+                let surface_point = SurfacePoint::from((Point2::new(u, v), point));
+                next_previous = Some(surface_point);
+                Some(surface_point)
+            })
+            .collect::<Option<Vec<_>>>()?;
+        Some((piece, next_previous))
+    }
+
+    fn projected_polyline_piece<S: PreMeshableSurface>(
+        surface: &S,
+        polyline: &PolylineCurve,
+        sp: &impl SP<S>,
+        previous: Option<SurfacePoint>,
+    ) -> Option<(Vec<SurfacePoint>, Option<SurfacePoint>)> {
+        let mut next_previous = previous;
+        let seed = next_previous.as_ref().and_then(|previous_point| {
+            polyline
+                .first()
+                .copied()
+                .filter(|point| point.near(&previous_point.point))
+                .map(|point| {
+                    SurfacePoint::from((Point2::new(previous_point.x, previous_point.y), point))
+                })
+        });
+        let prefix = seed.into_iter().collect::<Vec<_>>();
+        let suffix = polyline
+            .iter()
+            .copied()
+            .skip(prefix.len())
+            .map(|point| {
+                let surface_point = if next_previous
+                    .as_ref()
+                    .is_some_and(|previous_point| point.near(&previous_point.point))
+                {
+                    next_previous.as_ref().map(|previous_point| {
+                        SurfacePoint::from((Point2::new(previous_point.x, previous_point.y), point))
+                    })?
+                } else {
+                    let (u, v) = sp(
+                        surface,
+                        point,
+                        next_previous.as_ref().map(|point| (point.x, point.y)),
+                    )
+                    .and_then(|uv| {
+                        Self::normalize_uv(
+                            surface,
+                            uv,
+                            next_previous.as_ref().map(|point| (point.x, point.y)),
+                        )
+                    })?;
+                    SurfacePoint::from((Point2::new(u, v), point))
+                };
+                next_previous = Some(surface_point);
+                Some(surface_point)
+            })
+            .collect::<Option<Vec<_>>>()?;
+        Some((prefix.into_iter().chain(suffix).collect(), next_previous))
+    }
+
     pub(super) fn try_new_from_aligned_exact<S: PreMeshableSurface>(
         surface: &S,
         wire: impl Iterator<Item = (Option<Vec<Point2>>, PolylineCurve)>,
@@ -208,90 +331,38 @@ impl PolyBoundaryPiece {
                 .position(|(boundary, _)| boundary.is_some())
                 .unwrap_or(0);
             let mut previous = None::<SurfacePoint>;
+            let periodic_surface = surface.u_period().is_some() || surface.v_period().is_some();
             pieces
                 .into_iter()
                 .cycle()
                 .skip(start)
                 .take(piece_count)
                 .map(|(boundary, polyline)| {
-                    let boundary_piece = boundary
-                        .as_ref()
-                        .and_then(|boundary| resample_boundary(boundary, polyline.len()))
-                        .and_then(|boundary| {
-                            boundary
-                                .into_iter()
-                                .zip(polyline.iter().copied())
-                                .map(|(uv, point)| {
-                                    let (u, v) = Self::normalize_uv(
-                                        surface,
-                                        (uv.x, uv.y),
-                                        previous.as_ref().map(|point| (point.x, point.y)),
-                                    )?;
-                                    let surface_point =
-                                        SurfacePoint::from((Point2::new(u, v), point));
-                                    previous = Some(surface_point);
-                                    Some(surface_point)
-                                })
-                                .collect::<Option<Vec<_>>>()
-                        });
-                    let projected_piece = || {
-                        let seed = previous.as_ref().and_then(|previous_point| {
-                            polyline
-                                .first()
-                                .copied()
-                                .filter(|point| point.near(&previous_point.point))
-                                .map(|point| {
-                                    SurfacePoint::from((
-                                        Point2::new(previous_point.x, previous_point.y),
-                                        point,
-                                    ))
-                                })
-                        });
-                        let prefix = seed.into_iter().collect::<Vec<_>>();
-                        let suffix = polyline
-                            .iter()
-                            .copied()
-                            .skip(prefix.len())
-                            .map(|point| {
-                                let surface_point = if previous
-                                    .as_ref()
-                                    .is_some_and(|previous_point| point.near(&previous_point.point))
-                                {
-                                    previous.as_ref().map(|previous_point| {
-                                        SurfacePoint::from((
-                                            Point2::new(previous_point.x, previous_point.y),
-                                            point,
-                                        ))
-                                    })?
-                                } else {
-                                    let (u, v) = sp(
-                                        surface,
-                                        point,
-                                        previous.as_ref().map(|point| (point.x, point.y)),
-                                    )
-                                    .and_then(|uv| {
-                                        Self::normalize_uv(
-                                            surface,
-                                            uv,
-                                            previous.as_ref().map(|point| (point.x, point.y)),
-                                        )
-                                    })?;
-                                    SurfacePoint::from((Point2::new(u, v), point))
-                                };
-                                previous = Some(surface_point);
-                                Some(surface_point)
-                            })
-                            .collect::<Option<Vec<_>>>()?;
-                        Some(prefix.into_iter().chain(suffix).collect())
+                    let boundary_piece = || {
+                        boundary.as_ref().and_then(|boundary| {
+                            Self::aligned_boundary_piece(surface, boundary, &polyline, previous)
+                        })
                     };
-                    boundary_piece.or_else(projected_piece).or_else(|| {
-                        boundary.and_then(|boundary| {
-                            Self::from_parameter_boundary(surface, boundary).map(|piece| {
-                                previous = piece.0.last().copied();
-                                piece.0
+                    let projected_piece =
+                        || Self::projected_polyline_piece(surface, &polyline, sp, previous);
+                    let piece = if periodic_surface {
+                        projected_piece().or_else(boundary_piece)
+                    } else {
+                        boundary_piece().or_else(projected_piece)
+                    };
+                    piece
+                        .map(|(piece, next_previous)| {
+                            previous = next_previous;
+                            piece
+                        })
+                        .or_else(|| {
+                            boundary.and_then(|boundary| {
+                                Self::from_parameter_boundary(surface, boundary).map(|piece| {
+                                    previous = piece.0.last().copied();
+                                    piece.0
+                                })
                             })
                         })
-                    })
                 })
                 .collect::<Option<Vec<Vec<SurfacePoint>>>>()
                 .and_then(|pieces| {
@@ -321,8 +392,8 @@ impl PolyBoundaryPiece {
         } else if let Some(previous) = previous {
             if let Some(period) = period {
                 Some(periodic_min_difference(value, previous, period))
-            } else if let Some((min, max)) = range {
-                Some(value.clamp(min, max))
+            } else if let Some(range) = range {
+                Some(Self::clamp_near_range(value, range))
             } else {
                 Some(value)
             }
@@ -342,7 +413,7 @@ impl PolyBoundaryPiece {
                     Some(normalized.clamp(min, max))
                 }
             } else {
-                Some(value.clamp(min, max))
+                Some(Self::clamp_near_range(value, (min, max)))
             }
         } else {
             Some(value)
@@ -537,12 +608,418 @@ fn normalize_range(curve: &mut Vec<SurfacePoint>, compidx: usize, (u0, u1): (f64
     *curve = curve1;
 }
 
-fn loop_orientation(curve: &[SurfacePoint]) -> bool {
+fn loop_signed_area(curve: &[SurfacePoint]) -> f64 {
     curve
         .iter()
         .circular_tuple_windows()
         .fold(0.0, |sum, (p, q)| sum + (q.x + p.x) * (q.y - p.y))
-        > 0.0
+}
+
+fn loop_orientation(curve: &[SurfacePoint]) -> bool { loop_signed_area(curve) > 0.0 }
+
+fn normalize_closed_loop_winding(closed: &mut [Vec<SurfacePoint>]) {
+    let outer_index = closed
+        .iter()
+        .enumerate()
+        .max_by(|(_, lhs), (_, rhs)| {
+            loop_signed_area(lhs)
+                .abs()
+                .total_cmp(&loop_signed_area(rhs).abs())
+        })
+        .map(|(index, _)| index);
+    if let Some(outer_index) = outer_index {
+        closed.iter_mut().enumerate().for_each(|(index, curve)| {
+            let should_be_positive = index == outer_index;
+            if loop_orientation(curve) != should_be_positive {
+                curve.reverse();
+            }
+        });
+    }
+}
+
+fn periodic_axis_full_span(
+    curve: &[SurfacePoint],
+    surface: &impl PreMeshableSurface,
+) -> Option<(usize, f64)> {
+    let closed = curve
+        .first()
+        .zip(curve.last())
+        .is_some_and(|(front, back)| front.uv.near(&back.uv));
+    if curve.len() < 4 || !closed {
+        None
+    } else {
+        [(0usize, surface.u_period()), (1usize, surface.v_period())]
+            .into_iter()
+            .filter_map(|(axis, period)| Some((axis, period?)))
+            .find(|(axis, period)| {
+                let other_axis = 1 - *axis;
+                match (
+                    curve_axis_span(curve, *axis),
+                    curve_axis_span(curve, other_axis),
+                ) {
+                    (Some((min, max)), Some((other_min, other_max))) => {
+                        max - min + TOLERANCE >= period * 0.75
+                            && other_max - other_min <= PERIODIC_LOOP_OTHER_AXIS_TOLERANCE
+                    }
+                    _ => false,
+                }
+            })
+    }
+}
+
+fn curve_axis_span(curve: &[SurfacePoint], axis: usize) -> Option<(f64, f64)> {
+    curve
+        .iter()
+        .map(|point| point[axis])
+        .fold(None, |span, value| {
+            Some(match span {
+                Some((min, max)) => (f64::min(min, value), f64::max(max, value)),
+                None => (value, value),
+            })
+        })
+}
+
+fn surface_axis_range(
+    surface: &impl PreMeshableSurface,
+    axis: usize,
+) -> (Option<f64>, Option<(f64, f64)>) {
+    let (urange, vrange) = surface.try_range_tuple();
+    match axis {
+        0 => (surface.u_period(), urange),
+        _ => (surface.v_period(), vrange),
+    }
+}
+
+fn normalized_periodic_candidate(
+    curve: &[SurfacePoint],
+    surface: &impl PreMeshableSurface,
+    axis: usize,
+    period: f64,
+    range: Option<(f64, f64)>,
+    start: usize,
+    closed_len: usize,
+) -> Option<(f64, Vec<SurfacePoint>)> {
+    let mut previous = None;
+    let candidate = curve
+        .iter()
+        .take(closed_len)
+        .cycle()
+        .skip(start)
+        .take(closed_len)
+        .copied()
+        .map(|mut point| {
+            point[axis] =
+                PolyBoundaryPiece::normalize_axis(point[axis], previous, Some(period), range)?;
+            previous = Some(point[axis]);
+            point.point = surface.evaluate(point.x, point.y);
+            Some(point)
+        })
+        .collect::<Option<Vec<_>>>()?;
+    let span = curve_axis_span(&candidate, axis).map(|(min, max)| max - min)?;
+    Some((span, candidate))
+}
+
+fn compact_periodic_closed_loop(curve: &mut Vec<SurfacePoint>, surface: &impl PreMeshableSurface) {
+    let closed = curve
+        .first()
+        .zip(curve.last())
+        .is_some_and(|(front, back)| front.uv.near(&back.uv));
+    if curve.len() < 4 || !closed {
+        return;
+    }
+    if periodic_axis_full_span(curve, surface).is_some() {
+        return;
+    }
+    for axis in 0..=1 {
+        let (Some(period), range) = surface_axis_range(surface, axis) else {
+            continue;
+        };
+        let Some((min, max)) = curve_axis_span(curve, axis) else {
+            continue;
+        };
+        let has_periodic_jump = curve
+            .windows(2)
+            .any(|points| (points[1][axis] - points[0][axis]).abs() > period * 0.5);
+        if max - min <= period + TOLERANCE && !has_periodic_jump {
+            continue;
+        }
+        let closed_len = curve.len() - 1;
+        let best = (0..closed_len)
+            .filter_map(|start| {
+                normalized_periodic_candidate(
+                    curve, surface, axis, period, range, start, closed_len,
+                )
+            })
+            .min_by(|lhs, rhs| lhs.0.total_cmp(&rhs.0));
+        if let Some((span, mut candidate)) = best
+            && span <= period + TOLERANCE
+        {
+            candidate.push(candidate[0]);
+            *curve = candidate;
+        }
+    }
+}
+
+fn unwrap_periodic_open_curve(curve: &mut [SurfacePoint], axis: usize, period: f64) {
+    let mut previous = None;
+    curve.iter_mut().for_each(|point| {
+        if let Some(value) =
+            PolyBoundaryPiece::normalize_axis(point[axis], previous, Some(period), None)
+        {
+            point[axis] = value;
+        }
+        previous = Some(point[axis]);
+    });
+}
+
+fn shift_curve_axis(curve: &mut [SurfacePoint], axis: usize, shift: f64) {
+    curve.iter_mut().for_each(|point| {
+        point[axis] += shift;
+    });
+}
+
+fn paired_curve_axis_span(
+    curve0: &[SurfacePoint],
+    curve1: &[SurfacePoint],
+    axis: usize,
+    curve1_shift: f64,
+) -> Option<f64> {
+    curve0
+        .iter()
+        .map(|point| point[axis])
+        .chain(curve1.iter().map(|point| point[axis] + curve1_shift))
+        .fold(None, |span, value| {
+            Some(match span {
+                Some((min, max)) => (f64::min(min, value), f64::max(max, value)),
+                None => (value, value),
+            })
+        })
+        .map(|(min, max)| max - min)
+}
+
+fn align_periodic_open_pair(
+    curve0: &[SurfacePoint],
+    curve1: &mut [SurfacePoint],
+    axis: usize,
+    period: f64,
+) {
+    let best_shift = (-4..=4)
+        .filter_map(|lap| {
+            let shift = lap as f64 * period;
+            paired_curve_axis_span(curve0, curve1, axis, shift).map(|span| (span, shift))
+        })
+        .min_by(|lhs, rhs| lhs.0.total_cmp(&rhs.0))
+        .map(|(_, shift)| shift);
+    if let Some(shift) = best_shift {
+        shift_curve_axis(curve1, axis, shift);
+    }
+}
+
+fn periodic_seam_bounds(
+    lower: f64,
+    upper: f64,
+    period: f64,
+    range: Option<(f64, f64)>,
+) -> (f64, f64) {
+    let origin = range.map(|(min, _)| min).unwrap_or(0.0);
+    let mut seam_lower = origin + ((lower - origin) / period).floor() * period;
+    while upper > seam_lower + period + TOLERANCE {
+        seam_lower += period;
+    }
+    (seam_lower, seam_lower + period)
+}
+
+fn seam_surface_point(
+    surface: &impl PreMeshableSurface,
+    mut template: SurfacePoint,
+    axis: usize,
+    value: f64,
+) -> SurfacePoint {
+    template[axis] = value;
+    template.point = surface.evaluate(template.x, template.y);
+    template
+}
+
+fn open_periodic_closed_loop(
+    mut curve: Vec<SurfacePoint>,
+    surface: &impl PreMeshableSurface,
+    axis: usize,
+    period: f64,
+) -> Vec<SurfacePoint> {
+    curve.pop();
+    let jump = curve
+        .windows(2)
+        .enumerate()
+        .map(|(index, points)| (index, points[1][axis] - points[0][axis]))
+        .filter(|(_, delta)| delta.abs() > period * 0.5)
+        .max_by(|lhs, rhs| lhs.1.abs().total_cmp(&rhs.1.abs()));
+    if let Some((index, delta)) = jump {
+        let lower = f64::min(curve[index][axis], curve[index + 1][axis]);
+        let upper = f64::max(curve[index][axis], curve[index + 1][axis]);
+        let (_, range) = surface_axis_range(surface, axis);
+        let (seam_lower, seam_upper) = periodic_seam_bounds(lower, upper, period, range);
+        let mut opened = Vec::with_capacity(curve.len() + 2);
+        if delta > 0.0 {
+            opened.push(seam_surface_point(
+                surface,
+                curve[index + 1],
+                axis,
+                seam_upper,
+            ));
+            opened.extend_from_slice(&curve[index + 1..]);
+            opened.extend_from_slice(&curve[..=index]);
+            opened.push(seam_surface_point(surface, curve[index], axis, seam_lower));
+        } else {
+            opened.push(seam_surface_point(
+                surface,
+                curve[index + 1],
+                axis,
+                seam_lower,
+            ));
+            opened.extend_from_slice(&curve[index + 1..]);
+            opened.extend_from_slice(&curve[..=index]);
+            opened.push(seam_surface_point(surface, curve[index], axis, seam_upper));
+        }
+        opened
+    } else {
+        unwrap_periodic_open_curve(&mut curve, axis, period);
+        if let (Some(front), Some(back)) = (curve.first().copied(), curve.last().copied()) {
+            let delta = back[axis] - front[axis];
+            if delta.abs() + TOLERANCE < period {
+                let mut seam = front;
+                seam[axis] += if delta < 0.0 { -period } else { period };
+                seam.point = surface.evaluate(seam.x, seam.y);
+                curve.push(seam);
+            }
+        }
+        curve
+    }
+}
+
+fn periodic_open_axis_full_span(
+    curve: &[SurfacePoint],
+    surface: &impl PreMeshableSurface,
+) -> Option<(usize, f64)> {
+    if curve.len() < 2 {
+        None
+    } else {
+        [(0usize, surface.u_period()), (1usize, surface.v_period())]
+            .into_iter()
+            .filter_map(|(axis, period)| Some((axis, period?)))
+            .find(|(axis, period)| {
+                let other_axis = 1 - *axis;
+                match (
+                    curve_axis_span(curve, *axis),
+                    curve_axis_span(curve, other_axis),
+                ) {
+                    (Some((min, max)), Some((other_min, other_max))) => {
+                        max - min + TOLERANCE >= period * 0.75 && other_max - other_min <= 1.0e-6
+                    }
+                    _ => false,
+                }
+            })
+    }
+}
+
+fn axis_derivative_norm(surface: &impl PreMeshableSurface, axis: usize, uv: Point2) -> Option<f64> {
+    let norm = match axis {
+        0 => surface.derivative_u(uv.x, uv.y).magnitude(),
+        _ => surface.derivative_v(uv.x, uv.y).magnitude(),
+    };
+    norm.is_finite().then_some(norm)
+}
+
+fn uv_with_axis_values(
+    template: SurfacePoint,
+    axis: usize,
+    axis_value: f64,
+    other_value: f64,
+) -> Point2 {
+    let mut uv = template.uv;
+    uv[axis] = axis_value;
+    uv[1 - axis] = other_value;
+    uv
+}
+
+fn singular_periodic_other_parameter(
+    curve: &[SurfacePoint],
+    surface: &impl PreMeshableSurface,
+    periodic_axis: usize,
+) -> Option<f64> {
+    let other_axis = 1 - periodic_axis;
+    let other = curve.iter().map(|point| point[other_axis]).sum::<f64>() / curve.len() as f64;
+    let periodic = curve[0][periodic_axis];
+    let uv = uv_with_axis_values(curve[0], periodic_axis, periodic, other);
+    let radius = axis_derivative_norm(surface, periodic_axis, uv)?;
+    if radius <= TOLERANCE {
+        Some(other)
+    } else {
+        let (_, range) = surface_axis_range(surface, other_axis);
+        let step = range
+            .map(|(min, max)| (max - min).abs())
+            .filter(|span| span.is_finite() && *span > TOLERANCE)
+            .unwrap_or(DEFAULT_SINGULAR_PARAMETER_PROBE);
+        [-step, step]
+            .into_iter()
+            .filter_map(|delta| {
+                let sample_uv =
+                    uv_with_axis_values(curve[0], periodic_axis, periodic, other + delta);
+                let sample_radius = axis_derivative_norm(surface, periodic_axis, sample_uv)?;
+                let slope = (sample_radius - radius) / delta;
+                if slope.abs() <= TOLERANCE {
+                    None
+                } else {
+                    let candidate = other - radius / slope;
+                    let candidate_uv =
+                        uv_with_axis_values(curve[0], periodic_axis, periodic, candidate);
+                    let candidate_radius =
+                        axis_derivative_norm(surface, periodic_axis, candidate_uv)?;
+                    (candidate.is_finite()
+                        && candidate_radius
+                            <= TOLERANCE.max(radius * SINGULAR_RADIUS_RELATIVE_TOLERANCE))
+                    .then_some((candidate_radius, (candidate - other).abs(), candidate))
+                }
+            })
+            .min_by(|lhs, rhs| lhs.0.total_cmp(&rhs.0).then(lhs.1.total_cmp(&rhs.1)))
+            .map(|(_, _, candidate)| candidate)
+    }
+}
+
+fn singular_surface_point(
+    surface: &impl PreMeshableSurface,
+    mut template: SurfacePoint,
+    axis: usize,
+    other_value: f64,
+) -> SurfacePoint {
+    let other_axis = 1 - axis;
+    template[other_axis] = other_value;
+    template.point = surface.evaluate(template.x, template.y);
+    template
+}
+
+fn connect_edges<P>(vecs: impl IntoIterator<Item = Vec<P>>) -> Vec<P> {
+    let closure = |vec: Vec<P>| {
+        let len = vec.len();
+        vec.into_iter().take(len - 1)
+    };
+    vecs.into_iter().flat_map(closure).collect()
+}
+
+fn close_open_periodic_curve_to_singular(
+    curve: Vec<SurfacePoint>,
+    surface: &impl PreMeshableSurface,
+    axis: usize,
+    tolerance: f64,
+    point_cache: &mut HashMap<UvKey, Point3>,
+) -> Option<Vec<SurfacePoint>> {
+    let singular_other = singular_periodic_other_parameter(&curve, surface, axis)?;
+    let (p, q) = (*curve.first()?, *curve.last()?);
+    let singular_p = singular_surface_point(surface, p, axis, singular_other);
+    let singular_q = singular_surface_point(surface, q, axis, singular_other);
+    let vec0 = polyline_on_surface(surface, q, singular_q, tolerance, point_cache);
+    let vec1 = polyline_on_surface(surface, singular_q, singular_p, tolerance, point_cache);
+    let vec2 = polyline_on_surface(surface, singular_p, p, tolerance, point_cache);
+    Some(connect_edges([curve, vec0, vec1, vec2]))
 }
 
 pub(super) type UvKey = (u64, u64);
@@ -568,29 +1045,39 @@ impl PolyBoundary {
     ) -> Self {
         let (mut closed, mut open) = (Vec::new(), Vec::new());
         pieces.into_iter().for_each(|PolyBoundaryPiece(mut vec)| {
-            match vec[0].uv.distance(vec[vec.len() - 1].uv) < 1.0e-3 {
-                true => {
-                    vec.pop();
-                    closed.push(vec)
+            compact_periodic_closed_loop(&mut vec, surface);
+            if let Some((axis, period)) = periodic_axis_full_span(&vec, surface) {
+                open.push(open_periodic_closed_loop(vec, surface, axis, period));
+            } else {
+                match vec[0].uv.distance(vec[vec.len() - 1].uv) < 1.0e-3 {
+                    true => {
+                        vec.pop();
+                        closed.push(vec)
+                    }
+                    false => open.push(vec),
                 }
-                false => open.push(vec),
             }
         });
-        fn connect_edges<P>(vecs: impl IntoIterator<Item = Vec<P>>) -> Vec<P> {
-            let closure = |vec: Vec<P>| {
-                let len = vec.len();
-                vec.into_iter().take(len - 1)
-            };
-            vecs.into_iter().flat_map(closure).collect()
-        }
+        open.retain(|curve| curve.len() >= 2);
+        closed.retain(|curve| curve.len() >= 2);
         let mut point_cache = HashMap::<UvKey, Point3>::default();
         match open.len() {
             1 => {
                 // SAFETY: open.len() == 1 was matched above.
                 let mut curve = open.pop().unwrap();
-                let p = curve[0];
-                let q = curve[curve.len() - 1];
-                if let (Some((u0, u1)), Some((v0, v1))) = surface.try_range_tuple() {
+                if let Some((axis, _)) = periodic_open_axis_full_span(&curve, surface)
+                    && let Some(singular_curve) = close_open_periodic_curve_to_singular(
+                        curve.clone(),
+                        surface,
+                        axis,
+                        tolerance,
+                        &mut point_cache,
+                    )
+                {
+                    closed.push(singular_curve);
+                } else if let (Some((u0, u1)), Some((v0, v1))) = surface.try_range_tuple() {
+                    let p = curve[0];
+                    let q = curve[curve.len() - 1];
                     if p.x < q.x - TOLERANCE {
                         normalize_range(&mut curve, 0, (u0, u1));
                         let p = curve[0];
@@ -673,16 +1160,19 @@ impl PolyBoundary {
                 fn end_pts<T: Copy>(vec: &[T]) -> (T, T) { (vec[0], vec[vec.len() - 1]) }
                 let ((p0, p1), (q0, q1)) = (end_pts(&curve0), end_pts(&curve1));
                 if !p0.x.near(&p1.x) && !q0.x.near(&q1.x) {
-                    if let (Some(urange), _) = surface.try_range_tuple() {
+                    if let Some(period) = surface.u_period() {
+                        align_periodic_open_pair(&curve0, &mut curve1, 0, period);
+                    } else if let (Some(urange), _) = surface.try_range_tuple() {
                         normalize_range(&mut curve0, 0, urange);
                         normalize_range(&mut curve1, 0, urange);
                     }
-                } else if !p0.y.near(&p1.y)
-                    && !q0.y.near(&q1.y)
-                    && let (_, Some(vrange)) = surface.try_range_tuple()
-                {
-                    normalize_range(&mut curve0, 1, vrange);
-                    normalize_range(&mut curve1, 1, vrange);
+                } else if !p0.y.near(&p1.y) && !q0.y.near(&q1.y) {
+                    if let Some(period) = surface.v_period() {
+                        align_periodic_open_pair(&curve0, &mut curve1, 1, period);
+                    } else if let (_, Some(vrange)) = surface.try_range_tuple() {
+                        normalize_range(&mut curve0, 1, vrange);
+                        normalize_range(&mut curve1, 1, vrange);
+                    }
                 }
                 let ((p0, p1), (q0, q1)) = (end_pts(&curve0), end_pts(&curve1));
                 let vec0 = polyline_on_surface(surface, p1, q0, tolerance, &mut point_cache);
@@ -690,6 +1180,9 @@ impl PolyBoundary {
                 closed.push(connect_edges([curve0, vec0, curve1, vec1]));
             }
             _ => {}
+        }
+        if closed.len() == 1 && !loop_orientation(&closed[0]) {
+            closed[0].reverse();
         }
         if !closed.iter().any(|curve| loop_orientation(curve))
             && let (Some((u0, u1)), Some((v0, v1))) = surface.try_range_tuple()
@@ -706,6 +1199,7 @@ impl PolyBoundary {
             let vec3 = polyline_on_surface(surface, p[3], p[0], tolerance, &mut point_cache);
             closed.push(connect_edges([vec0, vec1, vec2, vec3]));
         }
+        normalize_closed_loop_winding(&mut closed);
         let (mut uv_min, mut uv_max) = (
             Point2::new(f64::INFINITY, f64::INFINITY),
             Point2::new(f64::NEG_INFINITY, f64::NEG_INFINITY),
@@ -777,70 +1271,24 @@ impl PolyBoundary {
                 }
             })
             .collect();
-        let vertex_positions = triangulation
-            .vertices()
-            .map(|vertex| {
-                let point = *vertex.as_ref();
-                (vertex.fix(), Point2::new(point.x, point.y))
-            })
-            .collect::<HashMap<_, _>>();
-        let mut prev: Option<usize> = None;
         let mut counter = 0;
         let mut added_constraints = 0usize;
         let mut skipped_constraints = 0usize;
         let mut add_constraint = |front: FixedVertexHandle, back: FixedVertexHandle| {
-            if triangulation.can_add_constraint(front, back) {
-                triangulation.add_constraint(front, back);
-                added_constraints += 1;
-                true
-            } else if let (Some(front_uv), Some(back_uv)) =
-                (vertex_positions.get(&front), vertex_positions.get(&back))
-            {
-                let mut chain = vertex_positions
-                    .iter()
-                    .filter_map(|(handle, point)| {
-                        if *handle == front || *handle == back {
-                            None
-                        } else {
-                            boundary_segment_parameter(*point, *front_uv, *back_uv)
-                                .map(|parameter| (parameter, *handle))
-                        }
-                    })
-                    .collect::<Vec<_>>();
-                chain.sort_by(|lhs, rhs| lhs.0.total_cmp(&rhs.0));
-                let handles = std::iter::once(front)
-                    .chain(chain.into_iter().map(|(_, handle)| handle))
-                    .chain(std::iter::once(back))
-                    .collect::<Vec<_>>();
-                let success = handles.len() > 2
-                    && handles.windows(2).all(|window| {
-                        window[0] == window[1]
-                            || if triangulation.can_add_constraint(window[0], window[1]) {
-                                triangulation.add_constraint(window[0], window[1]);
-                                added_constraints += 1;
-                                true
-                            } else {
-                                false
-                            }
-                    });
-                if !success {
-                    skipped_constraints += 1;
-                }
-                success
-            } else {
+            let constraints = triangulation.add_constraint_and_split(front, back, |point| point);
+            if constraints.is_empty() {
                 skipped_constraints += 1;
                 false
+            } else {
+                added_constraints += constraints.len();
+                true
             }
         };
-        self.loops
-            .iter()
-            .map(Vec::len)
-            .flat_map(|len| {
-                let range = counter..counter + len;
-                counter += len;
-                range.circular_tuple_windows()
-            })
-            .for_each(|(i, j)| {
+        self.loops.iter().map(Vec::len).for_each(|len| {
+            let range = counter..counter + len;
+            counter += len;
+            let mut prev: Option<usize> = None;
+            range.circular_tuple_windows().for_each(|(i, j)| {
                 let Some(vj) = poly2tri[j] else { return };
                 if let Some(p) = prev {
                     let Some(v) = poly2tri[p] else { return };
@@ -854,6 +1302,7 @@ impl PolyBoundary {
                     }
                 }
             });
+        });
         (boundary_map.len(), added_constraints, skipped_constraints)
     }
 }
@@ -875,4 +1324,174 @@ fn polyline_on_surface(
             surface_point_with_cache(&surface, uv, point_cache)
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use monstertruck_geometry::prelude::{
+        Line, Matrix4, ParameterCurve, Plane, Point2, Point3, Processor, RevolutionSurface, Vector3,
+    };
+    use std::f64::consts::{FRAC_PI_2, TAU};
+
+    fn trim_line(
+        surface: Plane,
+        front: Point2,
+        back: Point2,
+    ) -> ParameterCurve<Line<Point2>, Plane> {
+        ParameterCurve::new(Line(front, back), surface)
+    }
+
+    #[test]
+    fn normalize_axis_preserves_far_nonperiodic_values() {
+        assert_eq!(
+            PolyBoundaryPiece::normalize_axis(68.0, None, None, Some((0.0, 1.0))),
+            Some(68.0),
+        );
+        assert_eq!(
+            PolyBoundaryPiece::normalize_axis(1.0 + TOLERANCE * 0.5, None, None, Some((0.0, 1.0)),),
+            Some(1.0),
+        );
+    }
+
+    #[test]
+    fn face_local_trim_orientation_is_not_reversed_by_edge_orientation() {
+        let surface = Plane::xy();
+        let trims = [
+            trim_line(surface, Point2::new(0.0, 0.0), Point2::new(1.0, 0.0)),
+            trim_line(surface, Point2::new(1.0, 0.0), Point2::new(1.0, 1.0)),
+            trim_line(surface, Point2::new(1.0, 1.0), Point2::new(0.0, 1.0)),
+            trim_line(surface, Point2::new(0.0, 1.0), Point2::new(0.0, 0.0)),
+        ];
+        let edges = [
+            Line(Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0)),
+            Line(Point3::new(1.0, 1.0, 0.0), Point3::new(1.0, 0.0, 0.0)),
+            Line(Point3::new(1.0, 1.0, 0.0), Point3::new(0.0, 1.0, 0.0)),
+            Line(Point3::new(0.0, 0.0, 0.0), Point3::new(0.0, 1.0, 0.0)),
+        ];
+        let wire = [
+            (true, Some(&trims[0]), &edges[0]),
+            (false, Some(&trims[1]), &edges[1]),
+            (true, Some(&trims[2]), &edges[2]),
+            (false, Some(&trims[3]), &edges[3]),
+        ];
+
+        let piece = PolyBoundaryPiece::try_new_from_trimmed(&surface, wire.into_iter(), TOLERANCE)
+            .expect("face-local trims should build a boundary");
+        let uvs = piece
+            .0
+            .iter()
+            .map(|point| (point.x, point.y))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            uvs,
+            vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0), (0.0, 0.0)]
+        );
+    }
+
+    #[test]
+    fn exact_trim_orientation_is_aligned_to_oriented_edge_endpoints() {
+        let surface = Plane::xy();
+        let trim = trim_line(surface, Point2::new(0.0, 0.0), Point2::new(1.0, 0.0));
+        let edge = Line(Point3::new(1.0, 0.0, 0.0), Point3::new(0.0, 0.0, 0.0));
+        let wire = [(true, Some(&trim), &edge)];
+
+        let piece = PolyBoundaryPiece::try_new_from_trimmed(&surface, wire.into_iter(), TOLERANCE)
+            .expect("exact trim should build a boundary");
+        let uvs = piece
+            .0
+            .iter()
+            .map(|point| (point.x, point.y))
+            .collect::<Vec<_>>();
+
+        assert_eq!(uvs[0], (1.0, 0.0));
+        assert_eq!(uvs[1], (0.0, 0.0));
+    }
+
+    #[test]
+    fn closed_exact_trim_orientation_is_not_endpoint_aligned() {
+        let surface = Plane::xy();
+        let trim = trim_line(surface, Point2::new(0.0, 0.0), Point2::new(1.0, 0.0));
+        let edge = Line(Point3::new(1.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0));
+        let wire = [(true, Some(&trim), &edge)];
+
+        let piece = PolyBoundaryPiece::try_new_from_trimmed(&surface, wire.into_iter(), TOLERANCE)
+            .expect("closed exact trim should build a boundary");
+        let uvs = piece
+            .0
+            .iter()
+            .map(|point| (point.x, point.y))
+            .collect::<Vec<_>>();
+
+        assert_eq!(uvs[0], (0.0, 0.0));
+        assert_eq!(uvs[1], (1.0, 0.0));
+    }
+
+    #[test]
+    fn aligned_exact_projects_periodic_edge_samples_before_resampling() {
+        let profile = Line(Point3::new(1.0, 0.0, 0.0), Point3::new(1.0, 0.0, 1.0));
+        let surface =
+            RevolutionSurface::by_revolution(profile, Point3::origin(), Vector3::unit_z());
+        let half_span = FRAC_PI_2 / 3.0;
+        let boundary = Some(vec![
+            Point2::new(0.0, TAU - half_span),
+            Point2::new(0.0, half_span),
+        ]);
+        let polyline = (0..=4)
+            .map(|index| {
+                let angle = -half_span + half_span * index as f64 / 2.0;
+                surface.evaluate(0.0, angle)
+            })
+            .collect::<PolylineCurve>();
+        let piece = PolyBoundaryPiece::try_new_from_aligned_exact(
+            &surface,
+            [(boundary, polyline)].into_iter(),
+            &|_: &RevolutionSurface<Line<Point3>>, point: Point3, _| {
+                let angle = point.y.atan2(point.x);
+                Some((point.z, angle))
+            },
+        )
+        .expect("periodic edge samples should project onto the surface");
+        let span = piece
+            .0
+            .iter()
+            .map(|point| point.y)
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), value| {
+                (min.min(value), max.max(value))
+            });
+
+        assert!(span.1 - span.0 <= 2.0 * half_span + TOLERANCE);
+    }
+
+    #[test]
+    fn full_period_cone_loop_closes_to_singular_side() {
+        let profile = Line(Point3::new(2.5, 0.0, 0.0), Point3::new(3.5, 0.0, 1.0));
+        let mut surface: Processor<_, Matrix4> = Processor::new(RevolutionSurface::by_revolution(
+            profile,
+            Point3::origin(),
+            Vector3::unit_z(),
+        ));
+        surface.invert();
+        let ring = PolyBoundaryPiece(
+            (0..=16)
+                .map(|index| Point2::new(TAU * index as f64 / 16.0, 0.0))
+                .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                .collect(),
+        );
+        let boundary = PolyBoundary::new(vec![ring], &surface, 0.01);
+
+        assert!(
+            boundary.uv_min.y <= -2.5 + TOLERANCE,
+            "expected cone cap to include the apex side, got {:?}..{:?}",
+            boundary.uv_min,
+            boundary.uv_max,
+        );
+        assert!(
+            boundary.uv_max.y <= TOLERANCE,
+            "expected cone cap to end at the trim ring, got {:?}..{:?}",
+            boundary.uv_min,
+            boundary.uv_max,
+        );
+    }
 }
