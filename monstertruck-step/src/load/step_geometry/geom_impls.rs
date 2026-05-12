@@ -639,9 +639,9 @@ impl ParameterBoundary2D<Surface> for Curve3D {
             }
             Curve3D::Line(_)
             | Curve3D::Polyline(_)
+            | Curve3D::Conic(_)
             | Curve3D::BsplineCurve(_)
             | Curve3D::NurbsCurve(_) => sampled_parameter_boundary(self, surface, tolerance),
-            Curve3D::Conic(_) => None,
         }
     }
 }
@@ -1002,14 +1002,23 @@ fn sampled_parameter_boundary_preserves_unbounded_cylinder_axis_parameter() {
 }
 
 #[test]
-fn raw_conic_boundary_without_pcurve_returns_none() {
+fn raw_conic_boundary_without_pcurve_uses_sampled_projection_at_safe_tolerance() {
     let curve = Curve3D::Conic(Conic3D::Ellipse(
         Processor::new(TrimmedCurve::new(UnitCircle::<Point3>::new(), (0.0, TAU)))
             .transformed(Matrix4::from_nonuniform_scale(100.0, 100.0, 100.0)),
     ));
     let surface = Surface::ElementarySurface(ElementarySurface::Plane(Plane::xy()));
 
-    assert!(curve.parameter_boundary_2d(&surface, 1.0e-5).is_none());
+    let boundary = curve
+        .parameter_boundary_2d(&surface, 1.0e-3)
+        .expect("safe raw conic projection should produce a parameter boundary.");
+
+    assert!(boundary.len() > 4);
+    assert!(
+        boundary
+            .iter()
+            .any(|point| point.distance2(Point2::new(100.0, 0.0)) < 1.0e-6)
+    );
 }
 
 #[test]
