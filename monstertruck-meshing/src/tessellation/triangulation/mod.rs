@@ -191,6 +191,50 @@ fn fallback_polyline_curve_with_min_points<C: PolylineableCurve>(
     if orientation { curve } else { curve.inverse() }
 }
 
+fn untrimmed_isoparametric_curves<S: PreMeshableSurface>(
+    surface: &S,
+    uv_range: ((f64, f64), (f64, f64)),
+    options: IsoparametricCurveOptions,
+) -> Vec<Vec<Point3>> {
+    if options.samples_per_direction == 0 || options.segments_per_curve == 0 {
+        Vec::new()
+    } else {
+        let ((u_min, u_max), (v_min, v_max)) = uv_range;
+        let axis_values = |min: f64, max: f64| {
+            (0..options.samples_per_direction)
+                .map(move |index| {
+                    let parameter = (index + 1) as f64 / (options.samples_per_direction + 1) as f64;
+                    min + (max - min) * parameter
+                })
+                .collect::<Vec<_>>()
+        };
+        let sample_axis = |constant_axis: usize, constant_value: f64| {
+            (0..=options.segments_per_curve)
+                .map(|index| {
+                    let parameter = index as f64 / options.segments_per_curve as f64;
+                    let variable_value = match constant_axis {
+                        0 => v_min + (v_max - v_min) * parameter,
+                        _ => u_min + (u_max - u_min) * parameter,
+                    };
+                    match constant_axis {
+                        0 => surface.evaluate(constant_value, variable_value),
+                        _ => surface.evaluate(variable_value, constant_value),
+                    }
+                })
+                .collect::<Vec<_>>()
+        };
+        axis_values(u_min, u_max)
+            .into_iter()
+            .map(|u| sample_axis(0, u))
+            .chain(
+                axis_values(v_min, v_max)
+                    .into_iter()
+                    .map(|v| sample_axis(1, v)),
+            )
+            .collect()
+    }
+}
+
 fn oriented_edge_indices<'a>(
     wire: &'a [CompressedEdgeIndex],
     face_orientation: bool,
@@ -754,6 +798,29 @@ where
     T: ExactTrimBoundary2D + Parallelizable + 'a,
     <C as ExactParameterBoundary2D<S>>::BoundaryCurve: ExactTrimBoundary2D,
 {
+    compressed_trimmed_shell_tessellation_with_isoparams(
+        shell,
+        tolerance,
+        sp,
+        primitive_config,
+        None,
+    )
+    .shell
+}
+
+pub(super) fn compressed_trimmed_shell_tessellation_with_isoparams<'a, C, S, T>(
+    shell: &TrimmedShell<C, S, T>,
+    tolerance: f64,
+    sp: impl SP<S>,
+    primitive_config: TessellationPrimitiveOptions,
+    isoparametric_options: Option<IsoparametricCurveOptions>,
+) -> CompressedShellTessellation
+where
+    C: PolylineableCurve + ParameterBoundary2D<S> + ExactParameterBoundary2D<S> + 'a,
+    S: PreMeshableSurface + 'a,
+    T: ExactTrimBoundary2D + Parallelizable + 'a,
+    <C as ExactParameterBoundary2D<S>>::BoundaryCurve: ExactTrimBoundary2D,
+{
     let vertices = shell.vertices.clone();
     let exact_edge_polylines = shell
         .faces
@@ -844,12 +911,18 @@ where
         if is_untrimmed && let (Some(urange), Some(vrange)) = surface.try_range_tuple() {
             let polygon =
                 untrimmed_tessellation(surface, (urange, vrange), tolerance, primitive_config.mode);
+            let isoparams = isoparametric_options
+                .map(|options| untrimmed_isoparametric_curves(surface, (urange, vrange), options))
+                .unwrap_or_default();
             log_mesh_trace(face_idx, "untrimmed", "ok", face_start);
-            return CompressedFace {
-                boundaries,
-                orientation: face.orientation,
-                surface: Some(polygon),
-            };
+            return (
+                CompressedFace {
+                    boundaries,
+                    orientation: face.orientation,
+                    surface: Some(polygon),
+                },
+                isoparams,
+            );
         }
 
         let create_boundary = |wire: &Vec<CompressedEdgeUse<T>>| {
@@ -977,70 +1050,87 @@ where
         } else {
             log_mesh_trace(face_idx, "preboundary", "failed", boundary_start);
         }
-        let polygon = preboundary.map(|preboundary| {
-            let close_start = Instant::now();
-            let boundary = PolyBoundary::new(preboundary, surface, tolerance);
-            log_mesh_trace(
-                face_idx,
-                "polyboundary",
-                format!(
-                    "closed_loops={} uv_min=({:.6},{:.6}) uv_max=({:.6},{:.6})",
-                    boundary.loops.len(),
-                    boundary.uv_min.x,
-                    boundary.uv_min.y,
-                    boundary.uv_max.x,
-                    boundary.uv_max.y,
-                ),
-                close_start,
-            );
-            let mesh_start = Instant::now();
-            let polygon =
-                trimming_tessellation(surface, &boundary, tolerance, primitive_config, face_idx);
-            log_mesh_trace(
-                face_idx,
-                "trimmed",
-                format!(
-                    "tris={} quads={}",
-                    polygon.tri_faces().len(),
-                    polygon.quad_faces().len()
-                ),
-                mesh_start,
-            );
-            polygon
-        });
+        let (polygon, isoparams) = preboundary
+            .map(|preboundary| {
+                let close_start = Instant::now();
+                let boundary = PolyBoundary::new(preboundary, surface, tolerance);
+                log_mesh_trace(
+                    face_idx,
+                    "polyboundary",
+                    format!(
+                        "closed_loops={} uv_min=({:.6},{:.6}) uv_max=({:.6},{:.6})",
+                        boundary.loops.len(),
+                        boundary.uv_min.x,
+                        boundary.uv_min.y,
+                        boundary.uv_max.x,
+                        boundary.uv_max.y,
+                    ),
+                    close_start,
+                );
+                let isoparams = isoparametric_options
+                    .map(|options| boundary.isoparametric_curves(surface, options))
+                    .unwrap_or_default();
+                let mesh_start = Instant::now();
+                let polygon = trimming_tessellation(
+                    surface,
+                    &boundary,
+                    tolerance,
+                    primitive_config,
+                    face_idx,
+                );
+                log_mesh_trace(
+                    face_idx,
+                    "trimmed",
+                    format!(
+                        "tris={} quads={}",
+                        polygon.tri_faces().len(),
+                        polygon.quad_faces().len()
+                    ),
+                    mesh_start,
+                );
+                (Some(polygon), isoparams)
+            })
+            .unwrap_or_default();
         log_mesh_trace(
             face_idx,
             "face",
             format!("surface={}", polygon.is_some()),
             face_start,
         );
-        CompressedFace {
-            boundaries,
-            orientation: face.orientation,
-            surface: polygon,
-        }
+        (
+            CompressedFace {
+                boundaries,
+                orientation: face.orientation,
+                surface: polygon,
+            },
+            isoparams,
+        )
     };
     #[cfg(not(target_arch = "wasm32"))]
-    let faces = shell
+    let face_outputs = shell
         .faces
         .par_iter()
         .enumerate()
         .map(tessellate_face)
-        .collect();
+        .collect::<Vec<_>>();
     #[cfg(target_arch = "wasm32")]
-    let faces = shell
+    let face_outputs = shell
         .faces
         .iter()
         .enumerate()
         .map(tessellate_face)
-        .collect();
-    MeshedCompressedShell {
-        vertices,
-        edges,
-        faces,
-        vertex_stable_ids: None,
-        edge_stable_ids: None,
-        face_stable_ids: None,
+        .collect::<Vec<_>>();
+    let (faces, face_isoparams) = face_outputs.into_iter().unzip();
+    CompressedShellTessellation {
+        shell: MeshedCompressedShell {
+            vertices,
+            edges,
+            faces,
+            vertex_stable_ids: None,
+            edge_stable_ids: None,
+            face_stable_ids: None,
+        },
+        face_isoparams,
     }
 }
 
@@ -1540,6 +1630,76 @@ mod tests {
 
         assert!(shared_edge_count >= 5);
         assert_eq!(bottom_angles.len(), shared_edge_count);
+    }
+
+    #[test]
+    fn trimmed_shell_isoparams_stay_inside_trim_domain() {
+        let surface = Plane::new(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, 1.0, 0.0),
+        );
+        let mut vertices = Vec::<Point3>::new();
+        let mut edges = Vec::<CompressedEdge<Line<Point3>>>::new();
+        let mut edge_use = |front: Point2, back: Point2| {
+            let front_point = surface.evaluate(front.x, front.y);
+            let back_point = surface.evaluate(back.x, back.y);
+            let vertex_index = vertices.len();
+            let edge_index = edges.len();
+            vertices.extend([front_point, back_point]);
+            edges.push(CompressedEdge {
+                vertices: (vertex_index, vertex_index + 1),
+                curve: Line(front_point, back_point),
+            });
+            CompressedEdgeUse::from((edge_index, true, Some(sampled_trim([front, back]))))
+        };
+        let outer = vec![
+            edge_use(Point2::new(0.0, 0.0), Point2::new(2.0, 0.0)),
+            edge_use(Point2::new(2.0, 0.0), Point2::new(2.0, 2.0)),
+            edge_use(Point2::new(2.0, 2.0), Point2::new(0.0, 2.0)),
+            edge_use(Point2::new(0.0, 2.0), Point2::new(0.0, 0.0)),
+        ];
+        let hole = vec![
+            edge_use(Point2::new(0.75, 0.75), Point2::new(0.75, 1.25)),
+            edge_use(Point2::new(0.75, 1.25), Point2::new(1.25, 1.25)),
+            edge_use(Point2::new(1.25, 1.25), Point2::new(1.25, 0.75)),
+            edge_use(Point2::new(1.25, 0.75), Point2::new(0.75, 0.75)),
+        ];
+        let shell = CompressedTrimmedShell {
+            vertices,
+            edges,
+            faces: vec![CompressedTrimmedFace {
+                boundaries: vec![outer, hole],
+                orientation: true,
+                surface,
+            }],
+        };
+
+        let output = compressed_trimmed_shell_tessellation_with_isoparams(
+            &shell,
+            0.01,
+            |surface: &Plane, point: Point3, _| surface.search_parameter(point, None, 100),
+            TessellationPrimitiveOptions::default(),
+            Some(IsoparametricCurveOptions {
+                samples_per_direction: 3,
+                segments_per_curve: 32,
+            }),
+        );
+        let curves = &output.face_isoparams[0];
+
+        assert!(!curves.is_empty());
+        assert!(output.shell.faces[0].surface.is_some());
+        assert!(curves.iter().flatten().all(|point| {
+            let inside_outer = point.x >= -1.0e-6
+                && point.x <= 2.0 + 1.0e-6
+                && point.y >= -1.0e-6
+                && point.y <= 2.0 + 1.0e-6;
+            let inside_hole = point.x > 0.75 + 1.0e-5
+                && point.x < 1.25 - 1.0e-5
+                && point.y > 0.75 + 1.0e-5
+                && point.y < 1.25 - 1.0e-5;
+            inside_outer && !inside_hole
+        }));
     }
 
     #[test]

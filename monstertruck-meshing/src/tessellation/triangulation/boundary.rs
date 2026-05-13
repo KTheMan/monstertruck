@@ -1,9 +1,11 @@
 use super::*;
 use mesh::spade_round;
+use std::{f64::consts::TAU, mem};
 
 const PERIODIC_LOOP_OTHER_AXIS_TOLERANCE: f64 = 1.0e-6;
 const SINGULAR_RADIUS_RELATIVE_TOLERANCE: f64 = 1.0e-6;
 const DEFAULT_SINGULAR_PARAMETER_PROBE: f64 = 1.0;
+const ISOPARAM_BOUNDARY_SEARCH_ITERATIONS: usize = 32;
 
 #[derive(Clone, Copy, Debug, derive_more::Deref, derive_more::DerefMut)]
 pub(super) struct SurfacePoint {
@@ -1037,6 +1039,20 @@ pub(super) fn surface_point_with_cache(
     (uv, point).into()
 }
 
+fn push_isoparam_uv(curve: &mut Vec<Point2>, uv: Point2) {
+    if curve.last().is_none_or(|previous| !previous.near(&uv)) {
+        curve.push(uv);
+    }
+}
+
+fn push_finished_isoparam_curve(curves: &mut Vec<Vec<Point2>>, curve: &mut Vec<Point2>) {
+    if curve.len() >= 2 {
+        curves.push(mem::take(curve));
+    } else {
+        curve.clear();
+    }
+}
+
 impl PolyBoundary {
     pub(super) fn new(
         pieces: Vec<PolyBoundaryPiece>,
@@ -1224,7 +1240,7 @@ impl PolyBoundary {
         {
             return false;
         }
-        let t = 2.0 * std::f64::consts::PI * HashGen::hash1(c);
+        let t = TAU * HashGen::hash1(c);
         let r = Vector2::new(f64::cos(t), f64::sin(t));
         self.loops
             .iter()
@@ -1248,6 +1264,138 @@ impl PolyBoundary {
             })
             .map(|counter| counter > 0)
             .unwrap_or(false)
+    }
+
+    pub(super) fn isoparametric_curves<S: PreMeshableSurface>(
+        &self,
+        surface: &S,
+        options: IsoparametricCurveOptions,
+    ) -> Vec<Vec<Point3>> {
+        if self.loops.is_empty()
+            || options.samples_per_direction == 0
+            || options.segments_per_curve == 0
+            || self.uv_min.x >= self.uv_max.x
+            || self.uv_min.y >= self.uv_max.y
+        {
+            Vec::new()
+        } else {
+            (0..=1)
+                .flat_map(|axis| {
+                    self.isoparametric_axis_values(axis, options.samples_per_direction)
+                        .into_iter()
+                        .flat_map(move |axis_value| {
+                            self.isoparametric_uv_curves(
+                                axis,
+                                axis_value,
+                                options.segments_per_curve,
+                            )
+                            .into_iter()
+                            .map(|curve| {
+                                curve
+                                    .into_iter()
+                                    .map(|uv| surface.evaluate(uv.x, uv.y))
+                                    .collect::<Vec<_>>()
+                            })
+                        })
+                })
+                .collect()
+        }
+    }
+
+    fn isoparametric_axis_values(&self, axis: usize, count: usize) -> Vec<f64> {
+        let (min, max) = match axis {
+            0 => (self.uv_min.x, self.uv_max.x),
+            _ => (self.uv_min.y, self.uv_max.y),
+        };
+        (0..count)
+            .map(|index| {
+                let parameter = (index + 1) as f64 / (count + 1) as f64;
+                min + (max - min) * parameter
+            })
+            .collect()
+    }
+
+    fn isoparametric_uv_curves(
+        &self,
+        constant_axis: usize,
+        constant_value: f64,
+        segments: usize,
+    ) -> Vec<Vec<Point2>> {
+        let variable_axis = 1 - constant_axis;
+        let (min, max) = match variable_axis {
+            0 => (self.uv_min.x, self.uv_max.x),
+            _ => (self.uv_min.y, self.uv_max.y),
+        };
+        let samples = (0..=segments)
+            .map(|index| {
+                let parameter = index as f64 / segments as f64;
+                let variable_value = min + (max - min) * parameter;
+                match constant_axis {
+                    0 => Point2::new(constant_value, variable_value),
+                    _ => Point2::new(variable_value, constant_value),
+                }
+            })
+            .collect::<Vec<_>>();
+        self.trim_uv_samples(samples)
+    }
+
+    fn trim_uv_samples(&self, samples: Vec<Point2>) -> Vec<Vec<Point2>> {
+        let (_, mut curves, mut current) = samples.into_iter().fold(
+            (
+                None::<(Point2, bool)>,
+                Vec::<Vec<Point2>>::new(),
+                Vec::<Point2>::new(),
+            ),
+            |(previous, mut curves, mut current), uv| {
+                let included = self.include(uv);
+                if let Some((previous_uv, previous_included)) = previous
+                    && previous_included != included
+                {
+                    let crossing =
+                        self.isoparametric_boundary_crossing(previous_uv, uv, previous_included);
+                    push_isoparam_uv(&mut current, crossing);
+                    if previous_included {
+                        push_finished_isoparam_curve(&mut curves, &mut current);
+                    }
+                    if included {
+                        push_isoparam_uv(&mut current, crossing);
+                    }
+                }
+                if included {
+                    push_isoparam_uv(&mut current, uv);
+                }
+                (Some((uv, included)), curves, current)
+            },
+        );
+        push_finished_isoparam_curve(&mut curves, &mut current);
+        curves
+    }
+
+    fn isoparametric_boundary_crossing(
+        &self,
+        front: Point2,
+        back: Point2,
+        front_included: bool,
+    ) -> Point2 {
+        let (mut included, mut excluded) = match front_included {
+            true => (front, back),
+            false => (back, front),
+        };
+        (0..ISOPARAM_BOUNDARY_SEARCH_ITERATIONS).for_each(|_| {
+            let middle = Point2::new(
+                (included.x + excluded.x) * 0.5,
+                (included.y + excluded.y) * 0.5,
+            );
+            if self.include(middle) {
+                included = middle;
+            } else {
+                excluded = middle;
+            }
+        });
+        Point2::new(
+            (included.x + excluded.x) * 0.5,
+            (included.y + excluded.y) * 0.5,
+        )
     }
 
     /// Inserts points and adds constraint into triangulation.
