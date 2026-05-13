@@ -923,6 +923,114 @@ fn periodic_open_axis_full_span(
     }
 }
 
+fn full_period_curve_direction(curve: &[SurfacePoint], axis: usize) -> Option<f64> {
+    curve
+        .first()
+        .zip(curve.last())
+        .map(|(front, back)| if back[axis] < front[axis] { -1.0 } else { 1.0 })
+}
+
+fn periodic_axis_value(value: f64, target_start: f64, period: f64, direction: f64) -> f64 {
+    if direction < 0.0 {
+        target_start - (target_start - value).rem_euclid(period)
+    } else {
+        target_start + (value - target_start).rem_euclid(period)
+    }
+}
+
+fn periodic_seam_point(
+    surface: &impl PreMeshableSurface,
+    template: SurfacePoint,
+    axis: usize,
+    axis_value: f64,
+) -> SurfacePoint {
+    let mut point = template;
+    point[axis] = axis_value;
+    point.point = surface.evaluate(point.x, point.y);
+    point
+}
+
+fn align_full_period_curve_to_axis(
+    curve: &mut Vec<SurfacePoint>,
+    surface: &impl PreMeshableSurface,
+    axis: usize,
+    period: f64,
+    target_start: f64,
+    direction: f64,
+) -> bool {
+    if curve.len() < 2 {
+        false
+    } else {
+        if full_period_curve_direction(curve, axis).is_some_and(|current| current != direction) {
+            curve.reverse();
+        }
+        let Some(template) = curve.first().copied() else {
+            return false;
+        };
+        let target_end = target_start + direction * period;
+        let open_len = curve.len().saturating_sub(1);
+        let mut aligned = curve
+            .iter()
+            .take(open_len)
+            .copied()
+            .map(|mut point| {
+                point[axis] = periodic_axis_value(point[axis], target_start, period, direction);
+                point
+            })
+            .collect::<Vec<_>>();
+        aligned.sort_by(|lhs, rhs| {
+            if direction < 0.0 {
+                rhs[axis].total_cmp(&lhs[axis])
+            } else {
+                lhs[axis].total_cmp(&rhs[axis])
+            }
+        });
+        let mut with_seams = Vec::with_capacity(aligned.len() + 2);
+        with_seams.push(periodic_seam_point(surface, template, axis, target_start));
+        aligned
+            .into_iter()
+            .filter(|point| {
+                (point[axis] - target_start).abs() > TOLERANCE
+                    && (point[axis] - target_end).abs() > TOLERANCE
+            })
+            .for_each(|point| with_seams.push(point));
+        with_seams.push(periodic_seam_point(surface, template, axis, target_end));
+        *curve = with_seams;
+        true
+    }
+}
+
+fn align_full_period_open_pair(
+    curve0: &mut Vec<SurfacePoint>,
+    curve1: &mut Vec<SurfacePoint>,
+    surface: &impl PreMeshableSurface,
+) -> bool {
+    let Some((axis0, period0)) = periodic_open_axis_full_span(curve0, surface) else {
+        return false;
+    };
+    let Some((axis1, period1)) = periodic_open_axis_full_span(curve1, surface) else {
+        return false;
+    };
+    if axis0 != axis1 || (period0 - period1).abs() > TOLERANCE {
+        false
+    } else {
+        let Some(direction) = full_period_curve_direction(curve0, axis0) else {
+            return false;
+        };
+        let Some(start0) = curve0.first().map(|point| point[axis0]) else {
+            return false;
+        };
+        let aligned0 =
+            align_full_period_curve_to_axis(curve0, surface, axis0, period0, start0, direction);
+        let Some(start1) = curve0.last().map(|point| point[axis0]) else {
+            return false;
+        };
+        let aligned1 =
+            align_full_period_curve_to_axis(curve1, surface, axis0, period0, start1, -direction);
+        aligned0 && aligned1
+    }
+}
+
 fn axis_derivative_norm(surface: &impl PreMeshableSurface, axis: usize, uv: Point2) -> Option<f64> {
     let norm = match axis {
         0 => surface.derivative_u(uv.x, uv.y).magnitude(),
@@ -1174,15 +1282,17 @@ impl PolyBoundary {
                 let mut curve1 = open.pop().unwrap();
                 let mut curve0 = open.pop().unwrap();
                 fn end_pts<T: Copy>(vec: &[T]) -> (T, T) { (vec[0], vec[vec.len() - 1]) }
+                let full_period_pair_aligned =
+                    align_full_period_open_pair(&mut curve0, &mut curve1, surface);
                 let ((p0, p1), (q0, q1)) = (end_pts(&curve0), end_pts(&curve1));
-                if !p0.x.near(&p1.x) && !q0.x.near(&q1.x) {
+                if !full_period_pair_aligned && !p0.x.near(&p1.x) && !q0.x.near(&q1.x) {
                     if let Some(period) = surface.u_period() {
                         align_periodic_open_pair(&curve0, &mut curve1, 0, period);
                     } else if let (Some(urange), _) = surface.try_range_tuple() {
                         normalize_range(&mut curve0, 0, urange);
                         normalize_range(&mut curve1, 0, urange);
                     }
-                } else if !p0.y.near(&p1.y) && !q0.y.near(&q1.y) {
+                } else if !full_period_pair_aligned && !p0.y.near(&p1.y) && !q0.y.near(&q1.y) {
                     if let Some(period) = surface.v_period() {
                         align_periodic_open_pair(&curve0, &mut curve1, 1, period);
                     } else if let (_, Some(vrange)) = surface.try_range_tuple() {
@@ -1641,5 +1751,62 @@ mod tests {
             boundary.uv_min,
             boundary.uv_max,
         );
+    }
+
+    #[test]
+    fn full_period_ring_pair_uses_shared_periodic_seam() {
+        let profile = Line(Point3::new(2.5, 0.0, 0.0), Point3::new(2.5, 0.0, 1.0));
+        let mut surface: Processor<_, Matrix4> = Processor::new(RevolutionSurface::by_revolution(
+            profile,
+            Point3::origin(),
+            Vector3::unit_z(),
+        ));
+        surface.invert();
+        let ring = |v: f64, samples: &[f64]| {
+            PolyBoundaryPiece(
+                samples
+                    .iter()
+                    .map(|u| Point2::new(*u, v))
+                    .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                    .collect(),
+            )
+        };
+        let ring0_samples = [
+            3.0 * FRAC_PI_2,
+            4.0,
+            3.0,
+            2.0,
+            1.0,
+            0.0,
+            -0.8,
+            -1.4,
+            3.0 * FRAC_PI_2 - TAU,
+        ];
+        let ring1_samples = [0.0, -0.3, -0.9, -1.8, -2.7, -4.1, -5.4, -TAU];
+        let original_points = ring0_samples
+            .iter()
+            .map(|u| surface.evaluate(*u, 0.25))
+            .chain(ring1_samples.iter().map(|u| surface.evaluate(*u, 0.75)))
+            .collect::<Vec<_>>();
+        let boundary = PolyBoundary::new(
+            vec![ring(0.25, &ring0_samples), ring(0.75, &ring1_samples)],
+            &surface,
+            0.01,
+        );
+        let span = boundary.uv_max.x - boundary.uv_min.x;
+
+        assert!(
+            span <= TAU + TOLERANCE,
+            "expected full-period rings to share a seam, got {:?}..{:?}",
+            boundary.uv_min,
+            boundary.uv_max,
+        );
+        assert!(original_points.iter().all(|point| {
+            boundary
+                .loops
+                .iter()
+                .flatten()
+                .any(|boundary_point| boundary_point.point.distance(*point) <= TOLERANCE)
+        }));
     }
 }
