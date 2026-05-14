@@ -3,11 +3,11 @@ pub use dag::{Edge, EdgeMut, Node, NodeMut, Path};
 use monstertruck_core::cgmath64::One;
 
 /// Entity of the node
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct NodeEntity<Shape, NodeAttrs> {
     /// shape of node
     pub shape: Shape,
-    /// extra attributes (e.g. label, material, and other properties
+    /// extra attributes (e.g. label, material, and other properties)
     pub attrs: NodeAttrs,
 }
 
@@ -20,12 +20,31 @@ impl<Shape> From<Shape> for NodeEntity<Shape, ()> {
 pub struct EdgeEntity<Matrix, EdgeAttrs> {
     /// transform matrix of edge
     pub matrix: Matrix,
-    /// extra attributes (e.g. label, material, and other properties
+    /// extra attributes (e.g. label, material, and other properties)
     pub attrs: EdgeAttrs,
 }
 
 impl<Matrix> From<Matrix> for EdgeEntity<Matrix, ()> {
     fn from(matrix: Matrix) -> Self { Self { matrix, attrs: () } }
+}
+
+/// `EdgeEntity` defaults to the identity transform and a default attribute payload.
+///
+/// `Matrix` must satisfy `One` (i.e. expose its multiplicative identity)
+/// rather than `Default`: a default-constructed matrix would be the
+/// zero matrix in most numeric crates, which is rarely the meaningful
+/// "no transform" value for an assembly edge.
+impl<Matrix, EdgeAttrs> Default for EdgeEntity<Matrix, EdgeAttrs>
+where
+    Matrix: One,
+    EdgeAttrs: Default,
+{
+    fn default() -> Self {
+        Self {
+            matrix: One::one(),
+            attrs: EdgeAttrs::default(),
+        }
+    }
 }
 
 /// Assembly

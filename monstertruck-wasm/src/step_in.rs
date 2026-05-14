@@ -1,4 +1,6 @@
+use gloo::console;
 use monstertruck_meshing::tessellation::*;
+use monstertruck_step::load::Table as StepTable;
 use monstertruck_step::load::step_geometry::*;
 use monstertruck_topology::compress::*;
 
@@ -7,7 +9,7 @@ use crate::*;
 /// STEP parse table.
 #[derive(Clone, Debug, Deref, DerefMut, From, Into)]
 #[wasm_bindgen]
-pub struct Table(monstertruck_step::load::Table);
+pub struct Table(StepTable);
 
 #[derive(Clone, Debug)]
 enum SubShapeFromStep {
@@ -36,7 +38,10 @@ impl ShapeFromStep {
 impl Table {
     /// Reads a STEP file.
     pub fn from_step(step_str: &str) -> Option<Table> {
-        Some(Table(monstertruck_step::load::Table::from_step(step_str)?))
+        StepTable::from_step(step_str)
+            .map(Table)
+            .map_err(|e| console::error!(format!("{e}")))
+            .ok()
     }
     /// Gets shell indices.
     pub fn shell_indices(&self) -> Vec<u64> { self.0.shell.keys().copied().collect() }
@@ -45,7 +50,7 @@ impl Table {
         let stepshell = self.shell.get(&idx)?;
         let shell = self
             .to_compressed_shell(stepshell)
-            .map_err(|e| gloo::console::error!(format!("{e}")))
+            .map_err(|e| console::error!(format!("{e}")))
             .ok()?;
         Some(SubShapeFromStep::Shell(shell).into())
     }
