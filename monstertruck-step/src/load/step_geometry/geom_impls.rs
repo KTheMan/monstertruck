@@ -877,6 +877,21 @@ impl TryFrom<&Surface> for ModelingSurface {
     }
 }
 
+impl ToSameGeometry<Curve2D> for Line<Point2> {
+    #[inline]
+    fn to_same_geometry(&self) -> Curve2D { Curve2D::Line(*self) }
+}
+
+impl ToSameGeometry<Curve2D> for Processor<TrimmedCurve<UnitCircle<Point2>>, Matrix3> {
+    #[inline]
+    fn to_same_geometry(&self) -> Curve2D { Curve2D::Conic(Conic2D::Ellipse(*self)) }
+}
+
+impl ToSameGeometry<Curve2D> for BsplineCurve<Point2> {
+    #[inline]
+    fn to_same_geometry(&self) -> Curve2D { Curve2D::BsplineCurve(self.clone()) }
+}
+
 impl ToSameGeometry<Curve3D> for Line<Point3> {
     #[inline]
     fn to_same_geometry(&self) -> Curve3D { Curve3D::Line(*self) }
@@ -971,6 +986,47 @@ impl ToSameGeometry<Surface> for RevolutionSurface<Curve3D> {
             Curve3D::IntersectionCurve(_) => default(),
             _ => default(),
         }
+    }
+}
+
+#[test]
+fn to_same_geometry_2d_line_round_trip() {
+    let line = Line(Point2::new(0.0, 0.0), Point2::new(2.0, 1.0));
+    let curve: Curve2D = line.to_same_geometry();
+    match curve {
+        Curve2D::Line(rebuilt) => assert_eq!(rebuilt, line),
+        other => panic!("expected Curve2D::Line, got {other:?}"),
+    }
+}
+
+#[test]
+fn to_same_geometry_2d_ellipse_wraps_in_conic() {
+    let scale = Matrix3::from_nonuniform_scale(2.0, 3.0);
+    let arc = Processor::with_transform(
+        TrimmedCurve::new(UnitCircle::<Point2>::new(), (0.0, TAU)),
+        scale,
+    );
+    let curve: Curve2D = arc.to_same_geometry();
+    match curve {
+        Curve2D::Conic(Conic2D::Ellipse(rebuilt)) => assert_eq!(rebuilt, arc),
+        other => panic!("expected Curve2D::Conic(Conic2D::Ellipse), got {other:?}"),
+    }
+}
+
+#[test]
+fn to_same_geometry_2d_bspline_curve_round_trip() {
+    let knots = KnotVector::uniform_knot(2, 2);
+    let control = vec![
+        Point2::new(0.0, 0.0),
+        Point2::new(1.0, 1.0),
+        Point2::new(2.0, 0.0),
+        Point2::new(3.0, 1.0),
+    ];
+    let spline = BsplineCurve::new(knots, control);
+    let curve: Curve2D = spline.to_same_geometry();
+    match curve {
+        Curve2D::BsplineCurve(rebuilt) => assert_eq!(rebuilt, spline),
+        other => panic!("expected Curve2D::BsplineCurve, got {other:?}"),
     }
 }
 
