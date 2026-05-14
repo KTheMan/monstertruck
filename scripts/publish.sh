@@ -58,7 +58,7 @@ publish_crate() {
             attempt=$((attempt + 1))
             echo "  Rate limited (attempt $attempt/$MAX_RETRIES). Waiting 120s before retry..."
             sleep 120
-        elif grep -q "already uploaded" "$log"; then
+        elif grep -qE "already (uploaded|exists on crates\.io)" "$log"; then
             echo "  $crate already published at this version -- skipping."
             rm -f "$log"
             return 0
