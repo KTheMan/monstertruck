@@ -11,7 +11,7 @@ pub mod re_exports {
 pub use re_exports::*;
 
 /// Errors that occur when converting STEP format
-pub type StepConvertingError = Box<dyn std::error::Error>;
+pub type StepConvertingError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 /// `ellipse`, realized in `monstertruck`
 pub type Ellipse<P, M> = Processor<TrimmedCurve<UnitCircle<P>>, M>;

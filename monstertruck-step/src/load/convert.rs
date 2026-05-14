@@ -312,29 +312,34 @@ impl Table {
             .collect()
     }
 
-    /// Constructs `CompressedShell` from `Shell` in STEP file
+    /// Constructs [`CompressedShell`] from a STEP `Shell`.
+    ///
     /// # Example
     /// ```
+    /// # fn main() -> anyhow::Result<()> {
+    /// # use anyhow::anyhow;
     /// use monstertruck_step::load::{*, step_geometry::*};
-    /// // read file
+    ///
     /// let step_string = include_str!(concat!(
     ///     env!("CARGO_MANIFEST_DIR"),
     ///     "/../resources/step/occt-cube.step",
     /// ));
-    /// // parse into Rust structs
-    /// let table = Table::from_step(&step_string).unwrap();
-    /// // take one shell (this is only one shell)
-    /// let step_shell = table.shell.values().next().unwrap();
-    /// // convert STEP shell to `CompressedShell`
-    /// let cshell = table.to_compressed_shell(step_shell).unwrap();
-    /// // The cube has 6 faces!
+    /// let table = Table::from_step(&step_string)?;
+    /// let step_shell = table
+    ///     .shell
+    ///     .values()
+    ///     .next()
+    ///     .ok_or_else(|| anyhow!("STEP file contains no shell."))?;
+    /// let cshell = table.to_compressed_shell(step_shell)?;
     /// assert_eq!(cshell.faces.len(), 6);
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn to_compressed_shell(
         &self,
         shell: &impl StepShell,
-    ) -> Result<CompressedShell<Point3, Curve3D, Surface>, StepConvertingError> {
-        shell.to_compressed_shell(self)
+    ) -> Result<CompressedShell<Point3, Curve3D, Surface>, LoadError> {
+        Ok(shell.to_compressed_shell(self)?)
     }
 
     /// Constructs `CompressedTrimmedShell` from `Shell` in STEP file while preserving
@@ -344,16 +349,16 @@ impl Table {
         shell: &impl StepShell,
     ) -> Result<
         CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::StepParameterCurve>,
-        StepConvertingError,
+        LoadError,
     > {
-        shell.to_compressed_trimmed_shell(self)
+        Ok(shell.to_compressed_trimmed_shell(self)?)
     }
 
     /// Constructs `CompressedShell`s from `ShellBasedSurfaceModel` in STEP file
     pub fn to_compressed_shells(
         &self,
         shells: &ShellBasedSurfaceModelHolder,
-    ) -> Result<Vec<CompressedShell<Point3, Curve3D, Surface>>, StepConvertingError> {
+    ) -> Result<Vec<CompressedShell<Point3, Curve3D, Surface>>, LoadError> {
         let mut res = Vec::new();
         for place_holder in &shells.sbsm_boundary {
             let PlaceHolder::Ref(Name::Entity(idx)) = place_holder else {
@@ -376,7 +381,7 @@ impl Table {
         shells: &ShellBasedSurfaceModelHolder,
     ) -> Result<
         Vec<CompressedTrimmedShell<Point3, Curve3D, Surface, step_geometry::StepParameterCurve>>,
-        StepConvertingError,
+        LoadError,
     > {
         let mut res = Vec::new();
         for place_holder in &shells.sbsm_boundary {
@@ -394,31 +399,43 @@ impl Table {
         Ok(res)
     }
 
-    /// Constructs `CompressedSolid` from `ManifoldSolidBrep` in STEP file
+    /// Constructs [`CompressedSolid`] from [`ManifoldSolidBrep`] in a STEP file.
+    ///
+    /// The result keeps the STEP `outer` shell as the first entry of
+    /// `boundaries` and appends one entry per `void` (inner cavity).
+    ///
+    /// `Solid::extract` on the returned [`CompressedSolid`] requires the
+    /// outer shell to satisfy [`ShellCondition::Closed`]. Many real-world
+    /// STEP exports produce shells that are topologically *regular* but
+    /// not strictly *oriented*; for those, prefer
+    /// `to_compressed_trimmed_solid` and downstream meshing/healing.
+    ///
     /// # Example
     /// ```
+    /// # fn main() -> anyhow::Result<()> {
+    /// # use anyhow::anyhow;
     /// use monstertruck_step::load::{*, step_geometry::*};
-    /// monstertruck_topology::prelude!(Point3, Curve3D, Surface);
-    /// // read file
+    ///
     /// let step_string = include_str!(concat!(
     ///     env!("CARGO_MANIFEST_DIR"),
     ///     "/../resources/step/occt-cube.step",
     /// ));
-    /// // parse into Rust structs
-    /// let table = Table::from_step(&step_string).unwrap();
-    /// // take the solid
-    /// let step_solid = table.manifold_solid_brep.values().next().unwrap();
-    /// // convert STEP shell to `CompressedSolid`
-    /// let csolid = table.to_compressed_solid(step_solid).unwrap();
-    /// // Convert to `Solid`
-    /// let solid = Solid::extract(csolid).unwrap();
-    /// // The cube has 6 faces!
-    /// assert_eq!(solid.boundaries()[0].len(), 6);
+    /// let table = Table::from_step(&step_string)?;
+    /// let step_solid = table
+    ///     .manifold_solid_brep
+    ///     .values()
+    ///     .next()
+    ///     .ok_or_else(|| anyhow!("STEP file contains no manifold solid B-rep."))?;
+    /// let csolid = table.to_compressed_solid(step_solid)?;
+    /// assert_eq!(csolid.boundaries.len(), 1);
+    /// assert_eq!(csolid.boundaries[0].faces.len(), 6);
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn to_compressed_solid(
         &self,
         solid: &ManifoldSolidBrepHolder,
-    ) -> Result<CompressedSolid<Point3, Curve3D, Surface>, StepConvertingError> {
+    ) -> Result<CompressedSolid<Point3, Curve3D, Surface>, LoadError> {
         let PlaceHolder::Ref(Name::Entity(outer_idx)) = &solid.outer else {
             return Err("failed to reference `solid.outer`".into());
         };
@@ -452,7 +469,7 @@ impl Table {
         solid: &ManifoldSolidBrepHolder,
     ) -> Result<
         CompressedTrimmedSolid<Point3, Curve3D, Surface, step_geometry::StepParameterCurve>,
-        StepConvertingError,
+        LoadError,
     > {
         let PlaceHolder::Ref(Name::Entity(outer_idx)) = &solid.outer else {
             return Err("failed to reference `solid.outer`".into());

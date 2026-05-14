@@ -18,6 +18,37 @@ pub mod step_geometry;
 /// STEP type definitions: structs, enums, and their From/TryFrom impls.
 mod step_types;
 
+use step_geometry::StepConvertingError;
+
+/// Public error type returned by STEP loading entry points.
+///
+/// Wraps both [`ruststep`] parser failures and the boxed [`StepConvertingError`]
+/// produced internally by per-entity `TryFrom` impls. `LoadError` is [`Sized`]
+/// and implements [`std::error::Error`] + `Send` + `Sync` + `'static`, so it
+/// composes with `?` from any caller whose result type already accepts a
+/// standard error -- including [`anyhow::Result`].
+#[derive(Debug, thiserror::Error)]
+pub enum LoadError {
+    /// The input could not be parsed as a STEP exchange structure.
+    #[error("STEP parser error: {0}")]
+    Parse(#[from] ruststep::error::Error),
+    /// A per-entity conversion from STEP types into `monstertruck` types failed.
+    #[error("STEP conversion error: {0}")]
+    Conversion(String),
+}
+
+impl From<StepConvertingError> for LoadError {
+    fn from(value: StepConvertingError) -> Self { Self::Conversion(value.to_string()) }
+}
+
+impl From<&str> for LoadError {
+    fn from(value: &str) -> Self { Self::Conversion(value.to_owned()) }
+}
+
+impl From<String> for LoadError {
+    fn from(value: String) -> Self { Self::Conversion(value) }
+}
+
 use step_geometry::*;
 pub use step_types::*;
 
@@ -792,10 +823,14 @@ impl Table {
     pub fn from_data_section(data_section: &DataSection) -> Table {
         Table::from_iter(&data_section.entities)
     }
+    /// Parses a STEP file source and assembles a [`Table`] of entities.
+    ///
+    /// Returns the parser's error verbatim when the input is not a valid
+    /// STEP exchange structure.
     #[inline(always)]
-    pub fn from_step(step_str: &str) -> Option<Table> {
-        let exchange = ruststep::parser::parse(step_str).ok()?;
-        Some(Table::from_data_section(&exchange.data[0]))
+    pub fn from_step(step_str: &str) -> Result<Table, LoadError> {
+        let exchange = ruststep::parser::parse(step_str)?;
+        Ok(Table::from_data_section(&exchange.data[0]))
     }
 }
 

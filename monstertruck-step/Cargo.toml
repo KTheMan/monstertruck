@@ -21,6 +21,7 @@ chrono = { workspace = true }
 derive_more = { workspace = true, optional = true }
 ruststep = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
+thiserror = { workspace = true }
 monstertruck-assembly = { workspace = true }
 monstertruck-derive = { workspace = true, optional = true }
 monstertruck-geometry = { workspace = true }
