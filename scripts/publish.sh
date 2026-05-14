@@ -16,6 +16,10 @@ if [[ "${1:-}" == "--exec" ]]; then
 fi
 
 # Topological order (leaves first, dependents later).
+#
+# `monstertruck-solid` precedes `monstertruck-modeling` because modeling
+# has `solid` as an optional real dependency (the `fillet` feature), while
+# solid only references modeling as a dev-dependency.
 CRATES=(
     monstertruck-core
     monstertruck-derive
@@ -26,8 +30,8 @@ CRATES=(
     monstertruck-geometry
     monstertruck-topology
     monstertruck-meshing
-    monstertruck-modeling
     monstertruck-solid
+    monstertruck-modeling
     monstertruck-step
     monstertruck-render
     monstertruck-wasm
@@ -42,19 +46,31 @@ MAX_RETRIES=5
 publish_crate() {
     local crate="$1"
     local attempt=0
+    local log
+    log=$(mktemp)
 
     while (( attempt < MAX_RETRIES )); do
-        if cargo publish -p "$crate" 2>&1 | tee /dev/stderr | grep -q "429 Too Many Requests"; then
+        if cargo publish -p "$crate" 2>&1 | tee "$log" >&2; then
+            rm -f "$log"
+            return 0
+        fi
+        if grep -q "429 Too Many Requests" "$log"; then
             attempt=$((attempt + 1))
-            # Parse retry-after time or default to 120s.
             echo "  Rate limited (attempt $attempt/$MAX_RETRIES). Waiting 120s before retry..."
             sleep 120
-        else
+        elif grep -q "already uploaded" "$log"; then
+            echo "  $crate already published at this version -- skipping."
+            rm -f "$log"
             return 0
+        else
+            echo "  FAILED: $crate -- see error above."
+            rm -f "$log"
+            return 1
         fi
     done
 
     echo "  FAILED: $crate exceeded $MAX_RETRIES retries."
+    rm -f "$log"
     return 1
 }
 
