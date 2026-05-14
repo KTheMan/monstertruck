@@ -553,39 +553,36 @@ impl<P: ControlPoint<f64>> ParametricSurface for BsplineSurface<P> {
         } else if u_range_is_zero {
             if m == 0 {
                 let basis1 = knot_vector_v.bspline_basis_functions(degree1, n, v);
-                control_points[0]
+                control_points[0][basis1.start_index()..]
                     .iter()
-                    .zip(basis1)
-                    .fold(P::Diff::zero(), |sum, (point, basis)| {
-                        sum + point.to_vec() * basis
-                    })
+                    .zip(basis1.values())
+                    .fold(P::Diff::zero(), |sum, (&point, &b)| sum + point.to_vec() * b)
             } else {
                 P::Diff::zero()
             }
         } else if v_range_is_zero {
             if n == 0 {
                 let basis0 = knot_vector_u.bspline_basis_functions(degree0, m, u);
-                control_points
+                control_points[basis0.start_index()..]
                     .iter()
-                    .zip(basis0)
-                    .fold(P::Diff::zero(), |sum, (row, basis)| {
-                        sum + row[0].to_vec() * basis
-                    })
+                    .zip(basis0.values())
+                    .fold(P::Diff::zero(), |sum, (row, &b)| sum + row[0].to_vec() * b)
             } else {
                 P::Diff::zero()
             }
         } else {
             let basis0 = knot_vector_u.bspline_basis_functions(degree0, m, u);
             let basis1 = knot_vector_v.bspline_basis_functions(degree1, n, v);
-            control_points
+            let v_start = basis1.start_index();
+            control_points[basis0.start_index()..]
                 .iter()
-                .zip(basis0)
-                .fold(P::Diff::zero(), |sum, (row, basis0)| {
-                    let local = row
+                .zip(basis0.values())
+                .fold(P::Diff::zero(), |sum, (row, &b0)| {
+                    let local = row[v_start..]
                         .iter()
-                        .zip(&basis1)
-                        .fold(P::Diff::zero(), |sum, (point, basis1)| {
-                            sum + point.to_vec() * (basis0 * basis1)
+                        .zip(basis1.values())
+                        .fold(P::Diff::zero(), |sum, (&point, &b1)| {
+                            sum + point.to_vec() * (b0 * b1)
                         });
                     sum + local
                 })

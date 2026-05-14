@@ -137,7 +137,10 @@ where
             [CurveDerivatives::<Vector2>::new(max_order + 1); 4];
         let mut w_ders = CurveDerivatives::<f64>::new(max_order + 1);
         (0..=max_order + 1).for_each(|order| {
-            let basis = self.knot_vec.bspline_basis_functions(degree, order, v);
+            let basis = self
+                .knot_vec
+                .bspline_basis_functions(degree, order, v)
+                .to_full_values();
             uv0_ders[order] = basis.iter().zip(&self.side_control_points0).map(pmul).sum();
             uv1_ders[order] = basis.iter().zip(&self.side_control_points1).map(pmul).sum();
             b0_ders[order] = basis.iter().zip(&self.tangent_vecs0).map(tmul).sum();
@@ -181,8 +184,8 @@ where
             weights,
         } = self;
         let degree = self.vdegree();
-        let basis = knot_vec.bspline_basis_functions(degree, 0, v);
-        let dbasis = knot_vec.bspline_basis_functions(degree, 1, v);
+        let basis = knot_vec.bspline_basis_functions(degree, 0, v).to_full_values();
+        let dbasis = knot_vec.bspline_basis_functions(degree, 1, v).to_full_values();
         let weight: f64 = basis.iter().zip(weights).map(|(&b, &w)| b * w).sum();
         let striple0 = (surface0, side_control_points0, tangent_vecs0);
         let striple1 = (surface1, side_control_points1, tangent_vecs1);

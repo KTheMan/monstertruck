@@ -271,7 +271,7 @@ impl<P: ControlPoint<f64>> BsplineCurve<P> {
             .map(|(t, _)| {
                 knot_vec
                     .try_bspline_basis_functions(degree, 0, *t)
-                    .map(|sv| sv.to_vec())
+                    .map(|basis| basis.to_full_values())
             })
             .collect::<Result<Vec<_>>>()?;
 
@@ -378,10 +378,11 @@ impl<P: ControlPoint<f64>> ParametricCurve for BsplineCurve<P> {
                 P::Diff::zero()
             }
         } else {
-            self.control_points
+            let basis = self.knot_vec.bspline_basis_functions(self.degree(), n, t);
+            self.control_points[basis.start_index()..]
                 .iter()
-                .zip(self.knot_vec.bspline_basis_functions(self.degree(), n, t))
-                .fold(P::Diff::zero(), |sum, (p, b)| sum + p.to_vec() * b)
+                .zip(basis.values())
+                .fold(P::Diff::zero(), |sum, (&p, &b)| sum + p.to_vec() * b)
         }
     }
     #[inline(always)]

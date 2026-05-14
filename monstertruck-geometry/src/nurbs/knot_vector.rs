@@ -119,8 +119,8 @@ impl KnotVector {
     /// # Examples
     /// ```
     /// use monstertruck_geometry::prelude::*;
-    /// const N : usize = 100; // sample size in tests
     ///
+    /// const N: usize = 100; // sample size in tests.
     /// // B-spline basis functions is a partition of unity in (t_k, t_{n - k}).
     /// let vec = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
     /// let knot_vec = KnotVector::from(vec);
@@ -128,14 +128,14 @@ impl KnotVector {
     /// for i in 0..N {
     ///     let t = 2.0 + 4.0 / (N as f64) * (i as f64);
     ///     let res = knot_vec.bspline_basis_functions(degree, 0, t);
-    ///     let sum = res.iter().fold(0.0, |sum, a| sum + a);
+    ///     let sum = res.values().iter().sum::<f64>();
     ///     assert_near2!(sum, 1.0);
     /// }
     /// ```
     /// ```
     /// use monstertruck_geometry::prelude::*;
-    /// const N : usize = 100; // sample size in tests
     ///
+    /// const N: usize = 100; // sample size in tests.
     /// // In some case, B-spline basis functions coincide with Bernstein polynomials.
     /// let vec = vec![0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0];
     /// let knot_vec = KnotVector::from(vec);
@@ -143,7 +143,7 @@ impl KnotVector {
     /// for i in 0..=N {
     ///     let t = 1.0 / (N as f64) * (i as f64);
     ///     // substitution
-    ///     let res = knot_vec.bspline_basis_functions(degree, 0, t);
+    ///     let res = knot_vec.bspline_basis_functions(degree, 0, t).to_full_values();
     ///     let ans = [
     ///         1.0 * (1.0 - t) * (1.0 - t) * (1.0 - t),
     ///         3.0 * t * (1.0 - t) * (1.0 - t),
@@ -153,7 +153,7 @@ impl KnotVector {
     ///     for i in 0..4 { assert_near2!(res[i], ans[i]); }
     ///
     ///     // 2nd-order derivation
-    ///     let res = knot_vec.bspline_basis_functions(degree, 2, t);
+    ///     let res = knot_vec.bspline_basis_functions(degree, 2, t).to_full_values();
     ///     let ans = [
     ///         6.0 * (1.0 - t),
     ///         6.0 * (3.0 * t - 2.0),
@@ -168,7 +168,7 @@ impl KnotVector {
         degree: usize,
         der_rank: usize,
         t: f64,
-    ) -> SmallVec<[f64; 32]> {
+    ) -> BasisWindow {
         match self.try_bspline_basis_functions(degree, der_rank, t) {
             Ok(got) => got,
             Err(error) => panic!("{}", error),
@@ -186,8 +186,8 @@ impl KnotVector {
     /// ```
     /// # fn main() -> anyhow::Result<()> {
     /// use monstertruck_geometry::prelude::*;
-    /// const N : usize = 100; // sample size in tests
     ///
+    /// const N: usize = 100; // sample size in tests.
     /// // B-spline basis functions is a partition of unity in (t_k, t_{n - k}).
     /// let vec = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
     /// let knot_vec = KnotVector::from(vec);
@@ -195,7 +195,7 @@ impl KnotVector {
     /// for i in 0..N {
     ///     let t = 2.0 + 4.0 / (N as f64) * (i as f64);
     ///     let res = knot_vec.try_bspline_basis_functions(degree, 0, t)?;
-    ///     let sum = res.iter().fold(0.0, |sum, a| sum + a);
+    ///     let sum = res.values().iter().sum::<f64>();
     ///     assert_near2!(sum, 1.0);
     /// }
     /// # Ok(())
@@ -204,8 +204,8 @@ impl KnotVector {
     /// ```
     /// # fn main() -> anyhow::Result<()> {
     /// use monstertruck_geometry::prelude::*;
-    /// const N : usize = 100; // sample size in tests
     ///
+    /// const N: usize = 100; // sample size in tests.
     /// // In some case, B-spline basis functions coincide with Bernstein polynomials.
     /// let vec = vec![0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0];
     /// let knot_vec = KnotVector::from(vec);
@@ -213,7 +213,7 @@ impl KnotVector {
     /// for i in 0..=N {
     ///     let t = i as f64 / N as f64;
     ///     // substitution
-    ///     let res = knot_vec.try_bspline_basis_functions(degree, 0, t)?;
+    ///     let res = knot_vec.try_bspline_basis_functions(degree, 0, t)?.to_full_values();
     ///     let ans = [
     ///         1.0 * (1.0 - t) * (1.0 - t) * (1.0 - t),
     ///         3.0 * t * (1.0 - t) * (1.0 - t),
@@ -223,7 +223,7 @@ impl KnotVector {
     ///     for i in 0..4 { assert_near2!(res[i], ans[i]); }
     ///
     ///     // 2nd-order derivation
-    ///     let res = knot_vec.try_bspline_basis_functions(degree, 2, t)?;
+    ///     let res = knot_vec.try_bspline_basis_functions(degree, 2, t)?.to_full_values();
     ///     let ans = [
     ///         6.0 * (1.0 - t),
     ///         6.0 * (3.0 * t - 2.0),
@@ -240,7 +240,7 @@ impl KnotVector {
         degree: usize,
         der_rank: usize,
         t: f64,
-    ) -> Result<SmallVec<[f64; 32]>> {
+    ) -> Result<BasisWindow> {
         let n = self.len() - 1;
         if self[0] == self[n] {
             return Err(Error::ZeroRange);
@@ -248,7 +248,7 @@ impl KnotVector {
             return Err(Error::TooLargeDegree(n + 1, degree));
         }
         if degree < der_rank {
-            return Ok(smallvec::smallvec![0.0; n - degree]);
+            return Ok(BasisWindow::empty(n - degree));
         }
 
         let idx = {
@@ -263,28 +263,11 @@ impl KnotVector {
             }
         };
 
-        if n < 32 {
-            let mut eval = [0.0; 32];
-            self.sub_bspline_basis_functions(degree, der_rank, t, idx, &mut eval);
-            Ok(SmallVec::from_slice(&eval[..n - degree]))
-        } else {
-            let mut eval = vec![0.0; n];
-            self.sub_bspline_basis_functions(degree, der_rank, t, idx, &mut eval);
-            eval.truncate(n - degree);
-            Ok(SmallVec::from_vec(eval))
-        }
-    }
-
-    fn sub_bspline_basis_functions(
-        &self,
-        degree: usize,
-        der_rank: usize,
-        t: f64,
-        idx: usize,
-        eval: &mut [f64],
-    ) {
-        let n = self.len() - 1;
-        eval[idx] = 1.0;
+        let start = idx.saturating_sub(degree);
+        // The Cox-de Boor recurrence reads `eval[j]` and `eval[j + 1]`; an
+        // extra trailing slot avoids a bounds check on the final iteration.
+        let mut eval: SmallVec<[f64; 32]> = smallvec::smallvec![0.0; degree + 2];
+        eval[idx - start] = 1.0;
 
         for k in 1..=(degree - der_rank) {
             let base = idx.saturating_sub(k);
@@ -293,7 +276,8 @@ impl KnotVector {
             for i in base..=usize::min(idx, n - k - 1) {
                 let delta = self[i + k + 1] - self[i + 1];
                 let b = inv_or_zero_strict(delta) * (self[i + k + 1] - t);
-                eval[i] = a * eval[i] + b * eval[i + 1];
+                let j = i - start;
+                eval[j] = a * eval[j] + b * eval[j + 1];
                 a = 1.0 - b;
             }
         }
@@ -305,10 +289,17 @@ impl KnotVector {
             for i in base..=usize::min(idx, n - k - 1) {
                 let delta = self[i + k + 1] - self[i + 1];
                 let b = inv_or_zero_strict(delta);
-                eval[i] = (a * eval[i] - b * eval[i + 1]) * k as f64;
+                let j = i - start;
+                eval[j] = (a * eval[j] - b * eval[j + 1]) * k as f64;
                 a = b;
             }
         }
+
+        // Drop the trailing sentinel and any tail beyond the active window
+        // when the evaluation lands near the end of the parameter range.
+        eval.truncate(usize::min(degree + 1, (n - degree) - start));
+
+        Ok(BasisWindow::new(start, eval, n - degree))
     }
 
     #[doc(hidden)]
@@ -324,10 +315,12 @@ impl KnotVector {
             let t = self[0] + range * (i as f64) / (N as f64);
             // SAFETY: `t` is within the knot vector range, `degree` is valid for
             // this knot vector, and the range is non-zero.
-            let vals = self.try_bspline_basis_functions(degree, 0, t).unwrap();
-            for j in 0..m {
-                if max[j] < vals[j] {
-                    max[j] = vals[j];
+            let basis = self.try_bspline_basis_functions(degree, 0, t).unwrap();
+            let start = basis.start_index();
+            for (offset, &value) in basis.values().iter().enumerate() {
+                let j = start + offset;
+                if max[j] < value {
+                    max[j] = value;
                     res[j] = t;
                 }
             }

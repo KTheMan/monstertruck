@@ -229,7 +229,7 @@ fn bsp_bench() {
     for i in 0..=N {
         let t = i as f64 / N as f64;
         let x = knot_vec.try_bspline_basis_functions(3, 0, t).unwrap();
-        assert_near!(x.iter().sum::<f64>(), 1.0);
+        assert_near!(x.values().iter().sum::<f64>(), 1.0);
     }
 
     println!("bsp-bench: {}ms", instant.elapsed().as_millis());
