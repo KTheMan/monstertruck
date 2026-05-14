@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use monstertruck_core::assert_near;
 use monstertruck_mesh::*;
 use stl::{IntoStlIterator, StlFace, StlReader, StlType};
@@ -60,6 +61,27 @@ fn stl_io_test() {
     stl::write(bmesh.iter().cloned(), &mut bytes, StlType::Binary).unwrap();
     // Binary data is free from notational distortions except for the headers.
     assert_eq!(&bytes[80..], &BINARY_BUNNY[80..]);
+}
+
+#[test]
+fn ascii_stl_header_includes_trailing_space() -> anyhow::Result<()> {
+    let mesh = [StlFace {
+        normal: [0.0, 0.0, 1.0],
+        vertices: [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+    }];
+    let mut bytes = Vec::new();
+    stl::write(mesh.iter().cloned(), &mut bytes, StlType::Ascii)?;
+    let header = bytes
+        .split(|byte| *byte == b'\n')
+        .next()
+        .ok_or_else(|| anyhow!("ASCII STL output is empty."))?;
+    assert_eq!(
+        header,
+        b"solid ",
+        "the ASCII STL header must end with a space so that lenient readers \
+         that require `solid <name>` accept it even when the name is empty.",
+    );
+    Ok(())
 }
 
 #[test]

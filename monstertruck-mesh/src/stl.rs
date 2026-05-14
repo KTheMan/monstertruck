@@ -173,7 +173,10 @@ pub fn write<I: IntoStlIterator, W: Write>(
 /// Writes ASCII STL data.
 fn write_ascii<I: IntoStlIterator, W: Write>(iter: I, writer: &mut W) -> Result<()> {
     let mut iter = iter.into_iter();
-    writer.write_all(b"solid\n")?;
+    // Some readers expect the `solid` keyword to be followed by whitespace
+    // before the (optional) solid name; emit the trailing space even when
+    // the name is empty.
+    writer.write_all(b"solid \n")?;
     iter.try_for_each::<_, Result<()>>(|face| {
         writer.write_fmt(format_args!(
             "  facet normal {:e} {:e} {:e}\n",
