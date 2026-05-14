@@ -2,6 +2,12 @@ use newton::Jacobian;
 
 use super::*;
 
+/// Maximum depth of the recursive subdivision performed by
+/// [`parameter_division`]. Bounds runtime when a surface fails to converge
+/// (e.g. ill-conditioned offset or singular evaluation) so a tessellation
+/// caller falls back to the partial division instead of looping forever.
+const MAX_PARAMETER_DIVISION_RECURSION: usize = 100;
+
 /// Divides the domain into equal parts, examines all the values, and returns `(u, v)` such that
 /// `surface.evaluate(u, v)` is closest to `point`.
 /// This method is useful to get an efficient hint of `search_nearest_parameter`.
@@ -238,14 +244,27 @@ where
 {
     nonpositive_tolerance!(tol);
     let (mut udiv, mut vdiv) = (vec![urange.0, urange.1], vec![vrange.0, vrange.1]);
-    sub_parameter_division(surface, (&mut udiv, &mut vdiv), tol);
+    sub_parameter_division(
+        surface,
+        (&mut udiv, &mut vdiv),
+        tol,
+        MAX_PARAMETER_DIVISION_RECURSION,
+    );
     (udiv, vdiv)
 }
 
-fn sub_parameter_division<S>(surface: &S, (udiv, vdiv): (&mut Vec<f64>, &mut Vec<f64>), tol: f64)
-where
+fn sub_parameter_division<S>(
+    surface: &S,
+    (udiv, vdiv): (&mut Vec<f64>, &mut Vec<f64>),
+    tol: f64,
+    remaining_trials: usize,
+) where
     S: ParametricSurface,
-    S::Point: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64> + HashGen<f64>, {
+    S::Point: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64> + HashGen<f64>,
+{
+    if remaining_trials == 0 {
+        return;
+    }
     let mut divide_flag0 = vec![false; udiv.len() - 1];
     let mut divide_flag1 = vec![false; vdiv.len() - 1];
 
@@ -255,9 +274,12 @@ where
                 continue;
             }
             let (u_gen, v_gen) = ((u[0] + u[1]) / 2.0, (v[0] + v[1]) / 2.0);
-            let generated = surface.evaluate(u_gen, v_gen);
-            let p = 0.5 + (0.2 * HashGen::hash1(generated) - 0.1);
-            let q = 0.5 + (0.2 * HashGen::hash1(generated) - 0.1);
+            // Independent hash channels for `p` and `q`: `hash1` twice would
+            // return the same value, biasing the in-cell sample along the
+            // diagonal `p == q`.
+            let [p_jitter, q_jitter] = HashGen::hash2(surface.evaluate(u_gen, v_gen));
+            let p = 0.5 + (0.2 * p_jitter - 0.1);
+            let q = 0.5 + (0.2 * q_jitter - 0.1);
             let u0 = u[0] * (1.0 - p) + u[1] * p;
             let v0 = v[0] * (1.0 - q) + v[1] * q;
             let p0 = surface.evaluate(u0, v0);
@@ -304,6 +326,6 @@ where
     if udiv.len() != new_udiv.len() || vdiv.len() != new_vdiv.len() {
         *udiv = new_udiv;
         *vdiv = new_vdiv;
-        sub_parameter_division(surface, (udiv, vdiv), tol);
+        sub_parameter_division(surface, (udiv, vdiv), tol, remaining_trials - 1);
     }
 }
