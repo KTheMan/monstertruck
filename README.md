@@ -1,6 +1,11 @@
 # `monstertruck`
 
-**M**ultifarious **O**mnificence, **N**omenclature **S**tandardized, **T**erminology **E**nhanced & **R**efactored **Truck** – a **Ru**st **C**ad **K**ernel.
+[![crates.io](https://img.shields.io/crates/v/monstertruck.svg)](https://crates.io/crates/monstertruck)
+[![docs.rs](https://img.shields.io/docsrs/monstertruck)](https://docs.rs/monstertruck)
+[![CI](https://img.shields.io/github/actions/workflow/status/virtualritz/monstertruck/ci.yml?branch=master&label=ci)](https://github.com/virtualritz/monstertruck/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/crates/l/monstertruck.svg)](#license)
+
+**M**ultifarious **O**mnificence, **N**omenclature **S**tandardized, **T**erminology **E**nhanced & **R**efactored **Truck** -- a **Ru**st **C**ad **K**ernel.
 
 ## Overview
 
