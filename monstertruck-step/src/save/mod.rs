@@ -7,7 +7,7 @@ use self::topology::PreStepModel;
 const ERR: Result = Err(std::fmt::Error);
 
 #[cfg(feature = "derive")]
-pub use monstertruck_derive::{DisplayByStep, StepLength};
+pub use monstertruck_derive::{StepFormat, StepLength};
 
 /// display boolean number to step file
 #[derive(Clone, Copy, Debug)]
@@ -144,21 +144,35 @@ impl<I: Clone + IntoIterator<Item = usize>> Display for SliceDisplay<'_, IndexSl
     }
 }
 
-/// trait for outputting by STEP file format.
-pub trait DisplayByStep {
-    ///  formatter
+/// STEP-exchange-format counterpart to [`std::fmt::Display`].
+///
+/// Implementors emit their textual STEP encoding into `f` using `idx` as
+/// the entity number (`#idx = ...;`). Sub-entities the impl introduces
+/// take subsequent indices; their count is reported via [`StepLength`].
+pub trait StepFormat {
+    /// Write the STEP encoding of `self` rooted at entity index `idx`.
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result;
 }
 
-impl<T: DisplayByStep> DisplayByStep for &T {
-    fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result { DisplayByStep::fmt(*self, idx, f) }
+impl<T: StepFormat> StepFormat for &T {
+    fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result { StepFormat::fmt(*self, idx, f) }
 }
 
-impl<T: DisplayByStep> DisplayByStep for Box<T> {
+impl<T: StepFormat> StepFormat for Box<T> {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
-        DisplayByStep::fmt(self.as_ref(), idx, f)
+        StepFormat::fmt(self.as_ref(), idx, f)
     }
 }
+
+// `DisplayByStep` is the upstream `truck-stepio` trait name. We renamed
+// it to `StepFormat` because "display by step" parses as
+// "display step-by-step" rather than the intended "format as STEP". The
+// alias is kept so external code that imports `DisplayByStep` (e.g. code
+// ported from `truck` that pre-dates our rename) keeps compiling against
+// `monstertruck`. New code should use `StepFormat`. Slated for removal
+// once downstream callers are off the old name.
+#[deprecated(since = "0.3.1", note = "renamed to `StepFormat`.")]
+pub use StepFormat as DisplayByStep;
 
 /// Display struct for outputting some objects to STEP file format.
 #[derive(Clone, Debug)]
@@ -187,8 +201,8 @@ impl<T> StepDisplay<T> {
     pub const fn index(&self) -> usize { self.idx }
 }
 
-impl<T: DisplayByStep> Display for StepDisplay<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result { DisplayByStep::fmt(&self.entity, self.idx, f) }
+impl<T: StepFormat> Display for StepDisplay<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result { StepFormat::fmt(&self.entity, self.idx, f) }
 }
 
 /// Calculate how many lines are used in outputting an object to a STEP file

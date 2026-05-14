@@ -6,7 +6,7 @@ use monstertruck_modeling::{
     Surface as ModelingSurface,
 };
 
-impl DisplayByStep for Point2 {
+impl StepFormat for Point2 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         f.write_fmt(format_args!(
             "#{idx} = CARTESIAN_POINT('', {coordinates});\n",
@@ -16,7 +16,7 @@ impl DisplayByStep for Point2 {
 }
 impl_const_step_length!(Point2, 1);
 
-impl DisplayByStep for Point3 {
+impl StepFormat for Point3 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         f.write_fmt(format_args!(
             "#{idx} = CARTESIAN_POINT('', {coordinates});\n",
@@ -30,7 +30,7 @@ impl_const_step_length!(Point3, 1);
 #[derive(Clone, Debug, Copy)]
 pub struct VectorAsDirection<V>(pub V);
 
-impl DisplayByStep for VectorAsDirection<Vector2> {
+impl StepFormat for VectorAsDirection<Vector2> {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         f.write_fmt(format_args!(
             "#{idx} = DIRECTION('', {direction_ratios});\n",
@@ -39,7 +39,7 @@ impl DisplayByStep for VectorAsDirection<Vector2> {
     }
 }
 
-impl DisplayByStep for VectorAsDirection<Vector3> {
+impl StepFormat for VectorAsDirection<Vector3> {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         f.write_fmt(format_args!(
             "#{idx} = DIRECTION('', {direction_ratios});\n",
@@ -49,10 +49,10 @@ impl DisplayByStep for VectorAsDirection<Vector3> {
 }
 impl_const_step_length!(VectorAsDirection<V>, 1, <V>);
 
-impl<V> DisplayByStep for V
+impl<V> StepFormat for V
 where
     V: InnerSpace<Scalar = f64>,
-    VectorAsDirection<V>: DisplayByStep,
+    VectorAsDirection<V>: StepFormat,
 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let magnitude = self.magnitude();
@@ -67,10 +67,54 @@ where
 impl_const_step_length!(Vector2, 2);
 impl_const_step_length!(Vector3, 2);
 
-impl<P> DisplayByStep for Line<P>
+/// Wrapper that displays a transform matrix as a STEP `AXIS2_PLACEMENT_*` entity.
+///
+/// STEP encodes an oriented coordinate frame -- a placement -- as a
+/// location point plus one (`AXIS2_PLACEMENT_2D`) or two
+/// (`AXIS2_PLACEMENT_3D`) direction vectors. This wrapper takes a
+/// transform matrix from `cgmath` (column-major) and emits the four
+/// referenced entities: the placement itself, the location point, and
+/// the direction(s).
+#[derive(Clone, Copy, Debug)]
+pub struct MatrixAsAxis<M>(pub M);
+
+impl StepFormat for MatrixAsAxis<Matrix3> {
+    fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
+        let location_idx = idx + 1;
+        let ref_direction_idx = idx + 2;
+        let location = self.0[2].to_point();
+        let ref_direction = VectorAsDirection(self.0[0].truncate());
+        f.write_fmt(format_args!(
+            "#{idx} = AXIS2_PLACEMENT_2D('', #{location_idx}, #{ref_direction_idx});\n",
+        ))?;
+        StepFormat::fmt(&location, location_idx, f)?;
+        StepFormat::fmt(&ref_direction, ref_direction_idx, f)
+    }
+}
+impl_const_step_length!(MatrixAsAxis<Matrix3>, 3);
+
+impl StepFormat for MatrixAsAxis<Matrix4> {
+    fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
+        let location_idx = idx + 1;
+        let axis_idx = idx + 2;
+        let ref_direction_idx = idx + 3;
+        let location = self.0[3].to_point();
+        let axis = VectorAsDirection(self.0[2].truncate());
+        let ref_direction = VectorAsDirection(self.0[0].truncate());
+        f.write_fmt(format_args!(
+            "#{idx} = AXIS2_PLACEMENT_3D('', #{location_idx}, #{axis_idx}, #{ref_direction_idx});\n",
+        ))?;
+        StepFormat::fmt(&location, location_idx, f)?;
+        StepFormat::fmt(&axis, axis_idx, f)?;
+        StepFormat::fmt(&ref_direction, ref_direction_idx, f)
+    }
+}
+impl_const_step_length!(MatrixAsAxis<Matrix4>, 4);
+
+impl<P> StepFormat for Line<P>
 where
-    P: EuclideanSpace + ConstStepLength + DisplayByStep,
-    P::Diff: DisplayByStep,
+    P: EuclideanSpace + ConstStepLength + StepFormat,
+    P::Diff: StepFormat,
 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let pnt_idx = idx + 1;
@@ -102,8 +146,8 @@ where
 
 impl<P> StepCurve for Line<P> {}
 
-impl<P> DisplayByStep for PolylineCurve<P>
-where P: Copy + ConstStepLength + DisplayByStep
+impl<P> StepFormat for PolylineCurve<P>
+where P: Copy + ConstStepLength + StepFormat
 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         f.write_fmt(format_args!(
@@ -122,8 +166,8 @@ impl<P: ConstStepLength> StepLength for PolylineCurve<P> {
 
 impl<P> StepCurve for PolylineCurve<P> {}
 
-impl<P> DisplayByStep for BsplineCurve<P>
-where P: Copy + ConstStepLength + DisplayByStep
+impl<P> StepFormat for BsplineCurve<P>
+where P: Copy + ConstStepLength + StepFormat
 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let (knots, multi) = self.knot_vector().to_single_multi();
@@ -151,10 +195,10 @@ impl<P> StepLength for BsplineCurve<P> {
 
 impl<P> StepCurve for BsplineCurve<P> {}
 
-impl<V> DisplayByStep for NurbsCurve<V>
+impl<V> StepFormat for NurbsCurve<V>
 where
     V: Homogeneous<Scalar = f64>,
-    V::Point: ConstStepLength + DisplayByStep,
+    V::Point: ConstStepLength + StepFormat,
 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let (knots, multi) = self.knot_vector().to_single_multi();
@@ -199,7 +243,7 @@ impl<V> StepLength for NurbsCurve<V> {
 
 impl<V> StepCurve for NurbsCurve<V> {}
 
-impl DisplayByStep for Processor<TrimmedCurve<UnitCircle<Point2>>, Matrix3> {
+impl StepFormat for Processor<TrimmedCurve<UnitCircle<Point2>>, Matrix3> {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let transform = *self.transform();
         let position_idx = idx + 1;
@@ -221,13 +265,13 @@ impl DisplayByStep for Processor<TrimmedCurve<UnitCircle<Point2>>, Matrix3> {
         f.write_fmt(format_args!(
             "#{position_idx} = AXIS2_PLACEMENT_2D('', #{location_idx}, #{ref_direction_idx});\n",
         ))?;
-        DisplayByStep::fmt(&location, location_idx, f)?;
-        DisplayByStep::fmt(&ref_direction, ref_direction_idx, f)
+        StepFormat::fmt(&location, location_idx, f)?;
+        StepFormat::fmt(&ref_direction, ref_direction_idx, f)
     }
 }
 impl_const_step_length!(Processor<TrimmedCurve<UnitCircle<Point2>>, Matrix3>, 4);
 
-impl DisplayByStep for Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4> {
+impl StepFormat for Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4> {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let transform = self.transform();
         let position_idx = idx + 1;
@@ -251,14 +295,14 @@ impl DisplayByStep for Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4> {
         f.write_fmt(format_args!(
             "#{position_idx} = AXIS2_PLACEMENT_3D('', #{location_idx}, #{axis_idx}, #{ref_direction_idx});\n",
         ))?;
-        DisplayByStep::fmt(&location, location_idx, f)?;
-        DisplayByStep::fmt(&axis, axis_idx, f)?;
-        DisplayByStep::fmt(&ref_direction, ref_direction_idx, f)
+        StepFormat::fmt(&location, location_idx, f)?;
+        StepFormat::fmt(&axis, axis_idx, f)?;
+        StepFormat::fmt(&ref_direction, ref_direction_idx, f)
     }
 }
 impl_const_step_length!(Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4>, 5);
 
-impl DisplayByStep for Processor<TrimmedCurve<UnitHyperbola<Point2>>, Matrix3> {
+impl StepFormat for Processor<TrimmedCurve<UnitHyperbola<Point2>>, Matrix3> {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let transform = *self.transform();
         let position_idx = idx + 1;
@@ -279,7 +323,7 @@ impl DisplayByStep for Processor<TrimmedCurve<UnitHyperbola<Point2>>, Matrix3> {
 }
 impl_const_step_length!(Processor<TrimmedCurve<UnitHyperbola<Point2>>, Matrix3>, 4);
 
-impl DisplayByStep for Processor<TrimmedCurve<UnitHyperbola<Point3>>, Matrix4> {
+impl StepFormat for Processor<TrimmedCurve<UnitHyperbola<Point3>>, Matrix4> {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let transform = self.transform();
         let position_idx = idx + 1;
@@ -303,7 +347,7 @@ impl DisplayByStep for Processor<TrimmedCurve<UnitHyperbola<Point3>>, Matrix4> {
 }
 impl_const_step_length!(Processor<TrimmedCurve<UnitHyperbola<Point3>>, Matrix4>, 5);
 
-impl DisplayByStep for Processor<TrimmedCurve<UnitParabola<Point2>>, Matrix3> {
+impl StepFormat for Processor<TrimmedCurve<UnitParabola<Point2>>, Matrix3> {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let transform = *self.transform();
         let position_idx = idx + 1;
@@ -324,7 +368,7 @@ impl DisplayByStep for Processor<TrimmedCurve<UnitParabola<Point2>>, Matrix3> {
 }
 impl_const_step_length!(Processor<TrimmedCurve<UnitParabola<Point2>>, Matrix3>, 4);
 
-impl DisplayByStep for Processor<TrimmedCurve<UnitParabola<Point3>>, Matrix4> {
+impl StepFormat for Processor<TrimmedCurve<UnitParabola<Point3>>, Matrix4> {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let transform = self.transform();
         let position_idx = idx + 1;
@@ -353,11 +397,11 @@ impl<C, M: One> StepCurve for Processor<C, M> {
     fn same_sense(&self) -> bool { self.orientation() }
 }
 
-impl<C, S0, S1> DisplayByStep for IntersectionCurve<C, S0, S1>
+impl<C, S0, S1> StepFormat for IntersectionCurve<C, S0, S1>
 where
-    C: StepLength + DisplayByStep,
-    S0: StepLength + DisplayByStep,
-    S1: StepLength + DisplayByStep,
+    C: StepLength + StepFormat,
+    S0: StepLength + StepFormat,
+    S1: StepLength + StepFormat,
 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let curve_idx = idx + 1;
@@ -381,13 +425,13 @@ impl<C: StepLength, S0: StepLength, S1: StepLength> StepLength for IntersectionC
     }
 }
 
-impl<C, S0, S1, T0, T1> DisplayByStep for SurfaceCurve<C, S0, S1, T0, T1>
+impl<C, S0, S1, T0, T1> StepFormat for SurfaceCurve<C, S0, S1, T0, T1>
 where
-    C: StepLength + DisplayByStep,
-    S0: StepLength + DisplayByStep,
-    S1: StepLength + DisplayByStep,
-    T0: StepLength + DisplayByStep,
-    T1: StepLength + DisplayByStep,
+    C: StepLength + StepFormat,
+    S0: StepLength + StepFormat,
+    S1: StepLength + StepFormat,
+    T0: StepLength + StepFormat,
+    T1: StepLength + StepFormat,
 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let curve_idx = idx + 1;
@@ -449,10 +493,10 @@ impl<C: StepCurve, S0, S1> StepCurve for IntersectionCurve<C, S0, S1> {
     fn same_sense(&self) -> bool { self.leader().same_sense() }
 }
 
-impl<C, S> DisplayByStep for ParameterCurve<C, S>
+impl<C, S> StepFormat for ParameterCurve<C, S>
 where
-    C: DisplayByStep,
-    S: DisplayByStep + StepLength,
+    C: StepFormat,
+    S: StepFormat + StepLength,
 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let surface_idx = idx + 1;
@@ -491,12 +535,12 @@ impl<C: StepCurve, S> StepCurve for ParameterCurve<C, S> {
     fn same_sense(&self) -> bool { self.curve().same_sense() }
 }
 
-impl DisplayByStep for ModelingConic2D {
+impl StepFormat for ModelingConic2D {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         match self {
-            ModelingConic2D::Ellipse(x) => DisplayByStep::fmt(x, idx, f),
-            ModelingConic2D::Hyperbola(x) => DisplayByStep::fmt(x, idx, f),
-            ModelingConic2D::Parabola(x) => DisplayByStep::fmt(x, idx, f),
+            ModelingConic2D::Ellipse(x) => StepFormat::fmt(x, idx, f),
+            ModelingConic2D::Hyperbola(x) => StepFormat::fmt(x, idx, f),
+            ModelingConic2D::Parabola(x) => StepFormat::fmt(x, idx, f),
         }
     }
 }
@@ -513,14 +557,14 @@ impl StepLength for ModelingConic2D {
 
 impl StepCurve for ModelingConic2D {}
 
-impl DisplayByStep for ModelingCurve2D {
+impl StepFormat for ModelingCurve2D {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         match self {
-            ModelingCurve2D::Line(x) => DisplayByStep::fmt(x, idx, f),
-            ModelingCurve2D::Polyline(x) => DisplayByStep::fmt(x, idx, f),
-            ModelingCurve2D::Conic(x) => DisplayByStep::fmt(x, idx, f),
-            ModelingCurve2D::BsplineCurve(x) => DisplayByStep::fmt(x, idx, f),
-            ModelingCurve2D::NurbsCurve(x) => DisplayByStep::fmt(x, idx, f),
+            ModelingCurve2D::Line(x) => StepFormat::fmt(x, idx, f),
+            ModelingCurve2D::Polyline(x) => StepFormat::fmt(x, idx, f),
+            ModelingCurve2D::Conic(x) => StepFormat::fmt(x, idx, f),
+            ModelingCurve2D::BsplineCurve(x) => StepFormat::fmt(x, idx, f),
+            ModelingCurve2D::NurbsCurve(x) => StepFormat::fmt(x, idx, f),
         }
     }
 }
@@ -539,14 +583,14 @@ impl StepLength for ModelingCurve2D {
 
 impl StepCurve for ModelingCurve2D {}
 
-impl DisplayByStep for ModelingCurve {
+impl StepFormat for ModelingCurve {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         match self {
-            ModelingCurve::Line(x) => DisplayByStep::fmt(x, idx, f),
-            ModelingCurve::BsplineCurve(x) => DisplayByStep::fmt(x, idx, f),
-            ModelingCurve::NurbsCurve(x) => DisplayByStep::fmt(x, idx, f),
-            ModelingCurve::ParameterCurve(x) => DisplayByStep::fmt(x, idx, f),
-            ModelingCurve::IntersectionCurve(x) => DisplayByStep::fmt(x, idx, f),
+            ModelingCurve::Line(x) => StepFormat::fmt(x, idx, f),
+            ModelingCurve::BsplineCurve(x) => StepFormat::fmt(x, idx, f),
+            ModelingCurve::NurbsCurve(x) => StepFormat::fmt(x, idx, f),
+            ModelingCurve::ParameterCurve(x) => StepFormat::fmt(x, idx, f),
+            ModelingCurve::IntersectionCurve(x) => StepFormat::fmt(x, idx, f),
         }
     }
 }
@@ -565,7 +609,7 @@ impl StepLength for ModelingCurve {
 
 impl StepCurve for ModelingCurve {}
 
-impl DisplayByStep for Plane {
+impl StepFormat for Plane {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let axis2_placement_idx = idx + 1;
         let location_idx = idx + 2;
@@ -585,7 +629,7 @@ impl_const_step_length!(Plane, 5);
 
 impl StepSurface for Plane {}
 
-impl DisplayByStep for Processor<Sphere, Matrix4> {
+impl StepFormat for Processor<Sphere, Matrix4> {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let sphere = *self.entity();
         let transform = self.transform();
@@ -607,22 +651,22 @@ impl DisplayByStep for Processor<Sphere, Matrix4> {
             "#{idx} = SPHERICAL_SURFACE('', #{position_idx}, {r});
 #{position_idx} = AXIS2_PLACEMENT_3D('', #{location_idx}, #{axis_idx}, #{ref_direction_idx});\n"
         ))?;
-        DisplayByStep::fmt(&location, location_idx, f)?;
-        DisplayByStep::fmt(&axis, axis_idx, f)?;
-        DisplayByStep::fmt(&ref_direction, ref_direction_idx, f)
+        StepFormat::fmt(&location, location_idx, f)?;
+        StepFormat::fmt(&axis, axis_idx, f)?;
+        StepFormat::fmt(&ref_direction, ref_direction_idx, f)
     }
 }
 impl_const_step_length!(Processor<Sphere, Matrix4>, 5);
 
-impl DisplayByStep for Sphere {
+impl StepFormat for Sphere {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
-        DisplayByStep::fmt(&Processor::new(*self), idx, f)
+        StepFormat::fmt(&Processor::new(*self), idx, f)
     }
 }
 impl_const_step_length!(Sphere, 5);
 impl StepSurface for Sphere {}
 
-impl DisplayByStep for Processor<Torus, Matrix4> {
+impl StepFormat for Processor<Torus, Matrix4> {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let torus = *self.entity();
         let transform = self.transform();
@@ -645,9 +689,9 @@ impl DisplayByStep for Processor<Torus, Matrix4> {
             "#{idx} = TOROIDAL_SURFACE('', #{position_idx}, {greater}, {lesser});
 #{position_idx} = AXIS2_PLACEMENT_3D('', #{location_idx}, #{axis_idx}, #{ref_direction_idx});\n",
         ))?;
-        DisplayByStep::fmt(&location, location_idx, f)?;
-        DisplayByStep::fmt(&axis, axis_idx, f)?;
-        DisplayByStep::fmt(&ref_direction, ref_direction_idx, f)
+        StepFormat::fmt(&location, location_idx, f)?;
+        StepFormat::fmt(&axis, axis_idx, f)?;
+        StepFormat::fmt(&ref_direction, ref_direction_idx, f)
     }
 }
 impl_const_step_length!(Processor<Torus, Matrix4>, 5);
@@ -657,16 +701,16 @@ impl StepSurface for Processor<Torus, Matrix4> {
     fn same_sense(&self) -> bool { self.orientation() }
 }
 
-impl DisplayByStep for Torus {
+impl StepFormat for Torus {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
-        DisplayByStep::fmt(&Processor::new(*self), idx, f)
+        StepFormat::fmt(&Processor::new(*self), idx, f)
     }
 }
 impl_const_step_length!(Torus, 5);
 impl StepSurface for Torus {}
 
-impl<P> DisplayByStep for BsplineSurface<P>
-where P: Copy + DisplayByStep
+impl<P> StepFormat for BsplineSurface<P>
+where P: Copy + StepFormat
 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let control_points = self.control_points();
@@ -708,10 +752,10 @@ impl<P> StepLength for BsplineSurface<P> {
 }
 impl<P> StepSurface for BsplineSurface<P> {}
 
-impl<V> DisplayByStep for NurbsSurface<V>
+impl<V> StepFormat for NurbsSurface<V>
 where
     V: Homogeneous<Scalar = f64>,
-    V::Point: Copy + DisplayByStep,
+    V::Point: Copy + StepFormat,
 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let control_points_instances = self
@@ -770,8 +814,8 @@ impl<V> StepLength for NurbsSurface<V> {
 }
 impl<V> StepSurface for NurbsSurface<V> {}
 
-impl<C> DisplayByStep for ExtrusionSurface<C, Vector3>
-where C: StepLength + DisplayByStep
+impl<C> StepFormat for ExtrusionSurface<C, Vector3>
+where C: StepLength + StepFormat
 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let curve = self.entity_curve();
@@ -798,8 +842,8 @@ impl<C, T: One> StepSurface for Processor<ExtrusionSurface<C, Vector3>, T> {
     fn same_sense(&self) -> bool { self.orientation() }
 }
 
-impl<C> DisplayByStep for RevolutionSurface<C>
-where C: StepLength + DisplayByStep
+impl<C> StepFormat for RevolutionSurface<C>
+where C: StepLength + StepFormat
 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let curve = self.entity_curve();
@@ -831,8 +875,8 @@ impl<C> StepSurface for RevolutionSurface<C> {
     fn same_sense(&self) -> bool { false }
 }
 
-impl<C> DisplayByStep for Processor<RevolutionSurface<C>, Matrix4>
-where C: StepLength + Transformed<Matrix4> + DisplayByStep
+impl<C> StepFormat for Processor<RevolutionSurface<C>, Matrix4>
+where C: StepLength + Transformed<Matrix4> + StepFormat
 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         let surface = self.entity();
@@ -852,7 +896,7 @@ where C: StepLength + Transformed<Matrix4> + DisplayByStep
         let axis = k.transform_vector(surface.axis());
         let origin = transform.transform_point(surface.origin());
         let surface = RevolutionSurface::by_revolution(curve, origin, axis);
-        DisplayByStep::fmt(&surface, idx, f)
+        StepFormat::fmt(&surface, idx, f)
     }
 }
 impl<C: StepLength> StepLength for Processor<RevolutionSurface<C>, Matrix4> {
@@ -864,23 +908,23 @@ impl<C, T: One> StepSurface for Processor<RevolutionSurface<C>, T> {
     fn same_sense(&self) -> bool { !self.orientation() }
 }
 
-impl DisplayByStep for ModelingSurface {
+impl StepFormat for ModelingSurface {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         match self {
-            ModelingSurface::Plane(x) => DisplayByStep::fmt(x, idx, f),
-            ModelingSurface::BsplineSurface(x) => DisplayByStep::fmt(x, idx, f),
-            ModelingSurface::NurbsSurface(x) => DisplayByStep::fmt(x, idx, f),
+            ModelingSurface::Plane(x) => StepFormat::fmt(x, idx, f),
+            ModelingSurface::BsplineSurface(x) => StepFormat::fmt(x, idx, f),
+            ModelingSurface::NurbsSurface(x) => StepFormat::fmt(x, idx, f),
             ModelingSurface::RevolutionSurface(x) => {
                 if let Some(bsp) = x.try_into_homogeneous_bspline_surface() {
                     let nurbs = NurbsSurface::new(bsp);
-                    DisplayByStep::fmt(&nurbs, idx, f)
+                    StepFormat::fmt(&nurbs, idx, f)
                 } else {
-                    DisplayByStep::fmt(x, idx, f)
+                    StepFormat::fmt(x, idx, f)
                 }
             }
             ModelingSurface::TsplineSurface(t_mesh) => {
                 let bsp = t_mesh.to_bspline_surface(4);
-                DisplayByStep::fmt(&bsp, idx, f)
+                StepFormat::fmt(&bsp, idx, f)
             }
         }
     }

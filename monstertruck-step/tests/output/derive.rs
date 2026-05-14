@@ -1,7 +1,7 @@
 use monstertruck_geometry::prelude::*;
 use monstertruck_step::save::*;
 
-#[derive(Clone, Debug, StepLength, DisplayByStep)]
+#[derive(Clone, Debug, StepLength, StepFormat)]
 enum LengthCheck {
     Point(Point3),
     Vector(Vector3),

@@ -2,7 +2,7 @@ use super::*;
 use crate::load::{GeometricCurveSet, GeometricSetSelect};
 use crate::save::{FloatDisplay, IndexSliceDisplay, StepDisplay, StepLength, VectorAsDirection};
 
-impl save::DisplayByStep for SurfaceCurveAssociatedGeometry {
+impl save::StepFormat for SurfaceCurveAssociatedGeometry {
     fn fmt(&self, idx: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SurfaceCurveAssociatedGeometry::ParameterCurve(curve) => curve.fmt(idx, f),
@@ -20,7 +20,7 @@ impl save::StepLength for SurfaceCurveAssociatedGeometry {
     }
 }
 
-impl save::DisplayByStep for SurfaceCurve3D {
+impl save::StepFormat for SurfaceCurve3D {
     fn fmt(&self, idx: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let leader_idx = idx + 1;
         let (associated_indices, _) = self.associated_geometry().iter().fold(
@@ -76,7 +76,7 @@ impl save::ConstStepLength for Processor<Sphere, Matrix4> {
 impl save::StepLength for Processor<Sphere, Matrix4> {
     fn step_length(&self) -> usize { <Self as save::ConstStepLength>::LENGTH }
 }
-impl save::DisplayByStep for Processor<Sphere, Matrix4> {
+impl save::StepFormat for Processor<Sphere, Matrix4> {
     fn fmt(&self, idx: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Processor::new(self.entity().0)
             .transformed(*self.transform())
@@ -84,7 +84,7 @@ impl save::DisplayByStep for Processor<Sphere, Matrix4> {
     }
 }
 
-impl save::DisplayByStep for ElementarySurface {
+impl save::StepFormat for ElementarySurface {
     fn fmt(&self, idx: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Plane(x) => x.fmt(idx, f),
@@ -168,7 +168,7 @@ impl save::StepLength for GeometricCurveSet {
     }
 }
 
-impl save::DisplayByStep for GeometricCurveSet {
+impl save::StepFormat for GeometricCurveSet {
     fn fmt(&self, idx: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Collect element start indices.
         let mut cursor = idx + 1;
@@ -199,13 +199,13 @@ impl save::DisplayByStep for GeometricCurveSet {
             match elem {
                 GeometricSetSelect::Curve(c) => {
                     if let Ok(c3d) = Curve3D::try_from(c.as_ref()) {
-                        save::DisplayByStep::fmt(&c3d, cursor, f)?;
+                        save::StepFormat::fmt(&c3d, cursor, f)?;
                         cursor += c3d.step_length();
                     }
                 }
                 GeometricSetSelect::Point(p) => {
                     let pt = Point3::from(p.as_ref());
-                    save::DisplayByStep::fmt(&pt, cursor, f)?;
+                    save::StepFormat::fmt(&pt, cursor, f)?;
                     cursor += 1;
                 }
             }

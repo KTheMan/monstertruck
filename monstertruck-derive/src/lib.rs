@@ -1222,12 +1222,11 @@ pub fn derive_step_length(input: TokenStream) -> TokenStream {
     .into()
 }
 
-/// Derive macro generating an impl of the trait `DisplayByStep` for enums or single field tuple structs.
-#[proc_macro_error]
-#[proc_macro_derive(DisplayByStep)]
-pub fn derive_display_by_step(input: TokenStream) -> TokenStream {
+// Internal generator shared by the `StepFormat` derive and its
+// upstream-compatible `DisplayByStep` alias.
+fn derive_step_format_impl(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    let trait_name = quote! { monstertruck_step::save::DisplayByStep };
+    let trait_name = quote! { monstertruck_step::save::StepFormat };
     let ty = input.ident;
     let generics_params = input.generics;
     let where_predicates = generics_params
@@ -1275,6 +1274,22 @@ pub fn derive_display_by_step(input: TokenStream) -> TokenStream {
     }
     .into()
 }
+
+/// Derive macro generating an impl of the trait `StepFormat` for enums or single field tuple structs.
+#[proc_macro_error]
+#[proc_macro_derive(StepFormat)]
+pub fn derive_step_format(input: TokenStream) -> TokenStream { derive_step_format_impl(input) }
+
+// `DisplayByStep` is the upstream `truck-stepio` derive name. We renamed
+// the trait to `StepFormat` because "display by step" reads as
+// "display step-by-step" rather than "format as STEP". The alias is
+// kept registered so external code ported from `truck` still compiles
+// against `monstertruck`; new code should use `StepFormat`. Slated for
+// removal once downstream callers are off the old name.
+/// Deprecated alias for [`StepFormat`].
+#[proc_macro_error]
+#[proc_macro_derive(DisplayByStep)]
+pub fn derive_display_by_step(input: TokenStream) -> TokenStream { derive_step_format_impl(input) }
 
 /// Derive macro generating an impl of the trait `StepCurve` for enums or single field tuple structs.
 #[proc_macro_error]

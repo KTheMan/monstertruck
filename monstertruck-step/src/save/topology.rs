@@ -5,10 +5,10 @@ trait StepAssociatedEntity {
 }
 
 impl<T> StepAssociatedEntity for T
-where T: DisplayByStep + StepLength
+where T: StepFormat + StepLength
 {
     fn fmt(&self, idx: usize, formatter: &mut Formatter<'_>) -> Result {
-        DisplayByStep::fmt(self, idx, formatter)
+        StepFormat::fmt(self, idx, formatter)
     }
 
     fn step_length(&self) -> usize { StepLength::step_length(self) }
@@ -19,13 +19,13 @@ enum StepAssociatedGeometry<'a, S> {
     Surface(&'a S),
 }
 
-impl<S> DisplayByStep for StepAssociatedGeometry<'_, S>
-where S: DisplayByStep + StepLength
+impl<S> StepFormat for StepAssociatedGeometry<'_, S>
+where S: StepFormat + StepLength
 {
     fn fmt(&self, idx: usize, formatter: &mut Formatter<'_>) -> Result {
         match self {
             Self::ExactParameterCurve(curve) => curve.fmt(idx, formatter),
-            Self::Surface(surface) => DisplayByStep::fmt(surface, idx, formatter),
+            Self::Surface(surface) => StepFormat::fmt(surface, idx, formatter),
         }
     }
 }
@@ -52,10 +52,10 @@ struct StepSurfaceCurve<'a, C, S> {
     associated_geometry: Vec<StepAssociatedGeometry<'a, S>>,
 }
 
-impl<C, S> DisplayByStep for StepSurfaceCurve<'_, C, S>
+impl<C, S> StepFormat for StepSurfaceCurve<'_, C, S>
 where
-    C: DisplayByStep + StepLength,
-    S: DisplayByStep + StepLength,
+    C: StepFormat + StepLength,
+    S: StepFormat + StepLength,
 {
     fn fmt(&self, idx: usize, formatter: &mut Formatter<'_>) -> Result {
         let leader_idx = idx + 1;
@@ -73,11 +73,11 @@ where
             "#{idx} = SURFACE_CURVE('', #{leader_idx}, {associated_geometry}, .CURVE_3D.);\n",
             associated_geometry = IndexSliceDisplay(associated_indices.iter().copied()),
         ))?;
-        DisplayByStep::fmt(self.leader, leader_idx, formatter)?;
+        StepFormat::fmt(self.leader, leader_idx, formatter)?;
         self.associated_geometry
             .iter()
             .zip(associated_indices)
-            .try_for_each(|(entry, entry_idx)| DisplayByStep::fmt(entry, entry_idx, formatter))
+            .try_for_each(|(entry, entry_idx)| StepFormat::fmt(entry, entry_idx, formatter))
     }
 }
 
@@ -107,15 +107,15 @@ enum StepEdgeGeometry<'a, C, S> {
     SurfaceCurve(StepSurfaceCurve<'a, C, S>),
 }
 
-impl<C, S> DisplayByStep for StepEdgeGeometry<'_, C, S>
+impl<C, S> StepFormat for StepEdgeGeometry<'_, C, S>
 where
-    C: DisplayByStep + StepLength,
-    S: DisplayByStep + StepLength,
+    C: StepFormat + StepLength,
+    S: StepFormat + StepLength,
 {
     fn fmt(&self, idx: usize, formatter: &mut Formatter<'_>) -> Result {
         match self {
-            Self::Curve(curve) => DisplayByStep::fmt(curve, idx, formatter),
-            Self::SurfaceCurve(curve) => DisplayByStep::fmt(curve, idx, formatter),
+            Self::Curve(curve) => StepFormat::fmt(curve, idx, formatter),
+            Self::SurfaceCurve(curve) => StepFormat::fmt(curve, idx, formatter),
         }
     }
 }
@@ -234,7 +234,7 @@ where
         is_open: bool,
     ) -> Self
     where
-        T: DisplayByStep + StepLength,
+        T: StepFormat + StepLength,
     {
         let faces = shell
             .faces
@@ -367,9 +367,9 @@ where
 
 impl<P, C, S> Display for StepShell<'_, P, C, S>
 where
-    P: DisplayByStep + Copy,
-    C: DisplayByStep + StepLength + StepCurve,
-    S: DisplayByStep + StepLength + StepSurface,
+    P: StepFormat + Copy,
+    C: StepFormat + StepLength + StepCurve,
+    S: StepFormat + StepLength + StepSurface,
 {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         let StepShell {
@@ -475,7 +475,7 @@ where
         edge_geometries
             .iter()
             .zip(curve_indices)
-            .try_for_each(|(geometry, idx)| DisplayByStep::fmt(geometry, *idx, formatter))?;
+            .try_for_each(|(geometry, idx)| StepFormat::fmt(geometry, *idx, formatter))?;
         vertices
             .iter()
             .enumerate()
@@ -536,7 +536,7 @@ where
     S: StepLength,
 {
     fn new_trimmed<T>(solid: &'a CompressedTrimmedSolid<P, C, S, T>, idx: usize) -> Self
-    where T: DisplayByStep + StepLength {
+    where T: StepFormat + StepLength {
         let mut cursor = idx + 1;
         let boundaries = solid
             .boundaries
@@ -553,9 +553,9 @@ where
 
 impl<P, C, S> Display for StepSolid<'_, P, C, S>
 where
-    P: DisplayByStep + Copy,
-    C: DisplayByStep + StepLength + StepCurve,
-    S: DisplayByStep + StepLength + StepSurface,
+    P: StepFormat + Copy,
+    C: StepFormat + StepLength + StepCurve,
+    S: StepFormat + StepLength + StepSurface,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let StepSolid { idx, boundaries } = self;
@@ -639,7 +639,7 @@ where
     P: Copy,
     C: StepLength,
     S: StepLength,
-    T: DisplayByStep + StepLength,
+    T: StepFormat + StepLength,
 {
     fn from(shell: &'a CompressedTrimmedShell<P, C, S, T>) -> Self {
         Self::Shell(StepShell::new_trimmed(shell, 17, true))
@@ -651,7 +651,7 @@ where
     P: Copy,
     C: StepLength,
     S: StepLength,
-    T: DisplayByStep + StepLength,
+    T: StepFormat + StepLength,
 {
     fn from(solid: &'a CompressedTrimmedSolid<P, C, S, T>) -> Self {
         Self::Solid(StepSolid::new_trimmed(solid, 16))
@@ -660,9 +660,9 @@ where
 
 impl<P, C, S> Display for PreStepModel<'_, P, C, S>
 where
-    P: DisplayByStep + Copy,
-    C: DisplayByStep + StepLength + StepCurve,
-    S: DisplayByStep + StepLength + StepSurface,
+    P: StepFormat + Copy,
+    C: StepFormat + StepLength + StepCurve,
+    S: StepFormat + StepLength + StepSurface,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
@@ -730,7 +730,7 @@ where
     P: Copy,
     C: StepLength,
     S: StepLength,
-    T: DisplayByStep + StepLength,
+    T: StepFormat + StepLength,
 {
     fn from(shell: &'a CompressedTrimmedShell<P, C, S, T>) -> Self { Self(shell.into()) }
 }
@@ -740,16 +740,16 @@ where
     P: Copy,
     C: StepLength,
     S: StepLength,
-    T: DisplayByStep + StepLength,
+    T: StepFormat + StepLength,
 {
     fn from(solid: &'a CompressedTrimmedSolid<P, C, S, T>) -> Self { Self(solid.into()) }
 }
 
 impl<P, C, S> Display for StepModel<'_, P, C, S>
 where
-    P: DisplayByStep + Copy,
-    C: DisplayByStep + StepLength + StepCurve,
-    S: DisplayByStep + StepLength + StepSurface,
+    P: StepFormat + Copy,
+    C: StepFormat + StepLength + StepCurve,
+    S: StepFormat + StepLength + StepSurface,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.pad(
@@ -832,7 +832,7 @@ where
 {
     /// Pushes a trimmed shell to step models.
     pub fn push_trimmed_shell<T>(&mut self, shell: &'a CompressedTrimmedShell<P, C, S, T>)
-    where T: DisplayByStep + StepLength {
+    where T: StepFormat + StepLength {
         let model = PreStepModel::Shell(StepShell::new_trimmed(shell, self.next_idx + 1, true));
         self.next_idx += model.step_length();
         self.models.push(model)
@@ -840,7 +840,7 @@ where
 
     /// Pushes a trimmed solid to step models.
     pub fn push_trimmed_solid<T>(&mut self, solid: &'a CompressedTrimmedSolid<P, C, S, T>)
-    where T: DisplayByStep + StepLength {
+    where T: StepFormat + StepLength {
         let model = PreStepModel::Solid(StepSolid::new_trimmed(solid, self.next_idx));
         self.next_idx += model.step_length();
         self.models.push(model)
@@ -893,7 +893,7 @@ where
     P: Copy,
     C: StepLength,
     S: StepLength,
-    U: DisplayByStep + StepLength,
+    U: StepFormat + StepLength,
 {
     fn from_iter<T: IntoIterator<Item = &'a CompressedTrimmedShell<P, C, S, U>>>(iter: T) -> Self {
         let mut next_idx = 16;
@@ -915,7 +915,7 @@ where
     P: Copy,
     C: StepLength,
     S: StepLength,
-    U: DisplayByStep + StepLength,
+    U: StepFormat + StepLength,
 {
     fn from_iter<T: IntoIterator<Item = &'a CompressedTrimmedSolid<P, C, S, U>>>(iter: T) -> Self {
         let mut next_idx = 16;
@@ -933,9 +933,9 @@ where
 
 impl<P, C, S> Display for StepModels<'_, P, C, S>
 where
-    P: DisplayByStep + Copy,
-    C: DisplayByStep + StepLength + StepCurve,
-    S: DisplayByStep + StepLength + StepSurface,
+    P: StepFormat + Copy,
+    C: StepFormat + StepLength + StepCurve,
+    S: StepFormat + StepLength + StepSurface,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.pad(

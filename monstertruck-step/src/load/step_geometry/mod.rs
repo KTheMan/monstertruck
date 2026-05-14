@@ -1,6 +1,6 @@
 use crate::{self as monstertruck_step, save};
 use derive_more::From;
-use monstertruck_derive::{DisplayByStep, StepCurve, StepLength, StepSurface};
+use monstertruck_derive::{StepFormat, StepCurve, StepLength, StepSurface};
 use serde::{Deserialize, Serialize};
 
 /// re-export structs in `monstertruck-geometry` and `monstertruck-mesh`.
@@ -212,7 +212,7 @@ impl SurfaceCurve3D {
     TransformedM3,
     SelfSameGeometry,
     StepLength,
-    DisplayByStep,
+    StepFormat,
     StepCurve,
 )]
 pub enum Conic2D {
@@ -239,7 +239,7 @@ pub enum Conic2D {
     TransformedM3,
     SelfSameGeometry,
     StepLength,
-    DisplayByStep,
+    StepFormat,
     StepCurve,
 )]
 
@@ -270,7 +270,7 @@ pub enum Curve2D {
     TransformedM4,
     SelfSameGeometry,
     StepLength,
-    DisplayByStep,
+    StepFormat,
     StepCurve,
 )]
 pub enum Conic3D {
@@ -296,7 +296,7 @@ pub enum Conic3D {
     TransformedM4,
     SelfSameGeometry,
     StepLength,
-    DisplayByStep,
+    StepFormat,
     StepCurve,
 )]
 pub enum Curve3D {
@@ -352,7 +352,7 @@ pub enum ElementarySurface {
     TransformedM4,
     SelfSameGeometry,
     StepLength,
-    DisplayByStep,
+    StepFormat,
     StepSurface,
 )]
 pub enum SweepSurface {
@@ -385,7 +385,7 @@ pub enum Surface {
     NurbsSurface(NurbsSurface<Vector4>),
 }
 
-impl save::DisplayByStep for Surface {
+impl save::StepFormat for Surface {
     fn fmt(&self, idx: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use Surface::*;
         match self {
