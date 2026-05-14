@@ -13,6 +13,7 @@
 
 use crate::{prelude::*, *};
 use monstertruck_core::cgmath64::control_point::ControlPoint;
+use smallvec::SmallVec;
 
 /// A non-decreasing sequence of parameter values defining the piecewise structure of a B-spline.
 ///
@@ -21,6 +22,93 @@ use monstertruck_core::cgmath64::control_point::ControlPoint;
 /// a knot with multiplicity equal to degree creates a C⁰ joint.
 #[derive(Clone, PartialEq, Debug, Default, Serialize)]
 pub struct KnotVector(Vec<f64>);
+
+/// Active window of non-zero B-spline basis-function values evaluated at a parameter.
+///
+/// Built by [`KnotVector::bspline_basis_functions`] and
+/// [`KnotVector::try_bspline_basis_functions`]. The full basis-function
+/// vector has length [`total_length`](Self::total_length) and is almost all
+/// zeros; only the `degree + 1` consecutive entries starting at
+/// [`start_index`](Self::start_index) are potentially non-zero.
+///
+/// Storing only the active window avoids the per-evaluation allocation of a
+/// mostly-zero `Vec<f64>` and the redundant zip-with-zero work during
+/// [`BsplineCurve`] and [`BsplineSurface`] evaluation.
+#[derive(Clone, PartialEq, Debug, Default)]
+pub struct BasisWindow {
+    start: usize,
+    values: SmallVec<[f64; 32]>,
+    total_length: usize,
+}
+
+impl BasisWindow {
+    /// Index of the first basis function whose value is stored.
+    ///
+    /// The basis functions in the index range
+    /// `start_index() .. start_index() + len()` may be non-zero; all others
+    /// are exactly zero.
+    #[inline(always)]
+    pub const fn start_index(&self) -> usize { self.start }
+
+    /// Number of basis functions whose values are stored.
+    ///
+    /// Equals `degree + 1` for a non-degenerate evaluation; equals `0` for
+    /// the empty window produced when `degree < der_rank`.
+    #[inline(always)]
+    pub fn len(&self) -> usize { self.values.len() }
+
+    /// True when the window stores no values.
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool { self.values.is_empty() }
+
+    /// Stored basis-function values, ordered by ascending basis-function index.
+    #[inline(always)]
+    pub fn values(&self) -> &[f64] { &self.values }
+
+    /// Total length of the (sparse) basis-function vector this window was extracted from.
+    ///
+    /// Equal to the number of control points along the corresponding axis.
+    #[inline(always)]
+    pub const fn total_length(&self) -> usize { self.total_length }
+
+    /// Reconstructs the full basis-function vector with zeros outside the window.
+    ///
+    /// Intended for tests, debugging, and the few legacy code paths that
+    /// still want the dense layout; production curve and surface evaluation
+    /// should consume [`start_index`](Self::start_index) and
+    /// [`values`](Self::values) directly.
+    pub fn to_full_values(&self) -> Vec<f64> {
+        let mut full = vec![0.0; self.total_length];
+        full[self.start..self.start + self.values.len()].copy_from_slice(&self.values);
+        full
+    }
+
+    /// Builds a window from a precomputed `start` and `values` slice.
+    #[inline(always)]
+    pub(crate) fn new(start: usize, values: SmallVec<[f64; 32]>, total_length: usize) -> Self {
+        Self {
+            start,
+            values,
+            total_length,
+        }
+    }
+
+    /// Builds an empty window for the degenerate case where every basis
+    /// function evaluates to zero (e.g. `degree < der_rank`).
+    #[inline(always)]
+    pub(crate) fn empty(total_length: usize) -> Self {
+        Self {
+            start: 0,
+            values: SmallVec::new(),
+            total_length,
+        }
+    }
+}
+
+impl AsRef<[f64]> for BasisWindow {
+    #[inline(always)]
+    fn as_ref(&self) -> &[f64] { &self.values }
+}
 
 /// B-spline curve
 /// # Examples
@@ -228,3 +316,44 @@ mod gaussian_elimination {
         }
     }
 }
+
+#[cfg(test)]
+mod basis_window_tests {
+    use super::BasisWindow;
+    use smallvec::smallvec;
+
+    #[test]
+    fn empty_window_round_trips_to_zero_vector() {
+        let window = BasisWindow::empty(5);
+        assert!(window.is_empty());
+        assert_eq!(window.len(), 0);
+        assert_eq!(window.start_index(), 0);
+        assert_eq!(window.total_length(), 5);
+        assert_eq!(window.values(), &[]);
+        assert_eq!(window.to_full_values(), vec![0.0; 5]);
+    }
+
+    #[test]
+    fn dense_window_reconstructs_full_vector_at_start_offset() {
+        let window = BasisWindow::new(2, smallvec![0.5, 0.3, 0.2], 6);
+        assert_eq!(window.start_index(), 2);
+        assert_eq!(window.len(), 3);
+        assert_eq!(window.values(), &[0.5, 0.3, 0.2]);
+        assert_eq!(window.total_length(), 6);
+        assert_eq!(window.to_full_values(), vec![0.0, 0.0, 0.5, 0.3, 0.2, 0.0]);
+    }
+
+    #[test]
+    fn as_ref_yields_inner_values() {
+        let window = BasisWindow::new(1, smallvec![1.0, 0.0, 0.5], 4);
+        let as_ref: &[f64] = window.as_ref();
+        assert_eq!(as_ref, &[1.0, 0.0, 0.5]);
+    }
+
+    #[test]
+    fn window_at_end_pads_zeros_after_last_value() {
+        let window = BasisWindow::new(3, smallvec![0.25, 0.5], 5);
+        assert_eq!(window.to_full_values(), vec![0.0, 0.0, 0.0, 0.25, 0.5]);
+    }
+}
+
