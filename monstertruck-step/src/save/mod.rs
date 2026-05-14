@@ -411,6 +411,8 @@ impl<T> CompleteStepDisplay<T> {
     }
 }
 
+mod assembly;
 mod geometry;
 mod topology;
-pub use geometry::VectorAsDirection;
+pub use assembly::StepDesign;
+pub use geometry::{MatrixAsAxis, VectorAsDirection};

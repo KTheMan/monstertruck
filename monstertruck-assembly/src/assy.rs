@@ -78,41 +78,57 @@ impl<'a, Shape, NodeAttrs, Matrix, EdgeAttrs>
 impl<'a, Shape, NodeAttrs, Matrix, EdgeAttrs>
     Node<'a, NodeEntity<Shape, NodeAttrs>, EdgeEntity<Matrix, EdgeAttrs>>
 {
-    /// Returns the shape
+    /// Returns the shape.
     #[inline]
     pub fn shape(self) -> &'a Shape { &self.entity().shape }
-    /// Returns the node attributes
+    /// Returns the node attributes.
     #[inline]
-    pub fn attrs(self) -> &'a NodeAttrs { &self.entity().attrs }
+    pub fn attributes(self) -> &'a NodeAttrs { &self.entity().attrs }
+    /// Deprecated alias for [`attributes`](Self::attributes).
+    #[deprecated(since = "0.3.1", note = "renamed to `attributes`.")]
+    #[inline]
+    pub fn attrs(self) -> &'a NodeAttrs { self.attributes() }
 }
 
 impl<'a, Shape, NodeAttrs, Matrix, EdgeAttrs>
     NodeMut<'a, NodeEntity<Shape, NodeAttrs>, EdgeEntity<Matrix, EdgeAttrs>>
 {
-    /// Returns the shape
+    /// Returns the shape.
     #[inline]
     pub fn shape(&'a mut self) -> &'a mut Shape { &mut self.entity().shape }
-    /// Returns the node attributes
+    /// Returns the node attributes.
     #[inline]
-    pub fn attrs(&'a mut self) -> &'a mut NodeAttrs { &mut self.entity().attrs }
+    pub fn attributes(&'a mut self) -> &'a mut NodeAttrs { &mut self.entity().attrs }
+    /// Deprecated alias for [`attributes`](Self::attributes).
+    #[deprecated(since = "0.3.1", note = "renamed to `attributes`.")]
+    #[inline]
+    pub fn attrs(&'a mut self) -> &'a mut NodeAttrs { self.attributes() }
 }
 
 impl<'a, Matrix, EdgeAttrs> Edge<'a, EdgeEntity<Matrix, EdgeAttrs>> {
-    /// Returns the shape
+    /// Returns the transform matrix of the edge.
     #[inline]
     pub fn matrix(self) -> &'a Matrix { &self.entity().matrix }
-    /// Returns the node attributes
+    /// Returns the edge attributes.
     #[inline]
-    pub fn attrs(self) -> &'a EdgeAttrs { &self.entity().attrs }
+    pub fn attributes(self) -> &'a EdgeAttrs { &self.entity().attrs }
+    /// Deprecated alias for [`attributes`](Self::attributes).
+    #[deprecated(since = "0.3.1", note = "renamed to `attributes`.")]
+    #[inline]
+    pub fn attrs(self) -> &'a EdgeAttrs { self.attributes() }
 }
 
 impl<'a, Matrix, EdgeAttrs> EdgeMut<'a, EdgeEntity<Matrix, EdgeAttrs>> {
-    /// Returns the shape
+    /// Returns the transform matrix of the edge.
     #[inline]
     pub fn matrix(&'a mut self) -> &'a mut Matrix { &mut self.entity().matrix }
-    /// Returns the node attributes
+    /// Returns the edge attributes.
     #[inline]
-    pub fn attrs(&'a mut self) -> &'a mut EdgeAttrs { &mut self.entity().attrs }
+    pub fn attributes(&'a mut self) -> &'a mut EdgeAttrs { &mut self.entity().attrs }
+    /// Deprecated alias for [`attributes`](Self::attributes).
+    #[deprecated(since = "0.3.1", note = "renamed to `attributes`.")]
+    #[inline]
+    pub fn attrs(&'a mut self) -> &'a mut EdgeAttrs { self.attributes() }
 }
 
 /// have contents which can be removed
@@ -193,11 +209,11 @@ impl<Shape, NodeAttrs, Matrix, EdgeAttrs> Assembly<Shape, NodeAttrs, Matrix, Edg
     /// let node = assy.all_nodes().collect::<Vec<_>>();
     /// assert!(node[1].shape().is_none());
     /// assert_eq!(*node[4].shape(), Some(2));
-    /// assert_eq!(*node[4].attrs(), 0);
+    /// assert_eq!(*node[4].attributes(), 0);
     ///
     /// let new_edge = node[1].edges().collect::<Vec<_>>()[1];
     /// assert_eq!(*new_edge.matrix(), 1.0);
-    /// assert_eq!(*new_edge.attrs(), 0);
+    /// assert_eq!(*new_edge.attributes(), 0);
     /// ```
     pub fn normalize(&mut self)
     where
