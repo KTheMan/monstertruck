@@ -83,12 +83,48 @@ where Line<Point3>: ToSameGeometry<C> {
     Edge::new(vertex0, vertex1, Line(pt0, pt1).to_same_geometry())
 }
 
-/// Returns a circle arc from `vertex0` to `vertex1` via `transit`.
+/// Additional constraint that, together with the two endpoints, determines a circular arc.
+///
+/// Both shapes -- through-point and start-tangent -- pick out the same kind
+/// of curve (a single circular arc that travels less than a full
+/// revolution from `vertex0` to `vertex1`) but supply the missing degree
+/// of freedom in different ways:
+///
+/// - [`CircularArcConstraint::ThroughPoint`] names a third point on the arc.
+///   The plane and radius follow from circumscribing the three points.
+/// - [`CircularArcConstraint::StartTangent`] names the tangent direction
+///   at `vertex0`. The plane is spanned by the tangent and the chord
+///   `vertex1 - vertex0`; the radius is the curvature that takes the
+///   tangent to `vertex1`.
+///
+/// The enum is `From<Point3>` and `From<Vector3>` so existing call sites
+/// that already pass a [`Point3`] keep compiling.
+#[derive(Clone, Copy, Debug, derive_more::From)]
+pub enum CircularArcConstraint {
+    /// A point that the arc must pass through.
+    ThroughPoint(Point3),
+    /// A tangent vector that the arc must have at the start point.
+    StartTangent(Vector3),
+}
+
+/// Returns a circle arc from `vertex0` to `vertex1` satisfying `constraint`.
+///
+/// `constraint` is either a [`Point3`] the arc must pass through or a
+/// [`Vector3`] the arc must have as its tangent at `vertex0`. See
+/// [`CircularArcConstraint`] for the precise interpretation.
+///
+/// # Panics
+///
+/// Panics if the inputs are degenerate. Specifically, when `constraint`
+/// is [`CircularArcConstraint::StartTangent`], the tangent must be
+/// non-zero and not parallel to the chord between the endpoints. Use
+/// [`try_circle_arc`] to handle these cases as recoverable errors.
+///
 /// # Examples
 /// ```
 /// use monstertruck_modeling::*;
 ///
-/// // draw the unit upper semicircle
+/// // The upper unit semicircle, specified by a through-point.
 /// let vertex0 = builder::vertex(Point3::new(1.0, 0.0, 0.0));
 /// let vertex1 = builder::vertex(Point3::new(-1.0, 0.0, 0.0));
 /// let semi_circle = builder::circle_arc(&vertex0, &vertex1, Point3::new(0.0, 1.0, 0.0));
@@ -102,12 +138,57 @@ where Line<Point3>: ToSameGeometry<C> {
 /// #       assert!(curve.evaluate(t).to_vec().magnitude().near(&1.0));
 /// # }
 /// ```
-pub fn circle_arc<C>(vertex0: &Vertex, vertex1: &Vertex, transit: Point3) -> Edge<C>
+/// ```
+/// use monstertruck_modeling::*;
+///
+/// // A quarter of the unit circle, specified by the start tangent direction.
+/// let vertex0 = builder::vertex(Point3::new(1.0, 0.0, 0.0));
+/// let vertex1 = builder::vertex(Point3::new(0.0, 1.0, 0.0));
+/// let tangent = Vector3::new(0.0, 1.0, 0.0);
+/// let quarter = builder::circle_arc(&vertex0, &vertex1, tangent);
+/// # let curve = match quarter.oriented_curve() {
+/// #       Curve::NurbsCurve(curve) => curve,
+/// #       _ => unreachable!(),
+/// # };
+/// # const N: usize = 10;
+/// # for i in 0..=N {
+/// #       let t = curve.knot_vector()[0] + curve.knot_vector().range_length() * i as f64 / N as f64;
+/// #       assert!(curve.evaluate(t).to_vec().magnitude().near(&1.0));
+/// # }
+/// ```
+pub fn circle_arc<C>(
+    vertex0: &Vertex,
+    vertex1: &Vertex,
+    constraint: impl Into<CircularArcConstraint>,
+) -> Edge<C>
+where Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4>: ToSameGeometry<C> {
+    try_circle_arc(vertex0, vertex1, constraint).expect("degenerate circular-arc constraint.")
+}
+
+/// Fallible variant of [`circle_arc`].
+///
+/// Returns:
+/// - [`Error::DegenerateCircularArcTangent`] if the tangent is zero or
+///   near-zero.
+/// - [`Error::CircularArcTangentParallelToChord`] if the tangent is
+///   parallel to the chord between the endpoints.
+pub fn try_circle_arc<C>(
+    vertex0: &Vertex,
+    vertex1: &Vertex,
+    constraint: impl Into<CircularArcConstraint>,
+) -> std::result::Result<Edge<C>, Error>
 where Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4>: ToSameGeometry<C> {
     let pt0 = vertex0.point();
     let pt1 = vertex1.point();
-    let curve = geom_impls::circle_arc_by_three_points(pt0, pt1, transit);
-    Edge::new(vertex0, vertex1, curve.to_same_geometry())
+    let curve = match constraint.into() {
+        CircularArcConstraint::ThroughPoint(transit) => {
+            geom_impls::circle_arc_by_three_points(pt0, pt1, transit)
+        }
+        CircularArcConstraint::StartTangent(tangent) => {
+            geom_impls::try_circle_arc_by_start_tangent(pt0, pt1, tangent)?
+        }
+    };
+    Ok(Edge::new(vertex0, vertex1, curve.to_same_geometry()))
 }
 
 /// Returns a Bezier curve from `vertex0` to `vertex1` with inter control points `inter_points`.

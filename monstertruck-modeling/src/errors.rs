@@ -23,6 +23,13 @@ pub enum Error {
     /// No outer loop found among the provided wires.
     #[error("no outer loop found; at least one wire must have positive signed area.")]
     NoOuterLoop,
+    /// A circular-arc tangent vector is zero or near zero, so it cannot define a direction.
+    #[error("circular-arc tangent is degenerate (zero or near-zero).")]
+    DegenerateCircularArcTangent,
+    /// A circular-arc tangent is parallel (or anti-parallel) to the chord between the endpoints,
+    /// so the plane of the arc is under-determined.
+    #[error("circular-arc tangent is parallel to the chord between the arc endpoints.")]
+    CircularArcTangentParallelToChord,
 }
 
 #[test]

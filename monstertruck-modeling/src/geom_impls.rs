@@ -1,4 +1,5 @@
 use crate::*;
+use crate::errors::Error;
 use itertools::Itertools;
 use std::f64::consts::PI;
 
@@ -12,6 +13,42 @@ pub(super) fn circle_arc_by_three_points(
     let axis = vec1.cross(vec0).normalize();
     let angle = Rad(PI) - vec0.angle(vec1);
     circle_arc(point0, origin, axis, angle * 2.0)
+}
+
+/// Constructs the unique circular arc that starts at `point0` with the
+/// given start `tangent`, ends at `point1`, and turns less than a full
+/// revolution.
+///
+/// Returns:
+/// - [`Error::DegenerateCircularArcTangent`] if `tangent` is zero
+///   or near-zero.
+/// - [`Error::CircularArcTangentParallelToChord`] if `tangent` is
+///   parallel (or anti-parallel) to `point1 - point0` -- the plane of
+///   the arc would be under-determined and the radius infinite.
+pub(super) fn try_circle_arc_by_start_tangent(
+    point0: Point3,
+    point1: Point3,
+    tangent: Vector3,
+) -> std::result::Result<Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4>, Error> {
+    let chord = point1 - point0;
+    if tangent.magnitude2().so_small() {
+        return Err(Error::DegenerateCircularArcTangent);
+    }
+    let tangent = tangent.normalize();
+    let axis_raw = tangent.cross(chord);
+    if axis_raw.magnitude2().so_small() {
+        return Err(Error::CircularArcTangentParallelToChord);
+    }
+    let axis = axis_raw.normalize();
+    let to_origin = axis.cross(tangent);
+    let radius = chord.dot(chord) / (2.0 * chord.dot(to_origin));
+    let origin = point0 + radius * to_origin;
+    let (vec0, vec1) = (point0 - origin, point1 - origin);
+    let mut angle = f64::atan2(axis.dot(vec0.cross(vec1)), vec0.dot(vec1));
+    if angle <= 0.0 {
+        angle += 2.0 * PI;
+    }
+    Ok(circle_arc(point0, origin, axis, Rad(angle)))
 }
 
 fn circum_center(pt0: Point3, pt1: Point3, pt2: Point3) -> Point3 {
@@ -203,6 +240,39 @@ mod test_geom_impl {
             let angle2 = (p2 - p1).angle(p2 - p0);
             let angle3 = (p3 - p1).angle(p3 - p0);
             prop_assert_near!(angle2, angle3);
+        }
+
+        #[test]
+        fn test_circle_arc_by_start_tangent(
+            p0 in array::uniform3(-10.0f64..10.0),
+            p1 in array::uniform3(-10.0f64..10.0),
+            tangent in array::uniform3(-10.0f64..10.0),
+            t in TOLERANCE..(1.0 - TOLERANCE),
+        ) {
+            let p0 = Point3::from(p0);
+            let p1 = Point3::from(p1);
+            let tangent = Vector3::from(tangent);
+            prop_assume!(!(p1 - p0).so_small());
+            prop_assume!(!tangent.so_small());
+            prop_assume!(!tangent.cross(p1 - p0).so_small());
+
+            let curve = try_circle_arc_by_start_tangent(p0, p1, tangent)
+                .expect("non-degenerate inputs must yield a valid arc.");
+            let (t0, t1) = curve.range_tuple();
+
+            // Endpoints land on the requested points.
+            prop_assert_near!(curve.front(), p0);
+            prop_assert_near!(curve.back(), p1);
+            // The start tangent direction matches the requested one.
+            prop_assert_near!(curve.derivative(t0).normalize(), tangent.normalize());
+
+            // Any third sample is co-circular with the endpoints.
+            let p2 = curve.evaluate((1.0 - t) * t0 + t * t1);
+            let origin = circum_center(p0, p1, p2);
+            let r0 = p0.distance2(origin);
+            let r1 = p1.distance2(origin);
+            let r2 = p2.distance2(origin);
+            prop_assert!(r0.near(&r1) && r1.near(&r2));
         }
 
         #[test]
