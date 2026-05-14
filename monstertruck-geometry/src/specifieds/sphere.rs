@@ -262,9 +262,12 @@ impl SearchNearestParameter<D2> for Sphere {
         _: usize,
     ) -> Option<(f64, f64)> {
         let radius = (point - self.center).normalize();
-        let u = f64::acos(radius[2]);
+        // Clamp the `acos` arguments to `[-1.0, 1.0]` so floating-point
+        // error in `normalize()` or in the `radius[0] / sinu` division
+        // cannot push them slightly outside the domain and produce `NaN`.
+        let u = f64::acos(f64::clamp(radius[2], -1.0, 1.0));
         let sinu = f64::sqrt(1.0 - radius[2] * radius[2]);
-        let cosv = radius[0] / sinu;
+        let cosv = f64::clamp(radius[0] / sinu, -1.0, 1.0);
         let v = if radius[1] > 0.0 {
             f64::acos(cosv)
         } else {

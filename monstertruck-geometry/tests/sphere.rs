@@ -85,3 +85,18 @@ fn sphere_derivation_test() {
         }
     }
 }
+
+#[test]
+fn search_nearest_parameter_near_north_pole_is_finite() {
+    // Catastrophic cancellation in `point - center` for a center far
+    // from the origin produces a unit vector whose `z`-coordinate is
+    // slightly above `1.0` after `normalize()`. Without the
+    // `f64::clamp` guard the subsequent `acos` returns `NaN`.
+    let center = Point3::new(1.0e6, 1.0e6, 1.0e6);
+    let sphere = Sphere::new(center, 1.0);
+    let near_north_pole = center + Vector3::new(1.0e-10, 1.0e-10, 1.0);
+    let (u, v) = sphere
+        .search_nearest_parameter(near_north_pole, None, 100)
+        .expect("near-pole point should map to a valid (u, v).");
+    assert!(u.is_finite() && v.is_finite());
+}
