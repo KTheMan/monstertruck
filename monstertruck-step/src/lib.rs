@@ -44,6 +44,8 @@
 /// # Ok(())
 /// # }
 /// ```
+/// Types shared between the [`load`] and [`save`] sides of STEP I/O.
+pub mod common;
 #[cfg(feature = "load")]
 pub mod load;
 /// STEP file saving (export/formatting).

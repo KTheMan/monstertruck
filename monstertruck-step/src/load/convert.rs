@@ -527,16 +527,11 @@ pub enum NodeMatrix {
     Transform(Box<ItemDefinedTransformation>),
 }
 
-#[derive(Clone, Debug)]
-pub struct PartAttrs {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-}
+pub use crate::common::PartAttributes;
 
-pub type ProductEntity = NodeEntity<Vec<u64>, PartAttrs>;
-pub type AssembleEntity = EdgeEntity<NodeMatrix, PartAttrs>;
-pub type StepAssembly = Assembly<Vec<u64>, PartAttrs, NodeMatrix, PartAttrs>;
+pub type ProductEntity = NodeEntity<Vec<u64>, PartAttributes>;
+pub type AssembleEntity = EdgeEntity<NodeMatrix, PartAttributes>;
+pub type StepAssembly = Assembly<Vec<u64>, PartAttributes, NodeMatrix, PartAttributes>;
 
 impl TryFrom<&NodeMatrix> for Matrix3 {
     type Error = StepConvertingError;
@@ -576,7 +571,7 @@ impl Table {
         let Some(product) = self.product.get(p_idx) else {
             return Err("failed to reference `product`".into());
         };
-        let attrs = PartAttrs {
+        let attrs = PartAttributes {
             id: product.id.clone(),
             name: product.name.clone(),
             description: product.description.clone(),
@@ -630,7 +625,7 @@ impl Table {
             return Err("failed to reference the child node".into());
         };
 
-        let attrs = PartAttrs {
+        let attrs = PartAttributes {
             id: next_assy.id.clone(),
             name: next_assy.name.clone(),
             description: next_assy.description.clone(),
