@@ -31,6 +31,7 @@ CRATES=(
     monstertruck-step
     monstertruck-render
     monstertruck-wasm
+    monstertruck
 )
 
 # Seconds to wait between publishes for crates.io index propagation.
