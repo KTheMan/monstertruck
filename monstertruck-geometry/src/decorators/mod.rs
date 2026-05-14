@@ -355,13 +355,143 @@ pub struct ApproximateFilletSurface<S0, S1> {
     weights: Vec<f64>,
 }
 
+/// Curve `entity` offset by another parametric curve `offset` added pointwise.
+///
+/// `OffsetCurve<C, N>::subs(t)` returns `entity.subs(t) + offset.subs(t)`, and
+/// every derivative is the sum of the corresponding `entity` / `offset`
+/// derivatives. The parameter range and period come from `entity`.
+///
+/// Pair with [`NormalOffsetField`] when you want a normal-direction offset
+/// (i.e. an offset of magnitude `scalar(t)` along the curve normal): build
+/// `OffsetCurve::new(entity, NormalOffsetField::new(entity.clone(), scalar))`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SelfSameGeometry)]
+pub struct OffsetCurve<C, N> {
+    entity: C,
+    offset: N,
+}
+
+/// Surface `entity` offset by another parametric surface `offset` added pointwise.
+///
+/// Analogous to [`OffsetCurve`] but for two-parameter surfaces.
+/// `OffsetSurface<S, N>::subs(u, v)` returns
+/// `entity.subs(u, v) + offset.subs(u, v)`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SelfSameGeometry)]
+pub struct OffsetSurface<S, N> {
+    entity: S,
+    offset: N,
+}
+
+/// Unit-normal field of a curve in the plane or a surface in space,
+/// scaled by a per-parameter [`UnivariateScalarFunction`] or
+/// [`BivariateScalarFunction`] respectively.
+///
+/// Implements [`ParametricCurve`] when `T: ParametricCurve2D` (with the
+/// normal taken as the in-plane rotation of the tangent by 90 degrees)
+/// and [`ParametricSurface`] when `T: ParametricSurface3D` (with the
+/// normal taken as the normalised cross product of the parametric
+/// derivatives). The scalar function supplies the offset magnitude.
+///
+/// Typically used as the `N` parameter of [`OffsetCurve`] / [`OffsetSurface`]
+/// to express the classical offset-curve / offset-surface constructions.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SelfSameGeometry)]
+pub struct NormalOffsetField<T, F> {
+    entity: T,
+    scalar: F,
+}
+
+/// Univariate scalar function with derivatives of every order.
+///
+/// Implementors include `f64` (interpreted as a constant function) and
+/// per-coordinate projections of the small fixed-dimension spline types
+/// (e.g. `BsplineCurve<Vector1>`). Typically supplied as the magnitude
+/// component of a [`NormalOffsetField`] on a 2D curve.
+pub trait UnivariateScalarFunction: Clone {
+    /// Returns the `n`th-order derivative at parameter `t`.
+    fn derivative_n(&self, n: usize, t: f64) -> f64;
+    /// Substitutes the parameter `t` and returns the function value.
+    #[inline]
+    fn evaluate(&self, t: f64) -> f64 { self.derivative_n(0, t) }
+    /// Returns the first derivative.
+    #[inline]
+    fn derivative(&self, t: f64) -> f64 { self.derivative_n(1, t) }
+    /// Returns the second derivative.
+    #[inline]
+    fn derivative_2(&self, t: f64) -> f64 { self.derivative_n(2, t) }
+    /// Returns derivatives `0..=max_order` as a [`CurveDerivatives<f64>`].
+    #[inline]
+    fn derivatives(&self, max_order: usize, t: f64) -> CurveDerivatives<f64> {
+        (0..=max_order).map(|n| self.derivative_n(n, t)).collect()
+    }
+}
+
+/// Bivariate scalar function with mixed partial derivatives of every order.
+///
+/// Implementors include `f64` (interpreted as a constant function) and
+/// per-coordinate projections of fixed-dimension spline surface types
+/// (e.g. `BsplineSurface<Vector1>`). Typically supplied as the magnitude
+/// component of a [`NormalOffsetField`] on a 3D surface.
+pub trait BivariateScalarFunction: Clone {
+    /// Returns the mixed partial derivative
+    /// $\partial^{m+n} f / \partial u^m \partial v^n$ at `(u, v)`.
+    fn derivative_mn(&self, m: usize, n: usize, u: f64, v: f64) -> f64;
+    /// Substitutes the parameter `(u, v)` and returns the function value.
+    #[inline]
+    fn evaluate(&self, u: f64, v: f64) -> f64 { self.derivative_mn(0, 0, u, v) }
+    /// First partial derivative with respect to `u`.
+    #[inline]
+    fn derivative_u(&self, u: f64, v: f64) -> f64 { self.derivative_mn(1, 0, u, v) }
+    /// First partial derivative with respect to `v`.
+    #[inline]
+    fn derivative_v(&self, u: f64, v: f64) -> f64 { self.derivative_mn(0, 1, u, v) }
+    /// Second partial derivative with respect to `u`.
+    #[inline]
+    fn derivative_uu(&self, u: f64, v: f64) -> f64 { self.derivative_mn(2, 0, u, v) }
+    /// Mixed second partial derivative with respect to `u` and `v`.
+    #[inline]
+    fn derivative_uv(&self, u: f64, v: f64) -> f64 { self.derivative_mn(1, 1, u, v) }
+    /// Second partial derivative with respect to `v`.
+    #[inline]
+    fn derivative_vv(&self, u: f64, v: f64) -> f64 { self.derivative_mn(0, 2, u, v) }
+    /// Returns the lower-triangular block of partial derivatives up to total order `max_order`.
+    #[inline]
+    fn derivatives(&self, max_order: usize, u: f64, v: f64) -> SurfaceDerivatives<f64> {
+        let mut derivatives = SurfaceDerivatives::new(max_order);
+        (0..=max_order).for_each(|m| {
+            (0..=max_order - m)
+                .for_each(|n| derivatives[m][n] = self.derivative_mn(m, n, u, v))
+        });
+        derivatives
+    }
+}
+
+// The upstream `truck-geometry` trait spellings `ScalarFunctionD1` /
+// `ScalarFunctionD2` use a `D1`/`D2` dimension-marker suffix that reads
+// like a generic argument over our existing `D1`/`D2` parameter-space
+// enums (where they are not). We standardise on `UnivariateScalarFunction`
+// / `BivariateScalarFunction` -- ordinary English and free of the
+// "Dimension N" abbreviation -- and keep the upstream names as
+// `#[deprecated]` re-exports so code ported from `truck-geometry`
+// continues to compile.
+#[deprecated(since = "0.3.1", note = "renamed to `UnivariateScalarFunction`.")]
+pub use self::UnivariateScalarFunction as ScalarFunctionD1;
+#[deprecated(since = "0.3.1", note = "renamed to `BivariateScalarFunction`.")]
+pub use self::BivariateScalarFunction as ScalarFunctionD2;
+
+// `NormalField` in upstream conflates "normal field" with "offset along
+// the normal." `NormalOffsetField` makes the intent explicit. The alias
+// keeps porting from `truck-geometry` compiling.
+#[deprecated(since = "0.3.1", note = "renamed to `NormalOffsetField`.")]
+pub use self::NormalOffsetField as NormalField;
+
 mod approximate_fillet_surface;
 mod extruded_curve;
 mod homotopy;
 mod intersection_curve;
+mod offset;
 mod pcurve;
 mod processor;
 mod revolved_curve;
 /// Structures and traits associated with rolling ball fillet surfaces.
 pub mod rolling_ball_fillet;
+mod scalar_function;
 mod trimmed_curve;

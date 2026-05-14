@@ -766,6 +766,117 @@ impl<V> SurfaceDerivatives<V> {
         res
     }
 
+    /// Returns the magnitude of the surface-vector field along with all its
+    /// mixed partial derivatives up to `self.max_order`.
+    ///
+    /// Computes `|s(u, v)|` and its derivatives by differentiating
+    /// `|s|^2 = s . s` and solving for `|s|`'s derivatives in ascending
+    /// total order. Useful for normalising a surface derivative tensor in
+    /// the same coordinate system as the surface itself.
+    pub fn absolute_derivatives(&self) -> SurfaceDerivatives<V::Scalar>
+    where
+        V: InnerSpace,
+        V::Scalar: BaseFloat,
+    {
+        let mut evals = [[V::Scalar::zero(); MAX_DER_ORDER + 1]; MAX_DER_ORDER + 1];
+        evals[0][0] = self[0][0].magnitude();
+        for m in 0..=self.max_order {
+            for n in 0..=self.max_order - m {
+                if m == 0 && n == 0 {
+                    continue;
+                }
+
+                // Differentiate `|s|^2 = s . s` by `u^m v^n` and isolate
+                // the two terms containing `|s|_{m,n}`. Every other
+                // `|s|` derivative is already known because it has a
+                // strictly lower total order.
+                let mut ders_sum = V::Scalar::zero();
+                let mut evals_sum = V::Scalar::zero();
+                let mut c0 = 1;
+                for i in 0..=m {
+                    let mut c1 = 1;
+                    for j in 0..=n {
+                        // SAFETY: `c0` and `c1` are small binomial coefficients;
+                        // their product fits in `f64`.
+                        let coefficient =
+                            <V::Scalar as NumCast>::from(c0 * c1).unwrap();
+                        ders_sum += self[i][j].dot(self[m - i][n - j]) * coefficient;
+                        if !((i == 0 && j == 0) || (i == m && j == n)) {
+                            evals_sum +=
+                                evals[i][j] * evals[m - i][n - j] * coefficient;
+                        }
+                        c1 = c1 * (n - j) / (j + 1);
+                    }
+                    c0 = c0 * (m - i) / (i + 1);
+                }
+                evals[m][n] = (ders_sum - evals_sum) / (evals[0][0] + evals[0][0]);
+            }
+        }
+        SurfaceDerivatives {
+            array: evals,
+            max_order: self.max_order,
+        }
+    }
+
+    /// Returns the single `(u_order, v_order)`-th mixed partial derivative
+    /// of the bilinear combination `binomial(self, other)` evaluated
+    /// pointwise on the parameter domain.
+    ///
+    /// Together with [`combinatorial_derivatives`](Self::combinatorial_derivatives),
+    /// this is the surface-domain analogue of
+    /// [`CurveDerivatives::combinatorial_derivative`] and underlies, for
+    /// example, derivative-tensor multiplication of a vector field by a
+    /// scalar field.
+    pub fn combinatorial_derivative<W, U, B>(
+        &self,
+        other: &SurfaceDerivatives<W>,
+        binomial: B,
+        u_order: usize,
+        v_order: usize,
+    ) -> U
+    where
+        V: Copy,
+        W: Copy,
+        U: std::ops::Add + std::ops::Mul<f64, Output = U> + Zero,
+        B: Fn(V, W) -> U,
+    {
+        let mut c0 = 1;
+        (0..=u_order).fold(U::zero(), |sum, i| {
+            let mut c1 = 1;
+            let sum = (0..=v_order).fold(sum, |sum, j| {
+                let coefficient = (c0 * c1) as f64;
+                c1 = c1 * (v_order - j) / (j + 1);
+                sum + binomial(self[i][j], other[u_order - i][v_order - j]) * coefficient
+            });
+            c0 = c0 * (u_order - i) / (i + 1);
+            sum
+        })
+    }
+
+    /// Returns every mixed partial derivative of the bilinear combination
+    /// `binomial(self, other)` up to the smaller of the two operands'
+    /// `max_order`.
+    pub fn combinatorial_derivatives<W, U, B>(
+        &self,
+        other: &SurfaceDerivatives<W>,
+        binomial: B,
+    ) -> SurfaceDerivatives<U>
+    where
+        V: Copy,
+        W: Copy,
+        U: std::ops::Add + std::ops::Mul<f64, Output = U> + Zero + Copy,
+        B: Fn(V, W) -> U,
+    {
+        let max_order = self.max_order.min(other.max_order);
+        let mut res = SurfaceDerivatives::new(max_order);
+        for m in 0..=max_order {
+            for n in 0..=max_order - m {
+                res[m][n] = self.combinatorial_derivative(other, &binomial, m, n);
+            }
+        }
+        res
+    }
+
     /// Returns the result of element-wise operation.
     /// # Examples
     /// ```
