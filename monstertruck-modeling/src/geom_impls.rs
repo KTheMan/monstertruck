@@ -1,5 +1,5 @@
-use crate::*;
 use crate::errors::Error;
+use crate::*;
 use itertools::Itertools;
 use std::f64::consts::PI;
 

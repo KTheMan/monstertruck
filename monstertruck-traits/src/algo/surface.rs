@@ -2,10 +2,12 @@ use newton::Jacobian;
 
 use super::*;
 
-/// Maximum depth of the recursive subdivision performed by
-/// [`parameter_division`]. Bounds runtime when a surface fails to converge
-/// (e.g. ill-conditioned offset or singular evaluation) so a tessellation
-/// caller falls back to the partial division instead of looping forever.
+/// Maximum recursion depth used by [`parameter_division`].
+///
+/// Bounds runtime when a surface fails to converge -- for example an
+/// ill-conditioned offset or a singular evaluation -- so a tessellation
+/// caller falls back to the partial division it has so far instead of
+/// looping forever.
 const MAX_PARAMETER_DIVISION_RECURSION: usize = 100;
 
 /// Divides the domain into equal parts, examines all the values, and returns `(u, v)` such that

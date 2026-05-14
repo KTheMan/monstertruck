@@ -120,7 +120,8 @@ impl KnotVector {
     /// ```
     /// use monstertruck_geometry::prelude::*;
     ///
-    /// const N: usize = 100; // sample size in tests.
+    /// // sample size in tests.
+    /// const N: usize = 100;
     /// // B-spline basis functions is a partition of unity in (t_k, t_{n - k}).
     /// let vec = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
     /// let knot_vec = KnotVector::from(vec);
@@ -135,7 +136,8 @@ impl KnotVector {
     /// ```
     /// use monstertruck_geometry::prelude::*;
     ///
-    /// const N: usize = 100; // sample size in tests.
+    /// // sample size in tests.
+    /// const N: usize = 100;
     /// // In some case, B-spline basis functions coincide with Bernstein polynomials.
     /// let vec = vec![0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0];
     /// let knot_vec = KnotVector::from(vec);
@@ -163,12 +165,7 @@ impl KnotVector {
     ///     for i in 0..4 { assert_near2!(res[i], ans[i]); }
     /// }
     /// ```
-    pub fn bspline_basis_functions(
-        &self,
-        degree: usize,
-        der_rank: usize,
-        t: f64,
-    ) -> BasisWindow {
+    pub fn bspline_basis_functions(&self, degree: usize, der_rank: usize, t: f64) -> BasisWindow {
         match self.try_bspline_basis_functions(degree, der_rank, t) {
             Ok(got) => got,
             Err(error) => panic!("{}", error),
@@ -187,7 +184,8 @@ impl KnotVector {
     /// # fn main() -> anyhow::Result<()> {
     /// use monstertruck_geometry::prelude::*;
     ///
-    /// const N: usize = 100; // sample size in tests.
+    /// // sample size in tests.
+    /// const N: usize = 100;
     /// // B-spline basis functions is a partition of unity in (t_k, t_{n - k}).
     /// let vec = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
     /// let knot_vec = KnotVector::from(vec);
@@ -205,7 +203,8 @@ impl KnotVector {
     /// # fn main() -> anyhow::Result<()> {
     /// use monstertruck_geometry::prelude::*;
     ///
-    /// const N: usize = 100; // sample size in tests.
+    /// // sample size in tests.
+    /// const N: usize = 100;
     /// // In some case, B-spline basis functions coincide with Bernstein polynomials.
     /// let vec = vec![0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0];
     /// let knot_vec = KnotVector::from(vec);

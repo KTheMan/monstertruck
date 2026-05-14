@@ -76,8 +76,7 @@ fn ascii_stl_header_includes_trailing_space() -> anyhow::Result<()> {
         .next()
         .ok_or_else(|| anyhow!("ASCII STL output is empty."))?;
     assert_eq!(
-        header,
-        b"solid ",
+        header, b"solid ",
         "the ASCII STL header must end with a space so that lenient readers \
          that require `solid <name>` accept it even when the name is empty.",
     );

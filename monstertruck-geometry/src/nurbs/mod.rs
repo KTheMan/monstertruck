@@ -356,4 +356,3 @@ mod basis_window_tests {
         assert_eq!(window.to_full_values(), vec![0.0, 0.0, 0.0, 0.25, 0.5]);
     }
 }
-

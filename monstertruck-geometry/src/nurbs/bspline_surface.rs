@@ -556,7 +556,9 @@ impl<P: ControlPoint<f64>> ParametricSurface for BsplineSurface<P> {
                 control_points[0][basis1.start_index()..]
                     .iter()
                     .zip(basis1.values())
-                    .fold(P::Diff::zero(), |sum, (&point, &b)| sum + point.to_vec() * b)
+                    .fold(P::Diff::zero(), |sum, (&point, &b)| {
+                        sum + point.to_vec() * b
+                    })
             } else {
                 P::Diff::zero()
             }

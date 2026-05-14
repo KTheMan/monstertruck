@@ -94,11 +94,11 @@ where Line<Point3>: ToSameGeometry<C> {
 ///   The plane and radius follow from circumscribing the three points.
 /// - [`CircularArcConstraint::StartTangent`] names the tangent direction
 ///   at `vertex0`. The plane is spanned by the tangent and the chord
-///   `vertex1 - vertex0`; the radius is the curvature that takes the
-///   tangent to `vertex1`.
+///   `vertex1 - vertex0`; the radius is whatever value makes an arc with
+///   that start tangent reach `vertex1`.
 ///
-/// The enum is `From<Point3>` and `From<Vector3>` so existing call sites
-/// that already pass a [`Point3`] keep compiling.
+/// The enum implements `From<Point3>` and `From<Vector3>` so existing
+/// call sites that already pass a [`Point3`] keep compiling.
 #[derive(Clone, Copy, Debug, derive_more::From)]
 pub enum CircularArcConstraint {
     /// A point that the arc must pass through.
@@ -161,7 +161,9 @@ pub fn circle_arc<C>(
     vertex1: &Vertex,
     constraint: impl Into<CircularArcConstraint>,
 ) -> Edge<C>
-where Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4>: ToSameGeometry<C> {
+where
+    Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4>: ToSameGeometry<C>,
+{
     try_circle_arc(vertex0, vertex1, constraint).expect("degenerate circular-arc constraint.")
 }
 
@@ -177,7 +179,9 @@ pub fn try_circle_arc<C>(
     vertex1: &Vertex,
     constraint: impl Into<CircularArcConstraint>,
 ) -> std::result::Result<Edge<C>, Error>
-where Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4>: ToSameGeometry<C> {
+where
+    Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4>: ToSameGeometry<C>,
+{
     let pt0 = vertex0.point();
     let pt1 = vertex1.point();
     let curve = match constraint.into() {

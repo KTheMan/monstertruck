@@ -184,8 +184,12 @@ where
             weights,
         } = self;
         let degree = self.vdegree();
-        let basis = knot_vec.bspline_basis_functions(degree, 0, v).to_full_values();
-        let dbasis = knot_vec.bspline_basis_functions(degree, 1, v).to_full_values();
+        let basis = knot_vec
+            .bspline_basis_functions(degree, 0, v)
+            .to_full_values();
+        let dbasis = knot_vec
+            .bspline_basis_functions(degree, 1, v)
+            .to_full_values();
         let weight: f64 = basis.iter().zip(weights).map(|(&b, &w)| b * w).sum();
         let striple0 = (surface0, side_control_points0, tangent_vecs0);
         let striple1 = (surface1, side_control_points1, tangent_vecs1);
