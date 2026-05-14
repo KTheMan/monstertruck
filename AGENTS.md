@@ -11,7 +11,7 @@
 cargo test -p monstertruck-geometry --lib
 
 # Run all core tests
-cargo make cpu-test
+just test-cpu
 
 # Run a specific test
 cargo test -p monstertruck-geometry test_name
