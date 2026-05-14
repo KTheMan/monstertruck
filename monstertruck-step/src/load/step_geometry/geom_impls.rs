@@ -960,9 +960,7 @@ impl ToSameGeometry<Surface> for RevolutionSurface<Curve3D> {
     fn to_same_geometry(&self) -> Surface {
         let default = || {
             let (curve, origin, axis) = (self.entity_curve().inverse(), self.origin(), self.axis());
-            let mut processor =
-                Processor::new(RevolutionSurface::by_revolution(curve, origin, axis));
-            processor.invert();
+            let processor = Processor::new(RevolutionSurface::by_revolution(curve, origin, axis));
             Surface::SweepSurface(SweepSurface::RevolutionSurface(processor))
         };
         match self.entity_curve() {
@@ -972,11 +970,9 @@ impl ToSameGeometry<Surface> for RevolutionSurface<Curve3D> {
                 let axis = self.axis();
                 if v.cross(axis).so_small() {
                     let o = self.origin();
-                    let origin = o + (q - o).dot(axis) * axis;
-                    let line = Line(q, q - v.normalize());
-                    let revo = RevolutionSurface::by_revolution(line, origin, axis);
-                    let mut processor = Processor::new(revo);
-                    processor.invert();
+                    let origin = o + (p - o).dot(axis) * axis;
+                    let revo = RevolutionSurface::by_revolution(*line, origin, axis);
+                    let processor = Processor::new(revo);
                     Surface::ElementarySurface(ElementarySurface::CylindricalSurface(processor))
                 } else {
                     default()
@@ -986,6 +982,39 @@ impl ToSameGeometry<Surface> for RevolutionSurface<Curve3D> {
             Curve3D::IntersectionCurve(_) => default(),
             _ => default(),
         }
+    }
+}
+
+#[test]
+fn to_same_geometry_revolution_of_axis_parallel_line_is_uninverted_cylinder() {
+    let axis = Vector3::unit_z();
+    let center = Point3::new(0.5, -0.5, 0.0);
+    let radius = 2.0;
+    let p = center + radius * Vector3::unit_x();
+    let line = Line(p, p + axis);
+    let revolution = RevolutionSurface::by_revolution(Curve3D::Line(line), center, axis);
+
+    let surface = revolution.to_same_geometry();
+
+    match surface {
+        Surface::ElementarySurface(ElementarySurface::CylindricalSurface(processor)) => {
+            assert!(
+                processor.orientation(),
+                "cylinder from axis-parallel line must not be inverted.",
+            );
+
+            let entity = processor.entity();
+            assert_eq!(entity.axis(), axis, "cylinder axis must match.");
+
+            let origin = entity.origin();
+            assert_near!(origin.z, 0.0);
+            let in_plane = origin - center;
+            assert_near!(in_plane.dot(axis), 0.0);
+
+            let profile_distance = (line.0 - origin).magnitude();
+            assert_near!(profile_distance, radius);
+        }
+        other => panic!("expected cylindrical surface, got {other:?}"),
     }
 }
 
