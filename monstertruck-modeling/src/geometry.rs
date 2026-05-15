@@ -1115,7 +1115,7 @@ impl ToSameGeometry<Surface> for RevolutionSurface<Curve> {
     }
 }
 
-impl SearchNearestParameter<D2> for Surface {
+impl SearchNearestParameter<SurfaceParameter> for Surface {
     type Point = Point3;
     fn search_nearest_parameter<H: Into<SearchParameterHint2D>>(
         &self,

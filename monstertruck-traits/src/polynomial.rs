@@ -42,7 +42,7 @@ where P: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64> + HashGen<f64>
     }
 }
 
-impl<P> SearchNearestParameter<D1> for PolynomialCurve<P>
+impl<P> SearchNearestParameter<CurveParameter> for PolynomialCurve<P>
 where
     P: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64> + Tolerance,
     <P as EuclideanSpace>::Diff: InnerSpace<Scalar = f64> + Tolerance,
@@ -67,7 +67,7 @@ where
     }
 }
 
-impl<P> SearchParameter<D1> for PolynomialCurve<P>
+impl<P> SearchParameter<CurveParameter> for PolynomialCurve<P>
 where
     P: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64> + Tolerance,
     <P as EuclideanSpace>::Diff: InnerSpace<Scalar = f64> + Tolerance,

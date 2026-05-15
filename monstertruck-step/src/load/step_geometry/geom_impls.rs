@@ -455,7 +455,7 @@ impl Invertible for SurfaceCurve3D {
     }
 }
 
-impl SearchParameter<D1> for SurfaceCurve3D {
+impl SearchParameter<CurveParameter> for SurfaceCurve3D {
     type Point = Point3;
 
     fn search_parameter<H: Into<SearchParameterHint1D>>(
@@ -468,7 +468,7 @@ impl SearchParameter<D1> for SurfaceCurve3D {
     }
 }
 
-impl SearchNearestParameter<D1> for SurfaceCurve3D {
+impl SearchNearestParameter<CurveParameter> for SurfaceCurve3D {
     type Point = Point3;
 
     fn search_nearest_parameter<H: Into<SearchParameterHint1D>>(

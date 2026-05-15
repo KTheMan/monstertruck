@@ -366,11 +366,11 @@ where
 
 impl<E, T> v2::SearchParameter<v2::D1<f64>> for Processor<E, T>
 where
-    E: SearchParameter<D1> + BoundedCurve,
-    <E as SearchParameter<D1>>::Point: EuclideanSpace,
-    T: Transform<<E as SearchParameter<D1>>::Point>,
+    E: SearchParameter<CurveParameter> + BoundedCurve,
+    <E as SearchParameter<CurveParameter>>::Point: EuclideanSpace,
+    T: Transform<<E as SearchParameter<CurveParameter>>::Point>,
 {
-    type Point = <E as SearchParameter<D1>>::Point;
+    type Point = <E as SearchParameter<CurveParameter>>::Point;
     #[inline(always)]
     fn search_parameter<H: Into<v2::SearchParameterHint1D<f64>>>(
         &self,
@@ -384,7 +384,7 @@ where
 
 impl<P, E, T> v2::SearchNearestParameter<v2::D1<f64>> for Processor<E, T>
 where
-    E: BoundedCurve<Point = P> + SearchNearestParameter<D1, Point = P>,
+    E: BoundedCurve<Point = P> + SearchNearestParameter<CurveParameter, Point = P>,
     P: EuclideanSpace<Scalar = f64, Diff = E::Vector>,
     E::Vector: InnerSpace<Scalar = f64> + Tolerance,
     T: Transform<P> + Clone,
@@ -403,7 +403,7 @@ where
 
 impl<E, T> v2::SearchParameter<v2::D2<f64>> for Processor<E, T>
 where
-    E: SearchParameter<D2>,
+    E: SearchParameter<SurfaceParameter>,
     E::Point: EuclideanSpace,
     T: Transform<E::Point>,
 {
@@ -421,7 +421,7 @@ where
 
 impl<P, E, T> v2::SearchNearestParameter<v2::D2<f64>> for Processor<E, T>
 where
-    E: ParametricSurface<Point = P> + SearchNearestParameter<D2, Point = P>,
+    E: ParametricSurface<Point = P> + SearchNearestParameter<SurfaceParameter, Point = P>,
     P: EuclideanSpace<Scalar = f64, Diff = E::Vector> + MetricSpace<Metric = f64> + Tolerance,
     E::Vector: SearchNearestParameterVector<Point = P>,
     T: Transform<P> + SquareMatrix<Scalar = f64> + Clone,
@@ -595,16 +595,16 @@ impl<S: ParameterDivision2D> ParameterDivision2D for Processor<S, Matrix4> {
     }
 }
 
-impl<E, T> SearchParameter<D1> for Processor<E, T>
+impl<E, T> SearchParameter<CurveParameter> for Processor<E, T>
 where
-    E: SearchParameter<D1> + BoundedCurve,
-    <E as SearchParameter<D1>>::Point: EuclideanSpace,
-    T: Transform<<E as SearchParameter<D1>>::Point>,
+    E: SearchParameter<CurveParameter> + BoundedCurve,
+    <E as SearchParameter<CurveParameter>>::Point: EuclideanSpace,
+    T: Transform<<E as SearchParameter<CurveParameter>>::Point>,
 {
-    type Point = <E as SearchParameter<D1>>::Point;
+    type Point = <E as SearchParameter<CurveParameter>>::Point;
     fn search_parameter<H: Into<SearchParameterHint1D>>(
         &self,
-        point: <E as SearchParameter<D1>>::Point,
+        point: <E as SearchParameter<CurveParameter>>::Point,
         hint: H,
         trials: usize,
     ) -> Option<f64> {
@@ -617,9 +617,9 @@ where
     }
 }
 
-impl<E, T> SearchParameter<D2> for Processor<E, T>
+impl<E, T> SearchParameter<SurfaceParameter> for Processor<E, T>
 where
-    E: SearchParameter<D2>,
+    E: SearchParameter<SurfaceParameter>,
     E::Point: EuclideanSpace,
     T: Transform<E::Point>,
 {
@@ -642,9 +642,9 @@ where
     }
 }
 
-impl<P, E, T> SearchNearestParameter<D1> for Processor<E, T>
+impl<P, E, T> SearchNearestParameter<CurveParameter> for Processor<E, T>
 where
-    E: BoundedCurve<Point = P> + SearchNearestParameter<D1, Point = P>,
+    E: BoundedCurve<Point = P> + SearchNearestParameter<CurveParameter, Point = P>,
     P: EuclideanSpace<Scalar = f64, Diff = E::Vector>,
     E::Vector: InnerSpace<Scalar = f64> + Tolerance,
     T: Transform<P> + Clone,
@@ -666,9 +666,9 @@ where
     }
 }
 
-impl<P, E, T> SearchNearestParameter<D2> for Processor<E, T>
+impl<P, E, T> SearchNearestParameter<SurfaceParameter> for Processor<E, T>
 where
-    E: ParametricSurface<Point = P> + SearchNearestParameter<D2, Point = P>,
+    E: ParametricSurface<Point = P> + SearchNearestParameter<SurfaceParameter, Point = P>,
     P: EuclideanSpace<Scalar = f64, Diff = E::Vector> + MetricSpace<Metric = f64> + Tolerance,
     E::Vector: SearchNearestParameterVector<Point = P>,
     T: Transform<P> + SquareMatrix<Scalar = f64> + Clone,

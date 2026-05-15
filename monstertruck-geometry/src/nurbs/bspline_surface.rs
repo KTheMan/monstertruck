@@ -2287,7 +2287,7 @@ impl<V: Clone> Invertible for BsplineSurface<V> {
     fn invert(&mut self) { self.swap_axes(); }
 }
 
-impl<P, V> SearchParameter<D2> for BsplineSurface<P>
+impl<P, V> SearchParameter<SurfaceParameter> for BsplineSurface<P>
 where
     P: ControlPoint<f64, Diff = V>
         + EuclideanSpace<Scalar = f64, Diff = V>
@@ -2315,7 +2315,7 @@ where
     }
 }
 
-impl<P> SearchNearestParameter<D2> for BsplineSurface<P>
+impl<P> SearchNearestParameter<SurfaceParameter> for BsplineSurface<P>
 where
     P: ControlPoint<f64>
         + EuclideanSpace<Scalar = f64, Diff = <P as ControlPoint<f64>>::Diff>

@@ -136,7 +136,7 @@ impl<C: ParameterDivision1D, V> ParameterDivision2D for ExtrusionSurface<C, V> {
     }
 }
 
-impl<P, C> SearchParameter<D2> for ExtrusionSurface<C, P::Diff>
+impl<P, C> SearchParameter<SurfaceParameter> for ExtrusionSurface<C, P::Diff>
 where
     P: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64> + Tolerance,
     P::Diff: SearchParameterVector<Point = P>,
@@ -163,7 +163,7 @@ where
     }
 }
 
-impl<C: ParametricCurve3D + BoundedCurve> SearchNearestParameter<D2>
+impl<C: ParametricCurve3D + BoundedCurve> SearchNearestParameter<SurfaceParameter>
     for ExtrusionSurface<C, Vector3>
 {
     type Point = Point3;

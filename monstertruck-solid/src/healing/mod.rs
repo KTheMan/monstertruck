@@ -43,13 +43,13 @@ where
         + BoundedCurve
         + Cut
         + ParameterDivision1D<Point = Point3>
-        + SearchNearestParameter<D1, Point = Point3>
+        + SearchNearestParameter<CurveParameter, Point = Point3>
         + TryFrom<ParameterCurve<Line<Point2>, S>>,
-    S: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
+    S: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
 {
     fn split_closed_edges_and_faces(&mut self, tol: f64) {
         fn sp<S>(surface: &S, point: Point3, hint: Option<(f64, f64)>) -> Option<(f64, f64)>
-        where S: SearchParameter<D2, Point = Point3> {
+        where S: SearchParameter<SurfaceParameter, Point = Point3> {
             surface.search_parameter(point, hint, 100)
         }
         split_closed_edges(self);
@@ -63,9 +63,9 @@ where
         + BoundedCurve
         + Cut
         + ParameterDivision1D<Point = Point3>
-        + SearchNearestParameter<D1, Point = Point3>
+        + SearchNearestParameter<CurveParameter, Point = Point3>
         + TryFrom<ParameterCurve<Line<Point2>, S>>,
-    S: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
+    S: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
 {
     fn split_closed_edges_and_faces(&mut self, tol: f64) {
         self.boundaries
@@ -89,15 +89,15 @@ where
         + BoundedCurve
         + Cut
         + ParameterDivision1D<Point = Point3>
-        + SearchNearestParameter<D1, Point = Point3>
+        + SearchNearestParameter<CurveParameter, Point = Point3>
         + TryFrom<ParameterCurve<Line<Point2>, S>>,
     S: ParametricSurface3D
-        + SearchParameter<D2, Point = Point3>
-        + SearchNearestParameter<D2, Point = Point3>,
+        + SearchParameter<SurfaceParameter, Point = Point3>
+        + SearchNearestParameter<SurfaceParameter, Point = Point3>,
 {
     fn robust_split_closed_edges_and_faces(&mut self, tol: f64) {
         fn sp<S>(surface: &S, point: Point3, hint: Option<(f64, f64)>) -> Option<(f64, f64)>
-        where S: SearchParameter<D2, Point = Point3> + SearchNearestParameter<D2, Point = Point3>
+        where S: SearchParameter<SurfaceParameter, Point = Point3> + SearchNearestParameter<SurfaceParameter, Point = Point3>
         {
             surface
                 .search_parameter(point, hint, 100)
@@ -116,11 +116,11 @@ where
         + BoundedCurve
         + Cut
         + ParameterDivision1D<Point = Point3>
-        + SearchNearestParameter<D1, Point = Point3>
+        + SearchNearestParameter<CurveParameter, Point = Point3>
         + TryFrom<ParameterCurve<Line<Point2>, S>>,
     S: ParametricSurface3D
-        + SearchParameter<D2, Point = Point3>
-        + SearchNearestParameter<D2, Point = Point3>,
+        + SearchParameter<SurfaceParameter, Point = Point3>
+        + SearchNearestParameter<SurfaceParameter, Point = Point3>,
 {
     fn robust_split_closed_edges_and_faces(&mut self, tol: f64) {
         let fs = RobustSplitClosedEdgesAndFaces::robust_split_closed_edges_and_faces;
@@ -142,12 +142,12 @@ where
         + BoundedCurve
         + Cut
         + ParameterDivision1D<Point = Point3>
-        + SearchNearestParameter<D1, Point = Point3>
+        + SearchNearestParameter<CurveParameter, Point = Point3>
         + TryFrom<ParameterCurve<Line<Point2>, S>>
         + Clone,
     S: ParametricSurface3D
-        + SearchParameter<D2, Point = Point3>
-        + SearchNearestParameter<D2, Point = Point3>
+        + SearchParameter<SurfaceParameter, Point = Point3>
+        + SearchNearestParameter<SurfaceParameter, Point = Point3>
         + Clone,
 {
     cshell.robust_split_closed_edges_and_faces(tol);

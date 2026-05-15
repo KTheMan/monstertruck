@@ -12,8 +12,8 @@ use thiserror::Error;
 pub trait ShapeOpsSurface:
     ParametricSurface3D
     + ParameterDivision2D
-    + SearchParameter<D2, Point = Point3>
-    + SearchNearestParameter<D2, Point = Point3>
+    + SearchParameter<SurfaceParameter, Point = Point3>
+    + SearchNearestParameter<SurfaceParameter, Point = Point3>
     + Clone
     + Invertible
     + Send
@@ -21,8 +21,8 @@ pub trait ShapeOpsSurface:
 }
 impl<S> ShapeOpsSurface for S where S: ParametricSurface3D
         + ParameterDivision2D
-        + SearchParameter<D2, Point = Point3>
-        + SearchNearestParameter<D2, Point = Point3>
+        + SearchParameter<SurfaceParameter, Point = Point3>
+        + SearchNearestParameter<SurfaceParameter, Point = Point3>
         + Clone
         + Invertible
         + Send
@@ -39,8 +39,8 @@ pub trait ShapeOpsCurve<S: ShapeOpsSurface>:
     + TryFrom<ParameterCurve<Line<Point2>, S>>
     + Invertible
     + From<IntersectionCurve<BsplineCurve<Point3>, S, S>>
-    + SearchParameter<D1, Point = Point3>
-    + SearchNearestParameter<D1, Point = Point3>
+    + SearchParameter<CurveParameter, Point = Point3>
+    + SearchNearestParameter<CurveParameter, Point = Point3>
     + Send
     + Sync {
 }
@@ -51,8 +51,8 @@ impl<C, S: ShapeOpsSurface> ShapeOpsCurve<S> for C where C: ParametricCurve3D
         + TryFrom<ParameterCurve<Line<Point2>, S>>
         + Invertible
         + From<IntersectionCurve<BsplineCurve<Point3>, S, S>>
-        + SearchParameter<D1, Point = Point3>
-        + SearchNearestParameter<D1, Point = Point3>
+        + SearchParameter<CurveParameter, Point = Point3>
+        + SearchNearestParameter<CurveParameter, Point = Point3>
         + Send
         + Sync
 {

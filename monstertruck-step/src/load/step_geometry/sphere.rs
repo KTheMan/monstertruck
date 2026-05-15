@@ -34,7 +34,7 @@ impl ParametricSurface3D for Sphere {
     #[inline]
     fn normal(&self, u: f64, v: f64) -> Vector3 { self.0.normal(PI / 2.0 - v, u) }
 }
-impl SearchNearestParameter<D2> for Sphere {
+impl SearchNearestParameter<SurfaceParameter> for Sphere {
     type Point = Point3;
     #[inline]
     fn search_nearest_parameter<H: Into<SearchParameterHint2D>>(
@@ -48,7 +48,7 @@ impl SearchNearestParameter<D2> for Sphere {
             .map(|(u, v)| (v, PI / 2.0 - u))
     }
 }
-impl SearchParameter<D2> for Sphere {
+impl SearchParameter<SurfaceParameter> for Sphere {
     type Point = Point3;
     #[inline]
     fn search_parameter<H: Into<SearchParameterHint2D>>(

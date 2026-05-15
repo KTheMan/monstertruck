@@ -191,7 +191,7 @@ impl v2::SearchParameter<v2::D2<f64>> for Torus {
     }
 }
 
-impl SearchParameter<D2> for Torus {
+impl SearchParameter<SurfaceParameter> for Torus {
     type Point = Point3;
     fn search_parameter<H: Into<SearchParameterHint2D>>(
         &self,
@@ -221,7 +221,7 @@ impl SearchParameter<D2> for Torus {
     }
 }
 
-impl SearchNearestParameter<D2> for Torus {
+impl SearchNearestParameter<SurfaceParameter> for Torus {
     type Point = Point3;
     fn search_nearest_parameter<H: Into<SearchParameterHint2D>>(
         &self,

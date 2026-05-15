@@ -7,7 +7,7 @@ where
         + BoundedCurve
         + Cut
         + ParameterDivision1D<Point = Point3>
-        + SearchNearestParameter<D1, Point = Point3>
+        + SearchNearestParameter<CurveParameter, Point = Point3>
         + TryFrom<ParameterCurve<Line<Point2>, S>>,
     S: ParametricSurface3D, {
     let to_poly = closure_to_poly(tol);
@@ -34,7 +34,7 @@ where
         + BoundedCurve
         + Cut
         + ParameterDivision1D<Point = Point3>
-        + SearchNearestParameter<D1, Point = Point3>
+        + SearchNearestParameter<CurveParameter, Point = Point3>
         + TryFrom<ParameterCurve<Line<Point2>, S>>,
     S: ParametricSurface3D,
 {
@@ -68,7 +68,7 @@ where
         + BoundedCurve
         + Cut
         + ParameterDivision1D<Point = Point3>
-        + SearchNearestParameter<D1, Point = Point3>
+        + SearchNearestParameter<CurveParameter, Point = Point3>
         + TryFrom<ParameterCurve<Line<Point2>, S>>,
     S: ParametricSurface3D,
 {
@@ -233,7 +233,7 @@ where
         + BoundedCurve
         + Cut
         + ParameterDivision1D<Point = Point3>
-        + SearchNearestParameter<D1, Point = Point3>
+        + SearchNearestParameter<CurveParameter, Point = Point3>
         + TryFrom<ParameterCurve<Line<Point2>, S>>,
     S: ParametricSurface3D,
 {
@@ -275,7 +275,7 @@ where
     C: ParametricCurve3D
         + BoundedCurve
         + Cut
-        + SearchNearestParameter<D1, Point = Point3>
+        + SearchNearestParameter<CurveParameter, Point = Point3>
         + ParameterDivision1D<Point = Point3>,
     S: ParametricSurface3D,
 {
@@ -338,7 +338,7 @@ fn enumerate_intersections<C, S>(
     pcurve: &ParameterCurve<Line<Point2>, S>,
 ) -> Option<Vec<(f64, Point3)>>
 where
-    C: ParametricCurve3D + SearchNearestParameter<D1, Point = Point3>,
+    C: ParametricCurve3D + SearchNearestParameter<CurveParameter, Point = Point3>,
     S: ParametricSurface3D,
 {
     let rough_intersections = intersections_between_line_polyline(*pcurve.curve(), param_edge);
@@ -380,7 +380,7 @@ fn exact_intersections<C, S>(
     curve: &C,
 ) -> Option<Vec<(f64, Point3)>>
 where
-    C: ParametricCurve3D + SearchNearestParameter<D1, Point = Point3>,
+    C: ParametricCurve3D + SearchNearestParameter<CurveParameter, Point = Point3>,
     S: ParametricSurface3D,
 {
     let closure = |t| {
@@ -401,7 +401,7 @@ fn search_intersection<C, S>(
     mut t0: f64,
 ) -> Option<(f64, f64, Point3)>
 where
-    C: ParametricCurve3D + SearchNearestParameter<D1, Point = Point3>,
+    C: ParametricCurve3D + SearchNearestParameter<CurveParameter, Point = Point3>,
     S: ParametricSurface3D,
 {
     let mut previous0 = t0;

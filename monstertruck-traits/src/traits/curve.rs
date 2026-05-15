@@ -189,7 +189,7 @@ pub trait ExactParameterBoundary2D<S> {
     /// This is a curve-on-surface object in 3D, not a raw UV primitive.
     type BoundaryCurve: ParametricCurve3D<Point = Point3>
         + BoundedCurve<Point = Point3>
-        + SearchNearestParameter<D1, Point = Point3>
+        + SearchNearestParameter<CurveParameter, Point = Point3>
         + Cut
         + Clone
         + Invertible;

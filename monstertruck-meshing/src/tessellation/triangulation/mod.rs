@@ -40,7 +40,7 @@ where
     C: ParametricCurve2D + BoundedCurve + ParameterDivision1D<Point = Point2>,
     S: ParametricSurface3D,
     ParameterCurve<C, S>:
-        SearchParameter<D1, Point = Point3> + SearchNearestParameter<D1, Point = Point3>,
+        SearchParameter<CurveParameter, Point = Point3> + SearchNearestParameter<CurveParameter, Point = Point3>,
 {
     fn exact_trim_boundary_2d(&self, tolerance: f64) -> Vec<Point2> {
         lifted_trim_boundary_2d(self, tolerance)

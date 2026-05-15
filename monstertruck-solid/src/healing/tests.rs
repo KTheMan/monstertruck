@@ -1536,7 +1536,7 @@ fn many_closed_boundary_cylinder() {
 }
 
 fn sp<S>(surface: &S, p: Point3, hint: Option<(f64, f64)>) -> Option<(f64, f64)>
-where S: SearchParameter<D2, Point = Point3> {
+where S: SearchParameter<SurfaceParameter, Point = Point3> {
     surface.search_parameter(p, hint, 10)
 }
 

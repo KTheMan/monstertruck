@@ -39,8 +39,8 @@ fn double_projection<S0, S1>(
     trials: usize,
 ) -> Option<(Point3, Point2, Point2)>
 where
-    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
+    S0: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
 {
     let function = move |Vector4 { x, y, z, w }| {
         let ders0 = surface0.derivatives(1, x, y);
@@ -180,8 +180,8 @@ impl<C, S0, S1, T0, T1> SurfaceCurve<C, S0, S1, T0, T1> {
 impl<C, S0, S1> IntersectionCurve<C, S0, S1>
 where
     C: ParametricCurve3D,
-    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
+    S0: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
 {
     /// Search triple value of the point corresponding to the parameter `t`.
     /// - the coordinate on 3D space
@@ -261,8 +261,8 @@ where
 impl<C, S0, S1, T0, T1> SurfaceCurve<C, S0, S1, T0, T1>
 where
     C: ParametricCurve3D,
-    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
+    S0: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
 {
     /// Search triple value of the point corresponding to the parameter `t`.
     /// - the coordinate on 3D space
@@ -372,8 +372,8 @@ fn der_routine(
 impl<C, S0, S1> ParametricCurveTrait for IntersectionCurve<C, S0, S1>
 where
     C: ParametricCurve3D,
-    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
+    S0: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
 {
     type Point = Point3;
     type Vector = Vector3;
@@ -458,16 +458,16 @@ where
 impl<C, S0, S1> BoundedCurve for IntersectionCurve<C, S0, S1>
 where
     C: ParametricCurve3D + BoundedCurve,
-    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
+    S0: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
 {
 }
 
 impl<C, S0, S1> ParameterDivision1D for IntersectionCurve<C, S0, S1>
 where
     C: ParametricCurve3D + BoundedCurve,
-    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
+    S0: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
 {
     type Point = Point3;
     #[inline(always)]
@@ -479,8 +479,8 @@ where
 impl<C, S0, S1> Cut for IntersectionCurve<C, S0, S1>
 where
     C: Cut<Point = Point3, Vector = Vector3> + SnapCurveEndpoints,
-    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
+    S0: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
 {
     fn cut(&mut self, t: f64) -> Self {
         let split = self.search_triple(t, 100).map(|(point, _, _)| point);
@@ -503,11 +503,11 @@ impl<C: Invertible, S0: Clone, S1: Clone> Invertible for IntersectionCurve<C, S0
     fn invert(&mut self) { self.leader.invert(); }
 }
 
-impl<C, S0, S1> SearchParameter<D1> for IntersectionCurve<C, S0, S1>
+impl<C, S0, S1> SearchParameter<CurveParameter> for IntersectionCurve<C, S0, S1>
 where
-    C: ParametricCurve3D + SearchNearestParameter<D1, Point = Point3>,
-    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
+    C: ParametricCurve3D + SearchNearestParameter<CurveParameter, Point = Point3>,
+    S0: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
 {
     type Point = Point3;
     fn search_parameter<H: Into<SearchParameterHint1D>>(
@@ -527,11 +527,11 @@ where
     }
 }
 
-impl<C, S0, S1> SearchNearestParameter<D1> for IntersectionCurve<C, S0, S1>
+impl<C, S0, S1> SearchNearestParameter<CurveParameter> for IntersectionCurve<C, S0, S1>
 where
-    C: ParametricCurve3D + SearchNearestParameter<D1, Point = Point3>,
-    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
+    C: ParametricCurve3D + SearchNearestParameter<CurveParameter, Point = Point3>,
+    S0: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
 {
     type Point = Point3;
     fn search_nearest_parameter<H: Into<SearchParameterHint1D>>(
@@ -571,8 +571,8 @@ impl<C: BoundedCurve> IntersectionCurve<C, Plane, Plane> {
 impl<C, S0, S1, T0, T1> ParametricCurveTrait for SurfaceCurve<C, S0, S1, T0, T1>
 where
     C: ParametricCurve3D,
-    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
+    S0: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
     T0: Clone,
     T1: Clone,
 {
@@ -625,8 +625,8 @@ where
 impl<C, S0, S1, T0, T1> BoundedCurve for SurfaceCurve<C, S0, S1, T0, T1>
 where
     C: ParametricCurve3D + BoundedCurve,
-    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
-    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
+    S0: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3> + Clone,
+    S1: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3> + Clone,
     T0: Clone,
     T1: Clone,
 {
@@ -635,8 +635,8 @@ where
 impl<C, S0, S1, T0, T1> ParameterDivision1D for SurfaceCurve<C, S0, S1, T0, T1>
 where
     C: ParametricCurve3D + BoundedCurve,
-    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
-    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
+    S0: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3> + Clone,
+    S1: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3> + Clone,
     T0: Clone,
     T1: Clone,
 {
@@ -652,8 +652,8 @@ where
     C: Cut<Point = Point3, Vector = Vector3>,
     T0: Cut,
     T1: Cut,
-    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
-    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
+    S0: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3> + Clone,
+    S1: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3> + Clone,
 {
     #[inline(always)]
     fn cut(&mut self, t: f64) -> Self {
@@ -684,11 +684,11 @@ where
     }
 }
 
-impl<C, S0, S1, T0, T1> SearchParameter<D1> for SurfaceCurve<C, S0, S1, T0, T1>
+impl<C, S0, S1, T0, T1> SearchParameter<CurveParameter> for SurfaceCurve<C, S0, S1, T0, T1>
 where
-    C: ParametricCurve3D + SearchNearestParameter<D1, Point = Point3>,
-    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
-    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
+    C: ParametricCurve3D + SearchNearestParameter<CurveParameter, Point = Point3>,
+    S0: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3> + Clone,
+    S1: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3> + Clone,
     T0: Clone,
     T1: Clone,
 {
@@ -708,11 +708,11 @@ where
     }
 }
 
-impl<C, S0, S1, T0, T1> SearchNearestParameter<D1> for SurfaceCurve<C, S0, S1, T0, T1>
+impl<C, S0, S1, T0, T1> SearchNearestParameter<CurveParameter> for SurfaceCurve<C, S0, S1, T0, T1>
 where
-    C: ParametricCurve3D + SearchNearestParameter<D1, Point = Point3>,
-    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
-    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + Clone,
+    C: ParametricCurve3D + SearchNearestParameter<CurveParameter, Point = Point3>,
+    S0: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3> + Clone,
+    S1: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3> + Clone,
     T0: Clone,
     T1: Clone,
 {

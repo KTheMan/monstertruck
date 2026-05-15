@@ -309,7 +309,7 @@ impl<P: ControlPoint<f64>> Cut for PolylineCurve<P> {
     }
 }
 
-impl<P> SearchParameter<D1> for PolylineCurve<P>
+impl<P> SearchParameter<CurveParameter> for PolylineCurve<P>
 where
     P: ControlPoint<f64>,
     P::Diff: InnerSpace<Scalar = f64> + Tolerance,
@@ -334,7 +334,7 @@ where
     }
 }
 
-impl<P> SearchNearestParameter<D1> for PolylineCurve<P>
+impl<P> SearchNearestParameter<CurveParameter> for PolylineCurve<P>
 where
     P: ControlPoint<f64>,
     P::Diff: InnerSpace<Scalar = f64>,

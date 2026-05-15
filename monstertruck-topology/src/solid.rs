@@ -198,7 +198,7 @@ impl<P, C, S> Solid<P, C, S> {
     ) -> Option<(Edge<P, C>, Edge<P, C>)>
     where
         P: Clone,
-        C: Cut<Point = P> + SearchParameter<D1, Point = P>,
+        C: Cut<Point = P> + SearchParameter<CurveParameter, Point = P>,
     {
         let res = self
             .boundaries

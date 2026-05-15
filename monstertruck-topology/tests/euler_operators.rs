@@ -95,7 +95,7 @@ impl Concat<Segment> for Segment {
     }
 }
 
-impl SearchParameter<D1> for Segment {
+impl SearchParameter<CurveParameter> for Segment {
     type Point = Point3;
     fn search_parameter<H: Into<SearchParameterHint1D>>(
         &self,

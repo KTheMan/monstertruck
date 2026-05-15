@@ -120,7 +120,7 @@ where
     }
 }
 
-impl SearchNearestParameter<D1> for UnitHyperbola<Point2> {
+impl SearchNearestParameter<CurveParameter> for UnitHyperbola<Point2> {
     type Point = Point2;
     fn search_nearest_parameter<H: Into<SearchParameterHint1D>>(
         &self,
@@ -148,7 +148,7 @@ impl SearchNearestParameter<D1> for UnitHyperbola<Point2> {
     }
 }
 
-impl SearchNearestParameter<D1> for UnitHyperbola<Point3> {
+impl SearchNearestParameter<CurveParameter> for UnitHyperbola<Point3> {
     type Point = Point3;
     fn search_nearest_parameter<H: Into<SearchParameterHint1D>>(
         &self,
@@ -164,7 +164,7 @@ impl SearchNearestParameter<D1> for UnitHyperbola<Point3> {
     }
 }
 
-impl SearchParameter<D1> for UnitHyperbola<Point2> {
+impl SearchParameter<CurveParameter> for UnitHyperbola<Point2> {
     type Point = Point2;
     fn search_parameter<H: Into<SearchParameterHint1D>>(
         &self,
@@ -192,7 +192,7 @@ impl SearchParameter<D1> for UnitHyperbola<Point2> {
     }
 }
 
-impl SearchParameter<D1> for UnitHyperbola<Point3> {
+impl SearchParameter<CurveParameter> for UnitHyperbola<Point3> {
     type Point = Point3;
     fn search_parameter<H: Into<SearchParameterHint1D>>(
         &self,

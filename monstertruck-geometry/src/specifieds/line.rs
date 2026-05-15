@@ -146,7 +146,7 @@ impl<P: Copy> Invertible for Line<P> {
     fn inverse(&self) -> Self { Self(self.1, self.0) }
 }
 
-impl<P> SearchNearestParameter<D1> for Line<P>
+impl<P> SearchNearestParameter<CurveParameter> for Line<P>
 where
     P: ControlPoint<f64>,
     P::Diff: InnerSpace<Scalar = f64>,
@@ -164,7 +164,7 @@ where
     }
 }
 
-impl<P> SearchParameter<D1> for Line<P>
+impl<P> SearchParameter<CurveParameter> for Line<P>
 where
     P: ControlPoint<f64> + Tolerance,
     P::Diff: InnerSpace<Scalar = f64>,

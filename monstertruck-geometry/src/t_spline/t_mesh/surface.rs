@@ -333,7 +333,7 @@ impl Transformed<Matrix4> for Tmesh<Point3> {
     }
 }
 
-impl SearchParameter<D2> for Tmesh<Point3> {
+impl SearchParameter<SurfaceParameter> for Tmesh<Point3> {
     type Point = Point3;
     fn search_parameter<H: Into<SearchParameterHint2D>>(
         &self,
@@ -354,7 +354,7 @@ impl SearchParameter<D2> for Tmesh<Point3> {
     }
 }
 
-impl SearchNearestParameter<D2> for Tmesh<Point3> {
+impl SearchNearestParameter<SurfaceParameter> for Tmesh<Point3> {
     type Point = Point3;
     fn search_nearest_parameter<H: Into<SearchParameterHint2D>>(
         &self,

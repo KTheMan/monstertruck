@@ -210,7 +210,7 @@ impl<T: Transform3<Scalar = f64>> Transformed<T> for Plane {
     }
 }
 
-impl SearchParameter<D2> for Plane {
+impl SearchParameter<SurfaceParameter> for Plane {
     type Point = Point3;
     #[inline(always)]
     fn search_parameter<H: Into<SearchParameterHint2D>>(
@@ -227,7 +227,7 @@ impl SearchParameter<D2> for Plane {
     }
 }
 
-impl SearchNearestParameter<D2> for Plane {
+impl SearchNearestParameter<SurfaceParameter> for Plane {
     type Point = Point3;
     #[inline(always)]
     fn search_nearest_parameter<H: Into<SearchParameterHint2D>>(

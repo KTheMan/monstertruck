@@ -16,7 +16,7 @@ fn create_parameter_boundary<P, C, S>(
 where
     P: Copy,
     C: BoundedCurve<Point = P> + ParameterDivision1D<Point = P>,
-    S: Clone + SearchParameter<D2, Point = P> + SearchNearestParameter<D2, Point = P>,
+    S: Clone + SearchParameter<SurfaceParameter, Point = P> + SearchNearestParameter<SurfaceParameter, Point = P>,
 {
     let surface = face.surface();
     let pt = wire.front_vertex()?.point();
@@ -65,7 +65,7 @@ fn divide_one_face<C, S>(
 ) -> Option<Vec<FaceWithShapesOpStatus<C, S>>>
 where
     C: BoundedCurve<Point = Point3> + ParameterDivision1D<Point = Point3>,
-    S: Clone + SearchParameter<D2, Point = Point3> + SearchNearestParameter<D2, Point = Point3>,
+    S: Clone + SearchParameter<SurfaceParameter, Point = Point3> + SearchNearestParameter<SurfaceParameter, Point = Point3>,
 {
     let area_tol = tol * TOLERANCE;
     let cancellation_tol = TOLERANCE;
@@ -143,7 +143,7 @@ pub fn divide_faces<C, S>(
 ) -> Option<FacesClassification<Point3, C, S>>
 where
     C: BoundedCurve<Point = Point3> + ParameterDivision1D<Point = Point3>,
-    S: Clone + SearchParameter<D2, Point = Point3> + SearchNearestParameter<D2, Point = Point3>,
+    S: Clone + SearchParameter<SurfaceParameter, Point = Point3> + SearchNearestParameter<SurfaceParameter, Point = Point3>,
 {
     let mut res = FacesClassification::<Point3, C, S>::default();
     shell

@@ -126,8 +126,8 @@ mod contact_circle;
 impl<C, S0, S1, R> RollingBallFilletSurface<C, S0, S1, R>
 where
     C: ParametricCurve3D,
-    S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
+    S0: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
     R: RadiusFunction,
 {
     fn sub_der_mn(&self, m: usize, n: usize, u: f64, cc: ContactCircle) -> Vector3 {
@@ -146,8 +146,8 @@ where
 impl<C, S0, S1, R> ParametricSurface for RollingBallFilletSurface<C, S0, S1, R>
 where
     C: ParametricCurve3D,
-    S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
+    S0: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
     R: RadiusFunction,
 {
     type Point = Point3;
@@ -200,8 +200,8 @@ where
 impl<C, S0, S1, R> ParametricSurface3D for RollingBallFilletSurface<C, S0, S1, R>
 where
     C: ParametricCurve3D,
-    S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
+    S0: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
     R: RadiusFunction,
 {
 }
@@ -209,8 +209,8 @@ where
 impl<C, S0, S1, R> BoundedSurface for RollingBallFilletSurface<C, S0, S1, R>
 where
     C: ParametricCurve3D + BoundedCurve,
-    S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
+    S0: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
     R: RadiusFunction,
 {
 }
@@ -218,8 +218,8 @@ where
 impl<C, S0, S1, R> ParameterDivision2D for RollingBallFilletSurface<C, S0, S1, R>
 where
     C: ParametricCurve3D,
-    S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
+    S0: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
     R: RadiusFunction,
 {
     fn parameter_division(
@@ -237,11 +237,11 @@ where
     }
 }
 
-impl<C, S0, S1, R> SearchParameter<D2> for RollingBallFilletSurface<C, S0, S1, R>
+impl<C, S0, S1, R> SearchParameter<SurfaceParameter> for RollingBallFilletSurface<C, S0, S1, R>
 where
-    C: ParametricCurve3D + SearchNearestParameter<D1, Point = Point3>,
-    S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
+    C: ParametricCurve3D + SearchNearestParameter<CurveParameter, Point = Point3>,
+    S0: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
     R: RadiusFunction,
 {
     type Point = Point3;
@@ -282,8 +282,8 @@ impl<C, S0, S1, R> RollingBallFilletContactCurve<C, S0, S1, R> {
 impl<C, S0, S1, R> ParametricCurveTrait for RollingBallFilletContactCurve<C, S0, S1, R>
 where
     C: ParametricCurve3D,
-    S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
+    S0: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
     R: RadiusFunction,
 {
     type Point = Point3;
@@ -322,8 +322,8 @@ where
 impl<C, S0, S1, R> BoundedCurve for RollingBallFilletContactCurve<C, S0, S1, R>
 where
     C: ParametricCurve3D + BoundedCurve,
-    S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
+    S0: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
     R: RadiusFunction,
 {
 }
@@ -331,8 +331,8 @@ where
 impl<C, S0, S1, R> ParameterDivision1D for RollingBallFilletContactCurve<C, S0, S1, R>
 where
     C: ParametricCurve3D,
-    S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
+    S0: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
     R: RadiusFunction,
 {
     type Point = Point3;
@@ -341,11 +341,11 @@ where
     }
 }
 
-impl<C, S0, S1, R> SearchParameter<D1> for RollingBallFilletContactCurve<C, S0, S1, R>
+impl<C, S0, S1, R> SearchParameter<CurveParameter> for RollingBallFilletContactCurve<C, S0, S1, R>
 where
-    C: ParametricCurve3D + SearchNearestParameter<D1, Point = Point3>,
-    S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
+    C: ParametricCurve3D + SearchNearestParameter<CurveParameter, Point = Point3>,
+    S0: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
     R: RadiusFunction,
 {
     type Point = Point3;

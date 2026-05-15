@@ -238,8 +238,8 @@ where
 
 impl<S0, S1> ApproximateFilletSurface<S0, S1>
 where
-    S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
+    S0: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
 {
     /// Approximates a rolling ball fillet with an [`ApproximateFilletSurface`].
     pub fn approximate_rolling_ball_fillet<C, R>(

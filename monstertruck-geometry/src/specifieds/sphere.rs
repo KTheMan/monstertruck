@@ -220,7 +220,7 @@ impl ParameterDivision2D for Sphere {
     }
 }
 
-impl SearchParameter<D2> for Sphere {
+impl SearchParameter<SurfaceParameter> for Sphere {
     type Point = Point3;
     #[inline(always)]
     fn search_parameter<H: Into<SearchParameterHint2D>>(
@@ -252,7 +252,7 @@ impl SearchParameter<D2> for Sphere {
     }
 }
 
-impl SearchNearestParameter<D2> for Sphere {
+impl SearchNearestParameter<SurfaceParameter> for Sphere {
     type Point = Point3;
     #[inline(always)]
     fn search_nearest_parameter<H: Into<SearchParameterHint2D>>(

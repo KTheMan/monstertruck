@@ -478,7 +478,7 @@ impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V> + Tolerance> Nur
     pub fn boundary(&self) -> NurbsCurve<V> { NurbsCurve::new(self.0.boundary()) }
 }
 
-impl<V: Homogeneous<Scalar = f64>> SearchNearestParameter<D2> for NurbsSurface<V>
+impl<V: Homogeneous<Scalar = f64>> SearchNearestParameter<SurfaceParameter> for NurbsSurface<V>
 where
     Self: ParametricSurface<Point = V::Point, Vector = <V::Point as EuclideanSpace>::Diff>,
     V::Point: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64>,
@@ -877,7 +877,7 @@ where M: Copy + std::ops::Mul<V, Output = V>
     }
 }
 
-impl<V> SearchParameter<D2> for NurbsSurface<V>
+impl<V> SearchParameter<SurfaceParameter> for NurbsSurface<V>
 where
     V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>,
     V::Point: ControlPoint<f64, Diff = <V::Point as EuclideanSpace>::Diff>

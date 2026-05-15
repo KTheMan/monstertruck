@@ -119,7 +119,7 @@ where
     }
 }
 
-impl<C0, C1> SearchNearestParameter<D2> for HomotopySurface<C0, C1>
+impl<C0, C1> SearchNearestParameter<SurfaceParameter> for HomotopySurface<C0, C1>
 where
     C0: BoundedCurve,
     C1: BoundedCurve<Point = C0::Point, Vector = C0::Vector>,
@@ -146,7 +146,7 @@ where
     }
 }
 
-impl<C0, C1> SearchParameter<D2> for HomotopySurface<C0, C1>
+impl<C0, C1> SearchParameter<SurfaceParameter> for HomotopySurface<C0, C1>
 where
     C0: BoundedCurve,
     C1: BoundedCurve<Point = C0::Point, Vector = C0::Vector>,

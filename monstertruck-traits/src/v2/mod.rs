@@ -44,8 +44,10 @@ pub use cut::Cut;
 pub use division::{ParameterDivision1D, ParameterDivision2D};
 pub use parameter_boundary::ParameterBoundary2D;
 pub use search_parameter::{
-    D1, D2, ParameterRange, SearchNearestParameter, SearchParameter, SearchParameterDimension,
-    SearchParameterHint1D, SearchParameterHint2D,
+    CurveParameter, ParameterRange, SearchNearestParameter, SearchParameter,
+    SearchParameterDimension, SearchParameterHint1D, SearchParameterHint2D, SurfaceParameter,
 };
+#[allow(deprecated)]
+pub use search_parameter::{D1, D2};
 pub use surface::ParametricSurface;
 pub use surface3d::ParametricSurface3D;

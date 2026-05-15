@@ -700,7 +700,7 @@ impl<P, C, S> Shell<P, C, S> {
     ) -> Option<(Edge<P, C>, Edge<P, C>)>
     where
         P: Clone,
-        C: Cut<Point = P> + SearchParameter<D1, Point = P>,
+        C: Cut<Point = P> + SearchParameter<CurveParameter, Point = P>,
     {
         if self.vertex_iter().any(|v| &v == vertex) {
             return None;

@@ -190,7 +190,7 @@ impl RelaySphere {
     }
 
     fn next_point(
-        surface: &(impl ParametricSurface3D + SearchParameter<D2, Point = Point3>),
+        surface: &(impl ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>),
         (u, v): (f64, f64),
         (p, q): (Point3, Point3),
     ) -> Option<(Point3, (f64, f64))> {
@@ -211,13 +211,13 @@ impl RelaySphere {
         point_on_curve: (Point3, Vector3),
         surface0: &(
              impl ParametricSurface3D
-             + SearchParameter<D2, Point = Point3>
-             + SearchNearestParameter<D2, Point = Point3>
+             + SearchParameter<SurfaceParameter, Point = Point3>
+             + SearchNearestParameter<SurfaceParameter, Point = Point3>
          ),
         surface1: &(
              impl ParametricSurface3D
-             + SearchParameter<D2, Point = Point3>
-             + SearchNearestParameter<D2, Point = Point3>
+             + SearchParameter<SurfaceParameter, Point = Point3>
+             + SearchNearestParameter<SurfaceParameter, Point = Point3>
          ),
         radius: f64,
     ) -> Option<Self> {

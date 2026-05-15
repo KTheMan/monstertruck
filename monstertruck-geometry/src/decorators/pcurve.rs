@@ -128,12 +128,12 @@ where
     }
 }
 
-impl<C, S> SearchParameter<D1> for ParameterCurve<C, S>
+impl<C, S> SearchParameter<CurveParameter> for ParameterCurve<C, S>
 where
-    C: ParametricCurve2D + SearchParameter<D1, Point = Point2>,
-    S: SearchParameter<D2>,
+    C: ParametricCurve2D + SearchParameter<CurveParameter, Point = Point2>,
+    S: SearchParameter<SurfaceParameter>,
 {
-    type Point = <S as SearchParameter<D2>>::Point;
+    type Point = <S as SearchParameter<SurfaceParameter>>::Point;
     fn search_parameter<H: Into<SearchParameterHint1D>>(
         &self,
         point: Self::Point,
@@ -168,7 +168,7 @@ where
     }
 }
 
-impl<C, S> SearchNearestParameter<D1> for ParameterCurve<C, S>
+impl<C, S> SearchNearestParameter<CurveParameter> for ParameterCurve<C, S>
 where
     Self: BoundedCurve,
     <Self as ParametricCurveTrait>::Point: EuclideanSpace<Scalar = f64, Diff = <Self as ParametricCurveTrait>::Vector>

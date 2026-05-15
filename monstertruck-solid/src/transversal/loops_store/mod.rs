@@ -57,8 +57,8 @@ impl ShapesOpStatus {
     fn from_is_curve<C, S0, S1>(curve: &IntersectionCurve<C, S0, S1>) -> Option<ShapesOpStatus>
     where
         C: ParametricCurve3D + BoundedCurve,
-        S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
-        S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>, {
+        S0: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
+        S1: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>, {
         let (t0, t1) = curve.range_tuple();
         let t = (t0 + t1) / 2.0;
         let (_, pt0, pt1) = curve.search_triple(t, 100)?;
@@ -177,8 +177,8 @@ impl<P: Copy, C: Clone> Loops<P, C> {
     where
         P: Tolerance,
         C: BoundedCurve<Point = P>
-            + SearchParameter<D1, Point = P>
-            + SearchNearestParameter<D1, Point = P>, {
+            + SearchParameter<CurveParameter, Point = P>
+            + SearchNearestParameter<CurveParameter, Point = P>, {
         self.iter()
             .enumerate()
             .flat_map(move |(i, wire)| wire.iter().enumerate().map(move |(j, edge)| (i, j, edge)))
@@ -329,7 +329,7 @@ impl<P: Copy + Tolerance, C: Clone> LoopsStore<P, C> {
 
 impl<C: Clone> Loops<Point3, C> {
     fn nearest_distance2(&self, pt: Point3) -> Option<f64>
-    where C: BoundedCurve<Point = Point3> + SearchNearestParameter<D1, Point = Point3> {
+    where C: BoundedCurve<Point = Point3> + SearchNearestParameter<CurveParameter, Point = Point3> {
         self.iter()
             .flat_map(|wire| wire.iter())
             .filter_map(|edge| {
@@ -347,8 +347,8 @@ impl<C: Clone> Loops<Point3, C> {
     ) -> Option<(usize, usize, ParameterKind)>
     where
         C: BoundedCurve<Point = Point3>
-            + SearchParameter<D1, Point = Point3>
-            + SearchNearestParameter<D1, Point = Point3>,
+            + SearchParameter<CurveParameter, Point = Point3>
+            + SearchNearestParameter<CurveParameter, Point = Point3>,
     {
         self.search_parameter(pt).or_else(|| {
             self.iter()
@@ -423,8 +423,8 @@ impl<C> LoopsStore<Point3, C> {
     ) -> Option<(usize, usize, ParameterKind)>
     where
         C: Cut<Point = Point3>
-            + SearchParameter<D1, Point = Point3>
-            + SearchNearestParameter<D1, Point = Point3>,
+            + SearchParameter<CurveParameter, Point = Point3>
+            + SearchNearestParameter<CurveParameter, Point = Point3>,
     {
         let pt = v.point();
         let (wire_index, edge_index, kind) =
@@ -464,8 +464,8 @@ impl<C> LoopsStore<Point3, C> {
         emap: &mut HashMap<EdgeId<C>, Edge<Point3, C>>,
     ) -> Option<()>
     where
-        C: Cut<Point = Point3, Vector = Vector3> + SearchNearestParameter<D1, Point = Point3>,
-        S: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
+        C: Cut<Point = Point3, Vector = Vector3> + SearchNearestParameter<CurveParameter, Point = Point3>,
+        S: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
     {
         match kind {
             ParameterKind::Front => {
@@ -520,8 +520,8 @@ fn curve_surface_projection<C, S>(
     trials: usize,
 ) -> Option<(Point3, f64, Point2)>
 where
-    C: ParametricCurve3D + SearchNearestParameter<D1, Point = Point3>,
-    S: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
+    C: ParametricCurve3D + SearchNearestParameter<CurveParameter, Point = Point3>,
+    S: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
 {
     if trials == 0 {
         return None;
@@ -771,13 +771,13 @@ pub fn create_loops_stores_with_tolerance<C, S>(
     snap_tol: f64,
 ) -> std::result::Result<LoopsStoreQuadruple<C>, CreateLoopsStoreError>
 where
-    C: SearchNearestParameter<D1, Point = Point3>
-        + SearchParameter<D1, Point = Point3>
+    C: SearchNearestParameter<CurveParameter, Point = Point3>
+        + SearchParameter<CurveParameter, Point = Point3>
         + Cut<Point = Point3, Vector = Vector3>
         + From<IntersectionCurve<PolylineCurve, S, S>>,
     S: ParametricSurface3D
-        + SearchParameter<D2, Point = Point3>
-        + SearchNearestParameter<D2, Point = Point3>,
+        + SearchParameter<SurfaceParameter, Point = Point3>
+        + SearchNearestParameter<SurfaceParameter, Point = Point3>,
 {
     let snap_tol = f64::max(snap_tol, 10.0 * TOLERANCE);
     let debug_missing = std::env::var("MT_BOOL_DEBUG_ENDPOINTS").is_ok();
@@ -1321,13 +1321,13 @@ pub fn create_loops_stores<C, S>(
     poly_shell1: &Shell<Point3, PolylineCurve, Option<PolygonMesh>>,
 ) -> std::result::Result<LoopsStoreQuadruple<C>, CreateLoopsStoreError>
 where
-    C: SearchNearestParameter<D1, Point = Point3>
-        + SearchParameter<D1, Point = Point3>
+    C: SearchNearestParameter<CurveParameter, Point = Point3>
+        + SearchParameter<CurveParameter, Point = Point3>
         + Cut<Point = Point3, Vector = Vector3>
         + From<IntersectionCurve<PolylineCurve, S, S>>,
     S: ParametricSurface3D
-        + SearchParameter<D2, Point = Point3>
-        + SearchNearestParameter<D2, Point = Point3>,
+        + SearchParameter<SurfaceParameter, Point = Point3>
+        + SearchNearestParameter<SurfaceParameter, Point = Point3>,
 {
     create_loops_stores_with_tolerance(
         geom_shell0,

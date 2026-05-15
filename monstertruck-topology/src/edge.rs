@@ -438,7 +438,7 @@ impl<P, C> Edge<P, C> {
     pub fn cut(&self, vertex: &Vertex<P>) -> Option<(Self, Self)>
     where
         P: Clone,
-        C: Cut<Point = P> + SearchParameter<D1, Point = P>, {
+        C: Cut<Point = P> + SearchParameter<CurveParameter, Point = P>, {
         let curve0 = self.curve();
         let t = curve0.search_parameter(vertex.point(), None, SEARCH_PARAMETER_TRIALS)?;
         let (t0, t1) = curve0.range_tuple();

@@ -30,14 +30,14 @@ impl<C, S> ExactParameterBoundary2D<S> for ParameterCurve<C, S>
 where
     C: ParametricCurve2D<Point = Point2>
         + BoundedCurve<Point = Point2>
-        + SearchParameter<D1, Point = Point2>
-        + SearchNearestParameter<D1, Point = Point2>
+        + SearchParameter<CurveParameter, Point = Point2>
+        + SearchNearestParameter<CurveParameter, Point = Point2>
         + Cut
         + Invertible
         + Clone,
     S: ParametricSurface3D
-        + SearchParameter<D2, Point = Point3>
-        + SearchNearestParameter<D2, Point = Point3>
+        + SearchParameter<SurfaceParameter, Point = Point3>
+        + SearchNearestParameter<SurfaceParameter, Point = Point3>
         + Clone
         + PartialEq,
 {
@@ -129,7 +129,7 @@ fn exact_line_boundary_on_plane(
 fn exact_boundary_segment<C, B, P>(curve: &C, boundary: &B) -> Option<(f64, f64)>
 where
     C: ParametricCurve<Point = P> + BoundedCurve<Point = P>,
-    B: ParametricCurve<Point = P> + BoundedCurve<Point = P> + SearchParameter<D1, Point = P>,
+    B: ParametricCurve<Point = P> + BoundedCurve<Point = P> + SearchParameter<CurveParameter, Point = P>,
     P: Copy, {
     let (t0, t1) = curve.range_tuple();
     let samples = [
@@ -165,9 +165,9 @@ fn exact_boundary_line_on_surface<C, B, P>(
     ((u0, u1), (v0, v1)): ((f64, f64), (f64, f64)),
 ) -> Option<Line<Point2>>
 where
-    C: ParametricCurve<Point = P> + BoundedCurve<Point = P> + SearchParameter<D1, Point = P>,
+    C: ParametricCurve<Point = P> + BoundedCurve<Point = P> + SearchParameter<CurveParameter, Point = P>,
     P: Copy,
-    B: ParametricCurve<Point = P> + BoundedCurve<Point = P> + SearchParameter<D1, Point = P>,
+    B: ParametricCurve<Point = P> + BoundedCurve<Point = P> + SearchParameter<CurveParameter, Point = P>,
 {
     exact_boundary_segment(curve, &column_curve(0))
         .map(|(s0, s1)| Line(Point2::new(u0, s0), Point2::new(u0, s1)))
@@ -230,7 +230,7 @@ fn exact_boundary_on_homogeneous_surface<C, S>(
 where
     C: ParametricCurve3D
         + BoundedCurve<Point = Point3>
-        + SearchParameter<D1, Point = Point3>
+        + SearchParameter<CurveParameter, Point = Point3>
         + TryIntoHomogeneousBsplineCurve,
     S: Clone + ParametricSurface3D + TryIntoHomogeneousBsplineSurface,
 {
@@ -362,7 +362,7 @@ impl<C, S0, S1, T, S> ExactParameterBoundary2D<S> for SurfaceCurve<C, S0, S1, T,
 where
     T: ParametricCurve3D<Point = Point3>
         + BoundedCurve<Point = Point3>
-        + SearchNearestParameter<D1, Point = Point3>
+        + SearchNearestParameter<CurveParameter, Point = Point3>
         + Cut
         + Invertible
         + Clone,
@@ -385,8 +385,8 @@ where
 impl<C, S0, S1, T0, T1, S> ParameterBoundary2D<S> for SurfaceCurve<C, S0, S1, T0, T1>
 where
     C: ParametricCurve3D + BoundedCurve,
-    S0: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + PartialEq<S>,
-    S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3> + PartialEq<S>,
+    S0: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3> + PartialEq<S>,
+    S1: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3> + PartialEq<S>,
     T0: ParameterBoundary2D<S>,
     T1: ParameterBoundary2D<S>,
     T0: Clone,

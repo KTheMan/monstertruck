@@ -1,32 +1,58 @@
-/// Dimension for search nearest parameter
+/// Parameter-space dimension marker used by [`SearchParameter`] /
+/// [`SearchNearestParameter`].
+///
+/// Implemented by [`CurveParameter`] (1D) and [`SurfaceParameter`] (2D);
+/// not intended to be implemented by external code.
 pub trait SearchParameterDimension {
-    /// dimension
+    /// Number of parameter axes (`1` for a curve, `2` for a surface).
     const DIM: usize;
-    /// parameter type, curve => f64, surface => (f64, f64)
+    /// The parameter tuple: `f64` for a curve, `(f64, f64)` for a surface.
     type Parameter;
-    /// hint, curve => [`SearchParameterHint1D`], surface => [`SearchParameterHint2D`]
+    /// The hint payload: [`SearchParameterHint1D`] for a curve,
+    /// [`SearchParameterHint2D`] for a surface.
     type Hint;
 }
 
-/// curve geometry
+/// Parameter-space marker for curve geometry (`t: f64`).
+///
+/// Used as the dimension type parameter of [`SearchParameter`] and
+/// [`SearchNearestParameter`] on [`ParametricCurve`](crate::ParametricCurve)
+/// implementors.
 #[derive(Clone, Copy, Debug)]
-pub enum D1 {}
+pub enum CurveParameter {}
 
-impl SearchParameterDimension for D1 {
+impl SearchParameterDimension for CurveParameter {
     const DIM: usize = 1;
     type Parameter = f64;
     type Hint = SearchParameterHint1D;
 }
 
-/// curve geometry
+/// Parameter-space marker for surface geometry (`(u, v): (f64, f64)`).
+///
+/// Used as the dimension type parameter of [`SearchParameter`] and
+/// [`SearchNearestParameter`] on [`ParametricSurface`](crate::ParametricSurface)
+/// implementors.
 #[derive(Clone, Copy, Debug)]
-pub enum D2 {}
+pub enum SurfaceParameter {}
 
-impl SearchParameterDimension for D2 {
+impl SearchParameterDimension for SurfaceParameter {
     const DIM: usize = 2;
     type Parameter = (f64, f64);
     type Hint = SearchParameterHint2D;
 }
+
+// Upstream `truck-geotrait` names the parameter-space markers `D1` and `D2`
+// (for "Dimension 1" / "Dimension 2"). The names read as abbreviated
+// labels rather than self-describing markers, and at every call site
+// `SearchParameter<CurveParameter>` / `SearchParameter<SurfaceParameter>` is in fact picking the
+// curve vs surface flavour of the trait. The canonical names are now
+// `CurveParameter` and `SurfaceParameter`; the upstream spellings stay
+// as `#[deprecated]` re-exports so code ported from `truck-geotrait`
+// continues to compile.
+#[deprecated(since = "0.3.1", note = "renamed to `CurveParameter`.")]
+pub use self::CurveParameter as D1;
+#[deprecated(since = "0.3.1", note = "renamed to `SurfaceParameter`.")]
+pub use self::SurfaceParameter as D2;
 
 /// hint for searching parameter for curve
 #[derive(Clone, Copy, Debug, PartialEq)]

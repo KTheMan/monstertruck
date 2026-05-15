@@ -101,14 +101,14 @@ pub trait PreMeshableSurface: ParametricSurface3D + ParameterDivision2D + Parall
 impl<S: ParametricSurface3D + ParameterDivision2D + Parallelizable> PreMeshableSurface for S {}
 
 /// The generated mesh can be trimmed only if the boundary curves ride strictly on a surface.
-pub trait MeshableSurface: PreMeshableSurface + SearchParameter<D2, Point = Point3> {}
-impl<S: PreMeshableSurface + SearchParameter<D2, Point = Point3>> MeshableSurface for S {}
+pub trait MeshableSurface: PreMeshableSurface + SearchParameter<SurfaceParameter, Point = Point3> {}
+impl<S: PreMeshableSurface + SearchParameter<SurfaceParameter, Point = Point3>> MeshableSurface for S {}
 
 /// The generated mesh can be trimmed if the boundary curves does not ride strictly on a surface.
 pub trait RobustMeshableSurface:
-    MeshableSurface + SearchNearestParameter<D2, Point = Point3> {
+    MeshableSurface + SearchNearestParameter<SurfaceParameter, Point = Point3> {
 }
-impl<S: MeshableSurface + SearchNearestParameter<D2, Point = Point3>> RobustMeshableSurface for S {}
+impl<S: MeshableSurface + SearchNearestParameter<SurfaceParameter, Point = Point3>> RobustMeshableSurface for S {}
 
 type PolylineCurve = monstertruck_mesh::PolylineCurve<Point3>;
 

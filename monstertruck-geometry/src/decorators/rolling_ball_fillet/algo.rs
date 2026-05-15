@@ -6,8 +6,8 @@ const CROSS: fn(Vector3, Vector3) -> Vector3 = Vector3::cross;
 impl<C, S0, S1, R> RollingBallFilletSurface<C, S0, S1, R>
 where
     C: ParametricCurve3D,
-    S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
-    S1: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
+    S0: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
+    S1: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
     R: RadiusFunction,
 {
     /// Calculate contact circle corresponding to the parameter `t`, i.e.

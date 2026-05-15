@@ -1201,7 +1201,7 @@ where
         Some(hint)
     }
 }
-impl<P> SearchNearestParameter<D1> for BsplineCurve<P>
+impl<P> SearchNearestParameter<CurveParameter> for BsplineCurve<P>
 where
     P: ControlPoint<f64>
         + EuclideanSpace<Scalar = f64, Diff = <P as ControlPoint<f64>>::Diff>
@@ -1272,7 +1272,7 @@ where
         algo::curve::search_nearest_parameter(self, point, hint, trial)
     }
 }
-impl<P> SearchParameter<D1> for BsplineCurve<P>
+impl<P> SearchParameter<CurveParameter> for BsplineCurve<P>
 where
     P: ControlPoint<f64>
         + EuclideanSpace<Scalar = f64, Diff = <P as ControlPoint<f64>>::Diff>

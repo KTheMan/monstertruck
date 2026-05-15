@@ -56,7 +56,7 @@ where
     }
 }
 
-impl SearchNearestParameter<D1> for UnitParabola<Point2> {
+impl SearchNearestParameter<CurveParameter> for UnitParabola<Point2> {
     type Point = Point2;
     #[inline]
     fn search_nearest_parameter<H: Into<SearchParameterHint1D>>(
@@ -82,7 +82,7 @@ impl SearchNearestParameter<D1> for UnitParabola<Point2> {
     }
 }
 
-impl SearchNearestParameter<D1> for UnitParabola<Point3> {
+impl SearchNearestParameter<CurveParameter> for UnitParabola<Point3> {
     type Point = Point3;
     #[inline]
     fn search_nearest_parameter<H: Into<SearchParameterHint1D>>(
@@ -99,7 +99,7 @@ impl SearchNearestParameter<D1> for UnitParabola<Point3> {
     }
 }
 
-impl SearchParameter<D1> for UnitParabola<Point2> {
+impl SearchParameter<CurveParameter> for UnitParabola<Point2> {
     type Point = Point2;
     #[inline]
     fn search_parameter<H: Into<SearchParameterHint1D>>(
@@ -117,7 +117,7 @@ impl SearchParameter<D1> for UnitParabola<Point2> {
     }
 }
 
-impl SearchParameter<D1> for UnitParabola<Point3> {
+impl SearchParameter<CurveParameter> for UnitParabola<Point3> {
     type Point = Point3;
     #[inline]
     fn search_parameter<H: Into<SearchParameterHint1D>>(
