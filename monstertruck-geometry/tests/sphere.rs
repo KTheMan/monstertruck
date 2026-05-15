@@ -69,6 +69,46 @@ proptest! {
 
 }
 
+proptest! {
+    /// `search_nearest_parameter` must return a finite `(u, v)` for any
+    /// point on the sphere's axis-of-symmetry through `center`, including
+    /// the exact poles. Without the `sinu == 0` guard, the algorithm
+    /// computes `0 / 0` and propagates `NaN` through `clamp` and `acos`.
+    ///
+    /// Three regimes all hit the pole singularity:
+    /// - `axis_displacement == radius`: point sits exactly at a pole on
+    ///   the sphere surface.
+    /// - `axis_displacement < radius` (non-zero): point is inside the
+    ///   sphere on the axis; nearest sphere point is still a pole.
+    /// - `axis_displacement > radius`: point is outside the sphere on
+    ///   the axis; nearest sphere point is still a pole.
+    ///
+    /// `axis_displacement` is bounded away from zero because
+    /// `point == center` is a *different* singularity (see task #42).
+    #[test]
+    fn search_nearest_parameter_on_axis_is_finite(
+        center in prop::array::uniform3(-50f64..=50f64),
+        radius in 0.1f64..50f64,
+        axis_displacement in 0.01f64..100f64,
+        positive_axis in prop::bool::ANY,
+    ) {
+        let center = Point3::from(center);
+        let sphere = Sphere::new(center, radius);
+        let direction = if positive_axis { 1.0 } else { -1.0 };
+        let axis_point = center + Vector3::new(0.0, 0.0, direction * axis_displacement);
+        let (u, v) = sphere
+            .search_nearest_parameter(axis_point, None, 100)
+            .expect("a point on the axis-of-symmetry must yield a (u, v).");
+        prop_assert!(u.is_finite() && v.is_finite());
+        let projected = sphere.evaluate(u, v);
+        let expected = center + Vector3::new(0.0, 0.0, direction * radius);
+        // The pole evaluation drifts by ~`sqrt(2 * ulp(1.0))` in `u`,
+        // which becomes ~`radius * 1.5e-8` in 3D distance. Accept up to
+        // the kernel's standard `TOLERANCE`.
+        prop_assert_near!(projected, expected);
+    }
+}
+
 #[test]
 fn sphere_derivation_test() {
     let center = Point3::new(1.0, 2.0, 3.0);

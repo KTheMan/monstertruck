@@ -665,7 +665,7 @@ impl Table {
         Ok((entity, (parent_idx, child_idx)))
     }
 
-    pub fn step_assy(&self) -> Result<StepAssembly, StepConvertingError> {
+    pub fn step_assy(&self) -> Result<StepAssembly, LoadError> {
         let mut product_entities = Vec::<ProductEntity>::new();
         let mut indices_map = HashMap::<u64, usize>::new();
         let mut assy_nodes = Vec::<(AssembleEntity, (u64, u64))>::new();
@@ -689,10 +689,10 @@ impl Table {
                 Some((from, to, entity))
             })
             .collect::<Option<Vec<_>>>()
-            .ok_or::<StepConvertingError>("failed to reference `product_definiion_shape`".into())?;
+            .ok_or_else(|| LoadError::from("failed to reference `product_definition_shape`."))?;
 
         StepAssembly::try_from_adjacency(product_entities, adjacency)
-            .ok_or("maybe the graph has a cycle.".into())
+            .ok_or_else(|| LoadError::from("maybe the assembly graph has a cycle."))
     }
 }
 
@@ -818,6 +818,51 @@ mod tests {
     use super::*;
     use crate::load::step_geometry::SurfaceCurveRepresentation as StepSurfaceCurveRepresentation;
     use std::f64::consts::TAU;
+
+    /// Loads `occt-cylinder.step` and builds its trimmed shell. The
+    /// cylinder fixture carries `PCURVE` entities on both planar and
+    /// cylindrical surfaces, so this exercises the `ToSameGeometry<Curve2D>`
+    /// load path end-to-end -- the unit tests in `step_geometry/geom_impls`
+    /// only verify the impls in isolation. At least one of the resulting
+    /// trim curves must be present (`Some(_)`) and at least one of them
+    /// must contain a 2D curve variant that comes through the conversion.
+    #[test]
+    fn pcurve_load_path_populates_trim_curves() -> anyhow::Result<()> {
+        let step_string = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../resources/step/occt-cylinder.step",
+        ));
+        let table = crate::load::Table::from_step(step_string)?;
+        let step_shell = table
+            .shell
+            .values()
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("the cylinder fixture must contain a STEP shell."))?;
+        let trimmed = table.to_compressed_trimmed_shell(step_shell)?;
+        let total_edge_uses: usize = trimmed
+            .faces
+            .iter()
+            .flat_map(|face| &face.boundaries)
+            .map(|wire| wire.len())
+            .sum();
+        let trim_curves_present: usize = trimmed
+            .faces
+            .iter()
+            .flat_map(|face| &face.boundaries)
+            .flat_map(|wire| wire.iter())
+            .filter(|edge_use| edge_use.trim_curve.is_some())
+            .count();
+        assert!(
+            total_edge_uses > 0,
+            "the cylinder fixture should have at least one edge-use after trimmed loading.",
+        );
+        assert!(
+            trim_curves_present > 0,
+            "at least one edge-use should carry a trim curve. \
+             total edge-uses: {total_edge_uses}.",
+        );
+        Ok(())
+    }
 
     fn cylinder_surface() -> Surface {
         let axis = Vector3::unit_z();
