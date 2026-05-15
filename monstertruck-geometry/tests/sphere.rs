@@ -84,7 +84,8 @@ proptest! {
     ///   the axis; nearest sphere point is still a pole.
     ///
     /// `axis_displacement` is bounded away from zero because
-    /// `point == center` is a *different* singularity (see task #42).
+    /// `point == center` is a *different* singularity, handled by its
+    /// own guard and covered by `search_nearest_parameter_at_exact_center_is_finite`.
     #[test]
     fn search_nearest_parameter_on_axis_is_finite(
         center in prop::array::uniform3(-50f64..=50f64),
@@ -152,6 +153,22 @@ fn search_nearest_parameter_at_exact_south_pole_is_finite() {
         .expect("south pole should map to a valid (u, v).");
     assert!(u.is_finite() && v.is_finite());
     assert!(sphere.evaluate(u, v).distance(south_pole) < 1.0e-9);
+}
+
+#[test]
+fn search_nearest_parameter_at_exact_center_is_finite() {
+    // `point == center` is the second coordinate singularity (the first
+    // being the poles): `radial_vector.normalize()` would divide by zero
+    // and propagate `NaN`. Every (u, v) on the sphere is equidistant
+    // from the center; the guard returns the arbitrary `(0, 0)`.
+    let center = Point3::new(1.5, -2.5, 3.5);
+    let sphere = Sphere::new(center, 0.7);
+    let (u, v) = sphere
+        .search_nearest_parameter(center, None, 100)
+        .expect("the sphere's center must yield a (u, v).");
+    assert!(u.is_finite() && v.is_finite());
+    // The returned `(u, v)` must be a valid point on the sphere.
+    assert_near!(sphere.evaluate(u, v).distance(center), 0.7);
 }
 
 #[test]

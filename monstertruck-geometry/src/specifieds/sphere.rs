@@ -261,7 +261,16 @@ impl SearchNearestParameter<SurfaceParameter> for Sphere {
         _: H,
         _: usize,
     ) -> Option<(f64, f64)> {
-        let radius = (point - self.center).normalize();
+        let radial_vector = point - self.center;
+        // When `point` coincides with `center`, every `(u, v)` on the
+        // sphere is equidistant -- there is no unique nearest parameter.
+        // `radial_vector.normalize()` would divide by zero and propagate
+        // `NaN` through the rest of the routine; return an arbitrary
+        // valid `(u, v)` instead.
+        if radial_vector.magnitude2().so_small() {
+            return Some((0.0, 0.0));
+        }
+        let radius = radial_vector.normalize();
         // Clamp the `acos` argument to `[-1.0, 1.0]` so floating-point
         // error in `normalize()` cannot push it slightly outside the
         // domain and produce `NaN`.
