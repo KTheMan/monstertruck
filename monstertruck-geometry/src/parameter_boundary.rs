@@ -97,11 +97,13 @@ where
     S: PartialEq,
 {
     fn parameter_boundary_2d(&self, surface: &S, tolerance: f64) -> Option<Vec<Point2>> {
-        (self.surface() == surface).then(|| {
+        if self.surface() == surface {
             self.curve()
-                .parameter_division(self.curve().range_tuple(), tolerance)
-                .1
-        })
+                .try_parameter_division(self.curve().range_tuple(), tolerance)
+                .map(|(_, points)| points)
+        } else {
+            None
+        }
     }
 }
 
@@ -409,7 +411,7 @@ where
             self.boundary0()
                 .and_then(|boundary| boundary.parameter_boundary_2d(surface, tolerance))
                 .or_else(|| {
-                    self.parameter_division(self.range_tuple(), tolerance)
+                    self.try_parameter_division(self.range_tuple(), tolerance)?
                         .0
                         .into_iter()
                         .map(|t| self.search_triple(t, 100).map(|(_, uv0, _)| uv0))
@@ -419,7 +421,7 @@ where
             self.boundary1()
                 .and_then(|boundary| boundary.parameter_boundary_2d(surface, tolerance))
                 .or_else(|| {
-                    self.parameter_division(self.range_tuple(), tolerance)
+                    self.try_parameter_division(self.range_tuple(), tolerance)?
                         .0
                         .into_iter()
                         .map(|t| self.search_triple(t, 100).map(|(_, _, uv1)| uv1))

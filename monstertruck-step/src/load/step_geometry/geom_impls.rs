@@ -8,7 +8,7 @@ use monstertruck_modeling::{
     Surface as ModelingSurface,
 };
 use monstertruck_traits::SnapCurveEndpoints;
-use std::env;
+use std::{cmp::Ordering, env, time::Instant};
 
 #[cfg(test)]
 use std::f64::consts::TAU;
@@ -21,7 +21,7 @@ fn sampled_parameter_boundary<C>(
 where
     C: ParametricCurve3D + BoundedCurve + ParameterDivision1D<Point = Point3>,
 {
-    fn abs_diff(previous: f64) -> impl Fn(&f64, &f64) -> std::cmp::Ordering {
+    fn abs_diff(previous: f64) -> impl Fn(&f64, &f64) -> Ordering {
         let distance = move |value: &f64| f64::abs(*value - previous);
         // SAFETY: All compared values are finite after the finiteness check in
         // `normalize_axis`.
@@ -86,7 +86,9 @@ where
             normalize_axis(uv.y, previous.map(|(_, v)| v), surface.v_period(), vrange)?,
         ))
     };
-    let points = curve.parameter_division(curve.range_tuple(), tolerance).1;
+    let points = curve
+        .try_parameter_division(curve.range_tuple(), tolerance)?
+        .1;
     let project = |point: Point3, hint: Option<(f64, f64)>| {
         surface
             .search_parameter(point, hint, 100)
@@ -382,6 +384,14 @@ impl BoundedCurve for SurfaceCurve3D {}
 impl ParameterDivision1D for SurfaceCurve3D {
     type Point = Point3;
 
+    fn try_parameter_division(
+        &self,
+        range: (f64, f64),
+        tol: f64,
+    ) -> Option<(Vec<f64>, Vec<Self::Point>)> {
+        self.leader().try_parameter_division(range, tol)
+    }
+
     fn parameter_division(&self, range: (f64, f64), tol: f64) -> (Vec<f64>, Vec<Self::Point>) {
         self.leader().parameter_division(range, tol)
     }
@@ -502,9 +512,48 @@ impl Transformed<Matrix4> for SurfaceCurve3D {
 impl ParameterDivision1D for Curve3D {
     type Point = Point3;
 
+    fn try_parameter_division(
+        &self,
+        range: (f64, f64),
+        tol: f64,
+    ) -> Option<(Vec<f64>, Vec<Self::Point>)> {
+        let debug_profile = env::var("MT_PROFILE_CURVE_DIVISION").is_ok();
+        let started = Instant::now();
+        let result = match self {
+            Curve3D::Line(curve) => curve.try_parameter_division(range, tol),
+            Curve3D::Polyline(curve) => curve.try_parameter_division(range, tol),
+            Curve3D::Conic(curve) => curve.try_parameter_division(range, tol),
+            Curve3D::BsplineCurve(curve) => curve.try_parameter_division(range, tol),
+            Curve3D::ParameterCurve(curve) => curve.try_parameter_division(range, tol),
+            Curve3D::SurfaceCurve(curve) => curve.try_parameter_division(range, tol),
+            Curve3D::IntersectionCurve(curve) => curve.leader().try_parameter_division(range, tol),
+            Curve3D::NurbsCurve(curve) => curve.try_parameter_division(range, tol),
+        };
+        if debug_profile {
+            let kind = match self {
+                Curve3D::Line(_) => "Line",
+                Curve3D::Polyline(_) => "Polyline",
+                Curve3D::Conic(_) => "Conic",
+                Curve3D::BsplineCurve(_) => "BsplineCurve",
+                Curve3D::ParameterCurve(_) => "StepParameterCurve",
+                Curve3D::SurfaceCurve(_) => "SurfaceCurve",
+                Curve3D::IntersectionCurve(_) => "IntersectionCurve",
+                Curve3D::NurbsCurve(_) => "NurbsCurve",
+            };
+            eprintln!(
+                "trace bool curve_division kind={} points={} tol={} elapsed_ms={:.3}",
+                kind,
+                result.as_ref().map_or(0, |(_, points)| points.len()),
+                tol,
+                started.elapsed().as_secs_f64() * 1000.0,
+            );
+        }
+        result
+    }
+
     fn parameter_division(&self, range: (f64, f64), tol: f64) -> (Vec<f64>, Vec<Self::Point>) {
         let debug_profile = env::var("MT_PROFILE_CURVE_DIVISION").is_ok();
-        let started = std::time::Instant::now();
+        let started = Instant::now();
         let result = match self {
             Curve3D::Line(curve) => curve.parameter_division(range, tol),
             Curve3D::Polyline(curve) => curve.parameter_division(range, tol),
@@ -588,32 +637,33 @@ impl ParameterBoundary2D<Surface> for Curve3D {
         match self {
             Curve3D::ParameterCurve(curve) => {
                 if curve.surface().as_ref() == surface {
-                    Some(
-                        curve
-                            .curve()
-                            .parameter_division(curve.curve().range_tuple(), tolerance)
-                            .1,
-                    )
+                    curve
+                        .curve()
+                        .try_parameter_division(curve.curve().range_tuple(), tolerance)
+                        .map(|(_, points)| points)
                 } else {
                     sampled_parameter_boundary(curve, surface, tolerance)
                 }
             }
             Curve3D::SurfaceCurve(curve) => curve
                 .parameter_curve_on(surface)
-                .map(|parameter_curve| {
+                .and_then(|parameter_curve| {
                     parameter_curve
                         .curve()
-                        .parameter_division(parameter_curve.curve().range_tuple(), tolerance)
-                        .1
+                        .try_parameter_division(parameter_curve.curve().range_tuple(), tolerance)
+                        .map(|(_, points)| points)
                 })
                 .or_else(|| sampled_parameter_boundary(curve.leader(), surface, tolerance)),
             Curve3D::IntersectionCurve(curve) => {
                 exact_parameter_curve_on(curve.leader().as_ref(), surface)
-                    .map(|parameter_curve| {
+                    .and_then(|parameter_curve| {
                         parameter_curve
                             .curve()
-                            .parameter_division(parameter_curve.curve().range_tuple(), tolerance)
-                            .1
+                            .try_parameter_division(
+                                parameter_curve.curve().range_tuple(),
+                                tolerance,
+                            )
+                            .map(|(_, points)| points)
                     })
                     .or_else(|| {
                         sampled_parameter_boundary(curve.leader().as_ref(), surface, tolerance)
@@ -621,7 +671,7 @@ impl ParameterBoundary2D<Surface> for Curve3D {
                     .or_else(|| {
                         curve
                             .leader()
-                            .parameter_division(curve.range_tuple(), tolerance)
+                            .try_parameter_division(curve.range_tuple(), tolerance)?
                             .0
                             .into_iter()
                             .map(|t| {

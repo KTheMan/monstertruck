@@ -1570,19 +1570,13 @@ impl PolyBoundary {
         let mut added_constraints = 0usize;
         let mut skipped_constraints = 0usize;
         let mut add_constraint = |front: FixedVertexHandle, back: FixedVertexHandle| {
-            if !triangulation.can_add_constraint(front, back) {
+            let constraints = triangulation.add_constraint_and_split(front, back, |point| point);
+            if constraints.is_empty() {
                 skipped_constraints += 1;
                 false
             } else {
-                let constraints =
-                    triangulation.add_constraint_and_split(front, back, |point| point);
-                if constraints.is_empty() {
-                    skipped_constraints += 1;
-                    false
-                } else {
-                    added_constraints += constraints.len();
-                    true
-                }
+                added_constraints += constraints.len();
+                true
             }
         };
         self.loops.iter().map(Vec::len).for_each(|len| {

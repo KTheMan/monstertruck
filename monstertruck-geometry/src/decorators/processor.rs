@@ -487,6 +487,34 @@ impl<C> ParameterDivision1D for Processor<C, Matrix3>
 where C: ParameterDivision1D<Point = Point2> + BoundedCurve<Point = Point2>
 {
     type Point = Point2;
+
+    fn try_parameter_division(
+        &self,
+        range: (f64, f64),
+        tol: f64,
+    ) -> Option<(Vec<f64>, Vec<Self::Point>)> {
+        let a = self.transform;
+        let range = match self.orientation {
+            true => range,
+            false => (self.curve_parameter(range.1), self.curve_parameter(range.0)),
+        };
+        let (_, k, _) = a.iwasawa_decomposition()?;
+        let n = f64::abs(k[0][0])
+            .max(f64::abs(k[1][1]))
+            .max(f64::abs(k[2][2]));
+        let (mut params, mut points) = self.entity.try_parameter_division(range, tol / n)?;
+        points
+            .iter_mut()
+            .for_each(|pt| *pt = a.transform_point(*pt));
+        if !self.orientation {
+            params
+                .iter_mut()
+                .for_each(|t| *t = self.curve_parameter(*t));
+            points.reverse();
+        }
+        Some((params, points))
+    }
+
     fn parameter_division(&self, range: (f64, f64), tol: f64) -> (Vec<f64>, Vec<Self::Point>) {
         let a = self.transform;
         let range = match self.orientation {
@@ -517,6 +545,35 @@ impl<C> ParameterDivision1D for Processor<C, Matrix4>
 where C: ParameterDivision1D<Point = Point3> + BoundedCurve<Point = Point3>
 {
     type Point = Point3;
+
+    fn try_parameter_division(
+        &self,
+        range: (f64, f64),
+        tol: f64,
+    ) -> Option<(Vec<f64>, Vec<Self::Point>)> {
+        let a = self.transform;
+        let range = match self.orientation {
+            true => range,
+            false => (self.curve_parameter(range.1), self.curve_parameter(range.0)),
+        };
+        let (_, k, _) = a.iwasawa_decomposition()?;
+        let n = f64::abs(k[0][0])
+            .max(f64::abs(k[1][1]))
+            .max(f64::abs(k[2][2]))
+            / f64::abs(k[3][3]);
+        let (mut params, mut points) = self.entity.try_parameter_division(range, tol / n)?;
+        points
+            .iter_mut()
+            .for_each(|pt| *pt = a.transform_point(*pt));
+        if !self.orientation {
+            params
+                .iter_mut()
+                .for_each(|t| *t = self.curve_parameter(*t));
+            points.reverse();
+        }
+        Some((params, points))
+    }
+
     fn parameter_division(&self, range: (f64, f64), tol: f64) -> (Vec<f64>, Vec<Self::Point>) {
         let a = self.transform;
         let range = match self.orientation {

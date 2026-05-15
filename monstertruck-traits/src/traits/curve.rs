@@ -2,7 +2,7 @@ use super::*;
 use monstertruck_core::{
     assert_near,
     cgmath64::{Point2, Point3, Vector2, Vector3},
-    tolerance::Tolerance,
+    tolerance::{TOLERANCE, Tolerance},
 };
 use std::fmt::Debug;
 use thiserror::Error;
@@ -152,6 +152,16 @@ impl<C: ParametricCurve<Point = Point3, Vector = Vector3>> ParametricCurve3D for
 pub trait ParameterDivision1D {
     /// The curve is in the space of `Self::Point`.
     type Point;
+
+    /// Tries to create the curve division without panicking on invalid tolerance.
+    fn try_parameter_division(
+        &self,
+        range: (f64, f64),
+        tol: f64,
+    ) -> Option<(Vec<f64>, Vec<Self::Point>)> {
+        (tol >= TOLERANCE).then(|| self.parameter_division(range, tol))
+    }
+
     /// Creates the curve division (parameters, corresponding points).
     ///
     /// # Panics
@@ -162,6 +172,15 @@ pub trait ParameterDivision1D {
 
 impl<C: ParameterDivision1D> ParameterDivision1D for &C {
     type Point = C::Point;
+
+    fn try_parameter_division(
+        &self,
+        range: (f64, f64),
+        tol: f64,
+    ) -> Option<(Vec<f64>, Vec<Self::Point>)> {
+        (*self).try_parameter_division(range, tol)
+    }
+
     fn parameter_division(&self, range: (f64, f64), tol: f64) -> (Vec<f64>, Vec<Self::Point>) {
         (*self).parameter_division(range, tol)
     }
@@ -169,6 +188,15 @@ impl<C: ParameterDivision1D> ParameterDivision1D for &C {
 
 impl<C: ParameterDivision1D> ParameterDivision1D for Box<C> {
     type Point = C::Point;
+
+    fn try_parameter_division(
+        &self,
+        range: (f64, f64),
+        tol: f64,
+    ) -> Option<(Vec<f64>, Vec<Self::Point>)> {
+        (**self).try_parameter_division(range, tol)
+    }
+
     fn parameter_division(&self, range: (f64, f64), tol: f64) -> (Vec<f64>, Vec<Self::Point>) {
         (**self).parameter_division(range, tol)
     }
