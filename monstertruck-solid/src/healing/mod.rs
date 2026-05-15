@@ -18,6 +18,9 @@ use split_closed_edges::split_closed_edges;
 mod split_closed_faces;
 use split_closed_faces::split_closed_faces;
 
+mod strip_seam_edges;
+use strip_seam_edges::strip_seam_edges;
+
 /// Splits closed edges and faces
 ///
 /// # Details
@@ -54,6 +57,7 @@ where
         }
         split_closed_edges(self);
         split_closed_faces(self, tol, sp);
+        strip_seam_edges(self);
     }
 }
 
@@ -107,6 +111,7 @@ where
         }
         split_closed_edges(self);
         split_closed_faces(self, tol, sp);
+        strip_seam_edges(self);
     }
 }
 

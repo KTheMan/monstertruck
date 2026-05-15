@@ -16,29 +16,20 @@ fn create_parameter_boundary<P, C, S>(
 where
     P: Copy,
     C: BoundedCurve<Point = P> + ParameterDivision1D<Point = P>,
-    S: Clone + SearchParameter<SurfaceParameter, Point = P> + SearchNearestParameter<SurfaceParameter, Point = P>,
+    S: Clone + SearchParameter<SurfaceParameter, Point = P>,
 {
     let surface = face.surface();
-    let pt = wire.front_vertex()?.point();
-    let p: Point2 = surface
-        .search_parameter(pt, None, 100)
-        .or_else(|| surface.search_nearest_parameter(pt, None, 100))?
-        .into();
+    let pt = wire.front_vertex().unwrap().point();
+    let p: Point2 = surface.search_parameter(pt, None, 100)?.into();
     let vec = wire.edge_iter().try_fold(vec![p], |mut vec, edge| {
         let poly = polys.entry(edge.id()).or_insert_with(|| {
             let curve = edge.curve();
             let div = curve.parameter_division(curve.range_tuple(), tol).1;
             PolylineCurve(div)
         });
-        // SAFETY: `vec` is initialized with one element and only appended to.
         let mut p = *vec.last().unwrap();
         let closure = |q: &P| -> Option<Point2> {
-            p = surface
-                .search_parameter(*q, Some(p.into()), 100)
-                .or_else(|| surface.search_nearest_parameter(*q, Some(p.into()), 100))
-                .or_else(|| surface.search_parameter(*q, None, 100))
-                .or_else(|| surface.search_nearest_parameter(*q, None, 100))?
-                .into();
+            p = surface.search_parameter(*q, Some(p.into()), 100)?.into();
             Some(p)
         };
         let add: Option<Vec<Point2>> = match edge.orientation() {
@@ -65,16 +56,14 @@ fn divide_one_face<C, S>(
 ) -> Option<Vec<FaceWithShapesOpStatus<C, S>>>
 where
     C: BoundedCurve<Point = Point3> + ParameterDivision1D<Point = Point3>,
-    S: Clone + SearchParameter<SurfaceParameter, Point = Point3> + SearchNearestParameter<SurfaceParameter, Point = Point3>,
+    S: Clone + SearchParameter<SurfaceParameter, Point = Point3>,
 {
-    let area_tol = tol * TOLERANCE;
-    let cancellation_tol = TOLERANCE;
     let (mut pre_faces, mut negative_wires) = (Vec::new(), Vec::new());
     let mut map = HashMap::default();
     loops.iter().try_for_each(|wire| {
         let poly = create_parameter_boundary(face, wire, &mut map, tol)?;
         let area = poly.area();
-        if area.abs() < area_tol {
+        if area.abs() < tol {
             return Some(());
         }
         match area > 0.0 {
@@ -84,25 +73,14 @@ where
         Some(())
     })?;
     negative_wires.into_iter().try_for_each(|chunk| {
-        let len = chunk.poly.len();
-        let centroid = chunk
-            .poly
-            .iter()
-            .fold(Vector2::new(0.0, 0.0), |acc, p| acc + p.to_vec())
-            / len as f64;
-        let centroid = Point2::from_vec(centroid);
-        let front = chunk.poly.front();
-        let candidates = [centroid, front.midpoint(centroid), front];
-        let idx = pre_faces
-            .iter()
-            .position(|face| candidates.into_iter().any(|pt| face[0].poly.include(pt)));
+        let pt = chunk.poly.front();
+        let idx = pre_faces.iter().position(|face| face[0].poly.include(pt));
         if let Some(i) = idx {
             let outer_area = pre_faces[i][0].poly.area();
             let chunk_area = chunk.poly.area();
-            let scale = f64::max(1.0, f64::max(outer_area.abs(), chunk_area.abs()));
             // If the sum of areas is zero, the face is canceled.
             // This happens when an intersection loop exactly matches the face boundary.
-            if (outer_area + chunk_area).abs() < cancellation_tol * scale {
+            if (outer_area + chunk_area).abs() < tol {
                 pre_faces[i].clear();
             } else {
                 pre_faces[i].push(chunk);
@@ -126,7 +104,7 @@ where
                 .into_iter()
                 .map(|chunk| chunk.wire.deref().clone())
                 .collect();
-            let mut new_face = Face::try_new(wires, surface).ok()?;
+            let mut new_face = Face::debug_new(wires, surface).ok()?;
             if !face.orientation() {
                 new_face.invert();
             }
@@ -143,7 +121,7 @@ pub fn divide_faces<C, S>(
 ) -> Option<FacesClassification<Point3, C, S>>
 where
     C: BoundedCurve<Point = Point3> + ParameterDivision1D<Point = Point3>,
-    S: Clone + SearchParameter<SurfaceParameter, Point = Point3> + SearchNearestParameter<SurfaceParameter, Point = Point3>,
+    S: Clone + SearchParameter<SurfaceParameter, Point = Point3>,
 {
     let mut res = FacesClassification::<Point3, C, S>::default();
     shell
@@ -156,12 +134,9 @@ where
             {
                 res.push(face.clone(), ShapesOpStatus::Unknown);
             } else {
-                if let Some(vec) = divide_one_face(face, loops, tol) {
-                    vec.into_iter()
-                        .for_each(|(face, status)| res.push(face, status));
-                } else {
-                    res.push(face.clone(), ShapesOpStatus::Unknown);
-                }
+                let vec = divide_one_face(face, loops, tol)?;
+                vec.into_iter()
+                    .for_each(|(face, status)| res.push(face, status));
             }
             Some(())
         })?;

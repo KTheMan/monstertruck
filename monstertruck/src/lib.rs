@@ -82,11 +82,9 @@
 //! # Example: subtract a cylinder from a box, then export STEP
 //!
 //! Build a cuboid and a cylinder, subtract the cylinder via boolean `AND`
-//! against its inverse, and emit the result as a STEP string. The doctest
-//! is `no_run` because the boolean operator is slow enough to crowd out
-//! the rest of the test suite.
+//! against its inverse, and emit the result as a STEP string.
 //!
-//! ```no_run
+//! ```
 //! # #[cfg(not(all(feature = "step", feature = "solid")))]
 //! # fn main() {}
 //! # #[cfg(all(feature = "step", feature = "solid"))]
