@@ -3,7 +3,7 @@ use monstertruck_geometry::prelude::*;
 #[derive(Clone)]
 struct CurveLength;
 
-impl UnivariateScalarFunction for CurveLength {
+impl CurveScalarFunction for CurveLength {
     fn derivative_n(&self, n: usize, t: f64) -> f64 {
         match n {
             0 => 1.0 + t + t * t,
@@ -49,7 +49,7 @@ fn normal_offset_field_unit_circle_with_fixed_length() {
 #[derive(Clone)]
 struct PlaneLength;
 
-impl BivariateScalarFunction for PlaneLength {
+impl SurfaceScalarFunction for PlaneLength {
     fn derivative_mn(&self, m: usize, n: usize, u: f64, v: f64) -> f64 {
         match (m, n) {
             (0, 0) => u * u + u * v + v * v,

@@ -145,7 +145,7 @@ impl<T, F> NormalOffsetField<T, F> {
 impl<C, F> ParametricCurve for NormalOffsetField<C, F>
 where
     C: ParametricCurve2D,
-    F: UnivariateScalarFunction,
+    F: CurveScalarFunction,
 {
     type Point = Vector2;
     type Vector = Vector2;
@@ -178,7 +178,7 @@ where
 impl<S, F> ParametricSurface for NormalOffsetField<S, F>
 where
     S: ParametricSurface3D,
-    F: BivariateScalarFunction,
+    F: SurfaceScalarFunction,
 {
     type Point = Vector3;
     type Vector = Vector3;

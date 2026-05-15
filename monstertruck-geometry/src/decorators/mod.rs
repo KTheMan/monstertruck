@@ -382,8 +382,8 @@ pub struct OffsetSurface<S, N> {
 }
 
 /// Unit-normal field of a curve in the plane or a surface in space,
-/// scaled by a per-parameter [`UnivariateScalarFunction`] or
-/// [`BivariateScalarFunction`] respectively.
+/// scaled by a per-parameter [`CurveScalarFunction`] or
+/// [`SurfaceScalarFunction`] respectively.
 ///
 /// Implements [`ParametricCurve`] when `T: ParametricCurve2D` (with the
 /// normal taken as the in-plane rotation of the tangent by 90 degrees)
@@ -399,13 +399,13 @@ pub struct NormalOffsetField<T, F> {
     scalar: F,
 }
 
-/// Univariate scalar function with derivatives of every order.
+/// Scalar function parameterised over a curve's `t` parameter.
 ///
 /// Implementors include `f64` (interpreted as a constant function) and
 /// per-coordinate projections of the small fixed-dimension spline types
 /// (e.g. `BsplineCurve<Vector1>`). Typically supplied as the magnitude
 /// component of a [`NormalOffsetField`] on a 2D curve.
-pub trait UnivariateScalarFunction: Clone {
+pub trait CurveScalarFunction: Clone {
     /// Returns the `n`th-order derivative at parameter `t`.
     fn derivative_n(&self, n: usize, t: f64) -> f64;
     /// Substitutes the parameter `t` and returns the function value.
@@ -424,13 +424,13 @@ pub trait UnivariateScalarFunction: Clone {
     }
 }
 
-/// Bivariate scalar function with mixed partial derivatives of every order.
+/// Scalar function parameterised over a surface's `(u, v)` parameters.
 ///
 /// Implementors include `f64` (interpreted as a constant function) and
 /// per-coordinate projections of fixed-dimension spline surface types
 /// (e.g. `BsplineSurface<Vector1>`). Typically supplied as the magnitude
 /// component of a [`NormalOffsetField`] on a 3D surface.
-pub trait BivariateScalarFunction: Clone {
+pub trait SurfaceScalarFunction: Clone {
     /// Returns the mixed partial derivative
     /// $\partial^{m+n} f / \partial u^m \partial v^n$ at `(u, v)`.
     fn derivative_mn(&self, m: usize, n: usize, u: f64, v: f64) -> f64;
@@ -464,18 +464,18 @@ pub trait BivariateScalarFunction: Clone {
     }
 }
 
-// The upstream `truck-geometry` trait spellings `ScalarFunctionD1` /
-// `ScalarFunctionD2` use a `D1`/`D2` dimension-marker suffix that reads
-// like a generic argument over our existing `D1`/`D2` parameter-space
-// enums (where they are not). We standardise on `UnivariateScalarFunction`
-// / `BivariateScalarFunction` -- ordinary English and free of the
-// "Dimension N" abbreviation -- and keep the upstream names as
-// `#[deprecated]` re-exports so code ported from `truck-geometry`
-// continues to compile.
-#[deprecated(since = "0.3.1", note = "renamed to `UnivariateScalarFunction`.")]
-pub use self::UnivariateScalarFunction as ScalarFunctionD1;
-#[deprecated(since = "0.3.1", note = "renamed to `BivariateScalarFunction`.")]
-pub use self::BivariateScalarFunction as ScalarFunctionD2;
+// The canonical names are `CurveScalarFunction` and `SurfaceScalarFunction`:
+// they say what the function is parameterised *over* and use only the
+// concrete words "curve" and "surface" that appear all over the kernel.
+// The upstream `truck-geometry` spellings `ScalarFunctionD1` /
+// `ScalarFunctionD2` -- whose trailing `D1`/`D2` reads like a generic
+// argument over our existing parameter-space markers, which it is not --
+// are kept as `#[deprecated]` re-exports so code ported from upstream
+// keeps compiling with a warning.
+#[deprecated(since = "0.3.1", note = "renamed to `CurveScalarFunction`.")]
+pub use self::CurveScalarFunction as ScalarFunctionD1;
+#[deprecated(since = "0.3.1", note = "renamed to `SurfaceScalarFunction`.")]
+pub use self::SurfaceScalarFunction as ScalarFunctionD2;
 
 // `NormalField` in upstream conflates "normal field" with "offset along
 // the normal." `NormalOffsetField` makes the intent explicit. The alias
