@@ -491,3 +491,25 @@ Keep a note in this file and mine only these parts:
 - Do not restore upstream names when current `monstertruck` names are clearer.
 - Do not advance the merge-base in this file until audited ports land.
 - Treat drafting, fillet, offset, and assembly as independent projects, not as part of routine upstream sync.
+
+## Known failure: `monstertruck-solid` boolean-op regressions
+
+`cargo test -p monstertruck-solid --tests` fails four tests at HEAD as of 2026-05-15. All four predate the current session's work and trace back to commit `700138cb` ("feat: robust boolean ops (Result API), meta-crate feature gates, workspace fixes", 2026-03-03), which rewrote `monstertruck-solid/src/transversal/integrate/mod.rs` from a ~140-line passthrough into the current ~690-line algorithm (`process_one_pair_of_shells`, `try_cap_shell_with_existing_surfaces`, `try_build_solid` with `ShellCondition::Closed` validation).
+
+Failing tests, grouped by symptom:
+
+1. `transversal::integrate::tests::punched_cube` and `fillet::tests::boolean_shell_converts_for_fillet`
+   - Both produce `InvalidOutputShellCondition { condition: Oriented, boundary_loops: 1, first_boundary_len: 3, .. }` from `solid::and`.
+   - `punched_cube` builds a triangular cylinder (`division = 3`) extruding from `z = -0.5` to `z = 1.5` through a unit cube and subtracts it. Open boundary lives at `[0.5, 0.25, 0.0]`, which is the cylinder rim on the cube's bottom plane -- i.e. the bottom triangular cap of the punched hole is missing or its boundary is not shared with the modified bottom face.
+   - `try_cap_shell_with_existing_surfaces` is supposed to recover this case but is filtering candidates by `quality < current_quality` (strict less-than), and only considers surfaces from faces that already share an edge with the open boundary.
+2. `transversal::integrate::tests::adjacent_cubes_or`
+   - Two stacked unit cubes; `or` returns a shell whose triangulated center of gravity is `[0.75, 0.75, 1.125]` instead of `[0.75, 0.75, 1.25]`. Volume + bounding box checks pass, so the boolean is producing a topologically reasonable shell but with a half-stair near `z = 1`. Looks like one face on the shared midplane is being kept (or dropped) by `and_or_unknown` when it should be the other way around.
+3. `healing::tests::step_import`
+   - Imports a series of bundled STEP samples; first failure is `NotSimpleWire` on one of `occt-cylinder.step`, `occt-cone.step`, `abc-0006.step`, `abc-0008.step`. Independent of the boolean-op rewrite -- this is in `monstertruck-solid/src/healing`.
+
+### Recommended next steps (out of scope for the upstream sync)
+
+- Bisect against commit `700138cb~1`. If the first two tests pass there, the rewrite is the regression source and the right move is to keep the old simple boolean path behind a feature flag while the new algorithm is debugged.
+- Reproduce `punched_cube` with `MT_BOOL_DEBUG_BOUNDARY=1 MT_BOOL_DEBUG_COUNTS=1 MT_BOOL_DEBUG_CAP=1 cargo test -p monstertruck-solid -- punched_cube --nocapture`; this dumps the assignment search, the unknown-face classifications, and the cap-shell candidates that the healing pass rejected.
+- For `step_import`, narrow to the offending fixture by splitting the test, then check whether the failure is in the parser (`load::Table::from_step`) or in `healing::split_closed_face`.
+- These tests should stay listed (no `#[ignore]`) -- they are the canonical regression markers for the boolean-op rework and silencing them would erase the only signal we have.
