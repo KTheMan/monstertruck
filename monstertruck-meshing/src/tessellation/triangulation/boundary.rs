@@ -50,6 +50,26 @@ fn orient_boundary_to_edge<C, S>(
 pub(super) struct PolyBoundaryPiece(pub(super) Vec<SurfacePoint>);
 
 impl PolyBoundaryPiece {
+    fn rounded_uv_key(point: SurfacePoint) -> (u64, u64) {
+        (
+            spade_round(point.x).to_bits(),
+            spade_round(point.y).to_bits(),
+        )
+    }
+
+    pub(super) fn is_cdt_compatible(&self) -> bool {
+        let len = self.0.len();
+        let mut seen = HashMap::<(u64, u64), usize>::default();
+        self.0.iter().copied().enumerate().all(|(index, point)| {
+            let key = Self::rounded_uv_key(point);
+            if let Some(previous) = seen.insert(key, index) {
+                index == previous + 1 || (previous == 0 && index + 1 == len)
+            } else {
+                true
+            }
+        })
+    }
+
     fn clamp_near_range(value: f64, (min, max): (f64, f64)) -> f64 {
         if value < min && min - value < TOLERANCE {
             min
@@ -1132,6 +1152,17 @@ fn close_open_periodic_curve_to_singular(
     Some(connect_edges([curve, vec0, vec1, vec2]))
 }
 
+fn open_pair_connector_score(
+    p0: SurfacePoint,
+    p1: SurfacePoint,
+    q0: SurfacePoint,
+    q1: SurfacePoint,
+) -> f64 {
+    let p1q0 = p1.uv - q0.uv;
+    let q1p0 = q1.uv - p0.uv;
+    p1q0.x * p1q0.x + p1q0.y * p1q0.y + q1p0.x * q1p0.x + q1p0.y * q1p0.y
+}
+
 pub(super) type UvKey = (u64, u64);
 
 pub(super) fn uv_key(uv: Point2) -> UvKey { (uv.x.to_bits(), uv.y.to_bits()) }
@@ -1299,6 +1330,12 @@ impl PolyBoundary {
                         normalize_range(&mut curve0, 1, vrange);
                         normalize_range(&mut curve1, 1, vrange);
                     }
+                }
+                let ((p0, p1), (q0, q1)) = (end_pts(&curve0), end_pts(&curve1));
+                let current_score = open_pair_connector_score(p0, p1, q0, q1);
+                let reversed_score = open_pair_connector_score(p0, p1, q1, q0);
+                if reversed_score + TOLERANCE < current_score {
+                    curve1.reverse();
                 }
                 let ((p0, p1), (q0, q1)) = (end_pts(&curve0), end_pts(&curve1));
                 let vec0 = polyline_on_surface(surface, p1, q0, tolerance, &mut point_cache);

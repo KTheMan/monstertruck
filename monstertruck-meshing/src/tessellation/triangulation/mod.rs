@@ -39,8 +39,8 @@ impl<C, S> ExactTrimBoundary2D for ParameterCurve<C, S>
 where
     C: ParametricCurve2D + BoundedCurve + ParameterDivision1D<Point = Point2>,
     S: ParametricSurface3D,
-    ParameterCurve<C, S>:
-        SearchParameter<CurveParameter, Point = Point3> + SearchNearestParameter<CurveParameter, Point = Point3>,
+    ParameterCurve<C, S>: SearchParameter<CurveParameter, Point = Point3>
+        + SearchNearestParameter<CurveParameter, Point = Point3>,
 {
     fn exact_trim_boundary_2d(&self, tolerance: f64) -> Vec<Point2> {
         lifted_trim_boundary_2d(self, tolerance)
@@ -969,7 +969,9 @@ where
                 )
             };
             let exact_piece = if has_shared_edge_polyline {
-                aligned_trim_piece().or_else(direct_trim_piece)
+                aligned_trim_piece()
+                    .filter(PolyBoundaryPiece::is_cdt_compatible)
+                    .or_else(direct_trim_piece)
             } else {
                 direct_trim_piece().or_else(aligned_trim_piece)
             }
