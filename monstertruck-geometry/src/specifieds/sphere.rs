@@ -262,16 +262,26 @@ impl SearchNearestParameter<SurfaceParameter> for Sphere {
         _: usize,
     ) -> Option<(f64, f64)> {
         let radius = (point - self.center).normalize();
-        // Clamp the `acos` arguments to `[-1.0, 1.0]` so floating-point
-        // error in `normalize()` or in the `radius[0] / sinu` division
-        // cannot push them slightly outside the domain and produce `NaN`.
+        // Clamp the `acos` argument to `[-1.0, 1.0]` so floating-point
+        // error in `normalize()` cannot push it slightly outside the
+        // domain and produce `NaN`.
         let u = f64::acos(f64::clamp(radius[2], -1.0, 1.0));
         let sinu = f64::sqrt(1.0 - radius[2] * radius[2]);
-        let cosv = f64::clamp(radius[0] / sinu, -1.0, 1.0);
-        let v = if radius[1] > 0.0 {
-            f64::acos(cosv)
+        // The poles (`sinu == 0`, i.e. `point` on the sphere's
+        // axis-of-symmetry through `center`) are a coordinate
+        // singularity: every value of `v` maps to the same 3D point, so
+        // pick `0` rather than evaluating `radius[0] / sinu` (which
+        // would be `0 / 0`, producing `NaN` that propagates through
+        // every following `clamp` and `acos`).
+        let v = if sinu.so_small() {
+            0.0
         } else {
-            2.0 * PI - f64::acos(cosv)
+            let cosv = f64::clamp(radius[0] / sinu, -1.0, 1.0);
+            if radius[1] > 0.0 {
+                f64::acos(cosv)
+            } else {
+                2.0 * PI - f64::acos(cosv)
+            }
         };
         Some((u, v))
     }

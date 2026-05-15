@@ -87,6 +87,34 @@ fn sphere_derivation_test() {
 }
 
 #[test]
+fn search_nearest_parameter_at_exact_north_pole_is_finite() {
+    // At `u = 0` the sphere parameterisation has a coordinate singularity:
+    // `sinu == 0` and `cosv = radius[0] / sinu` would be `0 / 0 = NaN`.
+    // The pole guard picks `v = 0` arbitrarily so the result is finite.
+    let center = Point3::new(0.5, 0.5, 0.5);
+    let sphere = Sphere::new(center, 1.0);
+    let north_pole = center + Vector3::unit_z();
+    let (u, v) = sphere
+        .search_nearest_parameter(north_pole, None, 100)
+        .expect("north pole should map to a valid (u, v).");
+    assert!(u.is_finite() && v.is_finite());
+    assert!(sphere.evaluate(u, v).distance(north_pole) < 1.0e-9);
+}
+
+#[test]
+fn search_nearest_parameter_at_exact_south_pole_is_finite() {
+    // Same singularity at `u = π`. Symmetric to the north-pole case.
+    let center = Point3::origin();
+    let sphere = Sphere::new(center, 2.0);
+    let south_pole = center + Vector3::new(0.0, 0.0, -2.0);
+    let (u, v) = sphere
+        .search_nearest_parameter(south_pole, None, 100)
+        .expect("south pole should map to a valid (u, v).");
+    assert!(u.is_finite() && v.is_finite());
+    assert!(sphere.evaluate(u, v).distance(south_pole) < 1.0e-9);
+}
+
+#[test]
 fn search_nearest_parameter_near_north_pole_is_finite() {
     // Catastrophic cancellation in `point - center` for a center far
     // from the origin produces a unit vector whose `z`-coordinate is
