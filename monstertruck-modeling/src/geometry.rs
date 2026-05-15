@@ -378,6 +378,21 @@ impl From<IntersectionCurve<BsplineCurve<Point3>, Surface, Surface>> for Curve {
     }
 }
 
+fn boundary_curve_2d_to_model_curve(
+    curve: ParameterCurve<BoundaryCurve2D, Surface>,
+) -> ParameterCurve<Curve2D, Box<Surface>> {
+    let surface = Box::new(curve.surface().clone());
+    match curve.curve() {
+        BoundaryCurve2D::Line(line) => ParameterCurve::new(Curve2D::Line(*line), surface),
+        BoundaryCurve2D::BsplineCurve(bspline) => {
+            ParameterCurve::new(Curve2D::BsplineCurve(bspline.clone()), surface)
+        }
+        BoundaryCurve2D::NurbsCurve(nurbs) => {
+            ParameterCurve::new(Curve2D::NurbsCurve(nurbs.clone()), surface)
+        }
+    }
+}
+
 impl
     From<
         SurfaceCurve<
@@ -399,21 +414,43 @@ impl
         >,
     ) -> Curve {
         let (surface0, surface1, leader, boundary0, boundary1) = c.destruct_with_boundaries();
-        let convert_boundary = |curve: ParameterCurve<BoundaryCurve2D, Surface>| {
-            let surface = Box::new(curve.surface().clone());
-            match curve.curve() {
-                BoundaryCurve2D::Line(line) => ParameterCurve::new(Curve2D::Line(*line), surface),
-                BoundaryCurve2D::BsplineCurve(bspline) => {
-                    ParameterCurve::new(Curve2D::BsplineCurve(bspline.clone()), surface)
-                }
-            }
-        };
         Curve::IntersectionCurve(SurfaceCurve::with_boundaries(
             Box::new(surface0),
             Box::new(surface1),
             Box::new(leader.into()),
-            boundary0.map(convert_boundary),
-            boundary1.map(convert_boundary),
+            boundary0.map(boundary_curve_2d_to_model_curve),
+            boundary1.map(boundary_curve_2d_to_model_curve),
+        ))
+    }
+}
+
+impl
+    From<
+        SurfaceCurve<
+            NurbsCurve<Vector4>,
+            Surface,
+            Surface,
+            ParameterCurve<BoundaryCurve2D, Surface>,
+            ParameterCurve<BoundaryCurve2D, Surface>,
+        >,
+    > for Curve
+{
+    fn from(
+        c: SurfaceCurve<
+            NurbsCurve<Vector4>,
+            Surface,
+            Surface,
+            ParameterCurve<BoundaryCurve2D, Surface>,
+            ParameterCurve<BoundaryCurve2D, Surface>,
+        >,
+    ) -> Curve {
+        let (surface0, surface1, leader, boundary0, boundary1) = c.destruct_with_boundaries();
+        Curve::IntersectionCurve(SurfaceCurve::with_boundaries(
+            Box::new(surface0),
+            Box::new(surface1),
+            Box::new(leader.into()),
+            boundary0.map(boundary_curve_2d_to_model_curve),
+            boundary1.map(boundary_curve_2d_to_model_curve),
         ))
     }
 }
