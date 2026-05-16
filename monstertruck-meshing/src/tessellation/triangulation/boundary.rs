@@ -1,6 +1,6 @@
 use super::*;
 use mesh::spade_round;
-use std::{f64::consts::TAU, mem};
+use std::{f64::consts::TAU, iter, mem};
 
 const PERIODIC_LOOP_OTHER_AXIS_TOLERANCE: f64 = 1.0e-6;
 const SINGULAR_RADIUS_RELATIVE_TOLERANCE: f64 = 1.0e-6;
@@ -1167,6 +1167,24 @@ pub(super) type UvKey = (u64, u64);
 
 pub(super) fn uv_key(uv: Point2) -> UvKey { (uv.x.to_bits(), uv.y.to_bits()) }
 
+pub(super) fn boundary_segment_parameter(
+    point: Point2,
+    front: Point2,
+    back: Point2,
+) -> Option<f64> {
+    let segment = back - front;
+    let denom = segment.dot(segment);
+    if denom.so_small() {
+        None
+    } else {
+        let offset = point - front;
+        let parameter = offset.dot(segment) / denom;
+        let projected = front + segment * parameter;
+        (parameter > 0.0 && parameter < 1.0 && projected.distance(point) <= 1.0e-9)
+            .then_some(parameter)
+    }
+}
+
 pub(super) fn surface_point_with_cache(
     surface: &impl PreMeshableSurface,
     uv: Point2,
@@ -1189,6 +1207,28 @@ fn push_finished_isoparam_curve(curves: &mut Vec<Vec<Point2>>, curve: &mut Vec<P
         curves.push(mem::take(curve));
     } else {
         curve.clear();
+    }
+}
+
+fn add_direct_cdt_constraint(
+    triangulation: &mut Cdt,
+    added_constraints: &mut usize,
+    skipped_constraints: &mut usize,
+    front: FixedVertexHandle,
+    back: FixedVertexHandle,
+) -> bool {
+    if front == back || !triangulation.can_add_constraint(front, back) {
+        *skipped_constraints += 1;
+        false
+    } else {
+        let constraints = triangulation.add_constraint_and_split(front, back, |point| point);
+        if constraints.is_empty() {
+            *skipped_constraints += 1;
+            false
+        } else {
+            *added_constraints += constraints.len();
+            true
+        }
     }
 }
 
@@ -1566,17 +1606,54 @@ impl PolyBoundary {
                 }
             })
             .collect();
+        let split_vertices = triangulation
+            .vertices()
+            .map(|vertex| {
+                let point = vertex.position();
+                (vertex.fix(), Point2::new(point.x, point.y))
+            })
+            .collect::<Vec<_>>();
         let mut counter = 0;
         let mut added_constraints = 0usize;
         let mut skipped_constraints = 0usize;
         let mut add_constraint = |front: FixedVertexHandle, back: FixedVertexHandle| {
-            let constraints = triangulation.add_constraint_and_split(front, back, |point| point);
-            if constraints.is_empty() {
-                skipped_constraints += 1;
+            if front == back {
                 false
             } else {
-                added_constraints += constraints.len();
-                true
+                let front_point = triangulation.vertex(front).position();
+                let back_point = triangulation.vertex(back).position();
+                let front_point = Point2::new(front_point.x, front_point.y);
+                let back_point = Point2::new(back_point.x, back_point.y);
+                let mut chain = split_vertices
+                    .iter()
+                    .filter_map(|(handle, point)| {
+                        if *handle == front || *handle == back {
+                            None
+                        } else {
+                            boundary_segment_parameter(*point, front_point, back_point)
+                                .map(|parameter| (parameter, *handle))
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                chain.sort_by(|lhs, rhs| lhs.0.total_cmp(&rhs.0));
+                let handles = iter::once(front)
+                    .chain(chain.into_iter().map(|(_, handle)| handle))
+                    .chain(iter::once(back))
+                    .collect::<Vec<_>>();
+                let mut handled = false;
+                handles.windows(2).for_each(|window| {
+                    if window[0] != window[1] {
+                        handled = true;
+                        add_direct_cdt_constraint(
+                            triangulation,
+                            &mut added_constraints,
+                            &mut skipped_constraints,
+                            window[0],
+                            window[1],
+                        );
+                    }
+                });
+                handled
             }
         };
         self.loops.iter().map(Vec::len).for_each(|len| {
@@ -1845,5 +1922,98 @@ mod tests {
                 .flatten()
                 .any(|boundary_point| boundary_point.point.distance(*point) <= TOLERANCE)
         }));
+    }
+
+    #[test]
+    fn cdt_insertion_splits_duplicate_seam_chords_through_existing_vertices() {
+        const LOOP_POINT_BITS: &[(u64, u64)] = &[
+            (4614256656552045848, 4585802930648964187),
+            (4614138752589512040, 4585802930648964187),
+            (4614020848626978228, 4585802930648964187),
+            (4613785040701910618, 4585802930648964187),
+            (4613549232776843003, 4585802930648964188),
+            (4613313424851775388, 4585802930648964188),
+            (4613077616926707775, 4585802930648964188),
+            (4612841809001640160, 4585802930648964188),
+            (4612606001076572546, 4585802930648964188),
+            (4612370193151504928, 4585802930648964188),
+            (4612134385226437316, 4585802930648964188),
+            (4611898577301369703, 4585802930648964189),
+            (4611639520325216272, 4585802930648964189),
+            (4611167904475081038, 4585802930648964189),
+            (4610696288624945807, 4585802930648964189),
+            (4610224672774810583, 4585802930648964189),
+            (4609753056924675350, 4585802930648964190),
+            (4609517248999607734, 4585802930648964190),
+            (4609281441074540120, 4585802930648964190),
+            (4608809825224404895, 4585802930648964190),
+            (4608338209374269663, 4585802930648964190),
+            (4607866593524134430, 4585802930648964190),
+            (4607394977673999207, 4585802930648964190),
+            (4606664304847710542, 4585802930648964191),
+            (4605721073147440095, 4585802930648964191),
+            (4604777841447169628, 4585802930648964191),
+            (4603834609746899166, 4585802930648964191),
+            (4602891378046628704, 4585802930648964191),
+            (4601217473520069596, 4585802930648964191),
+            (4599331010119528668, 4585802930648964192),
+            (4596713873892699142, 4585802930648964192),
+            (4592210274265328630, 4585802930648964192),
+            (0, 4585802930648964182),
+            (4614256656552045848, 4591506709037279728),
+            (4592210274265328640, 4591506709037279728),
+            (4596713873892699136, 4591506709037279728),
+            (4599331010119528672, 4591506709037279728),
+            (4601217473520069600, 4591506709037279728),
+            (4602891378046628704, 4591506709037279728),
+            (4603834609746899168, 4591506709037279728),
+            (4604777841447169628, 4591506709037279728),
+            (4605721073147440096, 4591506709037279729),
+            (4606664304847710544, 4591506709037279729),
+            (4607394977673999208, 4591506709037279729),
+            (4607866593524134430, 4591506709037279729),
+            (4608338209374269663, 4591506709037279729),
+            (4608809825224404895, 4591506709037279729),
+            (4609281441074540120, 4591506709037279729),
+            (4609517248999607735, 4591506709037279729),
+            (4609753056924675350, 4591506709037279729),
+            (4610224672774810584, 4591506709037279729),
+            (4610696288624945807, 4591506709037279729),
+            (4611167904475081040, 4591506709037279729),
+            (4611639520325216270, 4591506709037279729),
+            (4611898577301369703, 4591506709037279729),
+            (4612134385226437316, 4591506709037279729),
+            (4612370193151504928, 4591506709037279729),
+            (4612606001076572547, 4591506709037279730),
+            (4612841809001640160, 4591506709037279730),
+            (4613077616926707775, 4591506709037279730),
+            (4613313424851775388, 4591506709037279730),
+            (4613549232776843003, 4591506709037279730),
+            (4613785040701910618, 4591506709037279730),
+            (4614020848626978228, 4591506709037279730),
+            (4614138752589512039, 4591506709037279730),
+            (4614256656552045848, 4591506709037279730),
+            (0, 4585802930648964192),
+        ];
+        let loop_points = LOOP_POINT_BITS
+            .iter()
+            .map(|(u, v)| Point2::new(f64::from_bits(*u), f64::from_bits(*v)))
+            .collect::<Vec<_>>();
+        let boundary = PolyBoundary {
+            loops: vec![
+                loop_points
+                    .into_iter()
+                    .map(|uv| SurfacePoint::from((uv, Point3::new(uv.x, uv.y, 0.0))))
+                    .collect(),
+            ],
+            uv_min: Point2::new(0.0, f64::from_bits(4585802930648964182)),
+            uv_max: Point2::new(TAU * 0.5, f64::from_bits(4591506709037279730)),
+        };
+        let mut triangulation = Cdt::new();
+        let mut boundary_map = HashMap::<FixedVertexHandle, Point3>::default();
+
+        let (_, added_constraints, _) = boundary.insert_to(&mut triangulation, &mut boundary_map);
+
+        assert!(added_constraints > 0);
     }
 }

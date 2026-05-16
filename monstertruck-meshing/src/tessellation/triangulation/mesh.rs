@@ -2,7 +2,7 @@ use std::iter;
 
 use super::*;
 use crate::common::FaceNormal;
-use boundary::{PolyBoundary, UvKey, uv_key};
+use boundary::{PolyBoundary, UvKey, boundary_segment_parameter, uv_key};
 
 const MAX_SURFACE_SPAN_INTERVALS: usize = 32;
 const SURFACE_SPAN_TOLERANCE_FACTOR: f64 = 8.0;
@@ -32,24 +32,6 @@ pub(super) fn spade_round(x: f64) -> f64 {
     match f64::abs(x) < MIN_ALLOWED_VALUE {
         true => 0.0,
         false => x,
-    }
-}
-
-pub(super) fn boundary_segment_parameter(
-    point: Point2,
-    front: Point2,
-    back: Point2,
-) -> Option<f64> {
-    let segment = back - front;
-    let denom = segment.dot(segment);
-    if denom.so_small() {
-        None
-    } else {
-        let offset = point - front;
-        let parameter = offset.dot(segment) / denom;
-        let projected = front + segment * parameter;
-        (parameter > 0.0 && parameter < 1.0 && projected.distance(point) <= 1.0e-9)
-            .then_some(parameter)
     }
 }
 
