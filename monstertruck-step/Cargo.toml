@@ -34,6 +34,7 @@ monstertruck-topology = { workspace = true }
 anyhow = { workspace = true }
 clap = { workspace = true }
 espr-derive = { workspace = true }
+image = { workspace = true }
 itertools = { workspace = true }
 proptest = { workspace = true }
 serde_json = { workspace = true }
