@@ -1,6 +1,6 @@
 use crate::{self as monstertruck_step, save};
 use derive_more::From;
-use monstertruck_derive::{StepFormat, StepCurve, StepLength, StepSurface};
+use monstertruck_derive::{StepCurve, StepFormat, StepLength, StepSurface};
 use serde::{Deserialize, Serialize};
 
 /// re-export structs in `monstertruck-geometry` and `monstertruck-mesh`.

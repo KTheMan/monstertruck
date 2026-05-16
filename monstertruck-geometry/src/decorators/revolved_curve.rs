@@ -302,7 +302,9 @@ impl<C: ParametricCurve3D + BoundedCurve> SearchParameter<CurveParameter> for Pr
     }
 }
 
-impl<C: ParametricCurve3D + BoundedCurve> SearchNearestParameter<CurveParameter> for ProjectedCurve<C> {
+impl<C: ParametricCurve3D + BoundedCurve> SearchNearestParameter<CurveParameter>
+    for ProjectedCurve<C>
+{
     type Point = Point2;
     fn search_nearest_parameter<H: Into<SearchParameterHint1D>>(
         &self,
@@ -379,7 +381,9 @@ impl<C: ParametricCurve3D + BoundedCurve> RevolutionSurface<C> {
     pub fn is_back_fixed(&self) -> bool { self.revolution.contains(self.curve.back()) }
 }
 
-impl<C: ParametricCurve3D + BoundedCurve> SearchParameter<SurfaceParameter> for RevolutionSurface<C> {
+impl<C: ParametricCurve3D + BoundedCurve> SearchParameter<SurfaceParameter>
+    for RevolutionSurface<C>
+{
     type Point = Point3;
     fn search_parameter<H: Into<SearchParameterHint2D>>(
         &self,
@@ -424,7 +428,9 @@ impl<C: ParametricCurve3D + BoundedCurve> SearchParameter<SurfaceParameter> for 
     }
 }
 
-impl<C: ParametricCurve3D + BoundedCurve> SearchNearestParameter<SurfaceParameter> for RevolutionSurface<C> {
+impl<C: ParametricCurve3D + BoundedCurve> SearchNearestParameter<SurfaceParameter>
+    for RevolutionSurface<C>
+{
     type Point = Point3;
     fn search_nearest_parameter<H: Into<SearchParameterHint2D>>(
         &self,

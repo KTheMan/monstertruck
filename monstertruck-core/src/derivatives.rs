@@ -776,8 +776,7 @@ impl<V> SurfaceDerivatives<V> {
     pub fn absolute_derivatives(&self) -> SurfaceDerivatives<V::Scalar>
     where
         V: InnerSpace,
-        V::Scalar: BaseFloat,
-    {
+        V::Scalar: BaseFloat, {
         let mut evals = [[V::Scalar::zero(); MAX_DER_ORDER + 1]; MAX_DER_ORDER + 1];
         evals[0][0] = self[0][0].magnitude();
         for m in 0..=self.max_order {
@@ -798,12 +797,10 @@ impl<V> SurfaceDerivatives<V> {
                     for j in 0..=n {
                         // SAFETY: `c0` and `c1` are small binomial coefficients;
                         // their product fits in `f64`.
-                        let coefficient =
-                            <V::Scalar as NumCast>::from(c0 * c1).unwrap();
+                        let coefficient = <V::Scalar as NumCast>::from(c0 * c1).unwrap();
                         ders_sum += self[i][j].dot(self[m - i][n - j]) * coefficient;
                         if !((i == 0 && j == 0) || (i == m && j == n)) {
-                            evals_sum +=
-                                evals[i][j] * evals[m - i][n - j] * coefficient;
+                            evals_sum += evals[i][j] * evals[m - i][n - j] * coefficient;
                         }
                         c1 = c1 * (n - j) / (j + 1);
                     }

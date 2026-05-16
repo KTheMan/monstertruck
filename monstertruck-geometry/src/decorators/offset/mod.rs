@@ -111,9 +111,7 @@ where
     }
     /// Inherits the parameter range from the entity surface.
     #[inline(always)]
-    fn parameter_range(&self) -> (ParameterRange, ParameterRange) {
-        self.entity.parameter_range()
-    }
+    fn parameter_range(&self) -> (ParameterRange, ParameterRange) { self.entity.parameter_range() }
     #[inline(always)]
     fn u_period(&self) -> Option<f64> {
         match (self.entity.u_period(), self.offset.u_period()) {

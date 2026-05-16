@@ -101,8 +101,8 @@ where
 {
     fn robust_split_closed_edges_and_faces(&mut self, tol: f64) {
         fn sp<S>(surface: &S, point: Point3, hint: Option<(f64, f64)>) -> Option<(f64, f64)>
-        where S: SearchParameter<SurfaceParameter, Point = Point3> + SearchNearestParameter<SurfaceParameter, Point = Point3>
-        {
+        where S: SearchParameter<SurfaceParameter, Point = Point3>
+                + SearchNearestParameter<SurfaceParameter, Point = Point3> {
             surface
                 .search_parameter(point, hint, 100)
                 .or_else(|| surface.search_parameter(point, None, 100))

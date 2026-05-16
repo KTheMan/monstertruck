@@ -417,8 +417,8 @@ where V::Point: MetricSpace<Metric = f64> + HashGen<f64>
     }
 }
 
-impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>> SearchNearestParameter<CurveParameter>
-    for NurbsCurve<V>
+impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>>
+    SearchNearestParameter<CurveParameter> for NurbsCurve<V>
 where
     V::Point: MetricSpace<Metric = f64>,
     <V::Point as EuclideanSpace>::Diff: InnerSpace + Tolerance,

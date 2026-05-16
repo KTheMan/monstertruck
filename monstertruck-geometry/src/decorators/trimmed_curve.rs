@@ -45,7 +45,9 @@ impl<C: ParametricCurveTrait> Cut for TrimmedCurve<C> {
     }
 }
 
-impl<C: SearchNearestParameter<CurveParameter>> SearchNearestParameter<CurveParameter> for TrimmedCurve<C> {
+impl<C: SearchNearestParameter<CurveParameter>> SearchNearestParameter<CurveParameter>
+    for TrimmedCurve<C>
+{
     type Point = C::Point;
     #[inline(always)]
     fn search_nearest_parameter<H: Into<SearchParameterHint1D>>(

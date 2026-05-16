@@ -478,8 +478,10 @@ mod tests {
             name: format!("Link {name}"),
             description: format!("test link {name}"),
         });
-        for (target_index, (target, attrs)) in
-            [parts[1], parts[2]].iter().zip(edge_attributes.iter()).enumerate()
+        for (target_index, (target, attrs)) in [parts[1], parts[2]]
+            .iter()
+            .zip(edge_attributes.iter())
+            .enumerate()
         {
             assembly.create_edge(
                 parts[0],
@@ -493,8 +495,10 @@ mod tests {
         }
         let design: StepDesign<NeverShape, _, _> = StepDesign::new(assembly);
 
-        let step_string =
-            format!("{}", CompleteStepDisplay::new(design, StepHeaderDescriptor::default()));
+        let step_string = format!(
+            "{}",
+            CompleteStepDisplay::new(design, StepHeaderDescriptor::default())
+        );
 
         let table = Table::from_step(&step_string)?;
         let round_trip = table.step_assy()?;

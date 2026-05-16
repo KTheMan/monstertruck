@@ -170,7 +170,8 @@ fn finalize<C: ShapeOpsCurve<S>, S: ShapeOpsSurface>(
     shell: Shell<Point3, C, S>,
 ) -> ShapeOpsResult<Solid<Point3, C, S>> {
     let boundaries = shell.connected_components();
-    Solid::try_new(boundaries).map_err(|source| ShapeOpsError::InvalidOutputShell { operation, source })
+    Solid::try_new(boundaries)
+        .map_err(|source| ShapeOpsError::InvalidOutputShell { operation, source })
 }
 
 /// AND operation between two solids.

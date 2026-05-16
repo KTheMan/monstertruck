@@ -348,7 +348,8 @@ impl<C> LoopsStore<Point3, C> {
         emap: &mut HashMap<EdgeId<C>, Edge<Point3, C>>,
     ) -> Option<()>
     where
-        C: Cut<Point = Point3, Vector = Vector3> + SearchNearestParameter<CurveParameter, Point = Point3>,
+        C: Cut<Point = Point3, Vector = Vector3>
+            + SearchNearestParameter<CurveParameter, Point = Point3>,
         S: ParametricSurface3D + SearchNearestParameter<SurfaceParameter, Point = Point3>,
     {
         match kind {

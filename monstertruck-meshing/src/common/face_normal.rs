@@ -2,6 +2,10 @@ use super::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct FaceNormal {
+    /// Only consumed by the `filters` feature's normal-clustering code.
+    /// Tagged `dead_code` so `cargo check --no-default-features --features analyzers`
+    /// stays clean under the workspace's `-D warnings`.
+    #[allow(dead_code)]
     pub face_id: usize,
     pub normal: Vector3,
 }

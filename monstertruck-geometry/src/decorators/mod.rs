@@ -457,8 +457,7 @@ pub trait SurfaceScalarFunction: Clone {
     fn derivatives(&self, max_order: usize, u: f64, v: f64) -> SurfaceDerivatives<f64> {
         let mut derivatives = SurfaceDerivatives::new(max_order);
         (0..=max_order).for_each(|m| {
-            (0..=max_order - m)
-                .for_each(|n| derivatives[m][n] = self.derivative_mn(m, n, u, v))
+            (0..=max_order - m).for_each(|n| derivatives[m][n] = self.derivative_mn(m, n, u, v))
         });
         derivatives
     }

@@ -789,10 +789,12 @@ mod tests {
     {
         assert_eq!(parameters.len(), points.len());
         assert!(parameters.windows(2).all(|window| window[0] <= window[1]));
-        assert!(parameters
-            .iter()
-            .zip(points)
-            .all(|(parameter, point)| curve.evaluate(*parameter).near(&point)));
+        assert!(
+            parameters
+                .iter()
+                .zip(points)
+                .all(|(parameter, point)| curve.evaluate(*parameter).near(&point))
+        );
     }
 
     fn assert_division_points_match_parameters<C, P>(curve: &C)

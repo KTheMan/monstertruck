@@ -5,7 +5,10 @@ use monstertruck_traits::ParametricCurve as ParametricCurveTrait;
 pub(super) trait FilletableSurface:
     ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3> {
 }
-impl<S: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>> FilletableSurface for S {}
+impl<S: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>> FilletableSurface
+    for S
+{
+}
 
 impl ContactCircle {
     /// center of the fillet circle

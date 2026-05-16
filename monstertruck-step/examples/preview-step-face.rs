@@ -1,6 +1,6 @@
 //! Renders selected STEP faces to diagnostic preview images.
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use clap::Parser;
 use image::{Rgb, RgbImage};
 use monstertruck_meshing::prelude::*;

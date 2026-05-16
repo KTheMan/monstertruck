@@ -833,11 +833,10 @@ mod tests {
             "/../resources/step/occt-cylinder.step",
         ));
         let table = crate::load::Table::from_step(step_string)?;
-        let step_shell = table
-            .shell
-            .values()
-            .next()
-            .ok_or_else(|| anyhow::anyhow!("the cylinder fixture must contain a STEP shell."))?;
+        let step_shell =
+            table.shell.values().next().ok_or_else(|| {
+                anyhow::anyhow!("the cylinder fixture must contain a STEP shell.")
+            })?;
         let trimmed = table.to_compressed_trimmed_shell(step_shell)?;
         let total_edge_uses: usize = trimmed
             .faces
