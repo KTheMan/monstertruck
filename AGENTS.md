@@ -82,6 +82,28 @@ cargo clippy --all-targets -- -W warnings
 - **CRITICAL: Never run tests with `RUST_TEST_UPDATE=1`** -- this modifies test expectations which is equivalent to changing tests.
 - **CRITICAL: Never change expected test outputs** -- these are the ground truth.
 
+## Visual Debugging for Meshing / Trim Bugs
+
+When a STEP face is suspected of tessellating wrong but the failure is
+not obvious from the test output, render the face to a diagnostic
+image with `monstertruck-step/examples/preview-step-face.rs`:
+
+```bash
+cargo run --example preview-step-face -- resources/step/abc-0008.step \
+  --face 10 --face 17 --shell 1 --out target/face-previews
+```
+
+The example dumps PNGs of the chosen faces in parameter space with the
+boundary wires, polylines, and any non-simple-wire artifacts drawn on
+top. `--dump-trims` prints the raw trim parameter ranges before
+tessellation -- useful when the boundary points themselves are
+suspect.
+
+This tool is the canonical replacement for ad-hoc "stick eprintln!s in
+loops_store" debugging sessions and is the intended way for an agent
+working on a meshing or trim-path bug to inspect the geometry without
+asking a human to open the model in a viewer.
+
 ## Documentation
 
 - All code comments MUST end with a period.
