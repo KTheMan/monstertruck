@@ -20,7 +20,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - uses: dtolnay/rust-toolchain@stable
+      # `rustfmt.toml` opts into unstable options (`fn_single_line`,
+      # `where_single_line`, `brace_style = "PreferSameLine"`); stable
+      # rustfmt silently ignores those, so the fmt check has to run on
+      # nightly to actually apply them.
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
       - run: cargo fmt --all -- --check
