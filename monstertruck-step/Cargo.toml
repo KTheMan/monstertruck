@@ -17,6 +17,10 @@ load = ["derive", "derive_more", "ruststep", "serde", "monstertruck-traits"]
 derive = ["monstertruck-derive"]
 
 [dependencies]
+# `web_time::Instant` is `std::time::Instant` on native and falls back
+# to `performance.now()` on wasm32-unknown-unknown (where std::time::*
+# panics).
+web-time = { workspace = true }
 chrono = { workspace = true }
 derive_more = { workspace = true, optional = true }
 ruststep = { workspace = true, optional = true }

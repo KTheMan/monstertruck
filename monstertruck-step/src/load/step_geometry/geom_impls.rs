@@ -8,7 +8,12 @@ use monstertruck_modeling::{
     Surface as ModelingSurface,
 };
 use monstertruck_traits::SnapCurveEndpoints;
-use std::{cmp::Ordering, env, time::Instant};
+use std::{cmp::Ordering, env};
+// `std::time::Instant::now()` panics on `wasm32-unknown-unknown`. The
+// `web_time` crate is std-compatible on native and falls back to
+// `performance.now()` in the browser, so all the `Instant::now()` /
+// `.elapsed()` call sites below stay unchanged.
+use web_time::Instant;
 
 #[cfg(test)]
 use std::f64::consts::TAU;
@@ -518,7 +523,10 @@ impl ParameterDivision1D for Curve3D {
         tol: f64,
     ) -> Option<(Vec<f64>, Vec<Self::Point>)> {
         let debug_profile = env::var("MT_PROFILE_CURVE_DIVISION").is_ok();
-        let started = Instant::now();
+        // Only consult the clock when actually profiling — `Instant::now()`
+        // panics on `wasm32-unknown-unknown` ("time not implemented"), so
+        // an unconditional call here breaks browser STEP loading.
+        let started = debug_profile.then(Instant::now);
         let result = match self {
             Curve3D::Line(curve) => curve.try_parameter_division(range, tol),
             Curve3D::Polyline(curve) => curve.try_parameter_division(range, tol),
@@ -529,7 +537,7 @@ impl ParameterDivision1D for Curve3D {
             Curve3D::IntersectionCurve(curve) => curve.leader().try_parameter_division(range, tol),
             Curve3D::NurbsCurve(curve) => curve.try_parameter_division(range, tol),
         };
-        if debug_profile {
+        if let Some(started) = started {
             let kind = match self {
                 Curve3D::Line(_) => "Line",
                 Curve3D::Polyline(_) => "Polyline",
@@ -553,7 +561,8 @@ impl ParameterDivision1D for Curve3D {
 
     fn parameter_division(&self, range: (f64, f64), tol: f64) -> (Vec<f64>, Vec<Self::Point>) {
         let debug_profile = env::var("MT_PROFILE_CURVE_DIVISION").is_ok();
-        let started = Instant::now();
+        // Same wasm-safety guard as `try_parameter_division` above.
+        let started = debug_profile.then(Instant::now);
         let result = match self {
             Curve3D::Line(curve) => curve.parameter_division(range, tol),
             Curve3D::Polyline(curve) => curve.parameter_division(range, tol),
@@ -564,7 +573,7 @@ impl ParameterDivision1D for Curve3D {
             Curve3D::IntersectionCurve(curve) => curve.leader().parameter_division(range, tol),
             Curve3D::NurbsCurve(curve) => curve.parameter_division(range, tol),
         };
-        if debug_profile {
+        if let Some(started) = started {
             let kind = match self {
                 Curve3D::Line(_) => "Line",
                 Curve3D::Polyline(_) => "Polyline",

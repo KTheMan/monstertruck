@@ -8,7 +8,11 @@ use handles::FixedVertexHandle;
 use itertools::{Either, Itertools};
 use monstertruck_geometry::prelude::ParameterCurve;
 use rustc_hash::FxHashMap as HashMap;
-use std::{collections::hash_map::Entry, env, iter, time::Instant};
+use std::{collections::hash_map::Entry, env, iter};
+// `std::time::Instant::now()` panics on `wasm32-unknown-unknown`.
+// `web_time::Instant` is std-compatible on native and uses
+// `performance.now()` in the browser.
+use web_time::Instant;
 
 mod boundary;
 mod mesh;
