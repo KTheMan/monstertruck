@@ -1,6 +1,6 @@
 [package]
 name = "monstertruck-meshing"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Moritz Moeller <virtualritz@protonmail.com>"]
 edition = "2024"
 description = "Tessellation and meshing algorithms for B-rep shapes"
