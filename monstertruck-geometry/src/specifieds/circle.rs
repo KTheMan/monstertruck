@@ -1,5 +1,5 @@
 use super::*;
-use std::f64::consts::PI;
+use std::f64::consts::TAU;
 
 impl<P> UnitCircle<P> {
     /// constructor
@@ -26,9 +26,7 @@ impl ParametricCurve for UnitCircle<Point2> {
     #[inline]
     fn derivative_2(&self, t: f64) -> Vector2 { self.derivative_n(2, t) }
     #[inline]
-    fn parameter_range(&self) -> ParameterRange {
-        (Bound::Included(0.0), Bound::Excluded(2.0 * PI))
-    }
+    fn parameter_range(&self) -> ParameterRange { (Bound::Included(0.0), Bound::Excluded(TAU)) }
 }
 
 impl BoundedCurve for UnitCircle<Point2> {}
@@ -52,11 +50,9 @@ impl ParametricCurve for UnitCircle<Point3> {
     #[inline]
     fn derivative_2(&self, t: f64) -> Vector3 { self.derivative_n(2, t) }
     #[inline]
-    fn period(&self) -> Option<f64> { Some(2.0 * PI) }
+    fn period(&self) -> Option<f64> { Some(TAU) }
     #[inline]
-    fn parameter_range(&self) -> ParameterRange {
-        (Bound::Included(0.0), Bound::Excluded(2.0 * PI))
-    }
+    fn parameter_range(&self) -> ParameterRange { (Bound::Included(0.0), Bound::Excluded(TAU)) }
 }
 
 impl BoundedCurve for UnitCircle<Point3> {}
@@ -64,6 +60,18 @@ impl BoundedCurve for UnitCircle<Point3> {}
 // -- v2 scalar-generic impls ------------------------------------------------
 
 use monstertruck_traits::v2;
+
+/// Bridges the scalar-generic v2 hint to the `f64` hint consumed by the
+/// hardcoded `SearchParameter` impls. The two enums are shaped identically
+/// but unrelated, so there is no blanket `From`; this rebuilds it by hand for
+/// the `f64` scalar so the v2 search forwards the hint instead of dropping it.
+fn v2_hint_to_hint(hint: v2::SearchParameterHint1D<f64>) -> SearchParameterHint1D {
+    match hint {
+        v2::SearchParameterHint1D::Parameter(t) => SearchParameterHint1D::Parameter(t),
+        v2::SearchParameterHint1D::Range(t0, t1) => SearchParameterHint1D::Range(t0, t1),
+        v2::SearchParameterHint1D::None => SearchParameterHint1D::None,
+    }
+}
 
 macro_rules! impl_v2_circle {
     ($point:ty, $vector:ty) => {
@@ -108,10 +116,15 @@ macro_rules! impl_v2_circle_search {
             fn search_nearest_parameter<H: Into<v2::SearchParameterHint1D<f64>>>(
                 &self,
                 pt: $point,
-                _: H,
+                hint: H,
                 _: usize,
             ) -> Option<f64> {
-                SearchNearestParameter::<D1>::search_nearest_parameter(self, pt, None, 0)
+                SearchNearestParameter::<D1>::search_nearest_parameter(
+                    self,
+                    pt,
+                    v2_hint_to_hint(hint.into()),
+                    0,
+                )
             }
         }
 
@@ -121,10 +134,10 @@ macro_rules! impl_v2_circle_search {
             fn search_parameter<H: Into<v2::SearchParameterHint1D<f64>>>(
                 &self,
                 pt: $point,
-                _: H,
+                hint: H,
                 _: usize,
             ) -> Option<f64> {
-                SearchParameter::<D1>::search_parameter(self, pt, None, 0)
+                SearchParameter::<D1>::search_parameter(self, pt, v2_hint_to_hint(hint.into()), 0)
             }
         }
     };
@@ -158,7 +171,7 @@ impl SearchNearestParameter<CurveParameter> for UnitCircle<Point2> {
     fn search_nearest_parameter<H: Into<SearchParameterHint1D>>(
         &self,
         pt: Point2,
-        _: H,
+        hint: H,
         _: usize,
     ) -> Option<f64> {
         let v = pt.to_vec();
@@ -169,9 +182,9 @@ impl SearchNearestParameter<CurveParameter> for UnitCircle<Point2> {
         let theta = f64::acos(f64::clamp(v.x, -1.0, 1.0));
         let theta = match v.y > 0.0 {
             true => theta,
-            false => 2.0 * PI - theta,
+            false => TAU - theta,
         };
-        Some(theta)
+        Some(round_theta(theta, hint.into()))
     }
 }
 
@@ -180,7 +193,7 @@ impl SearchParameter<CurveParameter> for UnitCircle<Point2> {
     fn search_parameter<H: Into<SearchParameterHint1D>>(
         &self,
         pt: Point2,
-        _: H,
+        hint: H,
         _: usize,
     ) -> Option<f64> {
         let v = pt.to_vec();
@@ -191,9 +204,48 @@ impl SearchParameter<CurveParameter> for UnitCircle<Point2> {
         let theta = f64::acos(f64::clamp(v.x, -1.0, 1.0));
         let theta = match v.y > 0.0 {
             true => theta,
-            false => 2.0 * PI - theta,
+            false => TAU - theta,
         };
-        Some(theta)
+        Some(round_theta(theta, hint.into()))
+    }
+}
+
+/// Shifts the base angle `theta` (in `[0, TAU)`) into the period nearest the
+/// `hint`. Without this, searching a circle's parameter always folds into the
+/// canonical first period, so a trimmed or multiply-wound arc loses the
+/// parameter the caller actually expects. With a `Parameter` hint we pick
+/// whichever of `theta - TAU`, `theta`, `theta + TAU` (offset into the hint's
+/// period) lands closest to the hint; with a `Range` hint we land inside the
+/// range when possible, else at the nearer endpoint's period.
+fn round_theta(theta: f64, hint: SearchParameterHint1D) -> f64 {
+    match hint {
+        SearchParameterHint1D::None => theta,
+        SearchParameterHint1D::Parameter(hint) => {
+            let floor = (hint / TAU).floor() * TAU;
+            [theta + floor - TAU, theta + floor, theta + floor + TAU]
+                .into_iter()
+                .fold(theta, |nearest, candidate| {
+                    match (candidate - hint).abs() < (nearest - hint).abs() {
+                        true => candidate,
+                        false => nearest,
+                    }
+                })
+        }
+        SearchParameterHint1D::Range(hint0, hint1) => {
+            let floor = (hint0 / TAU).floor() * TAU;
+            let theta = match theta + floor > hint0 {
+                true => theta + floor,
+                false => theta + floor + TAU,
+            };
+            if theta < hint1 {
+                return theta;
+            }
+            let theta0 = theta - TAU;
+            match hint0 - theta0 < theta - hint1 {
+                true => theta0,
+                false => theta,
+            }
+        }
     }
 }
 
@@ -202,10 +254,10 @@ impl SearchNearestParameter<CurveParameter> for UnitCircle<Point3> {
     fn search_nearest_parameter<H: Into<SearchParameterHint1D>>(
         &self,
         pt: Point3,
-        _: H,
+        hint: H,
         _: usize,
     ) -> Option<f64> {
-        UnitCircle::<Point2>::new().search_nearest_parameter(Point2::new(pt.x, pt.y), None, 0)
+        UnitCircle::<Point2>::new().search_nearest_parameter(Point2::new(pt.x, pt.y), hint, 0)
     }
 }
 
@@ -214,13 +266,13 @@ impl SearchParameter<CurveParameter> for UnitCircle<Point3> {
     fn search_parameter<H: Into<SearchParameterHint1D>>(
         &self,
         pt: Point3,
-        _: H,
+        hint: H,
         _: usize,
     ) -> Option<f64> {
         if !f64::abs(pt.z).so_small() {
             return None;
         }
-        UnitCircle::<Point2>::new().search_parameter(Point2::new(pt.x, pt.y), None, 0)
+        UnitCircle::<Point2>::new().search_parameter(Point2::new(pt.x, pt.y), hint, 0)
     }
 }
 

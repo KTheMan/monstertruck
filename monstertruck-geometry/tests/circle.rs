@@ -1,6 +1,6 @@
 use monstertruck_geometry::prelude::*;
 use proptest::prelude::*;
-use std::f64::consts::PI;
+use std::f64::consts::{PI, TAU};
 
 proptest! {
     #[test]
@@ -17,6 +17,36 @@ proptest! {
         let s = circle.search_nearest_parameter(p, None, 1).unwrap();
         let q = a * circle.evaluate(s);
         prop_assert_near!(p, q);
+    }
+
+    /// With a `Parameter` hint outside the canonical `[0, TAU)` period, the
+    /// search must return the parameter in the period nearest the hint rather
+    /// than folding back into the first period.
+    #[test]
+    fn search_parameter_honors_hint(
+        t in 0f64..=TAU,
+        winding in -3i32..=3i32,
+    ) {
+        let circle = UnitCircle::<Point2>::new();
+        let p = circle.evaluate(t);
+        let hint = t + winding as f64 * TAU;
+        let s = circle.search_parameter(p, hint, 1).unwrap();
+        prop_assert_near2!(s, hint);
+    }
+
+    /// The nearest-parameter search honors the hint identically, and the
+    /// returned parameter still evaluates back to the queried point.
+    #[test]
+    fn search_nearest_parameter_honors_hint(
+        t in 0f64..=TAU,
+        winding in -3i32..=3i32,
+    ) {
+        let circle = UnitCircle::<Point2>::new();
+        let p = circle.evaluate(t);
+        let hint = t + winding as f64 * TAU;
+        let s = circle.search_nearest_parameter(p, hint, 1).unwrap();
+        prop_assert_near2!(s, hint);
+        prop_assert_near!(circle.evaluate(s), p);
     }
 
     #[test]
