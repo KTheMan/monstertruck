@@ -1,6 +1,12 @@
 # Upstream sync survey -- `ricosjp/truck`
 
-Snapshot date: 2026-05-14.
+Snapshot date: 2026-05-14. Re-surveyed 2026-05-29 (upstream `2bbb4bae`, 136
+commits ahead of the merge-base): the only new substantive commit since this
+survey was `f563ae53` (`UnitCircle::search_{nearest_}parameter` honoring the
+`hint`), ported with its clippy follow-up `86e4ed75`. `6b2e59b4`/`c9592dfe`
+(`line_line`/`arc_arc`/`line_arc_line`) are `truck-drafting`-only and stay
+deferred. The crisp per-crate status now lives in
+[`TRUCK-PARITY.md`](TRUCK-PARITY.md); this file remains the narrative survey.
 
 ## Setup
 

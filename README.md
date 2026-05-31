@@ -37,6 +37,18 @@ This fork exists to accomplish two main goals:
    We have overhauled the project using idiomatic Rust naming conventions and standard, industry-recognized CAD terminology.
    Our goal is to make the codebase highly inclusive, readable, and accessible – whether you are a non-native English speaker or a seasoned CAD veteran.
 
+### Keeping in Sync with `truck`
+
+We do **not** merge or rebase `truck`. Because every crate has been renamed and
+much of the public API reworked, a merge would collide wholesale and would
+reintroduce upstream code we have deliberately diverged from. Instead we treat
+upstream as a patch queue: each useful commit is hand-ported with attribution,
+audited against our naming and architecture, and verified by our own tests.
+
+Current parity, tracked per crate and feature, lives in
+[`TRUCK-PARITY.md`](TRUCK-PARITY.md). The narrative survey and porting
+rationale are in [`truck-sync.md`](truck-sync.md).
+
 ## Usage
 
 ### Running the Examples
