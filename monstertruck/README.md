@@ -1,6 +1,6 @@
 # `monstertruck`
 
-**M**ultifarious **O**mnificence, **N**omenclature **S**tandardized, **T**erminology **E**nhanced & **R**efactored **Truck** – a **Ru**st **C**ad **K**ernel.
+**M**ultifarious **O**mnificence, **N**omenclature **S**tandardized, **T**erminology **E**nhanced & **R**efactored **Truck** -- a **Ru**st **C**ad **K**ernel.
 
 Meta-crate that re-exports all `monstertruck-*` sub-crates via feature flags.
 Enable only what you need, or use `full` for everything.
@@ -12,7 +12,7 @@ Enable only what you need, or use `full` for everything.
 monstertruck = { version = "0.2", features = ["full"] }
 ```
 
-### Example – spheres on cube corners with booleans and fillet
+### Example -- spheres on cube corners with booleans and fillet
 
 Place 1/3-unit spheres on all 8 corners of a unit cube. Subtract four along
 one tetrahedral diagonal, union the other four, then round-fillet all edges.

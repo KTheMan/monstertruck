@@ -849,7 +849,7 @@ fn whole_revolve<T: ClosedSweep<Matrix4, ArcConnector, RevoluteConnector, Swept>
 ///     builder::SweepAngle::Closed,
 ///     4,
 /// );
-/// // Degenerate edges are removed — faces have 3 edges, not 4.
+/// // Degenerate edges are removed -- faces have 3 edges, not 4.
 /// assert_eq!(shell[0].boundaries()[0].len(), 3);
 /// // The result is a valid closed shell.
 /// Solid::new(vec![shell]);

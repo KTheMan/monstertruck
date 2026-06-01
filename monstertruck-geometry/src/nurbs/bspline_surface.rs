@@ -1437,7 +1437,7 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineSurface<P> {
             "skin requires at least one section curve"
         );
         if curves.len() == 1 {
-            // Degenerate: single curve → constant surface in v.
+            // Degenerate: single curve -> constant surface in v.
             let c = &mut curves[0];
             c.knot_normalize();
             let knot_vector_u = c.knot_vector().clone();
@@ -1768,12 +1768,12 @@ fn rotation_between(from: Vector3, to: Vector3) -> Matrix3 {
     let t = to.normalize();
     let dot = f.dot(t);
 
-    // Nearly parallel — no rotation needed.
+    // Nearly parallel -- no rotation needed.
     if (dot - 1.0).abs() < TOLERANCE {
         return Matrix3::from_value(1.0);
     }
 
-    // Nearly anti-parallel — rotate 180 degrees around an arbitrary perpendicular axis.
+    // Nearly anti-parallel -- rotate 180 degrees around an arbitrary perpendicular axis.
     if (dot + 1.0).abs() < TOLERANCE {
         let perp = if f.x.abs() < 0.9 {
             Vector3::unit_x()

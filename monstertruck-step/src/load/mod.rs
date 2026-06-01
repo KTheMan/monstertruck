@@ -26,7 +26,7 @@ use step_geometry::StepConvertingError;
 /// produced internally by per-entity `TryFrom` impls. `LoadError` is [`Sized`]
 /// and implements [`std::error::Error`] + `Send` + `Sync` + `'static`, so it
 /// composes with `?` from any caller whose result type already accepts a
-/// standard error -- including [`anyhow::Result`].
+/// standard error -- including `anyhow::Result`.
 #[derive(Debug, thiserror::Error)]
 pub enum LoadError {
     /// The input could not be parsed as a STEP exchange structure.

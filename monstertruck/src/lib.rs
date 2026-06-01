@@ -22,8 +22,8 @@
 //! ## Numerical core
 //!
 //! - [`core`] -- `f64`-only linear algebra, tolerance helpers, bounding
-//!   boxes, and the [`derivatives`] family used to evaluate B-spline /
-//!   NURBS bases.
+//!   boxes, and the [`derivatives`](crate::core::derivatives) family used to
+//!   evaluate B-spline/NURBS bases.
 //! - [`traits`] -- the kernel's trait family
 //!   ([`ParametricCurve`](traits::ParametricCurve),
 //!   [`ParametricSurface`](traits::ParametricSurface),
@@ -51,10 +51,10 @@
 //!
 //! ## Meshing
 //!
-//! - [`mesh`] -- `PolygonMesh`, `StructuredMesh`, and the OBJ / STL
+//! - [`mesh`] -- `PolygonMesh`, `StructuredMesh`, and the OBJ/STL
 //!   serialisers.
 //! - [`meshing`] -- tessellation algorithms that turn B-rep
-//!   [`Shell`](topology::Shell) / [`Solid`](topology::Solid) into
+//!   [`Shell`](topology::Shell)/[`Solid`](topology::Solid) into
 //!   triangle soups for rendering or 3D printing.
 //!
 //! ## Modeling and boolean ops
@@ -68,7 +68,7 @@
 //! - [`solid`] -- shape operators
 //!   ([`and`](solid::and), [`or`](solid::or)) for boolean combinations of
 //!   solids, plus edge filleting.
-//! - [`assembly`] -- DAG-structured assemblies (`Node` / `Edge`) that group
+//! - [`assembly`] -- DAG-structured assemblies (`Node`/`Edge`) that group
 //!   parts and the rigid transforms between them.
 //!
 //! ## File I/O and rendering

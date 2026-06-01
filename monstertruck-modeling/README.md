@@ -9,7 +9,7 @@ Integrated geometric and topological modeling algorithms.
 ```rust
 use monstertruck_modeling::*;
 
-// Build a unit cube by three successive extrusions: point → edge → face → solid
+// Build a unit cube by three successive extrusions: point -> edge -> face -> solid
 let v = builder::vertex(Point3::new(-0.5, -0.5, -0.5));
 let e = builder::extrude(&v, Vector3::unit_x());
 let f = builder::extrude(&e, Vector3::unit_y());

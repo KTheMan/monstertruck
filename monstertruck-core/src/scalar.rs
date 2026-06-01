@@ -3,9 +3,9 @@
 //! Phase 0 scaffolding: defines marker traits that future scalar-generic code
 //! will bound on. The default (and currently only) scalar is `f64`.
 //!
-//! - [`NumericScalar`] — minimal marker for analytic evaluation.
-//! - [`ToleranceScalar`] — approximate equality and epsilon-based comparisons.
-//! - [`ToleranceV2`] — scalar-generic replacement for [`crate::tolerance::Tolerance`].
+//! - [`NumericScalar`](crate::scalar::NumericScalar) -- minimal marker for analytic evaluation.
+//! - [`ToleranceScalar`](crate::scalar::ToleranceScalar) -- approximate equality and epsilon-based comparisons.
+//! - [`ToleranceV2`](crate::scalar::ToleranceV2) -- scalar-generic replacement for [`crate::tolerance::Tolerance`].
 //!
 //! `PredicateScalar` is intentionally deferred until the predicate lane's
 //! requirements are known.

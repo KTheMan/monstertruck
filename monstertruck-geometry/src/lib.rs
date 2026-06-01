@@ -35,7 +35,7 @@ pub mod nurbs;
 /// Error types for geometry operations.
 pub mod errors;
 
-/// Concrete geometric primitives: [`Plane`], [`Sphere`], [`Line`], etc.
+/// Concrete geometric primitives: [`Plane`](crate::specifieds::Plane), [`Sphere`](crate::specifieds::Sphere), [`Line`](crate::specifieds::Line), etc.
 pub mod specifieds;
 
 /// Composite geometry: revolved curves, intersection curves, processor wrappers.

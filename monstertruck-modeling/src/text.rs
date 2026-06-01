@@ -111,7 +111,7 @@ fn transform_point(x: f64, y: f64, scale: f64, y_flip: bool, z: f64) -> Point3 {
     Point3::new(x * scale, y * scale, z)
 }
 
-/// Converts a collected contour into a closed [`Wire`].
+/// Converts a collected contour into a closed [`Wire`](crate::Wire).
 ///
 /// Each segment becomes one [`Edge`]; the wire is closed by snapping the
 /// last endpoint to the first vertex when within `closure_tolerance`.
@@ -192,7 +192,7 @@ fn is_degenerate_contour(start_x: f64, start_y: f64, segments: &[Segment]) -> bo
     })
 }
 
-/// Extracts the outline of a single glyph as a set of closed [`Wire`]s.
+/// Extracts the outline of a single glyph as a set of closed [`Wire`](crate::Wire)s.
 ///
 /// Each contour in the glyph becomes one wire. For glyphs with holes (e.g.
 /// `O`, `B`, `8`), multiple wires are returned: the outer contour and
@@ -252,7 +252,7 @@ struct OffsetContour {
 }
 
 /// Extracts glyph outlines for an entire text string as a flat set of
-/// closed [`Wire`]s, positioned along the baseline with correct glyph advance.
+/// closed [`Wire`](crate::Wire)s, positioned along the baseline with correct glyph advance.
 ///
 /// Each character's contours are offset along the X axis by the accumulated
 /// horizontal advance. The resulting wires can be passed directly to

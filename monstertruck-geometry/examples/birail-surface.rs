@@ -1,4 +1,4 @@
-//! Demonstrates `BsplineSurface::birail1` and `birail2` — creating surfaces
+//! Demonstrates `BsplineSurface::birail1` and `birail2` -- creating surfaces
 //! by sweeping profiles along two rail curves.
 
 use monstertruck_geometry::prelude::*;

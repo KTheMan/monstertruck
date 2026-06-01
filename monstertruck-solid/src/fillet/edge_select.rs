@@ -137,7 +137,7 @@ fn collect_boundary_runs(shell: &Shell, selected: &HashSet<EdgeId>) -> Vec<(usiz
                         candidate_runs.push((face_idx, run));
                     }
                 } else {
-                    // ALL edges selected → one closed run covering entire boundary.
+                    // ALL edges selected -> one closed run covering entire boundary.
                     let ids: Vec<EdgeId> = boundary_edges.iter().map(|e| e.id()).collect();
                     candidate_runs.push((face_idx, ids));
                 }
@@ -464,7 +464,7 @@ pub fn fillet_edges_by_id(
         group_edges_into_chains(shell, edge_ids, &edge_face_map)?
     };
 
-    // Build EdgeId→index map for PerEdge radius lookup.
+    // Build EdgeId->index map for PerEdge radius lookup.
     let edge_id_to_idx: HashMap<EdgeId, usize> = edge_ids
         .iter()
         .enumerate()

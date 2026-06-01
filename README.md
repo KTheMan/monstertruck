@@ -23,7 +23,7 @@ The underlying philosophy of this kernel rests on three foundational pillars:
 
 - **Ship of Theseus-like Architecture**
 
-  Instead of repeating the mistakes of monolithic CAD kernel architectures, we abandoned the idea of a single, massive library or app. Instead, we modularized the kernel into a collection of small, highly optimized, and interchangeable crates – much like [the ship of Theseus](https://en.wikipedia.org/wiki/Ship_of_Theseus).
+  Instead of repeating the mistakes of monolithic CAD kernel architectures, we abandoned the idea of a single, massive library or app. Instead, we modularized the kernel into a collection of small, highly optimized, and interchangeable crates -- much like [the ship of Theseus](https://en.wikipedia.org/wiki/Ship_of_Theseus).
 
 ## Why Was This Forked?
 
@@ -35,7 +35,7 @@ This fork exists to accomplish two main goals:
 
 2. **Fix the ergonomics:** The original codebase suffered from unconventional phrasing, non-idiomatic naming conventions, and occasionally confusing translations.
    We have overhauled the project using idiomatic Rust naming conventions and standard, industry-recognized CAD terminology.
-   Our goal is to make the codebase highly inclusive, readable, and accessible – whether you are a non-native English speaker or a seasoned CAD veteran.
+   Our goal is to make the codebase highly inclusive, readable, and accessible -- whether you are a non-native English speaker or a seasoned CAD veteran.
 
 ### Keeping in Sync with `truck`
 
@@ -71,29 +71,29 @@ The `monstertruck` kernel is split into independent crates so you only need to p
 
 ### Core & Geometry
 
-- [`monstertruck-core`](monstertruck-core/) – Core types and traits for linear algebra, curves, surfaces, and tolerances.
-- [`monstertruck-derive`](monstertruck-derive/) – Derive macros for geometric traits.
-- [`monstertruck-traits`](monstertruck-traits/) – Geometric trait definitions.
-- [`monstertruck-geometry`](monstertruck-geometry/) – Geometric primitives: knot vectors, B-splines, NURBS, and T-splines.
+- [`monstertruck-core`](monstertruck-core/) -- Core types and traits for linear algebra, curves, surfaces, and tolerances.
+- [`monstertruck-derive`](monstertruck-derive/) -- Derive macros for geometric traits.
+- [`monstertruck-traits`](monstertruck-traits/) -- Geometric trait definitions.
+- [`monstertruck-geometry`](monstertruck-geometry/) -- Geometric primitives: knot vectors, B-splines, NURBS, and T-splines.
 
 ### Topology & Modeling
 
-- [`monstertruck-topology`](monstertruck-topology/) – Topological data structures: vertices, edges, wires, faces, shells, and solids.
-- [`monstertruck-modeling`](monstertruck-modeling/) – Integrated geometric and topological modeling algorithms.
-- [`monstertruck-solid`](monstertruck-solid/) – Boolean operations, fillets, and shape healing for solids.
-- [`monstertruck-assembly`](monstertruck-assembly/) – Assembly data structures using a directed acyclic graph (DAG).
+- [`monstertruck-topology`](monstertruck-topology/) -- Topological data structures: vertices, edges, wires, faces, shells, and solids.
+- [`monstertruck-modeling`](monstertruck-modeling/) -- Integrated geometric and topological modeling algorithms.
+- [`monstertruck-solid`](monstertruck-solid/) -- Boolean operations, fillets, and shape healing for solids.
+- [`monstertruck-assembly`](monstertruck-assembly/) -- Assembly data structures using a directed acyclic graph (DAG).
 
 ### Meshing & Rendering
 
-- [`monstertruck-mesh`](monstertruck-mesh/) – Polygon mesh data structures and algorithms.
-- [`monstertruck-meshing`](monstertruck-meshing/) – Tessellation and meshing algorithms for B-rep shapes.
-- [`monstertruck-gpu`](monstertruck-gpu/) – Graphics utility crate built on `wgpu`.
-- [`monstertruck-render`](monstertruck-render/) – Shape and polygon mesh visualization.
+- [`monstertruck-mesh`](monstertruck-mesh/) -- Polygon mesh data structures and algorithms.
+- [`monstertruck-meshing`](monstertruck-meshing/) -- Tessellation and meshing algorithms for B-rep shapes.
+- [`monstertruck-gpu`](monstertruck-gpu/) -- Graphics utility crate built on `wgpu`.
+- [`monstertruck-render`](monstertruck-render/) -- Shape and polygon mesh visualization.
 
 ### I/O & Bindings
 
-- [`monstertruck-step`](monstertruck-step/) – STEP file import and export.
-- [`monstertruck-wasm`](monstertruck-wasm/) – WebAssembly/JavaScript bindings.
+- [`monstertruck-step`](monstertruck-step/) -- STEP file import and export.
+- [`monstertruck-wasm`](monstertruck-wasm/) -- WebAssembly/JavaScript bindings.
 
 ## Dependency Graph
 

@@ -235,11 +235,11 @@ fn collect_missing_knots(target: &KnotVector, source: &KnotVector) -> Vec<f64> {
 
     while si < s_slice.len() && ti < t_slice.len() {
         if s_slice[si] - t_slice[ti] > TOLERANCE {
-            // Source has a knot that target doesn't — need to insert it.
+            // Source has a knot that target doesn't -- need to insert it.
             result.push(s_slice[si]);
             si += 1;
         } else if t_slice[ti] - s_slice[si] > TOLERANCE {
-            // Target has a knot that source doesn't — skip.
+            // Target has a knot that source doesn't -- skip.
             ti += 1;
         } else {
             // Matching knots.

@@ -9,7 +9,7 @@ Geometric primitives: knot vectors, B-splines, NURBS, and T-splines.
 ```rust
 use monstertruck_geometry::prelude::*;
 
-// A quadratic Bézier curve from (0,0,0) through (1,1,0) to (2,0,0)
+// A quadratic Bezier curve from (0,0,0) through (1,1,0) to (2,0,0)
 let knot_vec = KnotVector::bezier_knot(2);
 let ctrl_pts = vec![
     Point3::new(0.0, 0.0, 0.0),

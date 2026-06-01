@@ -72,7 +72,7 @@ where
 
     let total_length = arc_lengths[n_samples - 1];
     if total_length.so_small() {
-        // Degenerate curve — return a clone with normalized knots.
+        // Degenerate curve -- return a clone with normalized knots.
         let mut result = curve.clone();
         result.knot_normalize();
         return Ok(result);

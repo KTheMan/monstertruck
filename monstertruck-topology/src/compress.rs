@@ -379,9 +379,9 @@ impl<P: Clone, C: Clone, S: Clone> Shell<P, C, S> {
     /// Extracts the serialized compressed shell into the shell.
     ///
     /// # Errors
-    /// Returns [`Error::NotSimpleWire`] if any boundary wire has repeated vertices.
+    /// Returns [`Error::NotSimpleWire`](crate::errors::Error::NotSimpleWire) if any boundary wire has repeated vertices.
     /// STEP files from other CAD systems often produce such wires. To handle this,
-    /// apply [`SplitClosedEdgesAndFaces`] or [`RobustSplitClosedEdgesAndFaces`]
+    /// apply `SplitClosedEdgesAndFaces` or `RobustSplitClosedEdgesAndFaces`
     /// (from `monstertruck-solid`) to the `CompressedShell` before calling `extract`.
     /// The convenience function `monstertruck_solid::extract_healed` does both steps.
     pub fn extract(cshell: CompressedShell<P, C, S>) -> Result<Self> {

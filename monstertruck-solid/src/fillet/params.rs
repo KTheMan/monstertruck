@@ -11,8 +11,8 @@ pub enum FilletProfile {
     Chamfer,
     /// V-shaped ridge: two straight segments meeting at the transit point.
     Ridge,
-    /// User-provided 2D profile curve. Domain [0,1], maps (0,0)→contact0,
-    /// (1,0)→contact1, y-axis = displacement toward transit.
+    /// User-provided 2D profile curve. Domain `[0, 1]`, maps `(0, 0)` -> `contact0`,
+    /// `(1, 0)` -> `contact1`, y-axis = displacement toward transit.
     Custom(Box<BsplineCurve<Point2>>),
 }
 

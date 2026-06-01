@@ -925,7 +925,7 @@ fn generic_fillet_mixed_surfaces() {
     assert!(shell.len() > initial_face_count);
 }
 
-/// Generic fillet with unsupported surface type → UnsupportedGeometry error.
+/// Generic fillet with unsupported surface type -> UnsupportedGeometry error.
 #[test]
 fn generic_fillet_unsupported() {
     type MCurve = monstertruck_modeling::Curve;
@@ -1623,7 +1623,7 @@ fn ridge_closed_wire() {
 // Custom profile tests
 // ---------------------------------------------------------------------------
 
-/// Custom with linear profile (0,0)→(1,0) -- should behave like chamfer.
+/// Custom with linear profile (0,0)->(1,0) -- should behave like chamfer.
 #[test]
 fn custom_profile_linear() {
     let (mut shell, edge, _) = build_box_shell();
@@ -1736,12 +1736,12 @@ fn variable_radius_closed_wire() {
     let _poly = shell.robust_triangulation(0.001).to_polygon();
 }
 
-/// Edge too short for requested fillet radius → DegenerateEdge error.
+/// Edge too short for requested fillet radius -> DegenerateEdge error.
 #[test]
 fn fillet_rejects_degenerate_edge() {
     let (mut shell, edge, _) = build_box_shell();
 
-    // The box edges are length 1.0. Request a radius of 0.6 → 2*0.6 = 1.2 > 1.0.
+    // The box edges are length 1.0. Request a radius of 0.6 -> 2*0.6 = 1.2 > 1.0.
     let params = FilletOptions {
         radius: FilletRadius::Constant(0.6),
         ..Default::default()
@@ -1753,7 +1753,7 @@ fn fillet_rejects_degenerate_edge() {
     );
 }
 
-/// Custom with degree-2 bump (0,0)→(0.5,1.0)→(1,0) -- non-trivial shape.
+/// Custom with degree-2 bump (0,0)->(0.5,1.0)->(1,0) -- non-trivial shape.
 #[test]
 fn custom_profile_bump() {
     let (mut shell, edge, _) = build_box_shell();
@@ -1785,7 +1785,7 @@ fn custom_profile_bump() {
 /// Verify that `convert_shell_in` successfully converts a boolean AND result
 /// containing `IntersectionCurve` edges to the internal NURBS representation.
 ///
-/// This exercises the `IntersectionCurve` → NURBS sampling path added to
+/// This exercises the `IntersectionCurve` -> NURBS sampling path added to
 /// `FilletableCurve::to_nurbs_curve`.
 #[test]
 fn boolean_shell_converts_for_fillet() {
@@ -1830,7 +1830,7 @@ fn boolean_shell_converts_for_fillet() {
         "expected IntersectionCurve edges in boolean result"
     );
 
-    // convert_shell_in should succeed now that IntersectionCurve→NURBS is implemented.
+    // convert_shell_in should succeed now that IntersectionCurve->NURBS is implemented.
     // Previously this would return UnsupportedGeometry.
     let result = convert_shell_in(&shell, &ic_edges);
     assert!(
@@ -1981,7 +1981,7 @@ fn cut_face_five_edge_boundary() {
         Edge::new(&v[i], &v[j], NurbsCurve::from(bsp).into())
     };
 
-    // 5 edges: e0(0→1), e1(1→2), e2(2→3), e3(3→4), e4(4→0)
+    // 5 edges: e0(0->1), e1(1->2), e2(2->3), e3(3->4), e4(4->0)
     let edges = [
         line_edge(0, 1),
         line_edge(1, 2),
@@ -2004,8 +2004,8 @@ fn cut_face_five_edge_boundary() {
 
     let face = Face::new(vec![wire], surface);
 
-    // Pick edge[2] (2→3) as the filleted edge.
-    // Adjacent edges: front=edge[1] (1→2), back=edge[3] (3→4).
+    // Pick edge[2] (2->3) as the filleted edge.
+    // Adjacent edges: front=edge[1] (1->2), back=edge[3] (3->4).
     // Build a bezier that starts near the midpoint of edge[1] and ends near
     // the midpoint of edge[3], crossing through the filleted edge region.
     let mid1 = (pts[1] + pts[2].to_vec()) / 2.0;
@@ -2125,12 +2125,12 @@ fn per_edge_radius_two_edges() {
     let _poly = shell.robust_triangulation(0.001).to_polygon();
 }
 
-/// Per-edge radius count mismatch → PerEdgeRadiusMismatch error.
+/// Per-edge radius count mismatch -> PerEdgeRadiusMismatch error.
 #[test]
 fn per_edge_radius_mismatch() {
     let (mut shell, edge, _) = build_box_shell();
 
-    // Provide 1 radius for 2 edges → mismatch.
+    // Provide 1 radius for 2 edges -> mismatch.
     let params = FilletOptions {
         radius: FilletRadius::PerEdge(vec![0.3]),
         ..Default::default()
@@ -2148,13 +2148,13 @@ fn per_edge_radius_mismatch() {
     );
 }
 
-/// Per-edge radius where one edge is too short → DegenerateEdge.
+/// Per-edge radius where one edge is too short -> DegenerateEdge.
 #[test]
 fn per_edge_radius_degenerate() {
     let (mut shell, edge, _) = build_box_shell();
 
-    // edge[5] length ~1.0, radius 0.15 → ok (2*0.15=0.3 < 1.0).
-    // edge[6] length ~1.0, radius 0.6 → too big (2*0.6=1.2 > 1.0).
+    // edge[5] length ~1.0, radius 0.15 -> ok (2*0.15=0.3 < 1.0).
+    // edge[6] length ~1.0, radius 0.6 -> too big (2*0.6=1.2 > 1.0).
     let params = FilletOptions {
         radius: FilletRadius::PerEdge(vec![0.15, 0.6]),
         ..Default::default()
@@ -2176,7 +2176,7 @@ fn radius_error_bounds() {
     let (shell, edge, _) = build_box_shell();
 
     // face 1 (front) is y=0 plane, face 2 (right) is x=1 plane.
-    // edge[5] (1→5) runs along z at (x=1, y=0). These faces are orthogonal.
+    // edge[5] (1->5) runs along z at (x=1, y=0). These faces are orthogonal.
     let radius = 0.3;
     let (_, _, fillet) = fillet(
         &shell[1],

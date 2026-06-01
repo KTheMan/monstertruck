@@ -15,7 +15,7 @@ porting rationale, and the boolean-op regression post-mortem, see
   merge-base.
 - Policy: treat upstream as a patch queue, not a branch to merge. A merge or
   broad cherry-pick would reintroduce upstream's `truck-shapeops` boolean-op
-  rewrite that we reverted (it regressed `punched_cube` / `adjacent_cubes_or`),
+  rewrite that we reverted (it regressed `punched_cube`/`adjacent_cubes_or`),
   and would collide with the workspace-wide crate/API renames.
 
 Legend: ported = landed in `monstertruck`; deferred = useful but parked as its
@@ -81,12 +81,12 @@ has diverged beyond upstream.
 
 ## `monstertruck-modeling` (`truck-modeling`)
 
-- ported -- tangent-constraint circular arcs (`993e156c`): `CircularArcConstraint::{ThroughPoint, StartTangent}`, `try_circle_arc_by_start_tangent` (renamed from upstream `ArcConstraint::{Transit, Tangent}` / `circle_arc_by_tangent0`).
+- ported -- tangent-constraint circular arcs (`993e156c`): `CircularArcConstraint::{ThroughPoint, StartTangent}`, `try_circle_arc_by_start_tangent` (renamed from upstream `ArcConstraint::{Transit, Tangent}`/`circle_arc_by_tangent0`).
 
 ## `monstertruck-solid` (`truck-shapeops`)
 
 - ahead -- robust boolean ops return `Result<Solid, ShapeOpsError>` (`and`/`or`/`difference`/`symmetric_difference`).
-- reverted -- upstream's `700138cb`-equivalent boolean rewrite (multi-ray voting, healing capper, greedy assignment search): regressed `punched_cube` / `adjacent_cubes_or`; we run the upstream-derived single-ray algorithm wrapped in our `Result` layer. See [`truck-sync.md`](truck-sync.md).
+- reverted -- upstream's `700138cb`-equivalent boolean rewrite (multi-ray voting, healing capper, greedy assignment search): regressed `punched_cube`/`adjacent_cubes_or`; we run the upstream-derived single-ray algorithm wrapped in our `Result` layer. See [`truck-sync.md`](truck-sync.md).
 - ahead -- `strip_seam_edges` healing pass splits STEP seam wires (one edge twice, opposite orientations) into simple wires; no upstream equivalent.
 - reference-only -- fillet branches (`simple-fillet-with-side`, `fix-fillet-estimation`): mine tests/numerical fixes only; do not resurrect old fillet architecture.
 
@@ -95,7 +95,7 @@ has diverged beyond upstream.
 - ahead -- `src/in` -> `src/load`, `src/out` -> `src/save`; `LoadError` thiserror enum; `Table::from_step` returns `Result`.
 - ported -- revolved-line-to-cylinder surface conversion fix (`524f5f53`), adapted to `RevolutionSurface` naming.
 - ported -- `ToSameGeometry` for STEP 2D geometries (`08d2cbf1`): `Line<Point2>`, `Processor<TrimmedCurve<UnitCircle<Point2>>, Matrix3>`, `BsplineCurve<Point2>`.
-- ported -- assembly STEP output as `save/assembly.rs` (`213-assy-step-output` / `0394eb43` / `82114a04`): `StepDesign`, `MatrixAsAxis`, renamed `PartAttrs` -> `PartAttributes`, `DisplayByStep` -> `StepFormat`.
+- ported -- assembly STEP output as `save/assembly.rs` (`213-assy-step-output`/`0394eb43`/`82114a04`): `StepDesign`, `MatrixAsAxis`, renamed `PartAttrs` -> `PartAttributes`, `DisplayByStep` -> `StepFormat`.
 - ahead -- `preview-step-face` diagnostic example for visual debugging of meshing/trim bugs (see [AGENTS.md](AGENTS.md)).
 
 ## `monstertruck-assembly` (`truck-assembly`)
@@ -103,7 +103,7 @@ has diverged beyond upstream.
 - ported -- `Default` impls for `NodeEntity`/`EdgeEntity`, `Dag::map`/`par_map` lifetimes -- foundation for assembly STEP output.
 - ahead -- `Node`/`Edge` `attrs()` -> `attributes()` (deprecated aliases kept).
 
-## `monstertruck-gpu` (`truck-platform`) / `monstertruck-render` (`truck-rendimpl`)
+## `monstertruck-gpu` (`truck-platform`)/`monstertruck-render` (`truck-rendimpl`)
 
 - ahead -- `truck-platform` renamed to `monstertruck-gpu`; edition 2024, `wgpu` 28.
 - skip -- `remove-render-object-by-id` (`79d2bc60`/`329af874`): GPU/render API churn, not kernel correctness.
@@ -122,6 +122,6 @@ has diverged beyond upstream.
 ## Routinely skipped upstream commit classes
 
 - `cargo upgrade` dependency rolls.
-- `Update CHANGELOG` / changelog-only commits.
-- `fmt` / `clippy` / `dos2unix` cosmetic commits (unless they touch code we are porting).
+- `Update CHANGELOG`/changelog-only commits.
+- `fmt`/`clippy`/`dos2unix` cosmetic commits (unless they touch code we are porting).
 - Merge commits.

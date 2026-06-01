@@ -4,7 +4,7 @@ The version is of the bottom crate `monstertruck-render`.
 
 ## Unreleased
 
-- In the README, we clarified that the subtitle is the origin of the name “truck,” and changed all instances of the term in the main text to `truck`.
+- In the README, we clarified that the subtitle is the origin of the name "truck," and changed all instances of the term in the main text to `truck`.
 - Get more precise part attributions from `Product` and `NextAssemblyUsageOccurrence`.
 - Add the variable `division` to `monstertruck_modeling::builder::rsweep`.
 - Renew DAG structure.

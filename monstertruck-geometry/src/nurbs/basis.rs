@@ -7,10 +7,10 @@
 //!
 //! | Source type | Description |
 //! |---|---|
-//! | [`HermiteSegment`] | Cubic Hermite (endpoints + tangents) |
-//! | [`CatmullRomSpline`] | Catmull-Rom through a point sequence |
-//! | [`PowerBasisCurve`] | Monomial polynomial coefficients |
-//! | [`PiecewiseBezier`] | Concatenated Bezier segments |
+//! | [`HermiteSegment`](crate::nurbs::basis::HermiteSegment) | Cubic Hermite (endpoints + tangents) |
+//! | [`CatmullRomSpline`](crate::nurbs::basis::CatmullRomSpline) | Catmull-Rom through a point sequence |
+//! | [`PowerBasisCurve`](crate::nurbs::basis::PowerBasisCurve) | Monomial polynomial coefficients |
+//! | [`PiecewiseBezier`](crate::nurbs::basis::PiecewiseBezier) | Concatenated Bezier segments |
 //!
 //! # Examples
 //!
@@ -136,7 +136,7 @@ impl<P: ControlPoint<f64> + Tolerance> From<CatmullRomSpline<P>> for BsplineCurv
 
 /// A polynomial curve in power (monomial) basis.
 ///
-/// Coefficients `[c0, c1, …, cn]` represent `p(t) = c0 + c1·t + c2·t² + … + cn·tⁿ`.
+/// Coefficients `[c0, c1, ..., cn]` represent `p(t) = c0 + c1·t + c2·t² + ... + cn·tⁿ`.
 /// Converts to a degree-n Bezier [`BsplineCurve`] over \[0, 1\] via the
 /// power-to-Bernstein matrix.
 ///

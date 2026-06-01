@@ -139,7 +139,7 @@ impl TryIntoBsplineSurface for NurbsSurface<Vector4> {
         if !all_unit {
             return None;
         }
-        // Project Vector4(x, y, z, w) → Point3(x/w, y/w, z/w).
+        // Project Vector4(x, y, z, w) -> Point3(x/w, y/w, z/w).
         let pts: Vec<Vec<Point3>> = ctrl
             .iter()
             .map(|row| row.iter().map(|v| v.to_point()).collect())
@@ -149,7 +149,7 @@ impl TryIntoBsplineSurface for NurbsSurface<Vector4> {
 }
 
 // ---------------------------------------------------------------------------
-// Plane: exact bilinear Bézier patch.
+// Plane: exact bilinear Bezier patch.
 // ---------------------------------------------------------------------------
 
 impl TryIntoBsplineSurface for Plane {
@@ -297,7 +297,7 @@ where C: TryIntoHomogeneousBsplineCurve
         let dir = self.extruding_vector();
         let knot_vecs = (curve.knot_vector().clone(), KnotVector::bezier_knot(1));
         // Row at v=0: original curve control points.
-        // Row at v=1: each (x,y,z,w) → (x+dx*w, y+dy*w, z+dz*w, w).
+        // Row at v=1: each (x,y,z,w) -> (x+dx*w, y+dy*w, z+dz*w, w).
         let row0 = curve.control_points().clone();
         let row1: Vec<Vector4> = row0
             .iter()

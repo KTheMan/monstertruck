@@ -174,7 +174,7 @@ impl<T> Takeable for Vec<T> {
 }
 
 impl<Shape, NodeAttrs, Matrix, EdgeAttrs> Assembly<Shape, NodeAttrs, Matrix, EdgeAttrs> {
-    /// Add nodes as needed and set all nodes except the terminal node's shape to “taken”.
+    /// Add nodes as needed and set all nodes except the terminal node's shape to "taken".
     /// Assign default attributes to newly added nodes.
     /// # Examples
     /// ```

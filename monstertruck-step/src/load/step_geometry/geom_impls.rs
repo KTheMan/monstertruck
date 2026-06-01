@@ -523,7 +523,7 @@ impl ParameterDivision1D for Curve3D {
         tol: f64,
     ) -> Option<(Vec<f64>, Vec<Self::Point>)> {
         let debug_profile = env::var("MT_PROFILE_CURVE_DIVISION").is_ok();
-        // Only consult the clock when actually profiling — `Instant::now()`
+        // Only consult the clock when actually profiling -- `Instant::now()`
         // panics on `wasm32-unknown-unknown` ("time not implemented"), so
         // an unconditional call here breaks browser STEP loading.
         let started = debug_profile.then(Instant::now);

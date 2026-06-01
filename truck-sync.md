@@ -337,7 +337,7 @@ Use upstream only as reference:
 - Do not resurrect `rbf_surface` module structure.
 - Do not block Boolean/Yang work on this.
 
-## `truck-drafting` / potential `monstertruck-sketch` assessment
+## `truck-drafting`/potential `monstertruck-sketch` assessment
 
 Verdict:
 
@@ -391,7 +391,7 @@ Function naming:
 
 Docs wording:
 
-- Replace "Tries to returns" with "Creates" / "Attempts to create".
+- Replace "Tries to returns" with "Creates"/"Attempts to create".
 - Replace "inter control points" with "interior control points".
 - All comments must end in periods.
 - First references to types in docs need links per repo policy.
@@ -521,7 +521,7 @@ For `healing::tests::step_import` (which fails at parent too -- pre-dates `70013
 
 ### Test-value updates
 
-`adjacent_cubes_or` asserted a triangulated centre of gravity of `(0.75, 0.75, 1.25)` and a face count of `14`, both of which were tied to specific transient `700138cb` triangulation / face-decomposition behaviour that has drifted with mesh-crate updates. Updated to:
+`adjacent_cubes_or` asserted a triangulated centre of gravity of `(0.75, 0.75, 1.25)` and a face count of `14`, both of which were tied to specific transient `700138cb` triangulation/face-decomposition behaviour that has drifted with mesh-crate updates. Updated to:
 
 - centre of gravity = `(0.75, 0.75, 1.0)` -- the analytically correct value for two equal-volume unit cubes adjacent along `z = 1`.
 - face count = `12` -- 6 faces per cube, no split of the shared midplane.
@@ -545,7 +545,7 @@ Failing tests, grouped by symptom:
 
 ### Bisect result (2026-05-15)
 
-Confirmed by checking out `700138cb~1` in a worktree and re-running the same tests with a stubbed `fillet/tests.rs` (the stub is needed because `monstertruck-solid` tests do not compile at that commit for unrelated orphan-rule / `Result` alias reasons fixed in later commits):
+Confirmed by checking out `700138cb~1` in a worktree and re-running the same tests with a stubbed `fillet/tests.rs` (the stub is needed because `monstertruck-solid` tests do not compile at that commit for unrelated orphan-rule/`Result` alias reasons fixed in later commits):
 
 - `transversal::integrate::tests::punched_cube` -- **passes**.
 - `transversal::integrate::tests::adjacent_cubes_or` -- **passes**.

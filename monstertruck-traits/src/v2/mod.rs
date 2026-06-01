@@ -10,7 +10,7 @@
 //! # Phase 0
 //!
 //! This module is scaffolding only. No existing code is modified. The
-//! [`compat`] module provides blanket adapters so that any type implementing
+//! `compat` module provides blanket adapters so that any type implementing
 //! the old `f64` traits automatically implements the v2 traits with
 //! `Scalar = f64`.
 

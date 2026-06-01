@@ -11,7 +11,7 @@ type Wire<C> = monstertruck_topology::Wire<Point3, C>;
 type Face<C, S> = monstertruck_topology::Face<Point3, C, S>;
 
 /// Projects a 3D wire onto 2D by sampling vertex and curve midpoints.
-/// Uses the same sampling strategy as [`builder::try_attach_plane`]:
+/// Uses the same sampling strategy as [`builder::try_attach_plane`](crate::builder::try_attach_plane):
 /// vertex point + curve midpoint per edge.
 fn project_wire_to_2d<C>(wire: &Wire<C>, u_axis: Vector3, v_axis: Vector3) -> Vec<Point2>
 where C: ParametricCurve3D + BoundedCurve + Clone {
@@ -202,13 +202,13 @@ where C: ParametricCurve3D + BoundedCurve + Clone + Invertible {
 /// Attaches a plane to a set of wires with automatic loop orientation
 /// normalization.
 ///
-/// Unlike [`builder::try_attach_plane`], this function does not require the
+/// Unlike [`builder::try_attach_plane`](crate::builder::try_attach_plane), this function does not require the
 /// caller to ensure correct winding order. It:
 ///
 /// 1. Detects the common plane of all wires.
 /// 2. Classifies loops as outer or holes via signed area and containment.
 /// 3. Normalizes winding directions (outer = CCW, holes = CW).
-/// 4. Delegates to [`builder::try_attach_plane`] with the normalized wires.
+/// 4. Delegates to [`builder::try_attach_plane`](crate::builder::try_attach_plane) with the normalized wires.
 ///
 /// # Errors
 ///
@@ -224,7 +224,7 @@ where
     crate::builder::try_attach_plane(normalized)
 }
 
-/// Constructs a [`Solid`] by extruding a planar profile along a direction
+/// Constructs a [`Solid`](crate::Solid) by extruding a planar profile along a direction
 /// vector.
 ///
 /// Takes a set of wires (possibly with holes), normalizes orientation,

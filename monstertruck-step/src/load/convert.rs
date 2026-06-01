@@ -405,7 +405,7 @@ impl Table {
     /// `boundaries` and appends one entry per `void` (inner cavity).
     ///
     /// `Solid::extract` on the returned [`CompressedSolid`] requires the
-    /// outer shell to satisfy [`ShellCondition::Closed`]. Many real-world
+    /// outer shell to satisfy [`ShellCondition::Closed`](monstertruck_topology::shell::ShellCondition::Closed). Many real-world
     /// STEP exports produce shells that are topologically *regular* but
     /// not strictly *oriented*; for those, prefer
     /// `to_compressed_trimmed_solid` and downstream meshing/healing.

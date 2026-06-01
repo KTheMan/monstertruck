@@ -1,4 +1,4 @@
-//! Demonstrates `BsplineSurface::gordon` — creating a surface from two
+//! Demonstrates `BsplineSurface::gordon` -- creating a surface from two
 //! families of curves using the boolean sum formula.
 
 use monstertruck_geometry::prelude::*;

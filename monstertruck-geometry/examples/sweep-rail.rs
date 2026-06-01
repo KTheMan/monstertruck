@@ -1,4 +1,4 @@
-//! Demonstrates `BsplineSurface::sweep_rail` — sweeping a profile along a
+//! Demonstrates `BsplineSurface::sweep_rail` -- sweeping a profile along a
 //! curved rail with tangent-aligned framing.
 
 use monstertruck_geometry::prelude::*;

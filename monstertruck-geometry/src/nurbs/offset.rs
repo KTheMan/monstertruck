@@ -137,7 +137,7 @@ pub fn curve_offset_3d(
                 let perp = normal - t_hat * normal.dot(t_hat);
                 let perp_len = perp.magnitude();
                 if perp_len.so_small() {
-                    // Normal is parallel to tangent — use cross product fallback.
+                    // Normal is parallel to tangent -- use cross product fallback.
                     let alt = if t_hat.x.abs() < 0.9 {
                         Vector3::unit_x()
                     } else {
@@ -224,7 +224,7 @@ pub fn surface_offset(
                     let cross_len = cross.magnitude();
 
                     let normal = if cross_len.so_small() {
-                        // Degenerate point — use z fallback.
+                        // Degenerate point -- use z fallback.
                         Vector3::unit_z()
                     } else {
                         cross / cross_len

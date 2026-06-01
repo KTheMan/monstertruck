@@ -192,13 +192,13 @@ impl Tmesh<Point3> {
             let mut targets: Vec<(f64, f64)> = high_curvature_cells
                 .iter()
                 .flat_map(|&(u, v)| {
-                    // Nearest existing t-line → insert at (u, t_val).
+                    // Nearest existing t-line -> insert at (u, t_val).
                     let on_t = t_lines
                         .iter()
                         .copied()
                         .min_by(|a, b| (a - v).abs().total_cmp(&(b - v).abs()))
                         .map(|t_val| (u, t_val));
-                    // Nearest existing s-line → insert at (s_val, v).
+                    // Nearest existing s-line -> insert at (s_val, v).
                     let on_s = s_lines
                         .iter()
                         .copied()

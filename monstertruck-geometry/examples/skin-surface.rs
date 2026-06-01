@@ -1,4 +1,4 @@
-//! Demonstrates `BsplineSurface::skin` — creating a lofted surface through
+//! Demonstrates `BsplineSurface::skin` -- creating a lofted surface through
 //! multiple section curves.
 
 use monstertruck_geometry::prelude::*;

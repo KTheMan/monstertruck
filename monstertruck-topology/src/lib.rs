@@ -64,8 +64,8 @@
 //! These containers are used for creating higher-dimensional topological elements and checked the
 //! regularity (e.g. connectivity, closedness, and so on) before creating these elements.
 //! ## Features
-//! * `nightly` – Use features available only in a `nightly` toolchain.
-//! * `rclite` – Use of `rclite::Arc` instead of `std::syn::Arc`. The latter
+//! * `nightly` -- Use features available only in a `nightly` toolchain.
+//! * `rclite` -- Use of `rclite::Arc` instead of `std::syn::Arc`. The latter
 //!   uses more memory and is potentially slower than the former. On by default.
 
 #![cfg_attr(not(debug_assertions), deny(warnings))]
