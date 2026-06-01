@@ -19,7 +19,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          # `.blueprints` (agent tooling) is not accessible to CI, so do not
+          # recurse submodules here. The only submodule CI needs is
+          # `resources`, fetched explicitly in the test job.
+          submodules: false
       # `rustfmt.toml` opts into unstable options (`fn_single_line`,
       # `where_single_line`, `brace_style = "PreferSameLine"`); stable
       # rustfmt silently ignores those, so the fmt check has to run on
@@ -35,7 +38,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          # `.blueprints` (agent tooling) is not accessible to CI, so do not
+          # recurse submodules here. The only submodule CI needs is
+          # `resources`, fetched explicitly in the test job.
+          submodules: false
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -49,7 +55,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          # `.blueprints` (agent tooling) is not accessible to CI, so do not
+          # recurse submodules here. The only submodule CI needs is
+          # `resources`, fetched explicitly in the test job.
+          submodules: false
+      # Tests read STEP/shape fixtures from the `resources` submodule at
+      # runtime; fetch only it (a public repo), not `.blueprints`.
+      - run: git submodule update --init resources
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: extractions/setup-just@v2
@@ -61,7 +73,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          # `.blueprints` (agent tooling) is not accessible to CI, so do not
+          # recurse submodules here. The only submodule CI needs is
+          # `resources`, fetched explicitly in the test job.
+          submodules: false
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: extractions/setup-just@v2
@@ -73,7 +88,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          # `.blueprints` (agent tooling) is not accessible to CI, so do not
+          # recurse submodules here. The only submodule CI needs is
+          # `resources`, fetched explicitly in the test job.
+          submodules: false
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
