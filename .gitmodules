@@ -1,3 +1,6 @@
 [submodule "resources"]
 	path = resources
 	url = https://github.com/ricosjp/resources4truck.git
+[submodule ".blueprints"]
+	path = .blueprints
+	url = https://github.com/virtualritz/blueprints.git

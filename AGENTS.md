@@ -1,5 +1,25 @@
 # Repository Guidelines
 
+## Blueprint Baseline
+
+This repo adopts the shared [`blueprints`](https://github.com/virtualritz/blueprints)
+baseline via the `.blueprints/` git submodule. Those files are the cross-project
+default for agent behavior, code quality, and microtypography; the
+project-specific rules in this file take precedence wherever they conflict.
+
+Core rules (read first):
+
+- [Agent behavior](.blueprints/base/AGENTS.md)
+- [Rust agent rules](.blueprints/lang/rust/AGENTS.md) and [Rust testing](.blueprints/lang/rust/testing.md)
+- [Git safety](.blueprints/base/git-safety.md) and [test ownership](.blueprints/base/test-ownership.md)
+
+Reference:
+
+- [Microtypography](.blueprints/base/microtypography.md) -- slashes, dashes, quotes, ellipses, spacing.
+- [Documentation standards](.blueprints/base/documentation.md)
+- [Commit messages](.blueprints/base/commit-messages.md)
+- [API change protocol](.blueprints/base/api-changes.md)
+
 ## Build, Test, and Development Commands
 
 **Only use `cargo test` and `cargo run`. NEVER use `cargo check` or `cargo build` for verification.**
@@ -82,7 +102,7 @@ cargo clippy --all-targets -- -W warnings
 - **CRITICAL: Never run tests with `RUST_TEST_UPDATE=1`** -- this modifies test expectations which is equivalent to changing tests.
 - **CRITICAL: Never change expected test outputs** -- these are the ground truth.
 
-## Visual Debugging for Meshing / Trim Bugs
+## Visual Debugging for Meshing/Trim Bugs
 
 When a STEP face is suspected of tessellating wrong but the failure is
 not obvious from the test output, render the face to a diagnostic
@@ -178,7 +198,7 @@ Compressed from the [Rust API Guidelines](https://rust-lang.github.io/api-guidel
 - **C-COLLECT**: Collections implement `FromIterator` and `Extend`.
 - **C-SEND-SYNC**: Types are `Send` + `Sync` where possible.
 - **C-GOOD-ERR**: Error types are meaningful and well-behaved.
-- **C-RW-VALUE**: Reader/writer functions take `R: Read` / `W: Write` by value.
+- **C-RW-VALUE**: Reader/writer functions take `R: Read`/`W: Write` by value.
 
 ### Macros
 
