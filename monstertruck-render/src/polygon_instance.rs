@@ -125,8 +125,8 @@ impl Rendered for PolygonInstance {
         let depth_stencil = match scene_desc.backend_buffer.depth_test {
             true => Some(DepthStencilState {
                 format: TextureFormat::Depth32Float,
-                depth_write_enabled: true,
-                depth_compare: CompareFunction::Less,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(CompareFunction::Less),
                 stencil: Default::default(),
                 bias: Default::default(),
             }),

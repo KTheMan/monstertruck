@@ -397,7 +397,7 @@ pub trait Rendered {
         let pipeline_layout = scene
             .device()
             .create_pipeline_layout(&PipelineLayoutDescriptor {
-                bind_group_layouts: &[&scene.bind_group_layout, &bind_group_layout],
+                bind_group_layouts: &[Some(&scene.bind_group_layout), Some(&bind_group_layout)],
                 ..Default::default()
             });
         let pipeline = self.pipeline(scene.device_handler(), &pipeline_layout, &scene.scene_desc);

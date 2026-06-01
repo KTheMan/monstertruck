@@ -17,9 +17,9 @@ async fn init_default_device(
     let backends = Backends::PRIMARY;
     #[cfg(feature = "webgl")]
     let backends = Backends::all();
-    let instance = Instance::new(&InstanceDescriptor {
+    let instance = Instance::new(InstanceDescriptor {
         backends,
-        ..Default::default()
+        ..InstanceDescriptor::new_without_display_handle()
     });
 
     let surface = window.as_ref().map(|window| {
@@ -637,8 +637,8 @@ impl Scene {
                 let device = handler.device();
                 let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
                     bind_group_layouts: &[
-                        &self.bind_group_layout,
-                        &render_object.bind_group_layout,
+                        Some(&self.bind_group_layout),
+                        Some(&render_object.bind_group_layout),
                     ],
                     ..Default::default()
                 });
@@ -838,17 +838,25 @@ impl WindowScene {
     pub fn render_frame(&mut self) {
         self.size_alignment();
         let surface = self.surface();
-        let surface_texture = match surface.get_current_texture() {
-            Ok(got) => got,
-            Err(_) => {
+        // wgpu 29 replaced the `Result<SurfaceTexture, SurfaceError>` return of
+        // `get_current_texture` with the `CurrentSurfaceTexture` enum. A
+        // `Suboptimal` texture is still usable; any other non-`Success` status
+        // means we reconfigure the surface and retry once.
+        let usable = |attempt: CurrentSurfaceTexture| match attempt {
+            CurrentSurfaceTexture::Success(texture)
+            | CurrentSurfaceTexture::Suboptimal(texture) => Some(texture),
+            _ => None,
+        };
+        let surface_texture = match usable(surface.get_current_texture()) {
+            Some(texture) => texture,
+            None => {
                 let config = self
                     .scene
                     .scene_desc
                     .render_texture
                     .compatible_surface_config();
                 surface.configure(self.device(), &config);
-                surface
-                    .get_current_texture()
+                usable(surface.get_current_texture())
                     .expect("Failed to acquire next surface texture!")
             }
         };

@@ -103,8 +103,8 @@ impl Rendered for Plane<'_> {
                     },
                     depth_stencil: Some(DepthStencilState {
                         format: TextureFormat::Depth32Float,
-                        depth_write_enabled: true,
-                        depth_compare: wgpu::CompareFunction::Less,
+                        depth_write_enabled: Some(true),
+                        depth_compare: Some(wgpu::CompareFunction::Less),
                         stencil: Default::default(),
                         bias: Default::default(),
                     }),
@@ -123,9 +123,9 @@ impl Rendered for Plane<'_> {
 
 pub fn init_device(backends: Backends) -> DeviceHandler {
     pollster::block_on(async {
-        let instance = Instance::new(&InstanceDescriptor {
+        let instance = Instance::new(InstanceDescriptor {
             backends,
-            ..Default::default()
+            ..InstanceDescriptor::new_without_display_handle()
         });
         let adapter = instance
             .request_adapter(&RequestAdapterOptions {

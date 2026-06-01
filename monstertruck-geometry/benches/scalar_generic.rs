@@ -1,6 +1,7 @@
 //! Phase 4.0 benchmark: f32 vs f64 Line evaluation through v2 traits.
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
+use std::hint::black_box;
 use monstertruck_geometry::prelude::*;
 use monstertruck_traits::v2;
 
