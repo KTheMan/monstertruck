@@ -29,8 +29,8 @@
 //!   [`ParametricSurface`](traits::ParametricSurface),
 //!   [`SearchParameter`](traits::SearchParameter), etc.) together with the
 //!   scalar-generic v2 successor under
-//!   [`traits::v2`](traits::v2).
-//! - [`derive`] -- proc-macros (`#[derive(StepFormat)]`, `#[derive(StepLength)]`)
+//!   [`v2`](traits::v2).
+//! - [`derive`](mod@derive) -- proc-macros (`#[derive(StepFormat)]`, `#[derive(StepLength)]`)
 //!   for the STEP back-end.
 //!
 //! ## Geometry and topology
@@ -60,10 +60,10 @@
 //! ## Modeling and boolean ops
 //!
 //! - [`modeling`] -- the high-level builder
-//!   ([`modeling::builder`](modeling::builder)) for vertices, edges, wires,
+//!   ([`builder`](modeling::builder)) for vertices, edges, wires,
 //!   sweeps ([`extrude`](modeling::builder::extrude),
 //!   [`revolve`](modeling::builder::revolve)), tangent arcs, and primitive
-//!   shapes ([`modeling::primitive::cuboid`](modeling::primitive::cuboid)
+//!   shapes ([`cuboid`](modeling::primitive::cuboid)
 //!   etc.).
 //! - [`solid`] -- shape operators
 //!   ([`and`](solid::and), [`or`](solid::or)) for boolean combinations of
