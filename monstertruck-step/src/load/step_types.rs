@@ -258,16 +258,25 @@ impl From<&Axis2Placement3d> for Matrix4 {
             Some(axis) => Vector3::from(axis),
             None => Vector3::unit_z(),
         };
+        // Pick a fallback reference direction that is not parallel to `z`.
+        let fallback = match z.near(&Vector3::unit_x()) {
+            true => Vector3::unit_y(),
+            false => Vector3::unit_x(),
+        };
         let x = match &axis.ref_direction {
             Some(axis) => Vector3::from(axis),
-            // When z is parallel to x, using `unit_x()` produces a zero vector
-            // after projection, causing NaN. Fall back to `unit_y()` instead.
-            None => match z.near(&Vector3::unit_x()) {
-                true => Vector3::unit_y(),
-                false => Vector3::unit_x(),
-            },
+            None => fallback,
         };
-        let x = (x - x.dot(z) * z).normalize();
+        // Gram-Schmidt: remove the `z` component of `x`. ISO 10303 permits
+        // `ref_direction` to be parallel to `axis`; in that case the projected
+        // vector is zero and `normalize()` would produce `NaN`, which later
+        // panics in `nonpositive_tolerance!` during meshing. Fall back to an
+        // arbitrary direction orthogonal to `z` when the projection degenerates.
+        let projected = x - x.dot(z) * z;
+        let x = match projected.magnitude2().so_small() {
+            true => (fallback - fallback.dot(z) * z).normalize(),
+            false => projected.normalize(),
+        };
         let y = z.cross(x);
         Matrix4::from_cols(
             x.extend(0.0),
@@ -2380,5 +2389,51 @@ impl TryFrom<&ItemDefinedTransformation> for Matrix4 {
             .invert()
             .ok_or("failed to invert transform_item_1 Matrix4")?;
         Ok(mat2 * inv)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn direction(ratios: [f64; 3]) -> Direction {
+        Direction {
+            label: String::new(),
+            direction_ratios: ratios.to_vec(),
+        }
+    }
+
+    /// Regression for `axis ∥ ref_direction`: ISO 10303 allows the placement's
+    /// `axis` and `ref_direction` to be parallel, but the Gram-Schmidt step
+    /// then normalized a zero vector and produced `NaN`, which later panicked
+    /// during meshing (`tolerance must be no less than 1e-6`). The conversion
+    /// must yield a finite, orthonormal basis instead.
+    #[test]
+    fn axis2_placement3d_parallel_axis_and_ref_direction_is_finite() {
+        let placement = Axis2Placement3d {
+            label: String::new(),
+            location: CartesianPoint {
+                label: String::new(),
+                coordinates: vec![1.0, 2.0, 3.0],
+            },
+            axis: Some(direction([0.0, 0.0, 1.0])),
+            // Parallel to `axis` -- the degenerate case.
+            ref_direction: Some(direction([0.0, 0.0, 1.0])),
+        };
+
+        let matrix = Matrix4::from(&placement);
+        let (x, y, z) = (
+            matrix.x.truncate(),
+            matrix.y.truncate(),
+            matrix.z.truncate(),
+        );
+        for component in [x.x, x.y, x.z, y.x, y.y, y.z, z.x, z.y, z.z] {
+            assert!(component.is_finite(), "placement basis must be finite");
+        }
+        // The recovered basis is orthonormal.
+        assert!((x.magnitude() - 1.0).abs() < 1.0e-9);
+        assert!((y.magnitude() - 1.0).abs() < 1.0e-9);
+        assert!(x.dot(z).abs() < 1.0e-9);
+        assert!(y.dot(z).abs() < 1.0e-9);
     }
 }
