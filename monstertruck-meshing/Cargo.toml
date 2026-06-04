@@ -15,8 +15,10 @@ categories = ["graphics"]
 analyzers = []
 filters = []
 tessellation = ["spade", "filters"]
+# Legacy-VTK mesh I/O. Off by default: `vtkio` pulls `lz4_flex`, which carries
+# RUSTSEC-2026-0041, so opting in is explicit. Enable with `--features vtk`.
 vtk = ["vtkio"]
-default = ["analyzers", "filters", "tessellation", "vtk"]
+default = ["analyzers", "filters", "tessellation"]
 
 [dependencies]
 # `web_time::Instant` is `std::time::Instant` on native and falls back
