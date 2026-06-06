@@ -25,13 +25,13 @@
 
 ## Overview
 
-`monstertruck` is an open-source, Rust-based shape processing kernel. It is a heavily fortified, feature-expanded fork of the original [`truck`](https://github.com/ricosjp/truck) project.
+`monstertruck` is an open-source, Rust-based shape processing kernel. It is a fortified, feature-expanded fork of the original [`truck`](https://github.com/ricosjp/truck) project.
 
 The underlying philosophy of this kernel rests on three foundational pillars:
 
 - **Modern Tooling**
 
-  We are building a next-generation CAD kernel in Rust with first-class WebGPU support.
+  We are building a CAD kernel in Rust with first-class WebGPU support.
 
 - **Classical Techniques, Reborn**
 
@@ -39,7 +39,7 @@ The underlying philosophy of this kernel rests on three foundational pillars:
 
 - **Ship of Theseus-like Architecture**
 
-  Instead of repeating the mistakes of monolithic CAD kernel architectures, we abandoned the idea of a single, massive library or app. Instead, we modularized the kernel into a collection of small, highly optimized, and interchangeable crates -- much like [the ship of Theseus](https://en.wikipedia.org/wiki/Ship_of_Theseus).
+  Instead of repeating the mistakes of monolithic CAD kernel architectures, we abandoned the idea of a single library or app. Instead, we modularized the kernel into a collection of small, interchangeable crates -- much like [the ship of Theseus](https://en.wikipedia.org/wiki/Ship_of_Theseus).
 
 ## Why Was This Forked?
 
@@ -47,15 +47,15 @@ Getting PRs accepted upstream was proving to be a challenge, so we spun up `mons
 
 This fork exists to accomplish two main goals:
 
-1. **Supercharge the functionality:** We are actively adding and enhancing features, tools, and operations that go beyond the original scope (hence the _Multifarious Omnificence_). This includes merging `truck` PRs that we deem useful (but you are welcome to open PRs against `monstertruck` directly, ofc!).
+1. **Supercharge the functionality:** We are adding and enhancing features, tools, and operations that go beyond the original scope (hence the _Multifarious Omnificence_). This includes merging `truck` PRs that we deem useful (but you are welcome to open PRs against `monstertruck` directly, ofc!).
 
 2. **Fix the ergonomics:** The original codebase suffered from unconventional phrasing, non-idiomatic naming conventions, and occasionally confusing translations.
-   We have overhauled the project using idiomatic Rust naming conventions and standard, industry-recognized CAD terminology.
-   Our goal is to make the codebase highly inclusive, readable, and accessible -- whether you are a non-native English speaker or a seasoned CAD veteran.
+   We have overhauled the project using idiomatic Rust naming conventions and standard CAD terminology.
+   Our goal is to make the codebase inclusive, readable, and accessible -- whether you are a non-native English speaker or a seasoned CAD veteran.
 
 ### Improvements Since the Fork
 
-Snapshot at the [`step-meshing-clean`](https://github.com/virtualritz/monstertruck/releases/tag/step-meshing-clean) tag. Per-crate detail and porting verdicts live in [`TRUCK-PARITY.md`](TRUCK-PARITY.md); upstream commits we hand-ported include SHAs in their commit bodies for attribution.
+Per-crate detail and porting verdicts live in [`TRUCK-PARITY.md`](TRUCK-PARITY.md); upstream commits we hand-ported include SHAs in their commit bodies for attribution.
 
 **Workspace Modernization**
 - All crates renamed `truck-*` -> `monstertruck-*`; `truck-platform` -> `monstertruck-gpu`, `truck-stepio/src/{in,out}` -> `monstertruck-step/src/{load,save}`, `truck-shapeops` -> `monstertruck-solid`.
@@ -79,7 +79,7 @@ Snapshot at the [`step-meshing-clean`](https://github.com/virtualritz/monstertru
 - STEP `Axis2Placement3d` guards parallel `axis`/`ref_direction`; revolved-line-to-cylinder conversion drops the spurious inversion (upstream `524f5f53`); rational trim boundaries preserved through the load path; inverted-processor sample alignment.
 
 **Meshing**
-- Triangulation/tessellation pipeline heavily rewritten; CDT trim-constraint handling rebuilt across `b60b1604`/`46b21f9f`/`f35d3b6d`/`7c5ce2d2` (skip conflicting, avoid invalid, preserve split, split through vertices).
+- Triangulation/tessellation pipeline rewritten; CDT trim-constraint handling rebuilt across `b60b1604`/`46b21f9f`/`f35d3b6d`/`7c5ce2d2` (skip conflicting, avoid invalid, preserve split, split through vertices).
 - `PolyBoundary::include` gets an AABB early reject; double tessellation removed in `step-to-mesh`.
 - Tessellation benchmark example + baseline log for regression tracking.
 
