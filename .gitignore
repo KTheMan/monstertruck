@@ -21,3 +21,9 @@ node_modules/
 
 /.vscode
 /.DS_store
+
+# Sketch crate is deferred upstream-sync work; agents stage it here but
+# it does not ship in `monstertruck` releases yet. Keep it untracked so
+# wildcard `git add monstertruck-*/Cargo.toml` invocations don't sweep
+# its manifest in by accident.
+/monstertruck-sketch
