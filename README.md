@@ -27,23 +27,9 @@
 
 `monstertruck` is an open-source, Rust-based shape processing kernel. It is a fortified, feature-expanded fork of the original [`truck`](https://github.com/ricosjp/truck) project.
 
-The underlying philosophy of this kernel rests on three foundational pillars:
-
-- **Modern Tooling**
-
-  We are building a CAD kernel in Rust with first-class WebGPU support.
-
-- **Classical Techniques, Reborn**
-
-  This a Rust-native implementation of classic Boundary Representation (B-rep) and NURBS from the ground up.
-
-- **Ship of Theseus-like Architecture**
-
-  Instead of repeating the mistakes of monolithic CAD kernel architectures, we abandoned the idea of a single library or app. Instead, we modularized the kernel into a collection of small, interchangeable crates -- much like [the ship of Theseus](https://en.wikipedia.org/wiki/Ship_of_Theseus).
-
 ## Why Was This Forked?
 
-Getting PRs accepted upstream was proving to be a challenge, so we spun up `monstertruck` to keep development moving.
+Getting PRs accepted upstream was proving to be a challenge, so we spun up `monstertruck` to keep development moving a tad faster.
 
 This fork exists to accomplish two main goals:
 
@@ -74,38 +60,38 @@ Per-crate detail and porting verdicts live in [`TRUCK-PARITY.md`](TRUCK-PARITY.m
 **Geometry Correctness**
 - `Sphere::search_nearest_parameter` guards: `acos` clamp, exact-pole `0/0` singularity, `point == center` singularity.
 - `parameter_range()` fix for non-clamped B-splines.
-- Surface `parameter_division` recursion guard + decorrelated jitter (partial port of upstream `7b1f4171`).
-- `UnitCircle::search_{nearest_}parameter` honors `hint` across the period (upstream `f563ae53` + `86e4ed75`).
-- STEP `Axis2Placement3d` guards parallel `axis`/`ref_direction`; revolved-line-to-cylinder conversion drops the spurious inversion (upstream `524f5f53`); rational trim boundaries preserved through the load path; inverted-processor sample alignment.
+- Surface `parameter_division` recursion guard + decorrelated jitter (partial port of upstream [`7b1f4171`](https://github.com/ricosjp/truck/commit/7b1f4171)).
+- `UnitCircle::search_{nearest_}parameter` honors `hint` across the period (upstream [`f563ae53`](https://github.com/ricosjp/truck/commit/f563ae53) + [`86e4ed75`](https://github.com/ricosjp/truck/commit/86e4ed75)).
+- STEP `Axis2Placement3d` guards parallel `axis`/`ref_direction`; revolved-line-to-cylinder conversion drops the spurious inversion (upstream [`524f5f53`](https://github.com/ricosjp/truck/commit/524f5f53)); rational trim boundaries preserved through the load path; inverted-processor sample alignment.
 
 **Meshing**
-- Triangulation/tessellation pipeline rewritten; CDT trim-constraint handling rebuilt across `b60b1604`/`46b21f9f`/`f35d3b6d`/`7c5ce2d2` (skip conflicting, avoid invalid, preserve split, split through vertices).
+- Triangulation/tessellation pipeline rewritten; CDT trim-constraint handling rebuilt across [`b60b1604`](https://github.com/virtualritz/monstertruck/commit/b60b1604)/[`46b21f9f`](https://github.com/virtualritz/monstertruck/commit/46b21f9f)/[`f35d3b6d`](https://github.com/virtualritz/monstertruck/commit/f35d3b6d)/[`7c5ce2d2`](https://github.com/virtualritz/monstertruck/commit/7c5ce2d2) (skip conflicting, avoid invalid, preserve split, split through vertices).
 - `PolyBoundary::include` gets an AABB early reject; double tessellation removed in `step-to-mesh`.
 - Tessellation benchmark example + baseline log for regression tracking.
 
 **Boolean Operations**
-- Reverted upstream's `700138cb`-equivalent boolean rewrite after bisect confirmed it regressed `punched_cube` and `adjacent_cubes_or` (output shells came back `Oriented`, not `Closed`); we keep the upstream-derived single-ray algorithm wrapped in our `Result` layer.
+- Reverted upstream's [`700138cb`](https://github.com/virtualritz/monstertruck/commit/700138cb)-equivalent boolean rewrite after bisect confirmed it regressed `punched_cube` and `adjacent_cubes_or` (output shells came back `Oriented`, not `Closed`); we keep the upstream-derived single-ray algorithm wrapped in our `Result` layer.
 - New `strip_seam_edges` healing pass: when a wire visits the same edge twice with opposite orientations (the canonical STEP cylinder/cone seam pattern), the pass cuts at the seam edge and emits two simple wires on the same face. Fixes `NotSimpleWire` extraction failures on `abc-0008.step`, `occt-cylinder.step`, `occt-cone.step`. No upstream equivalent.
 
 **New Capabilities**
-- Offset geometry: `OffsetCurve`, `OffsetSurface`, `NormalOffsetField`, `CurveScalarFunction`, `SurfaceScalarFunction` (renamed from upstream's `Offset`/`NormalField`/`ScalarFunctionD*`; upstream `9031e6dd`).
+- Offset geometry: `OffsetCurve`, `OffsetSurface`, `NormalOffsetField`, `CurveScalarFunction`, `SurfaceScalarFunction` (renamed from upstream's `Offset`/`NormalField`/`ScalarFunctionD*`; upstream [`9031e6dd`](https://github.com/ricosjp/truck/commit/9031e6dd)).
 - Assembly STEP output: `StepDesign`, `MatrixAsAxis`, full `save::assembly` module (upstream `213-assy-step-output`).
-- Tangent-based circular arc construction in `monstertruck-modeling`: `CircularArcConstraint::{ThroughPoint, StartTangent}`, `try_circle_arc_by_start_tangent` (renamed from upstream `ArcConstraint`/`circle_arc_by_tangent0`; upstream `993e156c`).
+- Tangent-based circular arc construction in `monstertruck-modeling`: `CircularArcConstraint::{ThroughPoint, StartTangent}`, `try_circle_arc_by_start_tangent` (renamed from upstream `ArcConstraint`/`circle_arc_by_tangent0`; upstream [`993e156c`](https://github.com/ricosjp/truck/commit/993e156c)).
 - Fillet engine rewrite: per-edge radii, variable-radius open wires, multi-chain + chamfer, `Ridge` and `Custom` profile modes, robust topology surgery, degenerate-edge rejection, `IntersectionCurve` support.
 - T-spline / T-NURCC promoted to first-class surface type with `BsplineSurface` conversion, curvature-based adaptive refinement, and hot-path optimization (lock-free `Tmesh::subs()`, flat-array layout for `analytical_der_mn()`).
 - Scalar-generic `v2` trait family (`CurveParameter<T>`/`SurfaceParameter<T>`, `SearchParameter<v2::D2<T>>`, etc.) -- no upstream equivalent; default scalar still `f64`.
 - `SurfaceDerivatives::absolute_derivatives` + `combinatorial_derivative(s)` ported from upstream's `truck-base::ders`, backing the offset surface family.
-- `BasisWindow` active-window B-spline basis evaluation (upstream `77e25635`), reimplemented with `SmallVec`; both `BsplineCurve` and `BsplineSurface` only touch active control points.
+- `BasisWindow` active-window B-spline basis evaluation (upstream [`77e25635`](https://github.com/ricosjp/truck/commit/77e25635)), reimplemented with `SmallVec`; both `BsplineCurve` and `BsplineSurface` only touch active control points.
 - STEP face preview tool at [`monstertruck-step/examples/preview-step-face.rs`](monstertruck-step/examples/preview-step-face.rs) for diagnostic visualization -- canonical replacement for ad-hoc `eprintln!`-in-`loops_store` debugging; see [AGENTS.md](AGENTS.md#visual-debugging-for-meshingtrim-bugs).
 
 **Testing Infrastructure**
-- STEP watertightness invariant + boolean-ops-over-STEP-geometry coverage (issue #91).
+- STEP watertightness invariant + boolean-ops-over-STEP-geometry coverage ([issue #91](https://github.com/virtualritz/monstertruck/issues/91)).
 - Assembly STEP round-trip, sphere pole-case property test, end-to-end 2D pcurve STEP integration test.
 - 59/59 `monstertruck-solid` tests green under `--features step-test`; meta-crate doctest exercises the full cuboid -> revolved cylinder -> `solid::and` -> `Solid::compress` -> `CompleteStepDisplay` path end-to-end.
 
 **Ported Upstream Commits** (attributed in their commit bodies)
-- `524f5f53` (revolved-line cylinder STEP), `08d2cbf1` (`ToSameGeometry` for STEP 2D primitives), `6c135abc` (ASCII STL `solid ` header), partial `7b1f4171` (parameter division guard + jitter decorrelation), `77e25635` (`BasisWindow`), `993e156c` (tangent circular arcs), `9031e6dd` (offset geometry), `213-assy-step-output`/`0394eb43`/`82114a04` (assembly STEP output), `f563ae53` + `86e4ed75` (`UnitCircle` hint honoring).
-- Upstream PRs we merged back **into truck** before forking: ricosjp/truck#40 (canonical `struct` naming, dep bumps), ricosjp/truck#48 (removed `_get` prefixes; `Mutex`/`Arc` swapped for faster alternatives).
+- [`524f5f53`](https://github.com/ricosjp/truck/commit/524f5f53) (revolved-line cylinder STEP), [`08d2cbf1`](https://github.com/ricosjp/truck/commit/08d2cbf1) (`ToSameGeometry` for STEP 2D primitives), [`6c135abc`](https://github.com/ricosjp/truck/commit/6c135abc) (ASCII STL `solid ` header), partial [`7b1f4171`](https://github.com/ricosjp/truck/commit/7b1f4171) (parameter division guard + jitter decorrelation), [`77e25635`](https://github.com/ricosjp/truck/commit/77e25635) (`BasisWindow`), [`993e156c`](https://github.com/ricosjp/truck/commit/993e156c) (tangent circular arcs), [`9031e6dd`](https://github.com/ricosjp/truck/commit/9031e6dd) (offset geometry), `213-assy-step-output`/[`0394eb43`](https://github.com/ricosjp/truck/commit/0394eb43)/[`82114a04`](https://github.com/ricosjp/truck/commit/82114a04) (assembly STEP output), [`f563ae53`](https://github.com/ricosjp/truck/commit/f563ae53) + [`86e4ed75`](https://github.com/ricosjp/truck/commit/86e4ed75) (`UnitCircle` hint honoring).
+- Upstream PRs we merged back **into truck** before forking: [ricosjp/truck#40](https://github.com/ricosjp/truck/pull/40) (canonical `struct` naming, dep bumps), [ricosjp/truck#48](https://github.com/ricosjp/truck/pull/48) (removed `_get` prefixes; `Mutex`/`Arc` swapped for faster alternatives).
 
 ### Keeping in Sync with `truck`
 
