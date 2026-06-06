@@ -37,6 +37,61 @@ This fork exists to accomplish two main goals:
    We have overhauled the project using idiomatic Rust naming conventions and standard, industry-recognized CAD terminology.
    Our goal is to make the codebase highly inclusive, readable, and accessible -- whether you are a non-native English speaker or a seasoned CAD veteran.
 
+### Improvements Since the Fork
+
+Snapshot at the [`step-meshing-clean`](https://github.com/virtualritz/monstertruck/releases/tag/step-meshing-clean) tag. Per-crate detail and porting verdicts live in [`TRUCK-PARITY.md`](TRUCK-PARITY.md); upstream commits we hand-ported include SHAs in their commit bodies for attribution.
+
+**Workspace modernization**
+- All crates renamed `truck-*` -> `monstertruck-*`; `truck-platform` -> `monstertruck-gpu`, `truck-stepio/src/{in,out}` -> `monstertruck-step/src/{load,save}`, `truck-shapeops` -> `monstertruck-solid`.
+- Rust edition 2024, `wgpu` 29, `rand` 0.10, `criterion` 0.8, `gloo` 0.12; `web_time::Instant` for wasm.
+- `vtk` dropped from default features over RUSTSEC-2026-0041; opt-in only.
+- Workspace `Cargo.toml` consolidates shared deps; `just` replaces `cargo-make`; GitHub Actions replaces GitLab CI; `fmt --check` runs on nightly so `rustfmt.toml`'s unstable options actually apply.
+- Shared `blueprints` baseline mounted at `.blueprints/` for cross-project agent and microtypography rules.
+
+**API ergonomics + naming**
+- Result-shaped boolean ops: `solid::and`/`or`/`difference`/`symmetric_difference` return `Result<Solid, ShapeOpsError>`.
+- `LoadError` thiserror enum on the STEP loader; `Table::from_step` returns `Result`.
+- Parameter-space markers `D1`/`D2` -> `CurveParameter`/`SurfaceParameter`; `Univariate*`/`Bivariate*ScalarFunction` -> `CurveScalarFunction`/`SurfaceScalarFunction`; `KnotVec` -> `KnotVector`; `BSpline*` -> `Bspline*`.
+- Public names de-abbreviated: `attrs()` -> `attributes()`, `PartAttrs` -> `PartAttributes`, `DisplayByStep` -> `StepFormat`, `assy` -> `assembly`, `rbf_surface` -> `rolling_ball_fillet`, `af_surface` -> `approximate_fillet_surface`, `interpole` -> `interpolate`.
+- Every rename ships a deprecated `pub use OldName` alias so upstream-style code still compiles.
+- Spelling fixes audited and corrected: `boundry`/`verticies`/`virtical`/`conected`/`Unkown` etc.
+
+**Geometry correctness**
+- `Sphere::search_nearest_parameter` guards: `acos` clamp, exact-pole `0/0` singularity, `point == center` singularity.
+- `parameter_range()` fix for non-clamped B-splines.
+- Surface `parameter_division` recursion guard + decorrelated jitter (partial port of upstream `7b1f4171`).
+- `UnitCircle::search_{nearest_}parameter` honors `hint` across the period (upstream `f563ae53` + `86e4ed75`).
+- STEP `Axis2Placement3d` guards parallel `axis`/`ref_direction`; revolved-line-to-cylinder conversion drops the spurious inversion (upstream `524f5f53`); rational trim boundaries preserved through the load path; inverted-processor sample alignment.
+
+**Meshing**
+- Triangulation/tessellation pipeline heavily rewritten; CDT trim-constraint handling rebuilt across `b60b1604`/`46b21f9f`/`f35d3b6d`/`7c5ce2d2` (skip conflicting, avoid invalid, preserve split, split through vertices).
+- `PolyBoundary::include` gets an AABB early reject; double tessellation removed in `step-to-mesh`.
+- Tessellation benchmark example + baseline log for regression tracking.
+
+**Boolean operations**
+- Reverted upstream's `700138cb`-equivalent boolean rewrite after bisect confirmed it regressed `punched_cube` and `adjacent_cubes_or` (output shells came back `Oriented`, not `Closed`); we keep the upstream-derived single-ray algorithm wrapped in our `Result` layer.
+- New `strip_seam_edges` healing pass: when a wire visits the same edge twice with opposite orientations (the canonical STEP cylinder/cone seam pattern), the pass cuts at the seam edge and emits two simple wires on the same face. Fixes `NotSimpleWire` extraction failures on `abc-0008.step`, `occt-cylinder.step`, `occt-cone.step`. No upstream equivalent.
+
+**New capabilities**
+- Offset geometry: `OffsetCurve`, `OffsetSurface`, `NormalOffsetField`, `CurveScalarFunction`, `SurfaceScalarFunction` (renamed from upstream's `Offset`/`NormalField`/`ScalarFunctionD*`; upstream `9031e6dd`).
+- Assembly STEP output: `StepDesign`, `MatrixAsAxis`, full `save::assembly` module (upstream `213-assy-step-output`).
+- Tangent-based circular arc construction in `monstertruck-modeling`: `CircularArcConstraint::{ThroughPoint, StartTangent}`, `try_circle_arc_by_start_tangent` (renamed from upstream `ArcConstraint`/`circle_arc_by_tangent0`; upstream `993e156c`).
+- Fillet engine rewrite: per-edge radii, variable-radius open wires, multi-chain + chamfer, `Ridge` and `Custom` profile modes, robust topology surgery, degenerate-edge rejection, `IntersectionCurve` support.
+- T-spline / T-NURCC promoted to first-class surface type with `BsplineSurface` conversion, adaptive refinement, and Phase-7 performance work.
+- Scalar-generic `v2` trait family (`CurveParameter<T>`/`SurfaceParameter<T>`, `SearchParameter<v2::D2<T>>`, etc.) -- no upstream equivalent; default scalar still `f64`.
+- `SurfaceDerivatives::absolute_derivatives` + `combinatorial_derivative(s)` ported from upstream's `truck-base::ders`, backing the offset surface family.
+- `BasisWindow` active-window B-spline basis evaluation (upstream `77e25635`), reimplemented with `SmallVec`; both `BsplineCurve` and `BsplineSurface` only touch active control points.
+- STEP face preview tool at [`monstertruck-step/examples/preview-step-face.rs`](monstertruck-step/examples/preview-step-face.rs) for diagnostic visualization -- canonical replacement for ad-hoc eprintln-in-loops_store debugging; see [AGENTS.md](AGENTS.md#visual-debugging-for-meshingtrim-bugs).
+
+**Testing infrastructure**
+- STEP watertightness invariant + boolean-ops-over-STEP-geometry coverage (issue #91).
+- Assembly STEP round-trip, sphere pole-case property test, end-to-end 2D pcurve STEP integration test.
+- 59/59 `monstertruck-solid` tests green under `--features step-test`; meta-crate doctest exercises the full cuboid -> revolved cylinder -> `solid::and` -> `Solid::compress` -> `CompleteStepDisplay` path end-to-end.
+
+**Ported upstream commits** (attributed in their commit bodies)
+- `524f5f53` (revolved-line cylinder STEP), `08d2cbf1` (`ToSameGeometry` for STEP 2D primitives), `6c135abc` (ASCII STL `solid ` header), partial `7b1f4171` (parameter division guard + jitter decorrelation), `77e25635` (`BasisWindow`), `993e156c` (tangent circular arcs), `9031e6dd` (offset geometry), `213-assy-step-output`/`0394eb43`/`82114a04` (assembly STEP output), `f563ae53` + `86e4ed75` (`UnitCircle` hint honoring).
+- Upstream PRs we merged back **into truck** before forking: ricosjp/truck#40 (canonical `struct` naming, dep bumps), ricosjp/truck#48 (removed `_get` prefixes; `Mutex`/`Arc` swapped for faster alternatives).
+
 ### Keeping in Sync with `truck`
 
 We do **not** merge or rebase `truck`. Because every crate has been renamed and
