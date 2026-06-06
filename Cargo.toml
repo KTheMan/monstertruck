@@ -54,7 +54,7 @@ proptest = "1"
 quote = "1"
 rand = "0.10"
 rayon = "1"
-rkyv = { version = "0.8.16", features = ["alloc"] }
+rkyv = { version = "0.8", features = ["alloc"] }
 rclite = "0.4"
 rustc-hash = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
