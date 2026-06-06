@@ -46,7 +46,7 @@ Per-crate detail and porting verdicts live in [`TRUCK-PARITY.md`](TRUCK-PARITY.m
 **Workspace Modernization**
 - All crates renamed `truck-*` -> `monstertruck-*`; `truck-platform` -> `monstertruck-gpu`, `truck-stepio/src/{in,out}` -> `monstertruck-step/src/{load,save}`, `truck-shapeops` -> `monstertruck-solid`.
 - Rust edition 2024, `wgpu` 29, `rand` 0.10, `criterion` 0.8, `gloo` 0.12; `web_time::Instant` for wasm.
-- `vtk` dropped from default features over RUSTSEC-2026-0041; opt-in only.
+- `vtk` dropped from default features over [RUSTSEC-2026-0041](https://rustsec.org/advisories/RUSTSEC-2026-0041.html); opt-in only.
 - Workspace `Cargo.toml` consolidates shared deps; `just` replaces `cargo-make`; GitHub Actions replaces GitLab CI; `fmt --check` runs on nightly so `rustfmt.toml`'s unstable options actually apply.
 - Shared `blueprints` baseline mounted at `.blueprints/` for cross-project agent and microtypography rules.
 
