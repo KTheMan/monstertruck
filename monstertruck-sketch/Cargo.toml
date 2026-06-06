@@ -1,37 +1,25 @@
 [package]
-name = "monstertruck-modeling"
+name = "monstertruck-sketch"
 version = "0.3.2"
 authors = ["Yoshinori Tanimura <tanimura@ricos.co.jp>", "Moritz Moeller <virtualritz@protonmail.com>"]
 edition = "2024"
-description = "Integrated geometric and topological modeling algorithms"
+description = "2D sketch construction: vertices, lines, arcs, and corner treatments (fillet, chamfer)"
 homepage = "https://github.com/virtualritz/monstertruck"
 repository = "https://github.com/virtualritz/monstertruck"
 license = "Apache-2.0"
 
-keywords = ["truck", "graphics"]
-categories = ["graphics"]
-
-[features]
-default = []
-fillet = ["monstertruck-solid"]
-font = ["dep:ttf-parser"]
+keywords = ["cad", "sketch", "2d", "fillet", "chamfer"]
+categories = ["graphics", "mathematics"]
 
 [dependencies]
 derive_more = { workspace = true }
 itertools = { workspace = true }
-rustc-hash = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 monstertruck-core = { workspace = true }
 monstertruck-geometry = { workspace = true }
 monstertruck-traits = { workspace = true, features = ["derive"] }
-monstertruck-mesh = { workspace = true }
-monstertruck-solid = { workspace = true, optional = true }
 monstertruck-topology = { workspace = true }
-rayon = { workspace = true }
-ttf-parser = { workspace = true, optional = true }
 
 [dev-dependencies]
-anyhow = { workspace = true }
-proptest = { workspace = true }
-serde_json = { workspace = true }
+proptest = { workspace = true, features = ["attr-macro"] }
