@@ -42,6 +42,11 @@ image = { workspace = true }
 itertools = { workspace = true }
 proptest = { workspace = true }
 serde_json = { workspace = true }
-monstertruck-meshing = { workspace = true }
+# The `vtk` feature pulls in `vtkio` so the `step-to-mesh` example can
+# emit `.vtu`. Dev-only -- downstream users on the default
+# (non-`vtk`) feature set never see `vtkio` -> `lz4_flex`
+# (RUSTSEC-2026-0041).
+monstertruck-meshing = { workspace = true, features = ["vtk"] }
 monstertruck-modeling = { workspace = true, features = ["fillet"] }
 monstertruck-solid = { workspace = true }
+vtkio = { workspace = true }
