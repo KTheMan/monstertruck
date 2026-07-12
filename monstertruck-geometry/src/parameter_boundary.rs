@@ -257,7 +257,21 @@ where
         |index| NurbsCurve::new(hom_surface.row_curve(index)),
         ranges,
     )?;
-    Some(ParameterCurve::new(boundary, surface.clone()))
+    // The row/column curves parameterize the border in the homogeneous
+    // B-spline's knot space, which need not agree with the original
+    // surface's parameterization along that border (a revolution surface
+    // measures its angle in radians while the homogeneous form inherits the
+    // normalized full-circle knots, so a quarter turn reads 0.25 instead of
+    // pi/2). Accept the matched border line only when its image on the
+    // original surface reproduces the curve; otherwise report no exact
+    // boundary so callers fall back to the sampled boundary.
+    let mid = boundary.evaluate(0.5);
+    (surface.evaluate(boundary.0.x, boundary.0.y).near(&curve.front())
+        && surface.evaluate(boundary.1.x, boundary.1.y).near(&curve.back())
+        && curve
+            .search_parameter(surface.evaluate(mid.x, mid.y), None, 100)
+            .is_some())
+    .then(|| ParameterCurve::new(boundary, surface.clone()))
 }
 
 impl ExactParameterBoundary2D<Plane> for Line<Point3> {
