@@ -48,7 +48,6 @@ Per-crate detail and porting verdicts live in [`TRUCK-PARITY.md`](TRUCK-PARITY.m
 - Rust edition 2024, `wgpu` 29, `rand` 0.10, `criterion` 0.8, `gloo` 0.12; `web_time::Instant` for `wasm`.
 - `vtk` dropped from default features over [RUSTSEC-2026-0041](https://rustsec.org/advisories/RUSTSEC-2026-0041.html); opt-in only.
 - Workspace `Cargo.toml` consolidates shared deps; `just` replaces `cargo-make`; GitHub Actions replaces GitLab CI; `fmt --check` runs on nightly so `rustfmt.toml`'s unstable options actually apply.
-- Shared `blueprints` baseline mounted at `.blueprints/` for cross-project agent and microtypography rules.
 
 **API Ergonomics & Naming**
 - Result-shaped boolean ops: `solid::and`/`or`/`difference`/`symmetric_difference` return `Result<Solid, ShapeOpsError>`.
@@ -106,6 +105,18 @@ Current parity, tracked per crate and feature, lives in
 rationale are in [`truck-sync.md`](truck-sync.md).
 
 ## Usage
+
+All `monstertruck-*` crates are released in lockstep and share one version
+number; internal dependencies are pinned to the same minor, so mixing crate
+versions across a release boundary is unsupported. Depend either on the
+`monstertruck` facade crate or on the individual `monstertruck-*` crates you
+need, at the same version:
+
+```bash
+cargo add monstertruck
+# or, granular:
+cargo add monstertruck-modeling monstertruck-solid monstertruck-meshing
+```
 
 ### Running the Examples
 
