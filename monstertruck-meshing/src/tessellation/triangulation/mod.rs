@@ -55,7 +55,7 @@ where
             .or_else(|| self.search_nearest_parameter(point, hint, 100))
             .or_else(|| self.search_parameter(point, None, 100))
             .or_else(|| self.search_nearest_parameter(point, None, 100))
-            .map(|t| (t, self.curve().evaluate(t)))
+            .map(|t| (t, self.curve().subs(t)))
     }
 }
 
@@ -105,10 +105,10 @@ fn append_lifted_trim_segment<C, S>(
         refined.push(back_uv);
     } else {
         let middle_parameter = (front_parameter + back_parameter) * 0.5;
-        let middle_uv = trim_curve.curve().evaluate(middle_parameter);
-        let front_point = trim_curve.surface().evaluate(front_uv.x, front_uv.y);
-        let middle_point = trim_curve.surface().evaluate(middle_uv.x, middle_uv.y);
-        let back_point = trim_curve.surface().evaluate(back_uv.x, back_uv.y);
+        let middle_uv = trim_curve.curve().subs(middle_parameter);
+        let front_point = trim_curve.surface().subs(front_uv.x, front_uv.y);
+        let middle_point = trim_curve.surface().subs(middle_uv.x, middle_uv.y);
+        let back_point = trim_curve.surface().subs(back_uv.x, back_uv.y);
         if point_segment_distance2(middle_point, front_point, back_point) > tolerance2 {
             append_lifted_trim_segment(
                 trim_curve,
@@ -190,7 +190,7 @@ fn fallback_polyline_curve_with_min_points<C: PolylineableCurve>(
     );
     let curve = parameters
         .into_iter()
-        .map(|parameter| edge.curve.evaluate(parameter))
+        .map(|parameter| edge.curve.subs(parameter))
         .collect::<PolylineCurve>();
     if orientation { curve } else { curve.inverse() }
 }
@@ -295,7 +295,7 @@ where
         tolerance,
     )
     .into_iter()
-    .map(|uv| surface.evaluate(uv.x, uv.y))
+    .map(|uv| surface.subs(uv.x, uv.y))
     .collect::<Vec<_>>();
     if points.len() < 2 {
         return None;
@@ -350,7 +350,7 @@ where
     } else {
         let points = filtered
             .iter()
-            .map(|uv| surface.evaluate(uv.x, uv.y))
+            .map(|uv| surface.subs(uv.x, uv.y))
             .collect::<Vec<_>>();
         let mut keep = vec![false; filtered.len()];
         keep[0] = true;
@@ -589,7 +589,7 @@ where
 }
 
 /// Tessellates faces.
-pub(super) fn compressed_shell_tessellation<'a, C, S>(
+pub(super) fn cshell_tessellation<'a, C, S>(
     shell: &CompressedShell<Point3, C, S>,
     tolerance: f64,
     sp: impl SP<S>,
@@ -790,7 +790,7 @@ where
     }
 }
 
-pub(super) fn compressed_trimmed_shell_tessellation<'a, C, S, T>(
+pub(super) fn trimmed_cshell_tessellation<'a, C, S, T>(
     shell: &TrimmedShell<C, S, T>,
     tolerance: f64,
     sp: impl SP<S>,
@@ -1258,7 +1258,7 @@ mod tests {
         PolyBoundaryPiece(
             boundary
                 .into_iter()
-                .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                .map(|uv| SurfacePoint::from((uv, surface.subs(uv.x, uv.y))))
                 .collect(),
         )
     }
@@ -1275,7 +1275,7 @@ mod tests {
                 .chain(right)
                 .chain(upper)
                 .chain(left)
-                .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                .map(|uv| SurfacePoint::from((uv, surface.subs(uv.x, uv.y))))
                 .collect(),
         )
     }
@@ -1295,7 +1295,7 @@ mod tests {
         PolyBoundaryPiece(
             boundary
                 .into_iter()
-                .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                .map(|uv| SurfacePoint::from((uv, surface.subs(uv.x, uv.y))))
                 .collect(),
         )
     }
@@ -1315,7 +1315,7 @@ mod tests {
         PolyBoundaryPiece(
             boundary
                 .into_iter()
-                .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                .map(|uv| SurfacePoint::from((uv, surface.subs(uv.x, uv.y))))
                 .collect(),
         )
     }
@@ -1345,7 +1345,7 @@ mod tests {
                 .chain(right)
                 .chain(upper)
                 .chain(left)
-                .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                .map(|uv| SurfacePoint::from((uv, surface.subs(uv.x, uv.y))))
                 .collect(),
         )
     }
@@ -1365,7 +1365,7 @@ mod tests {
         PolyBoundaryPiece(
             boundary
                 .into_iter()
-                .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                .map(|uv| SurfacePoint::from((uv, surface.subs(uv.x, uv.y))))
                 .collect(),
         )
     }
@@ -1386,7 +1386,7 @@ mod tests {
         PolyBoundaryPiece(
             boundary
                 .into_iter()
-                .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                .map(|uv| SurfacePoint::from((uv, surface.subs(uv.x, uv.y))))
                 .collect(),
         )
     }
@@ -1420,7 +1420,7 @@ mod tests {
         PolyBoundaryPiece(
             boundary
                 .into_iter()
-                .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                .map(|uv| SurfacePoint::from((uv, surface.subs(uv.x, uv.y))))
                 .collect(),
         )
     }
@@ -1440,7 +1440,7 @@ mod tests {
                 .chain(left)
                 .chain(lower)
                 .chain(close)
-                .map(|uv| SurfacePoint::from((uv, surface.evaluate(uv.x, uv.y))))
+                .map(|uv| SurfacePoint::from((uv, surface.subs(uv.x, uv.y))))
                 .collect(),
         )
     }
@@ -1458,7 +1458,7 @@ mod tests {
         let uv_points = trim.exact_trim_boundary_2d(0.01);
         let lifted = uv_points
             .iter()
-            .map(|uv| trim.surface().evaluate(uv.x, uv.y))
+            .map(|uv| trim.surface().subs(uv.x, uv.y))
             .collect::<Vec<_>>();
         let length = lifted
             .windows(2)
@@ -1496,8 +1496,8 @@ mod tests {
             &trim,
             (0, 1),
             &[
-                trim.surface().evaluate(TAU * 0.75, 8.0),
-                trim.surface().evaluate(-TAU * 0.25, 8.0),
+                trim.surface().subs(TAU * 0.75, 8.0),
+                trim.surface().subs(-TAU * 0.25, 8.0),
             ],
             0.138564065,
         )
@@ -1534,7 +1534,7 @@ mod tests {
             }],
         };
 
-        let meshed = compressed_trimmed_shell_tessellation(
+        let meshed = trimmed_cshell_tessellation(
             &shell,
             0.01,
             |surface: &Plane, point: Point3, _| surface.search_parameter(point, None, 100),
@@ -1554,10 +1554,10 @@ mod tests {
             RevolutionSurface::by_revolution(profile, Point3::origin(), Vector3::unit_z());
         let curve_on_surface = |front, back| ParameterCurve::new(Line(front, back), surface);
         let vertices = vec![
-            surface.evaluate(0.0, 0.0),
-            surface.evaluate(0.0, FRAC_PI_2),
-            surface.evaluate(1.0, FRAC_PI_2),
-            surface.evaluate(1.0, 0.0),
+            surface.subs(0.0, 0.0),
+            surface.subs(0.0, FRAC_PI_2),
+            surface.subs(1.0, FRAC_PI_2),
+            surface.subs(1.0, 0.0),
         ];
         let edges = vec![
             CompressedEdge {
@@ -1609,7 +1609,7 @@ mod tests {
             ],
         };
 
-        let meshed = compressed_trimmed_shell_tessellation(
+        let meshed = trimmed_cshell_tessellation(
             &shell,
             0.01,
             |_: &RevolutionSurface<Line<Point3>>, point: Point3, _| {

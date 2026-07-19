@@ -1,6 +1,6 @@
 [package]
 name = "monstertruck-step"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["Yoshinori Tanimura <tanimura@ricos.co.jp>", "Moritz Moeller <virtualritz@protonmail.com>"]
 edition = "2024"
 description = "STEP file import and export"
@@ -48,5 +48,7 @@ serde_json = { workspace = true }
 # (RUSTSEC-2026-0041).
 monstertruck-meshing = { workspace = true, features = ["vtk"] }
 monstertruck-modeling = { workspace = true, features = ["fillet"] }
+# The published classic-backend crate: the solidify example/tests heal boolean
+# output through its public `extract_healed_trimmed_solid`.
 monstertruck-solid = { workspace = true }
 vtkio = { workspace = true }

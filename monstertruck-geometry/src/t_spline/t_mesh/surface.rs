@@ -249,7 +249,7 @@ impl ParametricSurface for Tmesh<Point3> {
     type Vector = Vector3;
 
     fn evaluate(&self, u: f64, v: f64) -> Point3 {
-        Tmesh::try_evaluate(self, u, v).expect("T-mesh evaluation failed")
+        Tmesh::subs(self, u, v).expect("T-mesh evaluation failed")
     }
 
     fn derivative_u(&self, u: f64, v: f64) -> Vector3 { self.derivative_mn(1, 0, u, v) }
@@ -402,7 +402,7 @@ impl Serialize for Tmesh<Point3> {
 
             let mut cons = [None; 4];
             for dir in TmeshDirection::iter() {
-                cons[dir as usize] = match r.connection_type(dir) {
+                cons[dir as usize] = match r.con_type(dir) {
                     TmeshConnectionType::Tjunction => None,
                     // SAFETY: `Edge` connections always have a knot interval.
                     TmeshConnectionType::Edge => Some((None, r.connection_knot(dir).unwrap())),
@@ -451,9 +451,7 @@ impl<'de> Deserialize<'de> for Tmesh<Point3> {
                 if let Some((maybe_idx, ki)) = con {
                     if let Some(con_index) = maybe_idx {
                         // Point connection -- skip if already established from the other side.
-                        if points[point_index].read().connection_type(dir)
-                            == TmeshConnectionType::Point
-                        {
+                        if points[point_index].read().con_type(dir) == TmeshConnectionType::Point {
                             continue;
                         }
                         points[point_index].write().remove_connection(dir).ok();
@@ -472,7 +470,7 @@ impl<'de> Deserialize<'de> for Tmesh<Point3> {
                         // Edge condition.
                         points[point_index]
                             .write()
-                            .set_edge_connection_weight(dir, *ki)
+                            .set_edge_con_weight(dir, *ki)
                             .ok();
                     }
                 } else {
@@ -528,7 +526,7 @@ impl Tmesh<Point3> {
             .map(|&u| {
                 v_grev
                     .iter()
-                    .map(|&v| ParametricSurface::evaluate(self, u, v))
+                    .map(|&v| ParametricSurface::subs(self, u, v))
                     .collect()
             })
             .collect();

@@ -13,9 +13,19 @@ impl<V> NurbsSurface<V> {
     #[inline(always)]
     pub fn non_rationalized_mut(&mut self) -> &mut BsplineSurface<V> { &mut self.0 }
 
+    /// Returns the nurbs surface before rationalized
+    #[deprecated(note = "use `BsplineSurface::from()` or `.into()` instead")]
+    #[inline(always)]
+    pub fn into_non_rationalized(self) -> BsplineSurface<V> { self.into() }
+
     /// Returns the reference of the knot vectors.
     #[inline(always)]
     pub const fn knot_vectors(&self) -> &(KnotVector, KnotVector) { &self.0.knot_vecs }
+
+    /// Renamed to [`knot_vectors`](Self::knot_vectors).
+    #[deprecated(note = "renamed to knot_vectors")]
+    #[inline(always)]
+    pub const fn knot_vecs(&self) -> &(KnotVector, KnotVector) { &self.0.knot_vecs }
 
     /// Returns the u knot vector.
     #[inline(always)]
@@ -222,7 +232,7 @@ impl<V: Homogeneous<Scalar = f64>> NurbsSurface<V> {
 impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>> NurbsSurface<V> {
     /// Returns the closure of substitution.
     #[inline(always)]
-    pub fn closure(&self) -> impl Fn(f64, f64) -> V::Point + '_ { move |u, v| self.evaluate(u, v) }
+    pub fn closure(&self) -> impl Fn(f64, f64) -> V::Point + '_ { move |u, v| self.subs(u, v) }
 }
 
 impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>> NurbsSurface<V>
@@ -478,7 +488,73 @@ impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V> + Tolerance> Nur
     pub fn boundary(&self) -> NurbsCurve<V> { NurbsCurve::new(self.0.boundary()) }
 }
 
-impl<V: Homogeneous<Scalar = f64>> SearchNearestParameter<SurfaceParameter> for NurbsSurface<V>
+impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>> NurbsSurface<V>
+where V::Point: MetricSpace<Metric = f64> + Copy
+{
+    /// Separable-basis presearch: bit-identical to [`algo::surface::presearch`]
+    /// for this surface, but computes each grid row's `u`-direction basis window
+    /// and each grid column's `v`-direction basis window exactly once and reuses
+    /// them across the whole `(division + 1) x (division + 1)` grid. The
+    /// tensor-product B-spline basis is separable, so the generic scan's
+    /// per-point re-evaluation of both bases repeats each window `division + 1`
+    /// times; this hoists that redundant work out of the inner loop.
+    ///
+    /// Everything that affects the result is unchanged: the same grid nodes
+    /// (`u`, `v` computed by the identical expressions), the same evaluation
+    /// kernel ([`BsplineSurface::combine_basis`] + [`Homogeneous::to_point`]),
+    /// the same `distance2` metric, and the same strict-`<` first-minimum
+    /// tie-break. The returned `(u, v)` -- and therefore every downstream Newton
+    /// seed -- is byte-for-byte identical to the generic presearch.
+    fn presearch_separable(
+        &self,
+        point: V::Point,
+        (urange, vrange): SurfaceParameterRange,
+        division: usize,
+    ) -> (f64, f64) {
+        let bsp = &self.0;
+        let (degree0, degree1) = bsp.degrees();
+        let (knot_u, knot_v) = &bsp.knot_vecs;
+        // The separable kernel reproduces only the non-degenerate branch of
+        // `derivative_mn`; defer any zero-range surface to the generic scan so
+        // the degenerate corner cases stay byte-for-byte unchanged.
+        if knot_u[0] == knot_u[knot_u.len() - 1] || knot_v[0] == knot_v[knot_v.len() - 1] {
+            return algo::surface::presearch(self, point, (urange, vrange), division);
+        }
+        let ((u0, u1), (v0, v1)) = (urange, vrange);
+        // Every grid column's v-basis window, computed once.
+        let vbasis: Vec<BasisWindow> = (0..=division)
+            .map(|j| {
+                let q = j as f64 / division as f64;
+                let v = v0 * (1.0 - q) + v1 * q;
+                knot_v.bspline_basis_functions(degree1, 0, v)
+            })
+            .collect();
+        let mut res = (0.0, 0.0);
+        let mut min = f64::INFINITY;
+        for i in 0..=division {
+            let p = i as f64 / division as f64;
+            let u = u0 * (1.0 - p) + u1 * p;
+            // This grid row's u-basis window, computed once and reused for
+            // every column below.
+            let ubasis = knot_u.bspline_basis_functions(degree0, 0, u);
+            for (j, vb) in vbasis.iter().enumerate() {
+                let q = j as f64 / division as f64;
+                let v = v0 * (1.0 - q) + v1 * q;
+                let dist = V::from_vec(bsp.combine_basis(&ubasis, vb))
+                    .to_point()
+                    .distance2(point);
+                if dist < min {
+                    min = dist;
+                    res = (u, v);
+                }
+            }
+        }
+        res
+    }
+}
+
+impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>>
+    SearchNearestParameter<SurfaceParameter> for NurbsSurface<V>
 where
     Self: ParametricSurface<Point = V::Point, Vector = <V::Point as EuclideanSpace>::Diff>,
     V::Point: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64>,
@@ -498,7 +574,7 @@ where
     ///     vec![Vector3::new(0.0, 3.0, 1.0), Vector3::new(1.0, 7.0, 2.0), Vector3::new(1.0, 3.0, 1.0)],
     /// ];
     /// let surface = NurbsSurface::new(BsplineSurface::new(knot_vecs, control_points));
-    /// let pt = surface.evaluate(0.3, 0.7);
+    /// let pt = surface.subs(0.3, 0.7);
     /// let (u, v) = surface.search_nearest_parameter(pt, Some((0.5, 0.5)), 100).unwrap();
     /// assert!(u.near(&0.3) && v.near(&0.7));
     /// ```
@@ -515,10 +591,10 @@ where
         let hint = match hint.into() {
             SearchParameterHint2D::Parameter(x, y) => (x, y),
             SearchParameterHint2D::Range(range0, range1) => {
-                algo::surface::presearch(self, point, (range0, range1), PRESEARCH_DIVISION)
+                self.presearch_separable(point, (range0, range1), PRESEARCH_DIVISION)
             }
             SearchParameterHint2D::None => {
-                algo::surface::presearch(self, point, self.range_tuple(), PRESEARCH_DIVISION)
+                self.presearch_separable(point, self.range_tuple(), PRESEARCH_DIVISION)
             }
         };
         algo::surface::search_nearest_parameter(self, point, hint, trials)
@@ -762,7 +838,7 @@ where
 impl IncludeCurve<NurbsCurve<Vector3>> for NurbsSurface<Vector3> {
     #[inline(always)]
     fn include(&self, curve: &NurbsCurve<Vector3>) -> bool {
-        let pt = curve.evaluate(curve.knot_vector()[0]);
+        let pt = curve.subs(curve.knot_vector()[0]);
         let mut hint = match self.search_parameter(pt, None, INCLUDE_CURVE_TRIALS) {
             Some(got) => got,
             None => return false,
@@ -775,12 +851,12 @@ impl IncludeCurve<NurbsCurve<Vector3>> for NurbsSurface<Vector3> {
             for j in 1..=degree {
                 let p = j as f64 / degree as f64;
                 let t = knots[i - 1] * (1.0 - p) + knots[i] * p;
-                let pt = curve.evaluate(t);
+                let pt = curve.subs(t);
                 hint = match self.search_parameter(pt, Some(hint), INCLUDE_CURVE_TRIALS) {
                     Some(got) => got,
                     None => return false,
                 };
-                if !self.evaluate(hint.0, hint.1).near(&pt)
+                if !self.subs(hint.0, hint.1).near(&pt)
                     || hint.0 < knot_vector_u[0] - TOLERANCE
                     || hint.0 - knot_vector_u[0] > knot_vector_u.range_length() + TOLERANCE
                     || hint.1 < knot_vector_v[0] - TOLERANCE
@@ -810,12 +886,12 @@ impl IncludeCurve<BsplineCurve<Point3>> for NurbsSurface<Vector4> {
             for j in 1..=degree {
                 let p = j as f64 / degree as f64;
                 let t = knots[i - 1] * (1.0 - p) + knots[i] * p;
-                let pt = curve.evaluate(t);
+                let pt = curve.subs(t);
                 hint = match self.search_parameter(pt, Some(hint), INCLUDE_CURVE_TRIALS) {
                     Some(got) => got,
                     None => return false,
                 };
-                if !self.evaluate(hint.0, hint.1).near(&pt)
+                if !self.subs(hint.0, hint.1).near(&pt)
                     || hint.0 < knot_vector_u[0] - TOLERANCE
                     || hint.0 - knot_vector_u[0] > knot_vector_u.range_length() + TOLERANCE
                     || hint.1 < knot_vector_v[0] - TOLERANCE
@@ -845,12 +921,12 @@ impl IncludeCurve<NurbsCurve<Vector4>> for NurbsSurface<Vector4> {
             for j in 1..=degree {
                 let p = j as f64 / degree as f64;
                 let t = knots[i - 1] * (1.0 - p) + knots[i] * p;
-                let pt = curve.evaluate(t);
+                let pt = curve.subs(t);
                 hint = match self.search_parameter(pt, Some(hint), INCLUDE_CURVE_TRIALS) {
                     Some(got) => got,
                     None => return false,
                 };
-                if !self.evaluate(hint.0, hint.1).near(&pt)
+                if !self.subs(hint.0, hint.1).near(&pt)
                     || hint.0 < knot_vector_u[0] - TOLERANCE
                     || hint.0 - knot_vector_u[0] > knot_vector_u.range_length() + TOLERANCE
                     || hint.1 < knot_vector_v[0] - TOLERANCE
@@ -886,7 +962,7 @@ where
     <V::Point as EuclideanSpace>::Diff: SearchParameterVector<Point = V::Point>,
 {
     type Point = V::Point;
-    /// Search the parameter `(u, v)` such that `self.evaluate(u, v).rational_projection()` is near `pt`.
+    /// Search the parameter `(u, v)` such that `self.subs(u, v).rational_projection()` is near `pt`.
     /// If cannot find, then return `None`.
     /// # Examples
     /// ```
@@ -901,9 +977,9 @@ where
     /// let bspsurface = BsplineSurface::new((knot_vec.clone(), knot_vec), control_points);
     /// let surface = NurbsSurface::new(bspsurface);
     ///
-    /// let pt = surface.evaluate(0.3, 0.7);
+    /// let pt = surface.subs(0.3, 0.7);
     /// let (u, v) = surface.search_parameter(pt, Some((0.5, 0.5)), 100).unwrap();
-    /// assert_near!(surface.evaluate(u, v), pt);
+    /// assert_near!(surface.subs(u, v), pt);
     /// ```
     fn search_parameter<H: Into<SearchParameterHint2D>>(
         &self,
@@ -914,10 +990,10 @@ where
         let hint = match hint.into() {
             SearchParameterHint2D::Parameter(x, y) => (x, y),
             SearchParameterHint2D::Range(range0, range1) => {
-                algo::surface::presearch(self, point, (range0, range1), PRESEARCH_DIVISION)
+                self.presearch_separable(point, (range0, range1), PRESEARCH_DIVISION)
             }
             SearchParameterHint2D::None => {
-                algo::surface::presearch(self, point, self.range_tuple(), PRESEARCH_DIVISION)
+                self.presearch_separable(point, self.range_tuple(), PRESEARCH_DIVISION)
             }
         };
         algo::surface::search_parameter(self, point, hint, trials)

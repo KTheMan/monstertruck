@@ -104,7 +104,7 @@ where
     let mut normals = Vec::with_capacity(nu * nv);
     for u in &udiv {
         for v in &vdiv {
-            positions.push(surface.evaluate(*u, *v));
+            positions.push(surface.subs(*u, *v));
             uv_coords.push(Vector2::new(*u, *v));
             normals.push(surface.normal(*u, *v));
         }
@@ -263,7 +263,7 @@ where
     let sv = |k: usize| -> StandardVertex { [k, k, k].into() };
     let positions = udiv
         .iter()
-        .flat_map(|u| vdiv.iter().map(move |v| surface.evaluate(*u, *v)))
+        .flat_map(|u| vdiv.iter().map(move |v| surface.subs(*u, *v)))
         .collect::<Vec<_>>();
     let uv_coords = udiv
         .iter()
@@ -738,9 +738,9 @@ fn surface_axis_point<S: ParametricSurface3D>(
     other_value: f64,
 ) -> Point3 {
     if axis == 0 {
-        surface.evaluate(axis_value, other_value)
+        surface.subs(axis_value, other_value)
     } else {
-        surface.evaluate(other_value, axis_value)
+        surface.subs(other_value, axis_value)
     }
 }
 
@@ -941,7 +941,7 @@ fn triangulation_into_polymesh<'a>(
                 Some(point) => *point,
                 None => *surface_point_cache
                     .entry(key)
-                    .or_insert_with(|| surface.evaluate(p.x, p.y)),
+                    .or_insert_with(|| surface.subs(p.x, p.y)),
             };
             let normal = *normal_cache
                 .entry(key)

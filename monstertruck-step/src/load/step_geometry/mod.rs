@@ -84,9 +84,9 @@ pub enum SurfaceCurveRepresentation {
 /// STEP `surface_curve` flavor.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SurfaceCurveKind {
-    Surface,
-    Seam,
-    Intersection,
+    SurfaceCurve,
+    SeamCurve,
+    IntersectionCurve,
 }
 
 /// Associated geometry entry of a STEP `surface_curve`.
@@ -117,9 +117,9 @@ impl SurfaceCurve3D {
         [0.0, 0.5, 1.0].into_iter().all(|fraction| {
             let curve_t = curve_min + (curve_max - curve_min) * fraction;
             let leader_t = leader_min + (leader_max - leader_min) * fraction;
-            let uv = curve.curve().evaluate(curve_t);
-            let surface_point = surface.evaluate(uv.x, uv.y);
-            let leader_point = self.leader().evaluate(leader_t);
+            let uv = curve.curve().subs(curve_t);
+            let surface_point = surface.subs(uv.x, uv.y);
+            let leader_point = self.leader().subs(leader_t);
             surface_point.distance2(leader_point) <= tolerance2
         })
     }
@@ -136,8 +136,8 @@ impl SurfaceCurve3D {
             [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0), (0.5, 0.5)]
                 .into_iter()
                 .all(|(s, t)| {
-                    let lp = lhs.evaluate(lu0 + (lu1 - lu0) * s, lv0 + (lv1 - lv0) * t);
-                    let rp = rhs.evaluate(ru0 + (ru1 - ru0) * s, rv0 + (rv1 - rv0) * t);
+                    let lp = lhs.subs(lu0 + (lu1 - lu0) * s, lv0 + (lv1 - lv0) * t);
+                    let rp = rhs.subs(ru0 + (ru1 - ru0) * s, rv0 + (rv1 - rv0) * t);
                     lp.near(&rp)
                 })
         } else {
@@ -192,6 +192,13 @@ impl SurfaceCurve3D {
             })
     }
 }
+
+/// Renamed to [`StepExtrusionSurface`].
+#[deprecated(note = "renamed to StepExtrusionSurface")]
+pub type StepExtrudedCurve = StepExtrusionSurface;
+/// Renamed to [`StepRevolutionSurface`].
+#[deprecated(note = "renamed to StepRevolutionSurface")]
+pub type StepRevolutedCurve = StepRevolutionSurface;
 
 /// `conic` in 2D, realized in `monstertruck`
 #[derive(
@@ -424,7 +431,7 @@ mod tests {
             Box::new(surface.clone()),
         );
         let surface_curve = SurfaceCurve3D::new(
-            SurfaceCurveKind::Surface,
+            SurfaceCurveKind::SurfaceCurve,
             Box::new(leader),
             vec![SurfaceCurveAssociatedGeometry::ParameterCurve(invalid_trim)],
             SurfaceCurveRepresentation::Curve3D,
@@ -434,6 +441,21 @@ mod tests {
             surface_curve.parameter_curve_on(&surface).is_none(),
             "Invalid face-local pcurves must not be accepted only because their surface entity matches."
         );
+    }
+
+    #[test]
+    fn public_parameter_curve_api_uses_descriptive_names() {
+        let surface = Surface::ElementarySurface(ElementarySurface::Plane(Plane::xy()));
+        let trim: StepParameterCurve = ParameterCurve::new(
+            Box::new(Curve2D::Line(Line(
+                Point2::new(0.0, 0.0),
+                Point2::new(1.0, 0.0),
+            ))),
+            Box::new(surface),
+        );
+        let curve = Curve3D::ParameterCurve(trim);
+
+        assert!(matches!(curve, Curve3D::ParameterCurve(_)));
     }
 }
 

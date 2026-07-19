@@ -1,7 +1,42 @@
 use crate::errors::Error;
 use crate::shell::ShellCondition;
 use crate::*;
+use rustc_hash::FxHashMap as HashMap;
 use std::vec::Vec;
+
+fn assign_vertex_stable_id<P>(
+    vertex: &mut Vertex<P>,
+    ids: &mut HashMap<VertexId<P>, StableId>,
+    id_allocator: &mut StableIdAllocator,
+) {
+    let vertex_id = vertex.id();
+    let stable_id = if let Some(stable_id) = ids.get(&vertex_id).copied() {
+        stable_id
+    } else {
+        let stable_id = id_allocator.allocate();
+        ids.insert(vertex_id, stable_id);
+        stable_id
+    };
+    vertex.set_stable_id(stable_id);
+}
+
+fn collect_assigned_vertex_stable_id<P>(
+    vertex: &Vertex<P>,
+    ids: &mut HashMap<VertexId<P>, StableId>,
+) {
+    if vertex.stable_id().is_assigned() && !ids.contains_key(&vertex.id()) {
+        ids.insert(vertex.id(), vertex.stable_id());
+    }
+}
+
+fn collect_assigned_edge_stable_id<P, C>(
+    edge: &Edge<P, C>,
+    ids: &mut HashMap<EdgeId<C>, StableId>,
+) {
+    if edge.stable_id().is_assigned() && !ids.contains_key(&edge.id()) {
+        ids.insert(edge.id(), edge.stable_id());
+    }
+}
 
 impl<P, C, S> Solid<P, C, S> {
     /// Create a solid whose boundaries must be non-empty, connected,
@@ -138,6 +173,7 @@ impl<P, C, S> Solid<P, C, S> {
     /// be keyed on them. Calling this first gives every face a stable id to key
     /// attributes on.
     pub fn ensure_face_stable_ids(&mut self) {
+        self.ensure_allocator_above_existing_topology_ids();
         let id_allocator = &mut self.id_allocator;
         for shell in &mut self.boundaries {
             for face in shell.face_iter_mut() {
@@ -146,6 +182,149 @@ impl<P, C, S> Solid<P, C, S> {
                 }
             }
         }
+    }
+
+    /// Assigns a [`StableId`] to every vertex use that does not have one yet.
+    ///
+    /// Shared vertex uses receive the same id, preferring an existing assigned
+    /// id for that topology key before allocating a fresh one.
+    pub fn ensure_vertex_stable_ids(&mut self) {
+        self.ensure_allocator_above_existing_topology_ids();
+        let id_allocator = &mut self.id_allocator;
+        let mut ids = HashMap::<VertexId<P>, StableId>::default();
+        for shell in &self.boundaries {
+            for face in shell.face_iter() {
+                for wire in &face.boundaries {
+                    for edge in wire.iter() {
+                        collect_assigned_vertex_stable_id(&edge.vertices.0, &mut ids);
+                        collect_assigned_vertex_stable_id(&edge.vertices.1, &mut ids);
+                    }
+                }
+            }
+        }
+        for shell in &mut self.boundaries {
+            for face in shell.face_iter_mut() {
+                for wire in &mut face.boundaries {
+                    for edge in wire.edge_iter_mut() {
+                        assign_vertex_stable_id(&mut edge.vertices.0, &mut ids, id_allocator);
+                        assign_vertex_stable_id(&mut edge.vertices.1, &mut ids, id_allocator);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Assigns a [`StableId`] to every edge use that does not have one yet.
+    ///
+    /// Shared edge uses receive the same id, preferring an existing assigned id
+    /// for that topology key before allocating a fresh one.
+    pub fn ensure_edge_stable_ids(&mut self) {
+        self.ensure_allocator_above_existing_topology_ids();
+        let id_allocator = &mut self.id_allocator;
+        let mut ids = HashMap::<EdgeId<C>, StableId>::default();
+        for shell in &self.boundaries {
+            for face in shell.face_iter() {
+                for wire in &face.boundaries {
+                    for edge in wire.iter() {
+                        collect_assigned_edge_stable_id(edge, &mut ids);
+                    }
+                }
+            }
+        }
+        for shell in &mut self.boundaries {
+            for face in shell.face_iter_mut() {
+                for wire in &mut face.boundaries {
+                    for edge in wire.edge_iter_mut() {
+                        let edge_id = edge.id();
+                        let stable_id = if let Some(stable_id) = ids.get(&edge_id).copied() {
+                            stable_id
+                        } else {
+                            let stable_id = id_allocator.allocate();
+                            ids.insert(edge_id, stable_id);
+                            stable_id
+                        };
+                        edge.set_stable_id(stable_id);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Assigns stable ids to every topology element that does not have one yet.
+    pub fn ensure_topology_stable_ids(&mut self) {
+        self.ensure_vertex_stable_ids();
+        self.ensure_edge_stable_ids();
+        self.ensure_face_stable_ids();
+    }
+
+    /// Replaces every topology element's [`StableId`] with a caller-supplied
+    /// value, so result ids derive from a caller-computed canonical ordering
+    /// rather than construction/traversal order.
+    ///
+    /// `vertex_ids` and `edge_ids` map each shared vertex/edge topology key
+    /// ([`Vertex::id`]/[`Edge::id`]) to the id every use of that element must
+    /// carry, so all uses of one shared vertex or edge receive the same id.
+    /// Faces are not shared, so `face_ids_in_order` supplies the id of each
+    /// face in [`face_iter`](Self::face_iter) order. Any element absent from its
+    /// map (or beyond `face_ids_in_order`) keeps its current id. The allocator
+    /// is reset and then advanced past `next_free_id - 1`, so ids handed out
+    /// afterwards never collide with the assigned range.
+    ///
+    /// Unlike [`ensure_topology_stable_ids`](Self::ensure_topology_stable_ids),
+    /// which allocates in traversal order and skips already-assigned elements,
+    /// this reassigns every mapped element unconditionally. The caller owns the
+    /// canonical order; this method only applies it.
+    pub fn apply_stable_ids(
+        &mut self,
+        vertex_ids: &HashMap<VertexId<P>, StableId>,
+        edge_ids: &HashMap<EdgeId<C>, StableId>,
+        face_ids_in_order: &[StableId],
+        next_free_id: u64,
+    ) {
+        let mut face_ids = face_ids_in_order.iter().copied();
+        for shell in &mut self.boundaries {
+            for face in shell.face_iter_mut() {
+                if let Some(id) = face_ids.next() {
+                    face.set_stable_id(id);
+                }
+                for wire in &mut face.boundaries {
+                    for edge in wire.edge_iter_mut() {
+                        if let Some(id) = edge_ids.get(&edge.id()).copied() {
+                            edge.set_stable_id(id);
+                        }
+                        if let Some(id) = vertex_ids.get(&edge.vertices.0.id()).copied() {
+                            edge.vertices.0.set_stable_id(id);
+                        }
+                        if let Some(id) = vertex_ids.get(&edge.vertices.1.id()).copied() {
+                            edge.vertices.1.set_stable_id(id);
+                        }
+                    }
+                }
+            }
+        }
+        self.id_allocator = StableIdAllocator::new();
+        self.id_allocator
+            .ensure_above(next_free_id.saturating_sub(1));
+    }
+
+    fn ensure_allocator_above_existing_topology_ids(&mut self) {
+        let max_id = self
+            .boundaries
+            .iter()
+            .flat_map(|shell| shell.face_iter())
+            .fold(0_u64, |max_id, face| {
+                let max_id = max_id.max(face.stable_id().raw());
+                face.boundaries
+                    .iter()
+                    .flat_map(|wire| wire.iter())
+                    .fold(max_id, |max_id, edge| {
+                        max_id
+                            .max(edge.stable_id().raw())
+                            .max(edge.vertices.0.stable_id().raw())
+                            .max(edge.vertices.1.stable_id().raw())
+                    })
+            });
+        self.id_allocator.ensure_above(max_id);
     }
 
     /// Returns a new solid whose surfaces are mapped by `surface_mapping`,
@@ -400,4 +579,62 @@ fn ensure_face_stable_ids_assigns_unassigned_faces() {
     solid.ensure_face_stable_ids();
     let ids_again: Vec<StableId> = solid.face_iter().map(|f| f.stable_id()).collect();
     assert_eq!(ids, ids_again, "second call is a no-op for assigned faces");
+}
+
+#[test]
+fn ensure_edge_stable_ids_assigns_each_topological_edge_once() {
+    use monstertruck_core::StableId;
+    let mut solid = cube();
+    assert!(solid.edge_iter().all(|e| !e.stable_id().is_assigned()));
+
+    solid.ensure_edge_stable_ids();
+    let ids: Vec<StableId> = solid.edge_iter().map(|e| e.stable_id()).collect();
+    assert_eq!(ids.len(), 24);
+    assert!(
+        ids.iter().all(|id| id.is_assigned()),
+        "all edge uses assigned"
+    );
+    let mut unique = ids.clone();
+    unique.sort();
+    unique.dedup();
+    assert_eq!(unique.len(), 12, "shared edge uses receive one id");
+
+    solid.ensure_edge_stable_ids();
+    let ids_again: Vec<StableId> = solid.edge_iter().map(|e| e.stable_id()).collect();
+    assert_eq!(ids, ids_again, "second call is a no-op for assigned edges");
+}
+
+#[test]
+fn ensure_edge_stable_ids_preserves_existing_shared_edge_id() {
+    use monstertruck_core::StableId;
+    let mut solid = cube();
+    let target_id = solid.edge_iter().next().expect("cube has edges").id();
+    let existing_id = StableId::new(100);
+    let mut seen = 0;
+
+    for shell in &mut solid.boundaries {
+        for face in shell.face_iter_mut() {
+            for wire in &mut face.boundaries {
+                for edge in wire.edge_iter_mut() {
+                    if edge.id() == target_id {
+                        seen += 1;
+                        if seen == 2 {
+                            edge.set_stable_id(existing_id);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert_eq!(seen, 2, "cube edge should have two edge uses");
+
+    solid.ensure_edge_stable_ids();
+    let target_ids: Vec<StableId> = solid
+        .edge_iter()
+        .filter(|edge| edge.id() == target_id)
+        .map(|edge| edge.stable_id())
+        .collect();
+    assert_eq!(target_ids, vec![existing_id, existing_id]);
+    assert!(solid.edge_iter().all(|edge| edge.stable_id().is_assigned()));
+    assert!(solid.id_allocator().peek() > existing_id.raw());
 }

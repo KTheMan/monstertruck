@@ -908,6 +908,71 @@ impl<C, T: One> StepSurface for Processor<RevolutionSurface<C>, T> {
     fn same_sense(&self) -> bool { !self.orientation() }
 }
 
+/// Placement of a STEP `CYLINDRICAL_SURFACE`, expressed in world coordinates.
+struct CylindricalSurfaceData {
+    location: Point3,
+    axis: Vector3,
+    ref_direction: Vector3,
+    radius: f64,
+}
+
+impl StepFormat for CylindricalSurfaceData {
+    fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
+        let position_idx = idx + 1;
+        let location_idx = idx + 2;
+        let axis_idx = idx + 3;
+        let ref_direction_idx = idx + 4;
+        let radius = FloatDisplay(self.radius);
+        f.write_fmt(format_args!(
+            "#{idx} = CYLINDRICAL_SURFACE('', #{position_idx}, {radius});
+#{position_idx} = AXIS2_PLACEMENT_3D('', #{location_idx}, #{axis_idx}, #{ref_direction_idx});\n"
+        ))?;
+        StepFormat::fmt(&self.location, location_idx, f)?;
+        StepFormat::fmt(&VectorAsDirection(self.axis), axis_idx, f)?;
+        StepFormat::fmt(&VectorAsDirection(self.ref_direction), ref_direction_idx, f)
+    }
+}
+impl_const_step_length!(CylindricalSurfaceData, 5);
+
+/// Recognizes a right circular cylinder expressed as a surface of revolution of
+/// a straight profile line parallel to the revolution axis, returning its STEP
+/// `CYLINDRICAL_SURFACE` placement in world coordinates. Returns `None` for any
+/// other revolution (cones, spheres, general profiles) or a transform that does
+/// not preserve the circular cross-section.
+fn cylindrical_surface_from_revolution(
+    surface: &Processor<RevolutionSurface<ModelingCurve>, Matrix4>,
+) -> Option<CylindricalSurfaceData> {
+    let ModelingCurve::Line(profile) = surface.entity().entity_curve() else {
+        return None;
+    };
+    let transform = surface.transform();
+    // A cylinder stays a cylinder only under a similarity (uniform scale).
+    let (_, scale, _) = transform.iwasawa_decomposition()?;
+    if !scale[0][0].near(&scale[1][1]) || !scale[1][1].near(&scale[2][2]) {
+        return None;
+    }
+    let revolution = surface.entity();
+    let axis = revolution.axis().normalize();
+    let direction = profile.1 - profile.0;
+    // The profile must be parallel to the axis so the radius stays constant.
+    if direction.so_small() || !direction.normalize().cross(axis).so_small() {
+        return None;
+    }
+    let offset = profile.0 - revolution.origin();
+    let radial = offset - axis * offset.dot(axis);
+    if radial.so_small() {
+        return None;
+    }
+    let foot = revolution.origin() + axis * offset.dot(axis);
+    let radial = transform.transform_vector(radial);
+    Some(CylindricalSurfaceData {
+        location: transform.transform_point(foot),
+        axis: transform.transform_vector(axis).normalize(),
+        ref_direction: radial.normalize(),
+        radius: radial.magnitude(),
+    })
+}
+
 impl StepFormat for ModelingSurface {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
         match self {
@@ -915,7 +980,9 @@ impl StepFormat for ModelingSurface {
             ModelingSurface::BsplineSurface(x) => StepFormat::fmt(x, idx, f),
             ModelingSurface::NurbsSurface(x) => StepFormat::fmt(x, idx, f),
             ModelingSurface::RevolutionSurface(x) => {
-                if let Some(bsp) = x.try_into_homogeneous_bspline_surface() {
+                if let Some(cylinder) = cylindrical_surface_from_revolution(x) {
+                    StepFormat::fmt(&cylinder, idx, f)
+                } else if let Some(bsp) = x.try_into_homogeneous_bspline_surface() {
                     let nurbs = NurbsSurface::new(bsp);
                     StepFormat::fmt(&nurbs, idx, f)
                 } else {
@@ -937,7 +1004,9 @@ impl StepLength for ModelingSurface {
             ModelingSurface::BsplineSurface(x) => x.step_length(),
             ModelingSurface::NurbsSurface(x) => x.step_length(),
             ModelingSurface::RevolutionSurface(x) => {
-                if let Some(bsp) = x.try_into_homogeneous_bspline_surface() {
+                if cylindrical_surface_from_revolution(x).is_some() {
+                    CylindricalSurfaceData::LENGTH
+                } else if let Some(bsp) = x.try_into_homogeneous_bspline_surface() {
                     NurbsSurface::new(bsp).step_length()
                 } else {
                     x.entity().step_length()

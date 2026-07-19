@@ -180,7 +180,7 @@ impl Table {
         surface: &Surface,
         orientation: bool,
     ) -> Option<step_geometry::StepParameterCurve> {
-        (curve.kind() == StepSurfaceCurveKind::Seam)
+        (curve.kind() == StepSurfaceCurveKind::SeamCurve)
             .then(|| {
                 let curves = curve
                     .associated_geometry()
@@ -884,9 +884,9 @@ mod tests {
     }
 
     fn seam_curve(surface: &Surface) -> Curve3D {
-        let leader = Curve3D::Line(Line(surface.evaluate(0.0, 0.0), surface.evaluate(0.0, 1.0)));
+        let leader = Curve3D::Line(Line(surface.subs(0.0, 0.0), surface.subs(0.0, 1.0)));
         Curve3D::SurfaceCurve(SurfaceCurve3D::new(
-            StepSurfaceCurveKind::Seam,
+            StepSurfaceCurveKind::SeamCurve,
             Box::new(leader),
             vec![
                 SurfaceCurveAssociatedGeometry::ParameterCurve(line_pcurve(surface, 0.0)),
@@ -906,8 +906,8 @@ mod tests {
         let backward = Table::exact_trim_curve_on(&curve, &surface, false)
             .expect("backward trim curve should exist");
 
-        let forward_start = forward.curve().evaluate(forward.curve().range_tuple().0);
-        let backward_start = backward.curve().evaluate(backward.curve().range_tuple().0);
+        let forward_start = forward.curve().subs(forward.curve().range_tuple().0);
+        let backward_start = backward.curve().subs(backward.curve().range_tuple().0);
 
         assert!(forward_start.x.near(&0.0));
         assert!(backward_start.x.near(&TAU));

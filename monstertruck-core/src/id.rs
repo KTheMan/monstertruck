@@ -30,6 +30,10 @@ impl<T> PartialEq for Id<T> {
 
 impl<T> Eq for Id<T> {}
 
+/// Renamed to [`Id`] per RFC 430 (C-CASE).
+#[deprecated(note = "renamed to Id per RFC 430 (C-CASE)")]
+pub type ID<T> = Id<T>;
+
 impl<T> Debug for Id<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.write_fmt(format_args!("0x{:x}", self.0))
@@ -55,13 +59,13 @@ impl StableId {
     /// Reserved sentinel for unassigned IDs.
     pub const UNASSIGNED: StableId = StableId(0);
 
-    /// Create a new [`StableId`].
+    /// Create a new StableId.
     pub fn new(val: u64) -> Self {
         debug_assert!(val != 0, "StableId 0 is reserved for UNASSIGNED");
         StableId(val)
     }
 
-    /// Get the raw `u64` value.
+    /// Get the raw u64 value.
     pub fn raw(self) -> u64 { self.0 }
 
     /// Whether this ID has been assigned.
@@ -90,7 +94,7 @@ impl StableIdAllocator {
     /// Create a new allocator starting at 1.
     pub const fn new() -> Self { Self { next: 1 } }
 
-    /// Allocate a fresh [`StableId`].
+    /// Allocate the next [`StableId`].
     pub fn allocate(&mut self) -> StableId {
         let id = StableId::new(self.next);
         self.next += 1;

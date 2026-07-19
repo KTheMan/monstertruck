@@ -24,7 +24,7 @@ fn main() {
     obj::write(&mesh.create_mesh_by_face_indices(&planes), file).unwrap();
 
     let mesh = mesh.create_mesh_by_face_indices(&others);
-    let (upper, lower) = mesh.cluster_faces_by_gaussian_curvature(0.1, false);
+    let (upper, lower) = mesh.clustering_faces_by_gcurvature(0.1, false);
     let file = std::fs::File::create("lower.obj").unwrap();
     obj::write(&mesh.create_mesh_by_face_indices(&lower), file).unwrap();
     let file = std::fs::File::create("upper.obj").unwrap();

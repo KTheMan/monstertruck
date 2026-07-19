@@ -187,14 +187,14 @@ impl<P> Tmesh<P> {
 
         // TODO: Currently this code does not allow for knot intervals of 0, and needs to be
         // updated once a solution to figure 9 in [Sederberg et al. 2003] is found.
-        if con.read().connection_type(connection_side.clockwise()) == TmeshConnectionType::Edge {
+        if con.read().con_type(connection_side.clockwise()) == TmeshConnectionType::Edge {
             let edge_weight = con
                 .read()
                 .connection_knot(connection_side.clockwise())
                 .expect("Edges must have a weight");
 
             p.write()
-                .set_edge_connection_weight(connection_side.clockwise(), edge_weight)
+                .set_edge_con_weight(connection_side.clockwise(), edge_weight)
                 .expect("New points have edge conditions as default connection type.");
         } else {
             // Remove the edge condition created by the constructor.
@@ -206,15 +206,14 @@ impl<P> Tmesh<P> {
                 .map_err(|_| Error::TmeshUnknownError)?;
         }
 
-        if con.read().connection_type(connection_side.anti_clockwise()) == TmeshConnectionType::Edge
-        {
+        if con.read().con_type(connection_side.anti_clockwise()) == TmeshConnectionType::Edge {
             let edge_weight = con
                 .read()
                 .connection_knot(connection_side.anti_clockwise())
                 .expect("Edges must have a weight");
 
             p.write()
-                .set_edge_connection_weight(connection_side.anti_clockwise(), edge_weight)
+                .set_edge_con_weight(connection_side.anti_clockwise(), edge_weight)
                 .expect("New points have edge conditions as default connection type.");
         } else {
             // Remove the edge condition created by the constructor.
@@ -293,7 +292,7 @@ impl<P> Tmesh<P> {
             .filter(|point| (point.read().knot_coordinates().0 - knot_coords.0).so_small())
             // Filter those points to only include the point that straddles the T axis of insertion
             .filter(|point| {
-                if let Some(con) = point.read().connection(TmeshDirection::Up) {
+                if let Some(con) = point.read().get(TmeshDirection::Up) {
                     let temp_t_coord = point.read().knot_coordinates().1;
                     let temp_inter = con.1;
 
@@ -342,7 +341,7 @@ impl<P> Tmesh<P> {
             .filter(|point| (point.read().knot_coordinates().1 - knot_coords.1).so_small())
             // Filter those points to only include the point that straddles the S axis of insertion
             .filter(|point| {
-                if let Some(con) = point.read().connection(TmeshDirection::Right) {
+                if let Some(con) = point.read().get(TmeshDirection::Right) {
                     let temp_s_coord = point.read().knot_coordinates().0;
                     let temp_inter = con.1;
 
@@ -538,7 +537,7 @@ impl<P> Tmesh<P> {
         let mut ic_knot_interval = 0.0; // The interval of the ic
 
         // Check that p is not a corner
-        if p.read().connection_type(face_dir) == TmeshConnectionType::Point {
+        if p.read().con_type(face_dir) == TmeshConnectionType::Point {
             return Err(Error::TmeshExistingConnection);
         }
 
@@ -549,7 +548,7 @@ impl<P> Tmesh<P> {
 
             (cur_point, accumulation) = cur_point
                 .read()
-                .navigate_until_connection(cur_dir, cur_dir.anti_clockwise())?;
+                .navigate_until_con(cur_dir, cur_dir.anti_clockwise())?;
 
             cur_dir = cur_dir.anti_clockwise();
 
@@ -601,8 +600,7 @@ impl<P> Tmesh<P> {
             // Shouldn't need corner detection due to rule 1 in [Sederberg et al. 2003].
             // (needs testing)
             } else if ic_knot_accumulation > ic_knot_measurement
-                || cur_point.read().connection_type(cur_dir.anti_clockwise())
-                    == TmeshConnectionType::Point
+                || cur_point.read().con_type(cur_dir.anti_clockwise()) == TmeshConnectionType::Point
             {
                 return Ok(false);
             }
@@ -641,11 +639,11 @@ impl<P> Tmesh<P> {
 
         // 'intersection_loop:
         while knot_intervals.len() < num {
-            let connection_type = cur_point.read().connection_type(dir);
+            let con_type = cur_point.read().con_type(dir);
             let i = knot_intervals.len();
             knot_intervals.push(0.0);
 
-            match connection_type {
+            match con_type {
                 // If dir is a T-junction, navigate around the face to the other side,
                 // counting the knot intervals in the direction dir
                 TmeshConnectionType::Tjunction => {
@@ -654,17 +652,16 @@ impl<P> Tmesh<P> {
                     (cur_point, ray_distance) = {
                         let borrow = cur_point.read();
 
-                        // The possibility that TmeshControlPointNotFound is returned from navigate_until_connection would normaly be no
+                        // The possibility that TmeshControlPointNotFound is returned from navigate_until_con would normaly be no
                         // cuase for error, since the other direction may be tried. However, because cur_point is a T junction in
                         // the direction dir, it must be a point connection in dir.anti_clockwise(), otherwise the mesh is malformed.
-                        borrow.navigate_until_connection(dir.anti_clockwise(), dir)?
+                        borrow.navigate_until_con(dir.anti_clockwise(), dir)?
                     };
 
                     // Travrese with counting until a connection in the clockwise connection is found.
                     // Because all faces must be rectangular, this is guaranteed to be the first "ray intersection".
-                    let traversal_result = cur_point
-                        .read()
-                        .navigate_until_connection(dir, dir.clockwise())?;
+                    let traversal_result =
+                        cur_point.read().navigate_until_con(dir, dir.clockwise())?;
                     cur_point = traversal_result.0;
                     // Set the latest pushed value to the intersection length
                     knot_intervals[i] += traversal_result.1;
@@ -715,12 +712,12 @@ impl<P> Tmesh<P> {
                     // The above code is not included in the loop below because of certain guarantees that can be made about the
                     // geometry of the mesh which cannot be made for the rest of the mesh.
                     'face_traversal: loop {
-                        // It is possible that we are traversing along the edge of the mesh, in this case, the below navigate_until_connection is
+                        // It is possible that we are traversing along the edge of the mesh, in this case, the below navigate_until_con is
                         // going to navigate until the corner of the mesh, and return an error that it encountered an unexpected
                         // edge condition. This is not actually an error, so it needs to be checked before traversal. In the event that this occurs,
                         // normal ray casting is resumed, since all edge conditions in a mesh have the same weight. Do not push another knot interval,
                         // because the edge arm of the parent match statement will take care of it
-                        if cur_point.read().connection_type(dir) == TmeshConnectionType::Edge {
+                        if cur_point.read().con_type(dir) == TmeshConnectionType::Edge {
                             break 'face_traversal;
                         }
 
@@ -730,9 +727,8 @@ impl<P> Tmesh<P> {
 
                         // Traverse down to the lowest point on this edge which is not a T-junction and has not yet crossed the ray.
                         'ray_approaching: loop {
-                            let traversal_result = cur_point
-                                .read()
-                                .navigate_until_connection(dir.clockwise(), dir)?;
+                            let traversal_result =
+                                cur_point.read().navigate_until_con(dir.clockwise(), dir)?;
 
                             // Subtract distance as we approach the ray (temp var because the result might be
                             // over the ray, in which case we discard it).
@@ -756,10 +752,10 @@ impl<P> Tmesh<P> {
 
                         // It is possble that the above loop exited without modifying cur_point, as is the case for the face marked by
                         // the fourth and fifth intersections above. In this case, cur_point must be navigated up to the corner of the face.
-                        if cur_point.read().connection_type(dir) == TmeshConnectionType::Tjunction {
+                        if cur_point.read().con_type(dir) == TmeshConnectionType::Tjunction {
                             let traversal_result = cur_point
                                 .read()
-                                .navigate_until_connection(dir.anti_clockwise(), dir)?;
+                                .navigate_until_con(dir.anti_clockwise(), dir)?;
 
                             // Move cur_point.
                             cur_point = traversal_result.0;
@@ -768,9 +764,8 @@ impl<P> Tmesh<P> {
                         }
 
                         // Traverse accross the "top" of the face, to the other corner
-                        let traversal_result = cur_point
-                            .read()
-                            .navigate_until_connection(dir, dir.clockwise())?;
+                        let traversal_result =
+                            cur_point.read().navigate_until_con(dir, dir.clockwise())?;
 
                         // Record the traversal distance as a knot interval (guaranteed to be correct because all faces are rectangular)
                         knot_intervals.push(traversal_result.1);

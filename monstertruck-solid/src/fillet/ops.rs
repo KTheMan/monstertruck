@@ -3,7 +3,7 @@ use monstertruck_geometry::prelude::*;
 
 use super::error::FilletError;
 use super::geometry::*;
-use super::params::{FilletOptions, FilletProfile, FilletRadius};
+use super::params::{FilletOptions, FilletProfile, RadiusSpec};
 use super::topology::*;
 use super::types::*;
 
@@ -18,6 +18,21 @@ pub fn fillet(
     filleted_edge_id: EdgeId,
     options: &FilletOptions,
 ) -> Result<(Face, Face, Face)> {
+    // The relay-sphere construction picks its cutting side from the seam
+    // direction relative to the two surface normals. Boolean output reaches
+    // both boundary-winding conventions, so when the natural-side attempt
+    // fails geometrically, retry with the sphere side flipped.
+    fillet_on_side(face0, face1, filleted_edge_id, options, false)
+        .or_else(|_| fillet_on_side(face0, face1, filleted_edge_id, options, true))
+}
+
+fn fillet_on_side(
+    face0: &Face,
+    face1: &Face,
+    filleted_edge_id: EdgeId,
+    options: &FilletOptions,
+    flip_side: bool,
+) -> Result<(Face, Face, Face)> {
     let is_filleted_edge = move |edge: &Edge| edge.id() == filleted_edge_id;
     let filleted_edge =
         face0
@@ -28,34 +43,34 @@ pub fn fillet(
             })?;
 
     let division = options.divisions.get();
+    let surface0 = face0.oriented_surface();
+    let surface1 = face1.oriented_surface();
     let fillet_surface = {
-        let surface0 = face0.oriented_surface();
-        let surface1 = face1.oriented_surface();
         let curve = filleted_edge.oriented_curve();
         let make_with_extend = |radius: &dyn Fn(f64) -> f64, extend: bool| match &options.profile {
-            FilletProfile::Round => {
-                rolling_ball_fillet_surface(&surface0, &surface1, &curve, division, radius, extend)
-            }
-            FilletProfile::Chamfer => {
-                chamfer_fillet_surface(&surface0, &surface1, &curve, division, radius, extend)
-            }
-            FilletProfile::Ridge => {
-                ridge_fillet_surface(&surface0, &surface1, &curve, division, radius, extend)
-            }
+            FilletProfile::Round => rolling_ball_fillet_surface(
+                &surface0, &surface1, &curve, division, radius, extend, flip_side,
+            ),
+            FilletProfile::Chamfer => chamfer_fillet_surface(
+                &surface0, &surface1, &curve, division, radius, extend, flip_side,
+            ),
+            FilletProfile::Ridge => ridge_fillet_surface(
+                &surface0, &surface1, &curve, division, radius, extend, flip_side,
+            ),
             FilletProfile::Custom(profile) => custom_fillet_surface(
-                &surface0, &surface1, &curve, division, radius, extend, profile,
+                &surface0, &surface1, &curve, division, radius, extend, flip_side, profile,
             ),
         };
         let make = |radius: &dyn Fn(f64) -> f64| {
             make_with_extend(radius, true).or_else(|| make_with_extend(radius, false))
         };
         match &options.radius {
-            FilletRadius::Constant(r) => {
+            RadiusSpec::Constant(r) => {
                 let r = *r;
                 make(&|_| r)
             }
-            FilletRadius::Variable(f) => make(f.as_ref()),
-            FilletRadius::PerEdge(radii) => match radii.first() {
+            RadiusSpec::Variable(f) => make(f.as_ref()),
+            RadiusSpec::PerEdge(radii) => match radii.first() {
                 Some(&r) => make(&|_| r),
                 None => None,
             },
@@ -67,15 +82,13 @@ pub fn fillet(
 
     let (new_face0, fillet_edge0) = {
         let bezier = fillet_surface.column_curve(0);
-        cut_face_by_bezier(face0, bezier, filleted_edge.id()).ok_or(
-            FilletError::GeometryFailed {
-                context: "cut face0 by bezier",
-            },
-        )?
+        cut_face_by_bezier(face0, bezier, filleted_edge_id).ok_or(FilletError::GeometryFailed {
+            context: "cut face0 by bezier",
+        })?
     };
     let (new_face1, fillet_edge1) = {
         let bezier = fillet_surface.column_curve(fillet_surface.control_points().len() - 1);
-        cut_face_by_bezier(face1, bezier.inverse(), filleted_edge.id()).ok_or(
+        cut_face_by_bezier(face1, bezier.inverse(), filleted_edge_id).ok_or(
             FilletError::GeometryFailed {
                 context: "cut face1 by bezier",
             },
@@ -159,7 +172,7 @@ pub fn fillet_along_wire(shell: &mut Shell, wire: &Wire, options: &FilletOptions
     // Validate variable radius constraint for closed wire fillets.
     // Open wires don't wrap around, so f(0) ≈ f(1) is only needed for closed wires.
     if wire.is_closed()
-        && let FilletRadius::Variable(f) = &options.radius
+        && let RadiusSpec::Variable(f) = &options.radius
         && !f(0.0).near2(&f(1.0))
     {
         return Err(FilletError::VariableRadiusUnsupported);
@@ -176,7 +189,7 @@ pub fn fillet_along_wire(shell: &mut Shell, wire: &Wire, options: &FilletOptions
         .ok_or(FilletError::AdjacentFacesNotFound)?;
 
     let mut fillet_surfaces = match &options.radius {
-        FilletRadius::Constant(r) => {
+        RadiusSpec::Constant(r) => {
             let r = *r;
             fillet_surfaces_along_wire(
                 shell,
@@ -188,7 +201,7 @@ pub fn fillet_along_wire(shell: &mut Shell, wire: &Wire, options: &FilletOptions
                 &options.profile,
             )
         }
-        FilletRadius::Variable(f) => fillet_surfaces_along_wire(
+        RadiusSpec::Variable(f) => fillet_surfaces_along_wire(
             shell,
             wire,
             shared_face_index,
@@ -197,7 +210,7 @@ pub fn fillet_along_wire(shell: &mut Shell, wire: &Wire, options: &FilletOptions
             division,
             &options.profile,
         ),
-        FilletRadius::PerEdge(radii) => {
+        RadiusSpec::PerEdge(radii) => {
             if radii.len() != wire.len() {
                 return Err(FilletError::PerEdgeRadiusMismatch {
                     given: radii.len(),

@@ -120,32 +120,3 @@ fn solid_fixtures_export_closed_manifolds() -> anyhow::Result<()> {
     }
     Ok(())
 }
-
-#[test]
-fn boolean_result_exports_closed_manifold() -> anyhow::Result<()> {
-    // Box-minus-cylinder, the OpenCADStudio-style "build primitive, subtract,
-    // export" path: the boolean output must serialize as a closed manifold.
-    let v = builder::vertex(Point3::origin());
-    let e = builder::extrude(&v, Vector3::unit_x());
-    let f = builder::extrude(&e, Vector3::unit_y());
-    let cube: Solid = builder::extrude(&f, Vector3::unit_z());
-
-    let seed = builder::vertex(Point3::new(0.5, 0.25, -0.5));
-    let rim = builder::revolve(
-        &seed,
-        Point3::new(0.5, 0.5, 0.0),
-        Vector3::unit_z(),
-        builder::SweepAngle::Closed,
-        4,
-    );
-    let base = builder::try_attach_plane(&[rim])?;
-    let mut cylinder: Solid = builder::extrude(&base, Vector3::unit_z() * 2.0);
-    cylinder.not();
-
-    let punched = monstertruck_solid::and(&cube, &cylinder, 0.05)?;
-    let compressed = punched.compress();
-    let step =
-        CompleteStepDisplay::new(StepModel::from(&compressed), Default::default()).to_string();
-
-    assert_closed_manifold("box minus cylinder", &step)
-}

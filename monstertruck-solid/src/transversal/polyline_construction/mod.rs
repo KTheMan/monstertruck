@@ -1,3 +1,12 @@
+//! Assemble unordered interference segments into ordered polylines.
+//!
+//! Truck-derived marching-SSI support: [`monstertruck_meshing`]'s
+//! mesh-mesh interference extraction returns an unordered soup of
+//! `(Point3, Point3)` segments; this stitches them into connected
+//! [`PolylineCurve`] chains (open or closed) by walking a tolerance-keyed
+//! adjacency graph. Resurrected from the 0.3.2 published crate (the last
+//! release that shipped a self-contained boolean backend).
+
 use monstertruck_core::{cgmath64::*, tolerance::*};
 use monstertruck_meshing::prelude::PolylineCurve;
 use rustc_hash::FxHashMap as HashMap;

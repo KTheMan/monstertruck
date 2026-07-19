@@ -6,6 +6,9 @@ Derive macros for geometric traits. Re-exported by `monstertruck-traits` (featur
 
 ## Quick Start
 
+<!-- rust,ignore: the example needs monstertruck-traits, which depends on
+this crate -- the doctest can never link it here (lib.rs includes this
+README as the crate doc). It compiles as a monstertruck-traits doctest. -->
 ```rust,ignore
 use monstertruck_traits::prelude::*;
 
@@ -24,7 +27,7 @@ let pt = curve.evaluate(0.5); // dispatches to Line::evaluate
 Users do not need to depend on this crate directly:
 
 ```toml
-monstertruck-traits = { version = "0.2", features = ["derive"] }
+monstertruck-traits = { version = "0.1", features = ["derive"] }
 ```
 
 ## License

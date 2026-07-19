@@ -102,14 +102,16 @@ fn special_cylinder_model() -> Shell {
     );
     let surface: Surface = Processor::new(surface_row).into();
 
-    let face2 = Face::new(
+    let face2 = Face::try_new(
         vec![vec![edge2, edge1.clone(), edge4.inverse(), edge0.inverse()].into()],
         surface.clone(),
-    );
-    let face3 = Face::new(
+    )
+    .unwrap();
+    let face3 = Face::try_new(
         vec![vec![edge3, edge0, edge5.inverse(), edge1.inverse()].into()],
         surface,
-    );
+    )
+    .unwrap();
 
     vec![face0, face1, face2, face3].into()
 }
@@ -148,7 +150,7 @@ fn robust_closed() {
         let curve = edge.curve();
 
         if let Curve::Line(line) = curve {
-            let m = line.evaluate(0.5);
+            let m = line.subs(0.5);
             let p = m + 0.2 * (o - m);
             let bsp = BsplineCurve::new(KnotVector::bezier_knot(2), vec![line.0, p, line.1]);
             edge.set_curve(bsp.into());
@@ -165,4 +167,51 @@ fn robust_closed() {
     mesh.put_together_same_attrs(TOLERANCE2)
         .remove_unused_attrs();
     assert_eq!(mesh.shell_condition(), ShellCondition::Closed);
+}
+
+/// Verifies that every face mesh from a tessellated solid has consistent
+/// winding — all triangles within a face agree on the normal direction.
+#[test]
+fn per_face_winding_consistency() {
+    let shapes: Vec<(&str, Shell)> = vec![
+        ("cube", {
+            let v = builder::vertex(Point3::origin());
+            let e = builder::extrude(&v, Vector3::unit_x());
+            let f = builder::extrude(&e, Vector3::unit_y());
+            let solid: Solid = builder::extrude(&f, Vector3::unit_z());
+            solid.into_boundaries().pop().unwrap()
+        }),
+        ("cylinder", special_cylinder_model()),
+    ];
+    for (name, shell) in &shapes {
+        let meshed = shell.triangulation(0.01);
+        for (fi, face) in meshed.face_iter().enumerate() {
+            if let Some(mut poly) = face.surface() {
+                if !face.orientation() {
+                    poly.invert();
+                }
+                let positions = poly.positions();
+                let normals = poly.normals();
+                let (mut pos, mut neg) = (0usize, 0usize);
+                for tri in poly.tri_faces() {
+                    let e1 = positions[tri[1].pos] - positions[tri[0].pos];
+                    let e2 = positions[tri[2].pos] - positions[tri[0].pos];
+                    let geo = e1.cross(e2);
+                    let vtx: Vector3 = tri.iter().fold(Vector3::zero(), |s, v| {
+                        s + v.nor.map(|idx| normals[idx]).unwrap_or(Vector3::zero())
+                    });
+                    let dot = geo.dot(vtx);
+                    if dot > 0.0 {
+                        pos += 1;
+                    } else if dot < 0.0 {
+                        neg += 1;
+                    }
+                }
+                assert!(
+                    pos == 0 || neg == 0,
+                    "{name} face {fi}: mixed winding ({pos} pos, {neg} neg)"
+                );
+            }
+        }
+    }
 }

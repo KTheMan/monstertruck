@@ -241,7 +241,7 @@ fn exact_parabola_parameter_curve_on_plane(
         .then(|| StepParameterCurve::new(Box::new(trim), Box::new(surface.clone())))
 }
 
-fn line_parameter_curve_to_pcurve(line: Line<Point2>, surface: &Surface) -> StepParameterCurve {
+fn line_parameter_curve(line: Line<Point2>, surface: &Surface) -> StepParameterCurve {
     StepParameterCurve::new(Box::new(Curve2D::Line(line)), Box::new(surface.clone()))
 }
 
@@ -323,7 +323,7 @@ where
                         && surface.evaluate(projected.x, projected.y).near(point)
                 })
         })
-        .then(|| line_parameter_curve_to_pcurve(line, surface))
+        .then(|| line_parameter_curve(line, surface))
 }
 
 fn exact_conic_parameter_curve_on(
@@ -722,7 +722,7 @@ fn curve2d_from_sampled_boundary(points: Vec<Point2>) -> Option<Curve2D> {
         let line = Line(front, back);
         let is_linear = points.iter().copied().all(|point| {
             line.search_nearest_parameter(point, None, 1)
-                .is_some_and(|t| line.evaluate(t).near(&point))
+                .is_some_and(|t| line.subs(t).near(&point))
         });
         if is_linear {
             Some(Curve2D::Line(line))
@@ -1196,7 +1196,7 @@ fn surface_curve_line_without_pcurve_converts_to_exact_pcurve() {
         Point3::new(0.75, 0.5, 0.0),
     ));
     let curve = Curve3D::SurfaceCurve(SurfaceCurve3D::new(
-        SurfaceCurveKind::Surface,
+        SurfaceCurveKind::SurfaceCurve,
         Box::new(leader),
         Vec::new(),
         SurfaceCurveRepresentation::Curve3D,
@@ -1224,9 +1224,9 @@ fn surface_curve_line_without_pcurve_on_cylinder_stays_fallback_only() {
     let surface = Surface::ElementarySurface(ElementarySurface::CylindricalSurface(
         Processor::new(RevolutionSurface::by_revolution(profile, center, axis)),
     ));
-    let leader = Curve3D::Line(Line(surface.evaluate(0.0, 0.0), surface.evaluate(0.0, 1.0)));
+    let leader = Curve3D::Line(Line(surface.subs(0.0, 0.0), surface.subs(0.0, 1.0)));
     let curve = Curve3D::SurfaceCurve(SurfaceCurve3D::new(
-        SurfaceCurveKind::Surface,
+        SurfaceCurveKind::SurfaceCurve,
         Box::new(leader),
         Vec::new(),
         SurfaceCurveRepresentation::Curve3D,
@@ -1245,7 +1245,7 @@ fn raw_line_without_pcurve_on_cylinder_stays_fallback_only() {
     let surface = Surface::ElementarySurface(ElementarySurface::CylindricalSurface(
         Processor::new(RevolutionSurface::by_revolution(profile, center, axis)),
     ));
-    let curve = Curve3D::Line(Line(surface.evaluate(0.0, 0.0), surface.evaluate(0.0, 1.0)));
+    let curve = Curve3D::Line(Line(surface.subs(0.0, 0.0), surface.subs(0.0, 1.0)));
 
     assert!(StepParameterCurve::try_from(CurveTrimRef::new(&curve, &surface)).is_err());
     assert!(curve.exact_parameter_boundary_2d(&surface).is_none());

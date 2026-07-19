@@ -1,7 +1,5 @@
 use monstertruck_core::scalar::NumericScalar;
 
-use super::RangeTuple1D;
-
 /// Scalar-generic parametric curve.
 ///
 /// Mirrors [`crate::ParametricCurve`] but parameterizes the scalar type via the
@@ -25,5 +23,5 @@ pub trait ParametricCurve: Clone {
     /// `None` in default; `Some(period)` if periodic.
     fn period(&self) -> Option<Self::Scalar>;
     /// Returns the bounded parameter range as a tuple, or `None` if unbounded.
-    fn try_range_tuple(&self) -> Option<RangeTuple1D<Self::Scalar>>;
+    fn try_range_tuple(&self) -> Option<(Self::Scalar, Self::Scalar)>;
 }

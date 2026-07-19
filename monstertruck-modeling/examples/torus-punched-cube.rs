@@ -2,7 +2,6 @@
 //!
 //! Generated json file can be visualized by `simple-shape-viewer`, an example of `monstertruck-render`.
 
-use anyhow::Result;
 use monstertruck_modeling::*;
 use std::f64::consts::PI;
 
@@ -44,19 +43,20 @@ fn find_torus_boundary(bdds: &[Wire], idx: usize) -> Option<&Wire> {
         .find(|wire| wire[0].front().point()[idx].near(&0.0))
 }
 
-fn main() -> Result<()> {
+fn main() {
     let mut shell = cube_shell();
     let torus = torus_shell();
     let bdds = torus.extract_boundaries();
     let face = find_cube_face(&mut shell, -Vector3::unit_y()).unwrap();
     let bdd = find_torus_boundary(&bdds, 1).unwrap();
-    face.add_boundary(bdd.inverse())?;
+    face.add_boundary(bdd.inverse())
+        .expect("torus y-boundary should attach to cube face");
     let face = find_cube_face(&mut shell, -Vector3::unit_x()).unwrap();
     let bdd = find_torus_boundary(&bdds, 0).unwrap();
-    face.add_boundary(bdd.inverse())?;
+    face.add_boundary(bdd.inverse())
+        .expect("torus x-boundary should attach to cube face");
     shell.extend(torus);
     let solid = Solid::new(vec![shell]);
-    let json = serde_json::to_vec_pretty(&solid)?;
-    std::fs::write("torus-punched-cube.json", json)?;
-    Ok(())
+    let json = serde_json::to_vec_pretty(&solid).unwrap();
+    std::fs::write("torus-punched-cube.json", json).unwrap();
 }

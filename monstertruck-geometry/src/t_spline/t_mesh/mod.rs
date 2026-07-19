@@ -5,3 +5,6 @@ mod basis;
 mod core;
 mod ops;
 mod surface;
+
+#[cfg(test)]
+mod tests;

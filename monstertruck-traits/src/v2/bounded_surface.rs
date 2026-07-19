@@ -1,4 +1,4 @@
-use super::RangeTuple2D;
+use super::division::SurfaceParameterRange;
 use super::surface::ParametricSurface;
 
 /// Scalar-generic bounded parametric surface.
@@ -7,5 +7,5 @@ use super::surface::ParametricSurface;
 /// [`ParametricSurface`](super::ParametricSurface) trait.
 pub trait BoundedSurface: ParametricSurface {
     /// Returns the parameter range as `((u_start, u_end), (v_start, v_end))`.
-    fn range_tuple(&self) -> RangeTuple2D<Self::Scalar>;
+    fn range_tuple(&self) -> SurfaceParameterRange<Self::Scalar>;
 }

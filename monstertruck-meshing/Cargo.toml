@@ -1,6 +1,6 @@
 [package]
 name = "monstertruck-meshing"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["Moritz Moeller <virtualritz@protonmail.com>"]
 edition = "2024"
 description = "Tessellation and meshing algorithms for B-rep shapes"
@@ -44,7 +44,7 @@ anyhow = { workspace = true }
 proptest = { workspace = true }
 rand = { workspace = true }
 serde_json = { workspace = true }
-monstertruck-modeling = { path = "../monstertruck-modeling" }
+monstertruck-modeling = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 getrandom = { workspace = true }

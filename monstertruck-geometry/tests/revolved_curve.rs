@@ -12,32 +12,32 @@ fn revolve_test() {
         for j in 0..=N {
             let u = i as f64 / N as f64;
             let v = 2.0 * PI * j as f64 / N as f64;
-            let res = surface.evaluate(u, v);
+            let res = surface.subs(u, v);
             let ans = Point3::new(
                 u * f64::cos(v) + (1.0 - u) * f64::sin(v),
                 2.0 * (1.0 - u),
                 -u * f64::sin(v) + (1.0 - u) * f64::cos(v),
             );
             assert_near!(res, ans);
-            let res_uder = surface.derivative_u(u, v);
+            let res_uder = surface.uder(u, v);
             let ans_uder =
                 Vector3::new(f64::cos(v) - f64::sin(v), -2.0, -f64::sin(v) - f64::cos(v));
             assert_near!(res_uder, ans_uder);
-            let res_vder = surface.derivative_v(u, v);
+            let res_vder = surface.vder(u, v);
             let ans_vder = Vector3::new(
                 -u * f64::sin(v) + (1.0 - u) * f64::cos(v),
                 0.0,
                 -u * f64::cos(v) - (1.0 - u) * f64::sin(v),
             );
             assert_near!(res_vder, ans_vder);
-            let res_uuder = surface.derivative_uu(u, v);
+            let res_uuder = surface.uuder(u, v);
             let ans_uuder = Vector3::zero();
             assert_near!(res_uuder, ans_uuder);
-            let res_uvder = surface.derivative_uv(u, v);
+            let res_uvder = surface.uvder(u, v);
             let ans_uvder =
                 Vector3::new(-f64::sin(v) - f64::cos(v), 0.0, -f64::cos(v) + f64::sin(v));
             assert_near!(res_uvder, ans_uvder);
-            let res_vvder = surface.derivative_vv(u, v);
+            let res_vvder = surface.vvder(u, v);
             let ans_vvder = Vector3::new(
                 -u * f64::cos(v) - (1.0 - u) * f64::sin(v),
                 0.0,
@@ -60,7 +60,7 @@ fn search_parameter() {
     let surface = RevolutionSurface::by_revolution(line, Point3::origin(), Vector3::unit_y());
     let pt = Point3::new(-0.5, 1.0, 0.5);
     let (u, v) = surface.search_parameter(pt, Some((0.4, 1.2)), 100).unwrap();
-    assert_near!(surface.evaluate(u, v), pt);
+    assert_near!(surface.subs(u, v), pt);
 }
 
 #[test]
@@ -93,7 +93,7 @@ fn search_nearest_parameter() {
         vec![Point3::new(0.0, 2.0, 1.0), Point3::new(1.0, 0.0, 0.0)],
     );
     let surface = RevolutionSurface::by_revolution(line, Point3::origin(), Vector3::unit_y());
-    let pt = surface.evaluate(0.4, 1.2) + 0.1 * surface.normal(0.4, 1.2);
+    let pt = surface.subs(0.4, 1.2) + 0.1 * surface.normal(0.4, 1.2);
     let (u, v) = surface
         .search_nearest_parameter(pt, Some((0.4, 1.2)), 100)
         .unwrap();
@@ -170,8 +170,8 @@ fn include_curve_abnormal1() {
             Vector4::new(0.0, 0.0, 3.0, 1.0),
         ],
     ));
-    let pt0 = curve.evaluate(0.2);
-    let pt1 = curve.evaluate(0.6);
+    let pt0 = curve.subs(0.2);
+    let pt1 = curve.subs(0.6);
     let surface = RevolutionSurface::by_revolution(curve, Point3::origin(), Vector3::unit_y());
     let line = BsplineCurve::new(KnotVector::bezier_knot(1), vec![pt0, pt1]);
     assert!(!surface.include(&line));

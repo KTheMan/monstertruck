@@ -1,3 +1,10 @@
+//! Classic (0.3.2) face division.
+//!
+//! Ported verbatim from the published 0.3.2 crate's `transversal::divide_face`:
+//! projects each loop's edges into the face parameter domain, splits the face
+//! into positively oriented pre-faces with their contained holes, and tags each
+//! with its `and`/`or`/`unknown` status.
+
 #![allow(clippy::many_single_char_names)]
 
 use super::faces_classification::FacesClassification;
@@ -114,7 +121,7 @@ where
     Some(vec)
 }
 
-pub fn divide_faces<C, S>(
+pub(super) fn divide_faces<C, S>(
     shell: &Shell<Point3, C, S>,
     loops_store: &LoopsStore<Point3, C>,
     tol: f64,
@@ -142,6 +149,3 @@ where
         })?;
     Some(res)
 }
-
-#[cfg(test)]
-mod tests;

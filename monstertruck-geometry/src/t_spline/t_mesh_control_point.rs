@@ -29,7 +29,7 @@ impl<P> TmeshControlPoint<P> {
     // }
 
     /// Get an immutable reference to the connection on the side `dir`.
-    pub fn connection(&self, dir: TmeshDirection) -> &Option<TmeshConnection<P>> {
+    pub fn get(&self, dir: TmeshDirection) -> &Option<TmeshConnection<P>> {
         &self.connections[dir as usize]
     }
 
@@ -70,7 +70,7 @@ impl<P> TmeshControlPoint<P> {
     /// - `TmeshExistingConnection` if the connection is connected to another point.
     ///
     /// - `Ok` if the connection was modified.
-    pub fn set_edge_connection_weight(&mut self, dir: TmeshDirection, weight: f64) -> Result<()> {
+    pub fn set_edge_con_weight(&mut self, dir: TmeshDirection, weight: f64) -> Result<()> {
         if let Some(connection) = self.connection_mut(dir) {
             // If the connection is not an edge condition, return an error.
             if connection.0.is_some() {
@@ -171,14 +171,14 @@ impl<P> TmeshControlPoint<P> {
         let con = {
             let borrow = point.try_read().ok_or(Error::TmeshControlPointNotFound)?;
 
-            borrow.connection(dir).is_none()
+            borrow.get(dir).is_none()
         };
 
         // is connection dir.flip() for other none?
         let other_con = {
             let borrow = other.try_read().ok_or(Error::TmeshControlPointNotFound)?;
 
-            borrow.connection(dir.flip()).is_none()
+            borrow.get(dir.flip()).is_none()
         };
 
         // If both points have no connections in the relevant directions, connect them together
@@ -222,10 +222,10 @@ impl<P> TmeshControlPoint<P> {
     }
 
     /// Returns the connection type for `self` in the direction `dir`.
-    pub fn connection_type(&self, dir: TmeshDirection) -> TmeshConnectionType {
+    pub fn con_type(&self, dir: TmeshDirection) -> TmeshConnectionType {
         // The first option differentiates between a T-junction and a knotted (weighted)
         // connection (edge condition or connection to another point).
-        if let Some(con) = self.connection(dir).as_ref() {
+        if let Some(con) = self.get(dir).as_ref() {
             // This option differentiates between a point connection and an edge condition.
             if con.0.is_some() {
                 TmeshConnectionType::Point
@@ -244,9 +244,9 @@ impl<P> TmeshControlPoint<P> {
     ///
     /// - `Some(f64)` otherwise.
     pub fn connection_knot(&self, dir: TmeshDirection) -> Option<f64> {
-        match self.connection_type(dir) {
+        match self.con_type(dir) {
             TmeshConnectionType::Edge | TmeshConnectionType::Point => Some(
-                self.connection(dir)
+                self.get(dir)
                     .as_ref()
                     .expect("Edge and Point connection types must have a Some(TmeshConnection<P>)")
                     .1,
@@ -269,7 +269,7 @@ impl<P> TmeshControlPoint<P> {
     /// # Borrows
     /// Immutably borrows all points that are connected to `self` in direction `traverse` and connected to the
     /// face that `self` is connected to.
-    pub fn navigate_until_connection(
+    pub fn navigate_until_con(
         &self,
         traverse: TmeshDirection,
         monitor: TmeshDirection,
@@ -277,7 +277,7 @@ impl<P> TmeshControlPoint<P> {
         // Begin traversing (Think of this as a do while loop, where this let block is the
         // first "do" iteration)
         let (mut cur_point, mut knot_acc) = {
-            let first = self.connection(traverse);
+            let first = self.get(traverse);
 
             // Check initial conditions
             if let Some(con) = first {
@@ -299,16 +299,12 @@ impl<P> TmeshControlPoint<P> {
                 let borrow = cur_point.read();
 
                 // Found the desired connection
-                if borrow
-                    .connection(monitor)
-                    .as_ref()
-                    .is_some_and(|c| c.0.is_some())
-                {
+                if borrow.get(monitor).as_ref().is_some_and(|c| c.0.is_some()) {
                     break 'traverse;
                 }
 
                 // Check for T-junction
-                if let Some(con) = borrow.connection(traverse) {
+                if let Some(con) = borrow.get(traverse) {
                     // Check for edge condition
                     if let Some(point) = con.0.as_ref() {
                         knot_acc += con.1;
@@ -338,7 +334,7 @@ impl<P> TmeshControlPoint<P> {
         dir: TmeshDirection,
     ) -> Result<Arc<RwLock<TmeshControlPoint<P>>>> {
         let connected_point = &self
-            .connection(dir)
+            .get(dir)
             .as_ref()
             .ok_or(Error::TmeshConnectionNotFound)?
             .0
@@ -357,7 +353,7 @@ impl<P> TmeshControlPoint<P> {
     /// If there is no point connected to self in direction `dir`.
     pub fn connected_point(&self, dir: TmeshDirection) -> Arc<RwLock<TmeshControlPoint<P>>> {
         let connected_point = &self
-            .connection(dir)
+            .get(dir)
             .as_ref()
             .ok_or(Error::TmeshConnectionNotFound)
             .expect("Point connections require a connection")
@@ -382,7 +378,7 @@ where P: Debug
             // Write direction
             write!(f, "\t{}: ", dir)?;
 
-            if let Some(con) = self.connection(dir).as_ref() {
+            if let Some(con) = self.get(dir).as_ref() {
                 if let Some(ref point_rc) = con.0 {
                     // Connection to another point.
                     let point_borrow = point_rc.read();

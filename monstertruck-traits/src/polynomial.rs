@@ -188,11 +188,7 @@ impl<P: EuclideanSpace<Scalar = f64>> BoundedSurface for PolynomialSurface<P> {}
 impl<P> ParameterDivision2D for PolynomialSurface<P>
 where P: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64> + HashGen<f64>
 {
-    fn parameter_division(
-        &self,
-        range: ((f64, f64), (f64, f64)),
-        tol: f64,
-    ) -> (Vec<f64>, Vec<f64>) {
+    fn parameter_division(&self, range: SurfaceParameterRange, tol: f64) -> (Vec<f64>, Vec<f64>) {
         algo::surface::parameter_division(self, range, tol)
     }
 }

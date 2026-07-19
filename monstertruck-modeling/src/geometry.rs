@@ -1,8 +1,9 @@
 use super::*;
 use derive_more::From;
+use monstertruck_core::{ContentHasher, DeterministicContentHash};
 use monstertruck_geometry::prelude::{
-    BoundaryCurve2D, SupportsExactPatchDomains, TryIntoBsplineSurface,
-    TryIntoHomogeneousBsplineCurve, TryIntoHomogeneousBsplineSurface,
+    AnalyticSurfaceKind, BoundaryCurve2D, SupportsExactPatchDomains, TryIntoAnalyticSurfaceKind,
+    TryIntoBsplineSurface, TryIntoHomogeneousBsplineCurve, TryIntoHomogeneousBsplineSurface,
 };
 #[doc(hidden)]
 pub use monstertruck_geometry::prelude::{algo, inv_or_zero};
@@ -13,7 +14,12 @@ use monstertruck_topology::trimmed::{TrimmedFace, TrimmedShell, TrimmedSolid};
 use monstertruck_traits::SnapCurveEndpoints;
 #[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
+use rustc_hash::FxHashMap as HashMap;
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
+use std::hash::Hasher;
+use std::time::Instant;
+use std::{env, iter};
 
 type ModelSurfaceCurve = SurfaceCurve<
     Box<Curve>,
@@ -22,6 +28,13 @@ type ModelSurfaceCurve = SurfaceCurve<
     ParameterCurve<Curve2D, Box<Surface>>,
     ParameterCurve<Curve2D, Box<Surface>>,
 >;
+type ModelTrimCurve = ParameterCurve<Curve2D, Box<Surface>>;
+type ExactTrimCacheKey = (u64, u64);
+
+thread_local! {
+    static EXACT_NURBS_REVOLUTION_TRIM_CACHE: RefCell<HashMap<ExactTrimCacheKey, Option<ModelTrimCurve>>> =
+        RefCell::new(HashMap::default());
+}
 
 /// 3-dimensional curve
 #[derive(
@@ -136,9 +149,9 @@ fn sample_curve_to_nurbs(curve: &(impl ParametricCurve3D + BoundedCurve)) -> Nur
         .collect();
     let knots: Vec<f64> = (0..=samples).map(|i| i as f64 / samples as f64).collect();
     let knot_vec = KnotVector::from(
-        std::iter::once(0.0)
+        iter::once(0.0)
             .chain(knots.iter().copied())
-            .chain(std::iter::once(1.0))
+            .chain(iter::once(1.0))
             .collect::<Vec<_>>(),
     );
     NurbsCurve::from(BsplineCurve::new(knot_vec, points))
@@ -194,6 +207,194 @@ fn sampled_parameter_boundary(
         })
 }
 
+fn line_points(line: Line<Point2>, tolerance: f64) -> Vec<Point2> {
+    line.parameter_division(line.range_tuple(), tolerance).1
+}
+
+fn point_segment_distance2_2d(point: Point2, start: Point2, end: Point2) -> f64 {
+    let edge = end - start;
+    let len2 = edge.magnitude2();
+    if len2 <= TOLERANCE * TOLERANCE {
+        point.distance2(start)
+    } else {
+        let t = ((point - start).dot(edge) / len2).clamp(0.0, 1.0);
+        point.distance2(start + edge * t)
+    }
+}
+
+fn points_are_linear_2d(
+    points: impl IntoIterator<Item = Point2>,
+    start: Point2,
+    end: Point2,
+    tolerance: f64,
+) -> bool {
+    let tolerance2 = tolerance.max(TOLERANCE).powi(2);
+    points
+        .into_iter()
+        .all(|point| point_segment_distance2_2d(point, start, end) <= tolerance2)
+}
+
+fn homogeneous_point2(control: Vector3) -> Option<Point2> {
+    (control.z.abs() > f64::EPSILON)
+        .then(|| Point2::new(control.x / control.z, control.y / control.z))
+        .filter(|point| point.x.is_finite() && point.y.is_finite())
+}
+
+fn linear_curve2d_boundary(curve: &Curve2D, tolerance: f64) -> Option<Line<Point2>> {
+    let range = curve.range_tuple();
+    let start = curve.subs(range.0);
+    let end = curve.subs(range.1);
+    match curve {
+        Curve2D::Line(line) => Some(*line),
+        Curve2D::Polyline(polyline) => {
+            points_are_linear_2d(polyline.as_slice().iter().copied(), start, end, tolerance)
+                .then_some(Line(start, end))
+        }
+        Curve2D::BsplineCurve(curve) => points_are_linear_2d(
+            curve.control_points().iter().copied(),
+            start,
+            end,
+            tolerance,
+        )
+        .then_some(Line(start, end)),
+        Curve2D::NurbsCurve(curve) => curve
+            .control_points()
+            .iter()
+            .copied()
+            .map(homogeneous_point2)
+            .collect::<Option<Vec<_>>>()
+            .filter(|points| points_are_linear_2d(points.iter().copied(), start, end, tolerance))
+            .map(|_| Line(start, end)),
+        Curve2D::Conic(_) => None,
+    }
+}
+
+fn parameter_curve_points(
+    boundary: &ParameterCurve<Curve2D, Box<Surface>>,
+    tolerance: f64,
+) -> Vec<Point2> {
+    linear_curve2d_boundary(boundary.curve(), tolerance)
+        .map(|line| line_points(line, tolerance))
+        .unwrap_or_else(|| {
+            boundary
+                .curve()
+                .parameter_division(boundary.curve().range_tuple(), tolerance)
+                .1
+        })
+}
+
+fn boundary_matches_surface_curve(
+    leader: &Curve,
+    boundary: &ParameterCurve<Curve2D, Box<Surface>>,
+    surface: &Surface,
+) -> bool {
+    let leader_range = leader.range_tuple();
+    let boundary_range = boundary.curve().range_tuple();
+    [0.0, 0.5, 1.0].into_iter().all(|s| {
+        let leader_t = leader_range.0 + (leader_range.1 - leader_range.0) * s;
+        let boundary_t = boundary_range.0 + (boundary_range.1 - boundary_range.0) * s;
+        let uv = boundary.curve().subs(boundary_t);
+        surface.subs(uv.x, uv.y).near(&leader.subs(leader_t))
+    })
+}
+
+fn boundary_curve_orientation<C>(curve: &C, boundary: &C) -> Option<bool>
+where C: ParametricCurve<Point = Point3> + BoundedCurve<Point = Point3> {
+    let curve_range = curve.range_tuple();
+    let boundary_range = boundary.range_tuple();
+    let samples = [0.0, 0.25, 0.5, 0.75, 1.0];
+    let curve_t = |s: f64| curve_range.0 + (curve_range.1 - curve_range.0) * s;
+    let boundary_t = |s: f64| boundary_range.0 + (boundary_range.1 - boundary_range.0) * s;
+    let forward = samples.iter().copied().all(|s| {
+        curve
+            .evaluate(curve_t(s))
+            .near(&boundary.evaluate(boundary_t(s)))
+    });
+    if forward {
+        Some(false)
+    } else {
+        samples
+            .iter()
+            .copied()
+            .all(|s| {
+                curve
+                    .evaluate(curve_t(s))
+                    .near(&boundary.evaluate(boundary_t(1.0 - s)))
+            })
+            .then_some(true)
+    }
+}
+
+fn orient_boundary_line(line: Line<Point2>, reversed: bool) -> Line<Point2> {
+    if reversed { Line(line.1, line.0) } else { line }
+}
+
+fn direct_bspline_boundary_line(
+    curve: &BsplineCurve<Point3>,
+    surface: &BsplineSurface<Point3>,
+) -> Option<Line<Point2>> {
+    let (u_range, v_range) = surface.try_range_tuple();
+    let ((u0, u1), (v0, v1)) = (u_range?, v_range?);
+    let last_u = surface.control_points().len().checked_sub(1)?;
+    let last_v = surface.control_points().first()?.len().checked_sub(1)?;
+    [
+        (
+            surface.column_curve(0),
+            Line(Point2::new(u0, v0), Point2::new(u0, v1)),
+        ),
+        (
+            surface.column_curve(last_u),
+            Line(Point2::new(u1, v0), Point2::new(u1, v1)),
+        ),
+        (
+            surface.row_curve(0),
+            Line(Point2::new(u0, v0), Point2::new(u1, v0)),
+        ),
+        (
+            surface.row_curve(last_v),
+            Line(Point2::new(u0, v1), Point2::new(u1, v1)),
+        ),
+    ]
+    .into_iter()
+    .find_map(|(boundary, line)| {
+        boundary_curve_orientation(curve, &boundary)
+            .map(|reversed| orient_boundary_line(line, reversed))
+    })
+}
+
+fn direct_nurbs_boundary_line(
+    curve: &NurbsCurve<Vector4>,
+    surface: &NurbsSurface<Vector4>,
+) -> Option<Line<Point2>> {
+    let (u_range, v_range) = surface.try_range_tuple();
+    let ((u0, u1), (v0, v1)) = (u_range?, v_range?);
+    let last_u = surface.control_points().len().checked_sub(1)?;
+    let last_v = surface.control_points().first()?.len().checked_sub(1)?;
+    [
+        (
+            surface.column_curve(0),
+            Line(Point2::new(u0, v0), Point2::new(u0, v1)),
+        ),
+        (
+            surface.column_curve(last_u),
+            Line(Point2::new(u1, v0), Point2::new(u1, v1)),
+        ),
+        (
+            surface.row_curve(0),
+            Line(Point2::new(u0, v0), Point2::new(u1, v0)),
+        ),
+        (
+            surface.row_curve(last_v),
+            Line(Point2::new(u0, v1), Point2::new(u1, v1)),
+        ),
+    ]
+    .into_iter()
+    .find_map(|(boundary, line)| {
+        boundary_curve_orientation(curve, &boundary)
+            .map(|reversed| orient_boundary_line(line, reversed))
+    })
+}
+
 fn curve2d_from_sampled_boundary(points: Vec<Point2>) -> Option<Curve2D> {
     if points.len() < 2 {
         None
@@ -210,9 +411,9 @@ fn curve2d_from_sampled_boundary(points: Vec<Point2>) -> Option<Curve2D> {
         } else {
             let denom = (points.len() - 1) as f64;
             let knot_vec = KnotVector::from(
-                std::iter::once(0.0)
+                iter::once(0.0)
                     .chain((0..points.len()).map(|index| index as f64 / denom))
-                    .chain(std::iter::once(1.0))
+                    .chain(iter::once(1.0))
                     .collect::<Vec<_>>(),
             );
             Some(Curve2D::BsplineCurve(BsplineCurve::new(knot_vec, points)))
@@ -220,9 +421,17 @@ fn curve2d_from_sampled_boundary(points: Vec<Point2>) -> Option<Curve2D> {
     }
 }
 
+fn content_hash64<T: DeterministicContentHash>(value: &T) -> u64 {
+    let mut hasher = ContentHasher::default();
+    value.content_hash(&mut hasher);
+    hasher.finish()
+}
+
 fn same_surface(lhs: &Surface, rhs: &Surface) -> bool {
     if std::mem::discriminant(lhs) != std::mem::discriminant(rhs) {
         false
+    } else if content_hash64(lhs) == content_hash64(rhs) {
+        true
     } else if let (Some((lu0, lu1)), Some((lv0, lv1)), Some((ru0, ru1)), Some((rv0, rv1))) = (
         lhs.try_range_tuple().0,
         lhs.try_range_tuple().1,
@@ -250,6 +459,24 @@ fn exact_line_boundary(
             let (curve, plane) = boundary.decompose();
             ParameterCurve::new(Curve2D::Line(curve), Box::new(Surface::Plane(plane)))
         }),
+        Surface::BsplineSurface(surface) => {
+            line.exact_parameter_boundary_2d(surface).map(|boundary| {
+                let (curve, surface) = boundary.decompose();
+                ParameterCurve::new(
+                    Curve2D::Line(curve),
+                    Box::new(Surface::BsplineSurface(surface)),
+                )
+            })
+        }
+        Surface::NurbsSurface(surface) => {
+            line.exact_parameter_boundary_2d(surface).map(|boundary| {
+                let (curve, surface) = boundary.decompose();
+                ParameterCurve::new(
+                    Curve2D::Line(curve),
+                    Box::new(Surface::NurbsSurface(surface)),
+                )
+            })
+        }
         Surface::RevolutionSurface(surface) => {
             line.exact_parameter_boundary_2d(surface).map(|boundary| {
                 let (curve, surface) = boundary.decompose();
@@ -290,10 +517,7 @@ fn exact_bspline_boundary(
     }
 }
 
-fn exact_nurbs_boundary(
-    curve: &NurbsCurve<Vector4>,
-    surface: &Surface,
-) -> Option<ParameterCurve<Curve2D, Box<Surface>>> {
+fn exact_nurbs_boundary(curve: &NurbsCurve<Vector4>, surface: &Surface) -> Option<ModelTrimCurve> {
     match surface {
         Surface::NurbsSurface(surface) => {
             curve.exact_parameter_boundary_2d(surface).map(|boundary| {
@@ -305,16 +529,31 @@ fn exact_nurbs_boundary(
             })
         }
         Surface::RevolutionSurface(surface) => {
-            curve.exact_parameter_boundary_2d(surface).map(|boundary| {
+            cached_exact_nurbs_boundary_on_revolution_surface(curve, surface)
+        }
+        _ => None,
+    }
+}
+
+fn cached_exact_nurbs_boundary_on_revolution_surface(
+    curve: &NurbsCurve<Vector4>,
+    surface: &Processor<RevolutionSurface<Curve>, Matrix4>,
+) -> Option<ModelTrimCurve> {
+    let key = (content_hash64(curve), content_hash64(surface));
+    EXACT_NURBS_REVOLUTION_TRIM_CACHE.with(|cache| {
+        let cached = cache.borrow().get(&key).cloned();
+        cached.unwrap_or_else(|| {
+            let result = curve.exact_parameter_boundary_2d(surface).map(|boundary| {
                 let (curve, surface) = boundary.decompose();
                 ParameterCurve::new(
                     Curve2D::Line(curve),
                     Box::new(Surface::RevolutionSurface(surface)),
                 )
-            })
-        }
-        _ => None,
-    }
+            });
+            cache.borrow_mut().insert(key, result.clone());
+            result
+        })
+    })
 }
 
 impl Transformed<Matrix4> for Curve {
@@ -329,8 +568,8 @@ impl Transformed<Matrix4> for Curve {
 impl ParameterDivision1D for Curve {
     type Point = Point3;
     fn parameter_division(&self, range: (f64, f64), tol: f64) -> (Vec<f64>, Vec<Self::Point>) {
-        let debug_profile = std::env::var("MT_PROFILE_CURVE_DIVISION").is_ok();
-        let started = std::time::Instant::now();
+        let debug_profile = env::var("MT_PROFILE_CURVE_DIVISION").is_ok();
+        let started = Instant::now();
         let result = match self {
             Curve::Line(curve) => curve.parameter_division(range, tol),
             Curve::BsplineCurve(curve) => linear_bspline_division(curve, range)
@@ -619,62 +858,56 @@ impl TryFrom<ParameterCurve<Line<Point2>, Surface>> for Curve {
 impl ParameterBoundary2D<Surface> for Curve {
     fn parameter_boundary_2d(&self, surface: &Surface, tolerance: f64) -> Option<Vec<Point2>> {
         match self {
-            Curve::Line(curve) => {
-                sampled_parameter_boundary(curve, surface, tolerance).or_else(|| {
-                    exact_line_boundary(curve, surface).map(|boundary| {
-                        boundary
-                            .curve()
-                            .parameter_division(boundary.curve().range_tuple(), tolerance)
-                            .1
-                    })
-                })
-            }
-            Curve::BsplineCurve(curve) => sampled_parameter_boundary(curve, surface, tolerance)
+            Curve::Line(curve) => exact_line_boundary(curve, surface)
+                .map(|boundary| parameter_curve_points(&boundary, tolerance))
+                .or_else(|| sampled_parameter_boundary(curve, surface, tolerance)),
+            Curve::BsplineCurve(curve) => exact_bspline_boundary(curve, surface)
+                .map(|boundary| parameter_curve_points(&boundary, tolerance))
                 .or_else(|| {
-                    exact_bspline_boundary(curve, surface).map(|boundary| {
-                        boundary
-                            .curve()
-                            .parameter_division(boundary.curve().range_tuple(), tolerance)
-                            .1
-                    })
-                }),
-            Curve::NurbsCurve(curve) => sampled_parameter_boundary(curve, surface, tolerance)
-                .or_else(|| {
-                    exact_nurbs_boundary(curve, surface).map(|boundary| {
-                        boundary
-                            .curve()
-                            .parameter_division(boundary.curve().range_tuple(), tolerance)
-                            .1
-                    })
-                }),
-            Curve::ParameterCurve(curve) => {
-                same_surface(curve.surface().as_ref(), surface).then(|| {
-                    curve
-                        .curve()
-                        .parameter_division(curve.curve().range_tuple(), tolerance)
-                        .1
+                    if let Surface::BsplineSurface(bspline_surface) = surface {
+                        direct_bspline_boundary_line(curve, bspline_surface)
+                            .map(|line| line_points(line, tolerance))
+                    } else {
+                        None
+                    }
                 })
-            }
+                .or_else(|| sampled_parameter_boundary(curve, surface, tolerance)),
+            Curve::NurbsCurve(curve) => exact_nurbs_boundary(curve, surface)
+                .map(|boundary| parameter_curve_points(&boundary, tolerance))
+                .or_else(|| {
+                    if let Surface::NurbsSurface(nurbs_surface) = surface {
+                        direct_nurbs_boundary_line(curve, nurbs_surface)
+                            .map(|line| line_points(line, tolerance))
+                    } else {
+                        None
+                    }
+                })
+                // Fall back to a sampled polyline trim on surfaces the exact and
+                // direct-line paths do not cover (notably planar caps, whose
+                // circular boundary arcs are `NurbsCurve`s on a `Surface::Plane`).
+                // Without this the cap arcs yield no parameter curve and drop from
+                // downstream NURBS export. Mirrors the `Line`/`BsplineCurve` arms.
+                .or_else(|| sampled_parameter_boundary(curve, surface, tolerance)),
+            Curve::ParameterCurve(curve) => same_surface(curve.surface().as_ref(), surface)
+                .then(|| parameter_curve_points(curve, tolerance)),
             Curve::IntersectionCurve(curve) => {
-                if same_surface(curve.surface0().as_ref(), surface) {
+                if let Some(boundary) = curve.boundary0().filter(|boundary| {
+                    boundary_matches_surface_curve(curve.leader().as_ref(), boundary, surface)
+                }) {
+                    Some(parameter_curve_points(boundary, tolerance))
+                } else if let Some(boundary) = curve.boundary1().filter(|boundary| {
+                    boundary_matches_surface_curve(curve.leader().as_ref(), boundary, surface)
+                }) {
+                    Some(parameter_curve_points(boundary, tolerance))
+                } else if same_surface(curve.surface0().as_ref(), surface) {
                     curve
                         .boundary0()
-                        .map(|boundary| {
-                            boundary
-                                .curve()
-                                .parameter_division(boundary.curve().range_tuple(), tolerance)
-                                .1
-                        })
+                        .map(|boundary| parameter_curve_points(boundary, tolerance))
                         .or_else(|| curve.leader().parameter_boundary_2d(surface, tolerance))
                 } else if same_surface(curve.surface1().as_ref(), surface) {
                     curve
                         .boundary1()
-                        .map(|boundary| {
-                            boundary
-                                .curve()
-                                .parameter_division(boundary.curve().range_tuple(), tolerance)
-                                .1
-                        })
+                        .map(|boundary| parameter_curve_points(boundary, tolerance))
                         .or_else(|| curve.leader().parameter_boundary_2d(surface, tolerance))
                 } else {
                     sampled_parameter_boundary(curve.leader().as_ref(), surface, tolerance)
@@ -729,8 +962,8 @@ impl Curve {
         surface: &Surface,
         tolerance: f64,
     ) -> Option<ParameterCurve<Curve2D, Box<Surface>>> {
-        let debug_profile = std::env::var("MT_PROFILE_PARAMETER_CURVE_ON").is_ok();
-        let started = std::time::Instant::now();
+        let debug_profile = env::var("MT_PROFILE_PARAMETER_CURVE_ON").is_ok();
+        let started = Instant::now();
         let exact = self.exact_parameter_boundary_2d(surface);
         let exact_hit = exact.is_some();
         let result = exact.or_else(|| {
@@ -1152,6 +1385,147 @@ impl ToSameGeometry<Surface> for RevolutionSurface<Curve> {
     }
 }
 
+fn transform_preserves_nearest_parameter(transform: &Matrix4) -> bool {
+    let tol = 1.0e-10;
+    let x = Vector3::new(transform.x.x, transform.x.y, transform.x.z);
+    let y = Vector3::new(transform.y.x, transform.y.y, transform.y.z);
+    let z = Vector3::new(transform.z.x, transform.z.y, transform.z.z);
+    let scale2 = x.magnitude2();
+    scale2 > tol
+        && f64::abs(y.magnitude2() - scale2) <= tol
+        && f64::abs(z.magnitude2() - scale2) <= tol
+        && f64::abs(x.dot(y)) <= tol
+        && f64::abs(x.dot(z)) <= tol
+        && f64::abs(y.dot(z)) <= tol
+        && f64::abs(transform.x.w) <= tol
+        && f64::abs(transform.y.w) <= tol
+        && f64::abs(transform.z.w) <= tol
+        && f64::abs(transform.w.w - 1.0) <= tol
+}
+
+fn revolution_surface_nearest_parameter(
+    surface: &Processor<RevolutionSurface<Curve>, Matrix4>,
+    point: Point3,
+    hint: SearchParameterHint2D,
+    trials: usize,
+) -> Option<(f64, f64)> {
+    if env::var("MT_BOOL_DISABLE_REVOLUTION_NEAREST_FAST_PATH").is_err()
+        && transform_preserves_nearest_parameter(surface.transform())
+    {
+        let inv = surface.transform().inverse_transform()?;
+        let point = inv.transform_point(point);
+        let uv = surface
+            .entity()
+            .search_nearest_parameter(point, hint, trials)?;
+        Some(if surface.orientation() {
+            uv
+        } else {
+            (uv.1, uv.0)
+        })
+    } else {
+        surface.search_nearest_parameter(point, hint, trials)
+    }
+}
+
+/// Separable presearch for a revolved-curve surface, bit-identical to the generic
+/// [`algo::surface::presearch`] over the same `Processor<RevolutionSurface<..>, Matrix4>`.
+///
+/// `Processor::evaluate(u, v)` expands (per `orientation`) to
+/// `transform(origin + rotation(angle) * (curve(param) - origin))`, where the
+/// NURBS/basis `curve(param)` evaluation depends only on one grid axis and the
+/// sincos-built `rotation(angle)` matrix only on the other. The generic grid scan
+/// re-derives both `division + 1` times per grid line; this hoists each out of the
+/// `O(division^2)` inner loop, computing every distinct `curve(param)` and
+/// `rotation(angle)` exactly once and reusing it across the crossing line -- the
+/// same waste `NurbsSurface::presearch_separable` removes for tensor-product NURBS,
+/// which never covered the revolved-curve surface path.
+///
+/// Everything that decides the result is unchanged: the same grid nodes (`u`, `v`
+/// from the identical expressions), the identical evaluation arithmetic
+/// (`transform.transform_point(origin + rotation * (curve - origin))`), the same
+/// `distance2` metric, and the same strict-`<` first-minimum tie-break. The
+/// returned `(u, v)` -- and therefore every downstream Newton seed -- is
+/// byte-for-byte identical to the generic presearch.
+fn revolution_processor_presearch_separable(
+    rotted: &Processor<RevolutionSurface<Curve>, Matrix4>,
+    point: Point3,
+    (urange, vrange): ((f64, f64), (f64, f64)),
+    division: usize,
+) -> (f64, f64) {
+    let revolution = rotted.entity();
+    let transform = rotted.transform();
+    let origin = revolution.origin();
+    let axis = revolution.axis();
+    let curve = revolution.entity_curve();
+    let ((u0, u1), (v0, v1)) = (urange, vrange);
+    // Identical to the generic presearch's grid-node expression.
+    let node = |bound0: f64, bound1: f64, index: usize| {
+        let t = index as f64 / division as f64;
+        bound0 * (1.0 - t) + bound1 * t
+    };
+    // Each expensive separable factor is derived once per grid line and reused
+    // across the crossing line (the hoist), then paired with its node value so the
+    // loops iterate by value -- no range-indexing. `Processor::evaluate(u, v)` feeds
+    // (curve arg, rotation arg) = (u, v) when `orientation`, else (v, u), so the two
+    // factors bind to opposite axes per orientation; the returned node and the
+    // outer=`u`/inner=`v` iteration order stay fixed to reproduce the generic
+    // presearch's argmin and strict-`<` first-minimum tie-break exactly.
+    let mut res = (0.0, 0.0);
+    let mut min = f64::INFINITY;
+    if rotted.orientation() {
+        // evaluate(u, v) = transform(origin + rotation(v) * (curve(u) - origin)).
+        let curve_by_u: Vec<(f64, Point3)> = (0..=division)
+            .map(|i| {
+                let u = node(u0, u1, i);
+                (u, curve.evaluate(u))
+            })
+            .collect();
+        let rotation_by_v: Vec<(f64, Matrix3)> = (0..=division)
+            .map(|j| {
+                let v = node(v0, v1, j);
+                (v, Matrix3::from_axis_angle(axis, Rad(v)))
+            })
+            .collect();
+        for &(u, curve_point) in &curve_by_u {
+            for &(v, rotation) in &rotation_by_v {
+                let dist = transform
+                    .transform_point(origin + rotation * (curve_point - origin))
+                    .distance2(point);
+                if dist < min {
+                    min = dist;
+                    res = (u, v);
+                }
+            }
+        }
+    } else {
+        // evaluate(u, v) = transform(origin + rotation(u) * (curve(v) - origin)).
+        let rotation_by_u: Vec<(f64, Matrix3)> = (0..=division)
+            .map(|i| {
+                let u = node(u0, u1, i);
+                (u, Matrix3::from_axis_angle(axis, Rad(u)))
+            })
+            .collect();
+        let curve_by_v: Vec<(f64, Point3)> = (0..=division)
+            .map(|j| {
+                let v = node(v0, v1, j);
+                (v, curve.evaluate(v))
+            })
+            .collect();
+        for &(u, rotation) in &rotation_by_u {
+            for &(v, curve_point) in &curve_by_v {
+                let dist = transform
+                    .transform_point(origin + rotation * (curve_point - origin))
+                    .distance2(point);
+                if dist < min {
+                    min = dist;
+                    res = (u, v);
+                }
+            }
+        }
+    }
+    res
+}
+
 impl SearchNearestParameter<SurfaceParameter> for Surface {
     type Point = Point3;
     fn search_nearest_parameter<H: Into<SearchParameterHint2D>>(
@@ -1170,22 +1544,26 @@ impl SearchNearestParameter<SurfaceParameter> for Surface {
                 surface.search_nearest_parameter(point, hint, trials)
             }
             Surface::RevolutionSurface(rotted) => {
-                let hint = match hint.into() {
-                    SearchParameterHint2D::Parameter(hint0, hint1) => (hint0, hint1),
-                    SearchParameterHint2D::Range(x, y) => {
-                        algo::surface::presearch(rotted, point, (x, y), 100)
-                    }
-                    SearchParameterHint2D::None => {
-                        algo::surface::presearch(rotted, point, rotted.range_tuple(), 100)
-                    }
-                };
-                algo::surface::search_nearest_parameter(rotted, point, hint, trials).or_else(|| {
-                    let candidate = rotted.evaluate(hint.0, hint.1);
-                    if candidate.near(&point) {
-                        Some(hint)
-                    } else {
-                        None
-                    }
+                let hint = hint.into();
+                revolution_surface_nearest_parameter(rotted, point, hint, trials).or_else(|| {
+                    let hint = match hint {
+                        SearchParameterHint2D::Parameter(hint0, hint1) => (hint0, hint1),
+                        SearchParameterHint2D::Range(x, y) => {
+                            revolution_processor_presearch_separable(rotted, point, (x, y), 100)
+                        }
+                        SearchParameterHint2D::None => revolution_processor_presearch_separable(
+                            rotted,
+                            point,
+                            rotted.range_tuple(),
+                            100,
+                        ),
+                    };
+                    algo::surface::search_nearest_parameter(rotted, point, hint, trials).or_else(
+                        || {
+                            let candidate = rotted.evaluate(hint.0, hint.1);
+                            candidate.near(&point).then_some(hint)
+                        },
+                    )
                 })
             }
         }
@@ -1218,7 +1596,25 @@ impl TryIntoHomogeneousBsplineSurface for Surface {
 
 impl SupportsExactPatchDomains for Surface {
     fn supports_exact_patch_domains(&self) -> bool {
-        matches!(self, Surface::BsplineSurface(_) | Surface::NurbsSurface(_))
+        match self {
+            Surface::Plane(p) => p.supports_exact_patch_domains(),
+            Surface::BsplineSurface(b) => b.supports_exact_patch_domains(),
+            Surface::NurbsSurface(n) => n.supports_exact_patch_domains(),
+            Surface::RevolutionSurface(r) => r.supports_exact_patch_domains(),
+            Surface::TsplineSurface(t) => t.supports_exact_patch_domains(),
+        }
+    }
+}
+
+impl TryIntoAnalyticSurfaceKind for Surface {
+    fn try_into_analytic_surface_kind(&self) -> Option<AnalyticSurfaceKind> {
+        match self {
+            Surface::Plane(p) => p.try_into_analytic_surface_kind(),
+            Surface::BsplineSurface(b) => b.try_into_analytic_surface_kind(),
+            Surface::NurbsSurface(n) => n.try_into_analytic_surface_kind(),
+            Surface::RevolutionSurface(r) => r.try_into_analytic_surface_kind(),
+            Surface::TsplineSurface(t) => t.try_into_analytic_surface_kind(),
+        }
     }
 }
 
@@ -1259,8 +1655,8 @@ impl ToSameGeometry<Surface> for ExtrusionSurface<Curve, Vector3> {
 // Deterministic content hashing for modeling enums.
 // ---------------------------------------------------------------------------
 
-impl monstertruck_core::DeterministicContentHash for Conic2D {
-    fn content_hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl DeterministicContentHash for Conic2D {
+    fn content_hash<H: Hasher>(&self, state: &mut H) {
         match self {
             Self::Ellipse(v) => {
                 state.write_u8(0);
@@ -1278,8 +1674,8 @@ impl monstertruck_core::DeterministicContentHash for Conic2D {
     }
 }
 
-impl monstertruck_core::DeterministicContentHash for Curve2D {
-    fn content_hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl DeterministicContentHash for Curve2D {
+    fn content_hash<H: Hasher>(&self, state: &mut H) {
         match self {
             Self::Line(v) => {
                 state.write_u8(0);
@@ -1305,8 +1701,8 @@ impl monstertruck_core::DeterministicContentHash for Curve2D {
     }
 }
 
-impl monstertruck_core::DeterministicContentHash for Curve {
-    fn content_hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl DeterministicContentHash for Curve {
+    fn content_hash<H: Hasher>(&self, state: &mut H) {
         match self {
             Self::Line(v) => {
                 state.write_u8(0);
@@ -1332,8 +1728,8 @@ impl monstertruck_core::DeterministicContentHash for Curve {
     }
 }
 
-impl monstertruck_core::DeterministicContentHash for Surface {
-    fn content_hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl DeterministicContentHash for Surface {
+    fn content_hash<H: Hasher>(&self, state: &mut H) {
         match self {
             Self::Plane(v) => {
                 state.write_u8(0);

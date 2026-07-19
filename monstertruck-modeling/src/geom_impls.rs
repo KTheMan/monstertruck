@@ -236,7 +236,7 @@ mod test_geom_impl {
             // Any point on the curve is on the same side as point `p2`.
             // Check by the circular angle theorem.
             let (t0, t1) = curve.range_tuple();
-            let p3 = curve.evaluate((1.0 - t) * t0 + t * t1);
+            let p3 = curve.subs((1.0 - t) * t0 + t * t1);
             let angle2 = (p2 - p1).angle(p2 - p0);
             let angle3 = (p3 - p1).angle(p3 - p0);
             prop_assert_near!(angle2, angle3);
@@ -252,9 +252,20 @@ mod test_geom_impl {
             let p0 = Point3::from(p0);
             let p1 = Point3::from(p1);
             let tangent = Vector3::from(tangent);
-            prop_assume!(!(p1 - p0).so_small());
+            let chord = p1 - p0;
+            prop_assume!(!chord.so_small());
             prop_assume!(!tangent.so_small());
-            prop_assume!(!tangent.cross(p1 - p0).so_small());
+            // Exclude the near-degenerate neighbourhood where the tangent is
+            // (anti-)parallel to the chord. The old guard tested the *raw* cross
+            // product, whose magnitude scales with |tangent|*|chord|, so it
+            // admitted vanishingly small tangent/chord angles -- and the radius
+            // R = |chord|/(2 sin(theta)) then explodes toward infinity, which no
+            // finite-precision co-circularity check can certify. Bound the
+            // *angle* directly (scale-invariant); this mirrors the constructor's
+            // own `CircularArcTangentParallelToChord` degeneracy and keeps the
+            // radius bounded so the reconstruction below stays well-conditioned.
+            let sin_angle = tangent.normalize().cross(chord.normalize()).magnitude();
+            prop_assume!(sin_angle > 1.0e-3);
 
             let curve = try_circle_arc_by_start_tangent(p0, p1, tangent)
                 .expect("non-degenerate inputs must yield a valid arc.");
@@ -266,13 +277,23 @@ mod test_geom_impl {
             // The start tangent direction matches the requested one.
             prop_assert_near!(curve.derivative(t0).normalize(), tangent.normalize());
 
-            // Any third sample is co-circular with the endpoints.
+            // Any sample is co-circular with the endpoints. Reconstruct the
+            // reference circle from a *well-separated* triple -- the two
+            // endpoints and the arc midpoint -- because `circum_center` is
+            // catastrophically ill-conditioned once its three inputs are nearly
+            // coincident. Sampling the arc at a `t` arbitrarily close to 0 or 1
+            // lands the sample right on top of an endpoint, so `t` must never
+            // feed the reconstruction basis; it only picks the point under test.
+            let mid = curve.evaluate(0.5 * (t0 + t1));
+            let origin = circum_center(p0, p1, mid);
+            let radius = origin.distance(p0);
             let p2 = curve.evaluate((1.0 - t) * t0 + t * t1);
-            let origin = circum_center(p0, p1, p2);
-            let r0 = p0.distance2(origin);
-            let r1 = p1.distance2(origin);
-            let r2 = p2.distance2(origin);
-            prop_assert!(r0.near(&r1) && r1.near(&r2));
+            // `p2` lies on that circle to within a radius-relative tolerance:
+            // co-circularity is a relative-radius property, so comparing squared
+            // distances under an absolute tolerance (the previous form) is the
+            // wrong metric -- a large radius inflates the absolute position error
+            // even when the arc itself is exact.
+            prop_assert!((origin.distance(p2) - radius).abs() <= TOLERANCE * (1.0 + radius));
         }
 
         #[test]
@@ -299,7 +320,7 @@ mod test_geom_impl {
 
             // Any point on the curve lies in the same plane perpendicular to the axis.
             let (t0, t1) = curve.range_tuple();
-            let pt2 = curve.evaluate((1.0 - t) * t0 + t * t1);
+            let pt2 = curve.subs((1.0 - t) * t0 + t * t1);
             let vec0 = pt0 - origin;
             let vec2 = pt2 - origin;
             prop_assert_near!(vec0.dot(axis), vec2.dot(axis));

@@ -45,7 +45,9 @@ fn cylinder(bottom: f64, height: f64, radius: f64) -> Shell {
 fn grue_body_neck(body: &mut Shell, neck: Shell) {
     let body_seiling = body.last_mut().unwrap();
     let wire = neck[0].boundaries()[0].clone();
-    body_seiling.add_boundary(wire).unwrap();
+    body_seiling
+        .add_boundary(wire)
+        .expect("neck boundary should attach to body ceiling");
     body.extend(neck.into_iter().skip(1));
 }
 
@@ -85,7 +87,7 @@ fn bottle(height: f64, width: f64, thickness: f64) -> Solid {
     {
         let edges = vertical_line_edges(&body, height);
         let opts = FilletOptions {
-            radius: FilletRadius::Constant(thickness / 12.0),
+            radius: RadiusSpec::Constant(thickness / 12.0),
             ..Default::default()
         };
         fillet_edges(&mut body, &edges, Some(&opts)).expect("body fillet");
@@ -106,7 +108,7 @@ fn bottle(height: f64, width: f64, thickness: f64) -> Solid {
     {
         let edges = vertical_line_edges(&inner_body, height - 2.0 * eps);
         let opts = FilletOptions {
-            radius: FilletRadius::Constant((thickness - 2.0 * eps) / 12.0),
+            radius: RadiusSpec::Constant((thickness - 2.0 * eps) / 12.0),
             ..Default::default()
         };
         fillet_edges(&mut inner_body, &edges, Some(&opts)).expect("inner body fillet");
@@ -117,7 +119,10 @@ fn bottle(height: f64, width: f64, thickness: f64) -> Solid {
 
     let inner_hat = inner_body.pop().unwrap();
     let wire = inner_hat.into_boundaries()[0].inverse();
-    body.last_mut().unwrap().add_boundary(wire).unwrap();
+    body.last_mut()
+        .unwrap()
+        .add_boundary(wire)
+        .expect("inner hat boundary should attach to bottle body");
     body.extend(inner_body.into_iter().map(|face| face.inverse()));
     Solid::new(vec![body])
 }

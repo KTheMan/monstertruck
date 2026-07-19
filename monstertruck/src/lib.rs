@@ -144,6 +144,8 @@
 
 pub use monstertruck_core as core;
 
+pub mod example_output;
+
 #[cfg(feature = "traits")]
 pub use monstertruck_traits as traits;
 

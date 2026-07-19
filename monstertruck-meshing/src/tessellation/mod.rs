@@ -359,7 +359,7 @@ pub trait RobustMeshableShape {
 }
 
 /// Tessellates a [`Shell`] with a [`TessellationOptions`].
-pub fn shell_triangulation<C: PolylineableCurve, S: MeshableSurface>(
+pub fn triangulation_with<C: PolylineableCurve, S: MeshableSurface>(
     shell: &Shell<Point3, C, S>,
     options: TessellationOptions,
 ) -> Shell<Point3, PolylineCurve, Option<PolygonMesh>> {
@@ -378,7 +378,7 @@ pub fn shell_triangulation<C: PolylineableCurve, S: MeshableSurface>(
 }
 
 /// Tessellates a [`Shell`] with robust parameter search and a [`TessellationOptions`].
-pub fn robust_shell_triangulation<C: PolylineableCurve, S: RobustMeshableSurface>(
+pub fn robust_triangulation_with<C: PolylineableCurve, S: RobustMeshableSurface>(
     shell: &Shell<Point3, C, S>,
     options: TessellationOptions,
 ) -> Shell<Point3, PolylineCurve, Option<PolygonMesh>> {
@@ -397,7 +397,7 @@ pub fn robust_shell_triangulation<C: PolylineableCurve, S: RobustMeshableSurface
 }
 
 /// Tessellates a [`CompressedShell`] with a [`TessellationOptions`].
-pub fn compressed_shell_triangulation<
+pub fn cshell_triangulation_with<
     C: PolylineableCurve + ParameterBoundary2D<S>,
     S: MeshableSurface,
 >(
@@ -406,11 +406,11 @@ pub fn compressed_shell_triangulation<
 ) -> CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>> {
     nonpositive_tolerance!(options.tolerance);
     let sp = triangulation::search_parameter_sp::<S>(options.search_trials);
-    triangulation::compressed_shell_tessellation(shell, options.tolerance, sp, options.primitive)
+    triangulation::cshell_tessellation(shell, options.tolerance, sp, options.primitive)
 }
 
 /// Tessellates a [`CompressedShell`] with robust parameter search and a [`TessellationOptions`].
-pub fn robust_compressed_shell_triangulation<
+pub fn robust_cshell_triangulation_with<
     C: PolylineableCurve + ParameterBoundary2D<S>,
     S: RobustMeshableSurface,
 >(
@@ -419,11 +419,11 @@ pub fn robust_compressed_shell_triangulation<
 ) -> CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>> {
     nonpositive_tolerance!(options.tolerance);
     let sp = triangulation::search_nearest_parameter_sp::<S>(options.search_trials);
-    triangulation::compressed_shell_tessellation(shell, options.tolerance, sp, options.primitive)
+    triangulation::cshell_tessellation(shell, options.tolerance, sp, options.primitive)
 }
 
 /// Tessellates a [`CompressedTrimmedShell`] with a [`TessellationOptions`].
-pub fn compressed_trimmed_shell_triangulation<
+pub fn trimmed_cshell_triangulation_with<
     C: PolylineableCurve + ParameterBoundary2D<S> + ExactParameterBoundary2D<S>,
     S: MeshableSurface,
     T: ExactTrimBoundary2D + Parallelizable,
@@ -436,12 +436,7 @@ where
 {
     nonpositive_tolerance!(options.tolerance);
     let sp = triangulation::search_parameter_sp::<S>(options.search_trials);
-    triangulation::compressed_trimmed_shell_tessellation(
-        shell,
-        options.tolerance,
-        sp,
-        options.primitive,
-    )
+    triangulation::trimmed_cshell_tessellation(shell, options.tolerance, sp, options.primitive)
 }
 
 /// Tessellates a [`CompressedTrimmedShell`] and emits trim-aware isoparametric curves.
@@ -469,7 +464,7 @@ where
 }
 
 /// Tessellates a [`CompressedTrimmedShell`] with robust parameter search and a [`TessellationOptions`].
-pub fn robust_compressed_trimmed_shell_triangulation<
+pub fn robust_trimmed_cshell_triangulation_with<
     C: PolylineableCurve + ParameterBoundary2D<S> + ExactParameterBoundary2D<S>,
     S: RobustMeshableSurface,
     T: ExactTrimBoundary2D + Parallelizable,
@@ -482,12 +477,7 @@ where
 {
     nonpositive_tolerance!(options.tolerance);
     let sp = triangulation::search_nearest_parameter_sp::<S>(options.search_trials);
-    triangulation::compressed_trimmed_shell_tessellation(
-        shell,
-        options.tolerance,
-        sp,
-        options.primitive,
-    )
+    triangulation::trimmed_cshell_tessellation(shell, options.tolerance, sp, options.primitive)
 }
 
 /// Robustly tessellates a [`CompressedTrimmedShell`] and emits trim-aware isoparametric curves.
@@ -517,7 +507,7 @@ where
 impl<C: PolylineableCurve, S: MeshableSurface> MeshableShape for Shell<Point3, C, S> {
     type MeshedShape = Shell<Point3, PolylineCurve, Option<PolygonMesh>>;
     fn triangulation(&self, tolerance: f64) -> Self::MeshedShape {
-        shell_triangulation(
+        triangulation_with(
             self,
             TessellationOptions {
                 tolerance,
@@ -530,7 +520,7 @@ impl<C: PolylineableCurve, S: MeshableSurface> MeshableShape for Shell<Point3, C
 impl<C: PolylineableCurve, S: RobustMeshableSurface> RobustMeshableShape for Shell<Point3, C, S> {
     type MeshedShape = Shell<Point3, PolylineCurve, Option<PolygonMesh>>;
     fn robust_triangulation(&self, tolerance: f64) -> Self::MeshedShape {
-        robust_shell_triangulation(
+        robust_triangulation_with(
             self,
             TessellationOptions {
                 tolerance,
@@ -583,7 +573,7 @@ impl<C: PolylineableCurve + ParameterBoundary2D<S>, S: MeshableSurface> Meshable
 {
     type MeshedShape = CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>>;
     fn triangulation(&self, tolerance: f64) -> Self::MeshedShape {
-        compressed_shell_triangulation(
+        cshell_triangulation_with(
             self,
             TessellationOptions {
                 tolerance,
@@ -598,7 +588,7 @@ impl<C: PolylineableCurve + ParameterBoundary2D<S>, S: RobustMeshableSurface> Ro
 {
     type MeshedShape = CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>>;
     fn robust_triangulation(&self, tolerance: f64) -> Self::MeshedShape {
-        robust_compressed_shell_triangulation(
+        robust_cshell_triangulation_with(
             self,
             TessellationOptions {
                 tolerance,
@@ -617,7 +607,7 @@ where
 {
     type MeshedShape = CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>>;
     fn triangulation(&self, tolerance: f64) -> Self::MeshedShape {
-        compressed_trimmed_shell_triangulation(
+        trimmed_cshell_triangulation_with(
             self,
             TessellationOptions {
                 tolerance,
@@ -636,7 +626,7 @@ where
 {
     type MeshedShape = CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>>;
     fn robust_triangulation(&self, tolerance: f64) -> Self::MeshedShape {
-        robust_compressed_trimmed_shell_triangulation(
+        robust_trimmed_cshell_triangulation_with(
             self,
             TessellationOptions {
                 tolerance,

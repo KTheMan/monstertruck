@@ -6,7 +6,6 @@ use super::error::FilletError;
 use super::types::{self, Curve, ParameterCurveLinear};
 
 type InternalShell = types::Shell;
-const CURVE_SAMPLE_COUNT: usize = 24;
 const SURFACE_SAMPLE_COUNT: usize = 64;
 
 /// Intersection curve type used internally by fillet operations.
@@ -48,12 +47,14 @@ pub trait FilletableCurve:
     + From<NurbsCurve<Vector4>>
     + From<ParameterCurveLinear>
     + From<FilletIntersectionCurve> {
-    /// Converts this curve to a NURBS curve used by internal fillet logic.
-    fn to_nurbs_curve(&self) -> NurbsCurve<Vector4> {
-        self.clone().try_into().ok().unwrap_or_else(|| {
-            sample_curve_to_nurbs(self.range_tuple(), |t| self.evaluate(t), CURVE_SAMPLE_COUNT)
-        })
-    }
+    /// Converts this curve to the exact NURBS curve used by internal fillet
+    /// logic, or `None` when the curve has no exact NURBS representation.
+    ///
+    /// Refusal surfaces as [`FilletError::UnsupportedGeometry`] from
+    /// [`fillet_edges_generic`](super::fillet_edges_generic); it must never
+    /// be papered over with a sampled approximation, or exact boolean seam
+    /// leaders would silently degrade into polylines.
+    fn to_nurbs_curve(&self) -> Option<NurbsCurve<Vector4>> { self.clone().try_into().ok() }
 }
 
 impl<T> FilletableCurve for T where T: Clone
@@ -64,20 +65,6 @@ impl<T> FilletableCurve for T where T: Clone
         + From<ParameterCurveLinear>
         + From<FilletIntersectionCurve>
 {
-}
-
-fn sample_curve_to_nurbs(
-    range: (f64, f64),
-    evaluate: impl Fn(f64) -> Point3,
-    sample_count: usize,
-) -> NurbsCurve<Vector4> {
-    let (t0, t1) = range;
-    let points: Vec<Point3> = (0..=sample_count)
-        .map(|i| t0 + (t1 - t0) * (i as f64) / (sample_count as f64))
-        .map(evaluate)
-        .collect();
-    let knot_vector = KnotVector::uniform_knot(1, sample_count);
-    NurbsCurve::from(BsplineCurve::new(knot_vector, points))
 }
 
 fn sample_surface_to_nurbs<S: ParametricSurface<Point = Point3>>(
@@ -133,7 +120,7 @@ pub(super) fn convert_shell_in<C: FilletableCurve, S: FilletableSurface>(
     let internal_shell: InternalShell = shell
         .try_mapped(
             |p| Some(*p),
-            |c| Some(Curve::NurbsCurve(c.to_nurbs_curve())),
+            |c| c.to_nurbs_curve().map(Curve::NurbsCurve),
             |s| s.to_nurbs_surface(),
         )
         .ok_or(FilletError::UnsupportedGeometry {

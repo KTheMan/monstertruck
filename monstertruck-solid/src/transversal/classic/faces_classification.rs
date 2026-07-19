@@ -1,9 +1,17 @@
+//! Classic (0.3.2) per-face and/or/unknown classification.
+//!
+//! Ported verbatim from the published 0.3.2 crate's
+//! `transversal::faces_classification`. Kept private to the classic subtree so
+//! it binds to the classic [`ShapesOpStatus`] (the crate-level
+//! `faces_classification` binds to the upgrade-backend loops-store status of
+//! the same name, a distinct type).
+
 use super::loops_store::ShapesOpStatus;
 use monstertruck_topology::*;
 use rustc_hash::FxHashMap as HashMap;
 
 #[derive(Clone, Debug)]
-pub struct FacesClassification<P, C, S> {
+pub(super) struct FacesClassification<P, C, S> {
     shell: Shell<P, C, S>,
     status: HashMap<FaceId<S>, ShapesOpStatus>,
 }
@@ -18,12 +26,12 @@ impl<P, C, S> Default for FacesClassification<P, C, S> {
 }
 
 impl<P, C, S> FacesClassification<P, C, S> {
-    pub fn push(&mut self, face: Face<P, C, S>, status: ShapesOpStatus) {
+    pub(super) fn push(&mut self, face: Face<P, C, S>, status: ShapesOpStatus) {
         self.status.insert(face.id(), status);
         self.shell.push(face);
     }
 
-    pub fn and_or_unknown(&self) -> [Shell<P, C, S>; 3] {
+    pub(super) fn and_or_unknown(&self) -> [Shell<P, C, S>; 3] {
         let [mut and, mut or, mut unknown] = <[Shell<P, C, S>; 3]>::default();
         for face in &self.shell {
             // SAFETY: `push()` inserts every face id into `status`.
@@ -36,7 +44,7 @@ impl<P, C, S> FacesClassification<P, C, S> {
         [and, or, unknown]
     }
 
-    pub fn integrate_by_component(&mut self) {
+    pub(super) fn integrate_by_component(&mut self) {
         let [and, or, unknown] = self.and_or_unknown();
         let and_boundary = and.extract_boundaries();
         let or_boundary = or.extract_boundaries();
@@ -65,6 +73,3 @@ impl<P, C, S> FacesClassification<P, C, S> {
         }
     }
 }
-
-#[cfg(test)]
-mod tests;

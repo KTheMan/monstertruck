@@ -242,6 +242,19 @@ where
     S1: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
 {
     /// Approximates a rolling ball fillet with an [`ApproximateFilletSurface`].
+    pub fn approx_rolling_ball_fillet<C, R>(
+        fillet_surface: &RollingBallFilletSurface<C, S0, S1, R>,
+        edge_parameter_range: (f64, f64),
+        tol: f64,
+    ) -> Option<Self>
+    where
+        C: ParametricCurve3D,
+        R: RadiusFunction,
+    {
+        Self::approximate_rolling_ball_fillet(fillet_surface, edge_parameter_range, tol)
+    }
+
+    /// Approximates a rolling ball fillet with an [`ApproximateFilletSurface`].
     pub fn approximate_rolling_ball_fillet<C, R>(
         fillet_surface: &RollingBallFilletSurface<C, S0, S1, R>,
         edge_parameter_range: (f64, f64),

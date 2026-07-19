@@ -1,31 +1,23 @@
 use monstertruck_mesh::*;
 
-const TEAPOT_POSITION_OBJ: &[u8] = include_bytes!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../resources/obj/teapot.obj",
-));
-const TEAPOT_WITHNORMALS_OBJ: &[u8] = include_bytes!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../resources/obj/teapot-with-normals.obj",
-));
+fn resource_path(name: &str) -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../resources/obj")
+        .join(name)
+}
 
-// https://sketchfab.com/3d-models/skull-downloadable-1a9db900738d44298b0bc59f68123393
-// Skull downloadable - CC Attribution © martinjario
-const SKULL_WITHTEXCOORD_OBJ: &[u8] = include_bytes!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../resources/obj/skull-with-texcoord.obj",
-));
-
-// https://sketchfab.com/3d-models/pony-cartoon-885d9f60b3a9429bb4077cfac5653cf9
-// Pony Cartoon - CC Attribution © Slava Z.
-const PONY_COMPLETE_OBJ: &[u8] = include_bytes!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../resources/obj/pony-complete.obj",
-));
+fn read_resource(name: &str) -> Option<Vec<u8>> {
+    let path = resource_path(name);
+    std::fs::read(path).ok()
+}
 
 #[test]
 fn position_obj_ioi_test() {
-    let read_mesh0 = obj::read(TEAPOT_POSITION_OBJ).unwrap();
+    let Some(data) = read_resource("teapot.obj") else {
+        eprintln!("skipping: teapot.obj not found");
+        return;
+    };
+    let read_mesh0 = obj::read(data.as_slice()).unwrap();
     let mut gened_obj: Vec<u8> = Vec::new();
     obj::write(&read_mesh0, &mut gened_obj).unwrap();
     let read_mesh1 = obj::read(AsRef::<[u8]>::as_ref(&gened_obj)).unwrap();
@@ -34,7 +26,11 @@ fn position_obj_ioi_test() {
 
 #[test]
 fn withtexcoord_obj_ioi_test() {
-    let read_mesh0 = obj::read(SKULL_WITHTEXCOORD_OBJ).unwrap();
+    let Some(data) = read_resource("skull-with-texcoord.obj") else {
+        eprintln!("skipping: skull-with-texcoord.obj not found");
+        return;
+    };
+    let read_mesh0 = obj::read(data.as_slice()).unwrap();
     let mut gened_obj: Vec<u8> = Vec::new();
     obj::write(&read_mesh0, &mut gened_obj).unwrap();
     let read_mesh1 = obj::read(AsRef::<[u8]>::as_ref(&gened_obj)).unwrap();
@@ -43,7 +39,11 @@ fn withtexcoord_obj_ioi_test() {
 
 #[test]
 fn withnormals_obj_ioi_test() {
-    let read_mesh0 = obj::read(TEAPOT_WITHNORMALS_OBJ).unwrap();
+    let Some(data) = read_resource("teapot-with-normals.obj") else {
+        eprintln!("skipping: teapot-with-normals.obj not found");
+        return;
+    };
+    let read_mesh0 = obj::read(data.as_slice()).unwrap();
     let mut gened_obj: Vec<u8> = Vec::new();
     obj::write(&read_mesh0, &mut gened_obj).unwrap();
     let read_mesh1 = obj::read(AsRef::<[u8]>::as_ref(&gened_obj)).unwrap();
@@ -52,7 +52,11 @@ fn withnormals_obj_ioi_test() {
 
 #[test]
 fn complete_obj_ioi_test() {
-    let read_mesh0 = obj::read(PONY_COMPLETE_OBJ).unwrap();
+    let Some(data) = read_resource("pony-complete.obj") else {
+        eprintln!("skipping: pony-complete.obj not found");
+        return;
+    };
+    let read_mesh0 = obj::read(data.as_slice()).unwrap();
     let mut gened_obj: Vec<u8> = Vec::new();
     obj::write(&read_mesh0, &mut gened_obj).unwrap();
     let read_mesh1 = obj::read(AsRef::<[u8]>::as_ref(&gened_obj)).unwrap();

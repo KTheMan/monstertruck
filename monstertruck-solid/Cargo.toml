@@ -1,6 +1,6 @@
 [package]
 name = "monstertruck-solid"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["Moritz Moeller <virtualritz@protonmail.com>"]
 edition = "2024"
 description = "Boolean operations, fillets, and shape healing for solids"
@@ -9,13 +9,19 @@ repository = "https://github.com/virtualritz/monstertruck"
 license = "Apache-2.0"
 
 [features]
-default = ["step-test"]
+default = ["marching-ssi"]
+# Truck-derived polyline-marching SSI: the self-contained boolean backend the
+# published crate ships by default. Under `--no-default-features` no backend is
+# compiled and the boolean entry points return a typed `NoBackend` error.
+marching-ssi = []
 step-test = []
 
 [dependencies]
+ahash = { workspace = true }
 derive_more = { workspace = true }
 itertools = { workspace = true }
 rustc-hash = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 smallvec = { workspace = true }
 thiserror = { workspace = true }
 monstertruck-core = { workspace = true }
@@ -29,9 +35,8 @@ anyhow = { workspace = true }
 proptest = { workspace = true }
 rand = { workspace = true }
 serde_json = { workspace = true }
-monstertruck-meshing = { path = "../monstertruck-meshing" }
-monstertruck-modeling = { path = "../monstertruck-modeling", features = ["fillet"] }
-monstertruck-step = { path = "../monstertruck-step" }
+monstertruck-modeling = { workspace = true }
+monstertruck-step = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 getrandom = { workspace = true }

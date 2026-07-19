@@ -1,6 +1,7 @@
 use monstertruck_geometry::prelude::{
-    BsplineCurve, BsplineSurface, Point2, SupportsExactPatchDomains, TryIntoBsplineSurface,
-    TryIntoHomogeneousBsplineCurve, TryIntoHomogeneousBsplineSurface,
+    AnalyticSurfaceKind, BsplineCurve, BsplineSurface, ParametricSurface3D, Point2,
+    SearchNearestParameter, SearchParameter, SupportsExactPatchDomains, TryIntoAnalyticSurfaceKind,
+    TryIntoBsplineSurface, TryIntoHomogeneousBsplineCurve, TryIntoHomogeneousBsplineSurface,
 };
 use monstertruck_meshing::prelude::*;
 
@@ -201,6 +202,19 @@ where
         match self {
             Self::FirstType(entity) => entity.supports_exact_patch_domains(),
             Self::SecondType(entity) => entity.supports_exact_patch_domains(),
+        }
+    }
+}
+
+impl<T, U> TryIntoAnalyticSurfaceKind for Alternative<T, U>
+where
+    T: TryIntoAnalyticSurfaceKind,
+    U: TryIntoAnalyticSurfaceKind,
+{
+    fn try_into_analytic_surface_kind(&self) -> Option<AnalyticSurfaceKind> {
+        match self {
+            Self::FirstType(entity) => entity.try_into_analytic_surface_kind(),
+            Self::SecondType(entity) => entity.try_into_analytic_surface_kind(),
         }
     }
 }

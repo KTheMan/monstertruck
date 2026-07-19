@@ -104,7 +104,7 @@ impl StructuringFilter for PolygonMesh {
 trait SubStructureFilter {
     fn create_face_edge_list(&self, plane_tol: f64, score_tol: f64) -> Vec<FaceEdge>;
     fn reflect_face_edge_list(&mut self, list: Vec<FaceEdge>);
-    fn face_edge(
+    fn get_face_edge(
         &self,
         face0_id: usize,
         face1_id: usize,
@@ -122,7 +122,7 @@ impl SubStructureFilter for PolygonMesh {
             for j in face {
                 if i > *j {
                     continue;
-                } else if let Some(face_edge) = self.face_edge(i, *j, plane_tol, score_tol) {
+                } else if let Some(face_edge) = self.get_face_edge(i, *j, plane_tol, score_tol) {
                     passed.push(face_edge);
                 }
             }
@@ -159,7 +159,7 @@ impl SubStructureFilter for PolygonMesh {
             .collect::<Vec<_>>();
         *self.debug_editor().faces = Faces::from_tri_and_quad_faces(tri_faces, quad_faces);
     }
-    fn face_edge(
+    fn get_face_edge(
         &self,
         face0_id: usize,
         face1_id: usize,

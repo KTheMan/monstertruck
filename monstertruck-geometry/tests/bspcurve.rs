@@ -15,7 +15,7 @@ fn test_substitution() {
     const N: usize = 100; // sample size
     for i in 0..=N {
         let t = -1.0 + 2.0 * (i as f64) / (N as f64);
-        assert_near2!(bspcurve.evaluate(t), Vector2::new(t, t * t));
+        assert_near2!(bspcurve.subs(t), Vector2::new(t, t * t));
     }
 }
 
@@ -33,7 +33,7 @@ fn test_derivation() {
     const N: usize = 100; // sample size
     for i in 0..=N {
         let t = 1.0 / (N as f64) * (i as f64);
-        assert_near2!(bspcurve.derivative(t), Vector2::new(1.0, 2.0 * t));
+        assert_near2!(bspcurve.der(t), Vector2::new(1.0, 2.0 * t));
     }
 }
 
@@ -52,10 +52,7 @@ fn test_2nd_derivation() {
     const N: usize = 100; // sample size
     for i in 0..=N {
         let t = 1.0 / (N as f64) * (i as f64);
-        assert_near2!(
-            bspcurve.derivative_2(t),
-            Vector2::new(24.0 * t - 12.0, -6.0)
-        );
+        assert_near2!(bspcurve.der2(t), Vector2::new(24.0 * t - 12.0, -6.0));
     }
 }
 
@@ -77,8 +74,8 @@ proptest! {
         let bsp = BsplineCurve::new(knot_vec, control_points);
 
         const EPS: f64 = 1.0e-4;
-        let der0 = bsp.derivative_n(n + 1, t);
-        let der1 = (bsp.derivative_n(n, t + EPS) - bsp.derivative_n(n, t - EPS)) / (2.0 * EPS);
+        let der0 = bsp.der_n(n + 1, t);
+        let der1 = (bsp.der_n(n, t + EPS) - bsp.der_n(n, t - EPS)) / (2.0 * EPS);
         prop_assert!((der0 - der1).magnitude() < 0.01 * der0.magnitude());
     }
 }
@@ -189,12 +186,12 @@ fn test_parameter_division() {
     assert_eq!(knot_vec[0], div[0]);
     assert_eq!(knot_vec.range_length(), div.last().unwrap() - div[0]);
     for i in 1..div.len() {
-        let pt0 = bspcurve.evaluate(div[i - 1]);
+        let pt0 = bspcurve.subs(div[i - 1]);
         assert_eq!(pt0, pts[i - 1]);
-        let pt1 = bspcurve.evaluate(div[i]);
+        let pt1 = bspcurve.subs(div[i]);
         assert_eq!(pt1, pts[i]);
         let value_middle = pt0 + (pt1 - pt0) / 2.0;
-        let param_middle = bspcurve.evaluate((div[i - 1] + div[i]) / 2.0);
+        let param_middle = bspcurve.subs((div[i - 1] + div[i]) / 2.0);
         assert!(value_middle.distance(param_middle) < tol);
     }
 }
@@ -215,7 +212,7 @@ fn test_invert() {
     const N: usize = 100;
     for i in 0..=N {
         let t = (i as f64) / (N as f64);
-        assert_near2!(bspcurve0.evaluate(t), bspcurve1.evaluate(1.0 - t));
+        assert_near2!(bspcurve0.subs(t), bspcurve1.subs(1.0 - t));
     }
 }
 
@@ -233,4 +230,50 @@ fn bsp_bench() {
     }
 
     println!("bsp-bench: {}ms", instant.elapsed().as_millis());
+}
+
+fn near_endpoint_cut_test_curve() -> BsplineCurve<Point3> {
+    BsplineCurve::new(
+        KnotVector::from(vec![0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0]),
+        vec![
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(1.0, 2.0, 0.0),
+            Point3::new(2.0, -1.0, 1.0),
+            Point3::new(3.0, 0.0, 2.0),
+        ],
+    )
+}
+
+#[test]
+fn cut_near_domain_start_regression() {
+    // A cut parameter within `TOLERANCE` of the domain start must behave like a
+    // cut at the start itself, not produce an invalid empty front curve.
+    let curve = near_endpoint_cut_test_curve();
+    let mut front = curve.clone();
+    let tail = front.cut(7.0e-7);
+
+    assert!(!front.control_points().is_empty());
+    assert_eq!(front.control_points().len(), 1);
+    assert_near!(front.front(), curve.front());
+    for i in 0..=20 {
+        let t = i as f64 / 20.0;
+        assert_near!(tail.subs(t), curve.subs(t));
+    }
+}
+
+#[test]
+fn cut_near_domain_end_regression() {
+    // A cut parameter within `TOLERANCE` of the domain end must behave like a
+    // cut at the end itself, not produce an invalid empty tail curve.
+    let curve = near_endpoint_cut_test_curve();
+    let mut front = curve.clone();
+    let tail = front.cut(1.0 + 7.0e-7);
+
+    assert!(!tail.control_points().is_empty());
+    assert_eq!(tail.control_points().len(), 1);
+    assert_near!(tail.back(), curve.back());
+    for i in 0..=20 {
+        let t = i as f64 / 20.0;
+        assert_near!(front.subs(t), curve.subs(t));
+    }
 }

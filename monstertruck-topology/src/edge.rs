@@ -261,6 +261,10 @@ impl<P, C> Edge<P, C> {
         self.curve.lock().clone()
     }
 
+    /// Calls `f` with a borrowed reference to the edge curve.
+    #[inline(always)]
+    pub fn with_curve<R>(&self, f: impl FnOnce(&C) -> R) -> R { f(&self.curve.lock()) }
+
     /// Set the curve.
     /// # Examples
     /// ```
@@ -433,7 +437,7 @@ impl<P, C> Edge<P, C> {
     /// Cuts the edge at `vertex`.
     /// # Failures
     /// Returns `None` if:
-    /// - cannot find the parameter `t` such that `edge.curve().evaluate(t) == vertex.point()`, or
+    /// - cannot find the parameter `t` such that `edge.curve().subs(t) == vertex.point()`, or
     /// - the found parameter is not in the parameter range without end points.
     pub fn cut(&self, vertex: &Vertex<P>) -> Option<(Self, Self)>
     where
@@ -450,13 +454,13 @@ impl<P, C> Edge<P, C> {
 
     /// Cuts the edge at `vertex` with parameter `t`.
     /// # Failure
-    /// Returns `None` if `!edge.curve().evaluate(t).near(&vertex.point())`.
+    /// Returns `None` if `!edge.curve().subs(t).near(&vertex.point())`.
     pub fn cut_with_parameter(&self, vertex: &Vertex<P>, t: f64) -> Option<(Self, Self)>
     where
         P: Clone + Tolerance,
         C: Cut<Point = P>, {
         let curve0 = self.curve();
-        if !curve0.evaluate(t).near(&vertex.point()) {
+        if !curve0.subs(t).near(&vertex.point()) {
             return None;
         }
         let (t0, t1) = curve0.range_tuple();

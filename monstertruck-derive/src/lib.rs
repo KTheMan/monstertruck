@@ -431,6 +431,7 @@ pub fn derive_parameter_division_1d(input: TokenStream) -> TokenStream {
             let tys = &tys[1..];
             let methods = methods! {
                 variants, trait_name,
+                fn try_parameter_division(&self, range: (f64, f64), tol: f64) -> Option<(Vec<f64>, Vec<Self::Point>)>,
                 fn parameter_division(&self, range: (f64, f64), tol: f64) -> (Vec<f64>, Vec<Self::Point>),
             };
             quote! {
@@ -458,6 +459,9 @@ pub fn derive_parameter_division_1d(input: TokenStream) -> TokenStream {
                     #(#where_predicates,)*
                     #field_type: #trait_name {
                     type Point = <#field_type as #trait_name>::Point;
+                    fn try_parameter_division(&self, range: (f64, f64), tol: f64) -> Option<(Vec<f64>, Vec<Self::Point>)> {
+                        self.0.try_parameter_division(range, tol)
+                    }
                     fn parameter_division(&self, range: (f64, f64), tol: f64) -> (Vec<f64>, Vec<Self::Point>) {
                         self.0.parameter_division(range, tol)
                     }

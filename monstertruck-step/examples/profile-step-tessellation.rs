@@ -7,7 +7,7 @@ use monstertruck_topology::compress::*;
 use std::path::PathBuf;
 use std::time::Instant;
 
-type CShell = CompressedShell<Point3, Curve3D, Surface>;
+type CShell = CompressedTrimmedShell<Point3, Curve3D, Surface, StepParameterCurve>;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -71,24 +71,8 @@ fn shell_bounding_box(shell: &CShell) -> BoundingBox<Point3> {
         let (t0, t1) = edge.curve.range_tuple();
         (0..=4).for_each(|i| {
             let t = t0 + (t1 - t0) * i as f64 / 4.0;
-            bdd.push(edge.curve.evaluate(t));
+            bdd.push(edge.curve.subs(t));
         });
-    });
-    shell.faces.iter().for_each(|face| {
-        let (urange, vrange) = face.surface.try_range_tuple();
-        if let (Some((u0, u1)), Some((v0, v1))) = (urange, vrange) {
-            [
-                face.surface.evaluate(u0, v0),
-                face.surface.evaluate(u1, v0),
-                face.surface.evaluate(u0, v1),
-                face.surface.evaluate(u1, v1),
-                face.surface.evaluate((u0 + u1) * 0.5, (v0 + v1) * 0.5),
-            ]
-            .into_iter()
-            .for_each(|point| {
-                bdd.push(point);
-            });
-        }
     });
     bdd
 }
@@ -212,11 +196,11 @@ fn main() {
                 .filter_map(|idx| {
                     if let Some(step_solid) = table.manifold_solid_brep.get(idx) {
                         table
-                            .to_compressed_solid(step_solid)
+                            .to_compressed_trimmed_solid(step_solid)
                             .ok()
                             .map(|solid| solid.boundaries)
                     } else if let Some(step_shells) = table.shell_based_surface_model.get(idx) {
-                        table.to_compressed_shells(step_shells).ok()
+                        table.to_compressed_trimmed_shells(step_shells).ok()
                     } else {
                         None
                     }
@@ -225,6 +209,13 @@ fn main() {
                 .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>();
+    if shells.is_empty() {
+        shells = table
+            .shell
+            .values()
+            .filter_map(|shell| table.to_compressed_trimmed_shell(shell).ok())
+            .collect();
+    }
     shells.sort_by_key(|shell| shell.faces.len());
     shells
         .into_iter()
@@ -299,8 +290,9 @@ fn main() {
                                         surface_kind(&face.surface),
                                     ),
                                     _ => eprintln!(
-                                        "inspect shell={shell_idx} face={face_idx} wire={wire_idx} edge={edge_pos} edge_index={} exact={} boundary_points={boundary_points} edge_curve_points={} boundary_front={} boundary_back={}",
+                                        "inspect shell={shell_idx} face={face_idx} wire={wire_idx} edge={edge_pos} edge_index={} orientation={} exact={} boundary_points={boundary_points} edge_curve_points={} boundary_front={} boundary_back={}",
                                         edge_idx.index,
+                                        edge_idx.orientation,
                                         boundary.is_some(),
                                         edge.curve.parameter_division(edge.curve.range_tuple(), tolerance).1.len(),
                                         boundary_front,

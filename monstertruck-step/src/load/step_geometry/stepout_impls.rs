@@ -34,9 +34,9 @@ impl save::StepFormat for SurfaceCurve3D {
             },
         );
         let entity = match self.kind() {
-            SurfaceCurveKind::Surface => "SURFACE_CURVE",
-            SurfaceCurveKind::Seam => "SEAM_CURVE",
-            SurfaceCurveKind::Intersection => "INTERSECTION_CURVE",
+            SurfaceCurveKind::SurfaceCurve => "SURFACE_CURVE",
+            SurfaceCurveKind::SeamCurve => "SEAM_CURVE",
+            SurfaceCurveKind::IntersectionCurve => "INTERSECTION_CURVE",
         };
         let master_representation = match self.master_representation() {
             SurfaceCurveRepresentation::Curve3D => ".CURVE_3D.",

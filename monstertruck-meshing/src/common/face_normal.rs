@@ -11,7 +11,7 @@ pub struct FaceNormal {
 }
 
 impl FaceNormal {
-    pub fn new(positions: &[Point3], face: &[Vertex], face_id: usize) -> FaceNormal {
+    pub fn new(positions: &[Point3], face: &[Vertex], _face_id: usize) -> FaceNormal {
         let center = face
             .iter()
             .fold(Vector3::zero(), |sum, v| sum + positions[v.pos].to_vec())
@@ -25,6 +25,9 @@ impl FaceNormal {
                 sum + vec0.cross(vec1)
             })
             .normalize();
-        FaceNormal { face_id, normal }
+        FaceNormal {
+            face_id: _face_id,
+            normal,
+        }
     }
 }

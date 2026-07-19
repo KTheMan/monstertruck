@@ -15,12 +15,12 @@ proptest! {
 
         const EPS: f64 = 1.0e-4;
         let (der0, der1) = if u_derivate {
-            let der0 = sphere.derivative_mn(m + 1, n, u, v);
-            let der1 = (sphere.derivative_mn(m, n, u + EPS, v) - sphere.derivative_mn(m, n, u - EPS, v)) / (2.0 * EPS);
+            let der0 = sphere.der_mn(m + 1, n, u, v);
+            let der1 = (sphere.der_mn(m, n, u + EPS, v) - sphere.der_mn(m, n, u - EPS, v)) / (2.0 * EPS);
             (der0, der1)
         } else {
-            let der0 = sphere.derivative_mn(m, n + 1, u, v);
-            let der1 = (sphere.derivative_mn(m, n, u, v + EPS) - sphere.derivative_mn(m, n, u, v - EPS)) / (2.0 * EPS);
+            let der0 = sphere.der_mn(m, n + 1, u, v);
+            let der1 = (sphere.der_mn(m, n, u, v + EPS) - sphere.der_mn(m, n, u, v - EPS)) / (2.0 * EPS);
             (der0, der1)
         };
         prop_assert!((der0 - der1).magnitude() < 0.01 * der0.magnitude());
@@ -36,7 +36,7 @@ fn exec_search_parameter_test(
 ) -> std::result::Result<(), TestCaseError> {
     let center = Point3::from(center);
     let sphere = Sphere::new(center, radius);
-    let pt = sphere.evaluate(u, v);
+    let pt = sphere.subs(u, v);
     let (u0, v0) = sphere.search_parameter(pt, None, 100).unwrap();
     prop_assert_near!(Vector2::new(u, v), Vector2::new(u0, v0));
     let boolnum = |t: bool| if t { 1.0 } else { -1.0 };
@@ -49,7 +49,7 @@ fn exec_search_parameter_test(
     prop_assert!(sphere.search_parameter(pt, None, 100).is_none());
     let (u, v) = sphere.search_nearest_parameter(pt, None, 100).unwrap();
     prop_assert_near!(
-        sphere.evaluate(u, v),
+        sphere.subs(u, v),
         center + (pt - center).normalize() * radius
     );
     Ok(())
@@ -121,8 +121,8 @@ fn sphere_derivation_test() {
             let u = PI * i as f64 / N as f64;
             let v = 2.0 * PI * j as f64 / N as f64;
             let normal = sphere.normal(u, v);
-            assert!(normal.dot(sphere.derivative_u(u, v)).so_small());
-            assert!(normal.dot(sphere.derivative_v(u, v)).so_small());
+            assert!(normal.dot(sphere.uder(u, v)).so_small());
+            assert!(normal.dot(sphere.vder(u, v)).so_small());
         }
     }
 }

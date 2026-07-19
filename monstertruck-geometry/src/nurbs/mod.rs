@@ -140,7 +140,7 @@ impl AsRef<[f64]> for BasisWindow {
 /// const N : usize = 100; // sample size in test
 /// for i in 0..N {
 ///     let t = 1.0 / (N as f64) * (i as f64);
-///     let v = bspline.evaluate(t); // We can use the instances as a function.
+///     let v = bspline.subs(t); // We can use the instances as a function.
 ///     let c = (v[0] / v[3]).powi(2) + (v[1] / v[3]).powi(2);
 ///     assert_near2!(c, 1.0);
 /// }
@@ -203,7 +203,7 @@ pub struct BsplineCurve<P> {
 ///     for j in 0..N {
 ///         let u = 1.0 / (N as f64) * (i as f64);
 ///         let v = 1.0 / (N as f64) * (j as f64);
-///         let v = bspline.evaluate(u, v); // We can use the instances as a function.
+///         let v = bspline.subs(u, v); // We can use the instances as a function.
 ///         let c = (v[0] / v[3]).powi(2) + (v[1] / v[3]).powi(2) + (v[2] / v[3]).powi(2);
 ///         assert_near2!(c, 1.0);
 ///     }
@@ -228,6 +228,18 @@ pub struct NurbsCurve<V>(BsplineCurve<V>);
 /// The generic parameter `V` is typically `Vector4` (homogeneous coordinates).
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize, SelfSameGeometry)]
 pub struct NurbsSurface<V>(BsplineSurface<V>);
+
+/// Renamed to [`BsplineCurve`] per RFC 430 (C-CASE).
+#[deprecated(note = "renamed to BsplineCurve per RFC 430 (C-CASE)")]
+pub type BSplineCurve<P> = BsplineCurve<P>;
+
+/// Renamed to [`BsplineSurface`] per RFC 430 (C-CASE).
+#[deprecated(note = "renamed to BsplineSurface per RFC 430 (C-CASE)")]
+pub type BSplineSurface<P> = BsplineSurface<P>;
+
+/// Renamed to [`KnotVector`] for clarity.
+#[deprecated(note = "renamed to KnotVector for clarity")]
+pub type KnotVec = KnotVector;
 
 /// Basis conversion utilities for importing non-B-spline representations.
 pub mod basis;

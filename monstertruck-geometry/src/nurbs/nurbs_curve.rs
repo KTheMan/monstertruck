@@ -9,9 +9,19 @@ impl<V> NurbsCurve<V> {
     #[inline(always)]
     pub const fn non_rationalized(&self) -> &BsplineCurve<V> { &self.0 }
 
+    /// Returns the Bspline curve before rationalized.
+    #[deprecated(note = "use `BsplineCurve::from()` or `.into()` instead")]
+    #[inline(always)]
+    pub fn into_non_rationalized(self) -> BsplineCurve<V> { self.into() }
+
     /// Returns the reference of the knot vector. cf.[`BsplineCurve::knot_vector`]
     #[inline(always)]
     pub const fn knot_vector(&self) -> &KnotVector { &self.0.knot_vec }
+
+    /// Renamed to [`knot_vector`](Self::knot_vector).
+    #[deprecated(note = "renamed to knot_vector")]
+    #[inline(always)]
+    pub const fn knot_vec(&self) -> &KnotVector { &self.0.knot_vec }
 
     /// Returns the `idx`th knot. cf.[`BsplineCurve::knot`]
     #[inline(always)]
@@ -105,7 +115,7 @@ impl<V: Homogeneous<Scalar = f64>> NurbsCurve<V> {
 impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>> NurbsCurve<V> {
     /// Returns the closure of substitution.
     #[inline(always)]
-    pub fn closure(&self) -> impl Fn(f64) -> V::Point + '_ { move |t| self.evaluate(t) }
+    pub fn closure(&self) -> impl Fn(f64) -> V::Point + '_ { move |t| self.subs(t) }
 }
 
 impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>> NurbsCurve<V>
@@ -140,8 +150,8 @@ where V::Point: Tolerance
     /// let bspcurve = BsplineCurve::new(knot_vec, control_points);
     ///
     /// // bspcurve is not constant.
-    /// assert_eq!(bspcurve.evaluate(0.0), Vector2::new(0.0, 0.0));
-    /// assert_ne!(bspcurve.evaluate(0.5), Vector2::new(0.0, 0.0));
+    /// assert_eq!(bspcurve.subs(0.0), Vector2::new(0.0, 0.0));
+    /// assert_ne!(bspcurve.subs(0.5), Vector2::new(0.0, 0.0));
     ///
     /// // bspcurve.is_const() is true
     /// assert!(bspcurve.is_const());
@@ -344,8 +354,8 @@ where V::Point: Tolerance
     /// let mut flag = false;
     /// for i in 0..N {
     ///     let t = 4.0 * (i as f64) / (N as f64);
-    ///     let pt0 = curve.evaluate(t);
-    ///     let pt1 = curve.evaluate(t + 1.0 / (N as f64));
+    ///     let pt0 = curve.subs(t);
+    ///     let pt1 = curve.subs(t + 1.0 / (N as f64));
     ///     flag = flag || pt0.near(&pt1);
     /// }
     /// // There exists t such that bspcurve(t) == bspcurve(t + 0.01).
@@ -355,8 +365,8 @@ where V::Point: Tolerance
     /// let mut flag = false;
     /// for i in 0..N {
     ///     let t = 1.0 * (i as f64) / (N as f64);
-    ///     let pt0 = curve.evaluate(t);
-    ///     let pt1 = curve.evaluate(t + 1.0 / (N as f64));
+    ///     let pt0 = curve.subs(t);
+    ///     let pt1 = curve.subs(t + 1.0 / (N as f64));
     ///     flag = flag || pt0.near(&pt1);
     /// }
     /// // There does not exist t such that bspcurve(t) == bspcurve(t + 0.01).
@@ -441,7 +451,7 @@ where
     /// let t = curve.search_nearest_parameter(pt, Some(hint), 100).unwrap();
     ///
     /// // check the answer
-    /// let res = curve.evaluate(t);
+    /// let res = curve.subs(t);
     /// let ans = Point2::from_vec(pt.to_vec().normalize());
     /// assert_near!(res, ans);
     /// ```
@@ -523,10 +533,10 @@ impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>> ParametricCurve
     type Point = V::Point;
     type Vector = <V::Point as EuclideanSpace>::Diff;
     fn derivative_n(&self, n: usize, t: f64) -> Self::Vector {
-        self.0.derivatives(n, t).rational_derivatives()[n]
+        self.0.ders(n, t).rational_derivatives()[n]
     }
     fn derivatives(&self, n: usize, t: f64) -> CurveDerivatives<Self::Vector> {
-        self.0.derivatives(n, t).rational_derivatives()
+        self.0.ders(n, t).rational_derivatives()
     }
     #[inline(always)]
     fn evaluate(&self, t: f64) -> Self::Point { self.0.evaluate(t).to_point() }

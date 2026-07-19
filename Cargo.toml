@@ -23,6 +23,7 @@ members = [
 [workspace.dependencies]
 
 # External dependencies
+ahash = "0.8"
 anyhow = "1"
 array-macro = "2"
 async-trait = "0.1"
@@ -75,19 +76,19 @@ wgpu = "29"
 winit = "0.30"
 
 # Internal crates
-monstertruck-assembly = { version = "0.3", path = "monstertruck-assembly" }
-monstertruck-core = { version = "0.3", path = "monstertruck-core" }
-monstertruck-derive = { version = "0.3", path = "monstertruck-derive" }
-monstertruck-geometry = { version = "0.3", path = "monstertruck-geometry" }
-monstertruck-mesh = { version = "0.3", path = "monstertruck-mesh" }
-monstertruck-meshing = { version = "0.3", path = "monstertruck-meshing" }
-monstertruck-modeling = { version = "0.3", path = "monstertruck-modeling" }
-monstertruck-gpu = { version = "0.3", path = "monstertruck-gpu" }
-monstertruck-render = { version = "0.3", path = "monstertruck-render" }
-monstertruck-solid = { version = "0.3", path = "monstertruck-solid" }
-monstertruck-step = { version = "0.3", path = "monstertruck-step" }
-monstertruck-topology = { version = "0.3", path = "monstertruck-topology" }
-monstertruck-traits = { version = "0.3", path = "monstertruck-traits" }
+monstertruck-assembly = { version = "0.3.3", path = "monstertruck-assembly" }
+monstertruck-core = { version = "0.3.3", path = "monstertruck-core" }
+monstertruck-derive = { version = "0.3.3", path = "monstertruck-derive" }
+monstertruck-geometry = { version = "0.3.3", path = "monstertruck-geometry" }
+monstertruck-mesh = { version = "0.3.3", path = "monstertruck-mesh" }
+monstertruck-meshing = { version = "0.3.3", path = "monstertruck-meshing" }
+monstertruck-modeling = { version = "0.3.3", path = "monstertruck-modeling" }
+monstertruck-gpu = { version = "0.3.3", path = "monstertruck-gpu" }
+monstertruck-render = { version = "0.3.3", path = "monstertruck-render" }
+monstertruck-solid = { version = "0.3.3", path = "monstertruck-solid" }
+monstertruck-step = { version = "0.3.3", path = "monstertruck-step" }
+monstertruck-topology = { version = "0.3.3", path = "monstertruck-topology" }
+monstertruck-traits = { version = "0.3.3", path = "monstertruck-traits" }
 
 [profile.release.package.monstertruck-wasm]
 opt-level = "z"

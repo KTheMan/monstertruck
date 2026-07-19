@@ -17,7 +17,7 @@ impl<P> TnurccFace<P> {
                 .face_side(Arc::clone(&f))
                 .expect("Face edge should be on either side of that edge.");
             let iter = TnurccAcwFaceIter::try_from_edge(Arc::clone(&edge), face_side)
-                .expect("Edge should have face on side if face_side succeeded");
+                .expect("Edge should have face on side if get_face_side succeeded");
 
             iter.map(|e| {
                 match e

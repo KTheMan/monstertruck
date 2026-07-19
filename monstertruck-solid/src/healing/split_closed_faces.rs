@@ -1,65 +1,212 @@
 use super::*;
+use std::env;
 use std::ops::Range;
 
-pub(super) fn split_closed_faces<C, S>(shell: &mut Shell<Point3, C, S>, tol: f64, sp: impl SP<S>)
+type ParamBoundaryCache = HashMap<(usize, usize, bool), Option<PolylineCurve<Point2>>>;
+
+struct ParamBoundaryInput<'a, C, Sp> {
+    edges: &'a [Edge<C>],
+    poly_edges: &'a [PolylineCurve<Point3>],
+    param_boundary_cache: &'a mut ParamBoundaryCache,
+    sp: Sp,
+    tol: f64,
+}
+
+struct SplitBoundariesByDivisorInput<'a, C, S, Sp> {
+    face_index: usize,
+    face: &'a Face<S>,
+    closed: &'a [Wire],
+    divisor: (usize, usize),
+    edges: &'a mut Vec<Edge<C>>,
+    poly_edges: &'a mut Vec<PolylineCurve<Point3>>,
+    param_boundary_cache: &'a mut ParamBoundaryCache,
+    sp: Sp,
+    tol: f64,
+}
+
+struct AssortBoundaryInput<'a, C, S, Sp> {
+    face_index: usize,
+    surface: &'a S,
+    boundaries: Vec<Wire>,
+    edges: &'a [Edge<C>],
+    poly_edges: &'a [PolylineCurve<Point3>],
+    param_boundary_cache: &'a mut ParamBoundaryCache,
+    sp: Sp,
+    tol: f64,
+}
+
+struct DivideFaceInput<'a, C, S, Sp> {
+    face_index: usize,
+    face: &'a mut Face<S>,
+    new_boundaries: Vec<Wire>,
+    edges: &'a [Edge<C>],
+    poly_edges: &'a [PolylineCurve<Point3>],
+    param_boundary_cache: &'a mut ParamBoundaryCache,
+    sp: Sp,
+    tol: f64,
+}
+
+pub(super) fn split_closed_faces<C, S>(
+    shell: &mut Shell<Point3, C, S>,
+    tol: f64,
+    sp: impl SP<S>,
+) -> bool
 where
     C: ParametricCurve3D
         + BoundedCurve
         + Cut
         + ParameterDivision1D<Point = Point3>
+        + ParameterBoundary2D<S>
         + SearchNearestParameter<CurveParameter, Point = Point3>
         + TryFrom<ParameterCurve<Line<Point2>, S>>,
-    S: ParametricSurface3D, {
+    S: ParametricSurface3D,
+{
+    let debug_trace = env::var("MT_BOOL_TRACE").is_ok();
+    let mut changed = false;
     let to_poly = closure_to_poly(tol);
-    let mut poly_edges: Vec<_> = shell.edges.iter().map(to_poly).collect();
+    let mut param_boundary_cache = ParamBoundaryCache::default();
+    let mut poly_edges: Vec<_> = shell
+        .edges
+        .iter()
+        .enumerate()
+        .map(|(index, edge)| {
+            let started = std::time::Instant::now();
+            let poly = to_poly(edge);
+            if debug_trace && started.elapsed().as_secs_f64() * 1000.0 >= 10.0 {
+                eprintln!(
+                    "trace bool split_closed_faces poly_edge edge={index} elapsed_ms={:.3}",
+                    started.elapsed().as_secs_f64() * 1000.0,
+                );
+            }
+            poly
+        })
+        .collect();
     let len = shell.faces.len();
     (0..len).for_each(|i| {
-        split_face_with_non_closed_boundary(i, shell, &mut poly_edges, &sp, tol);
+        let started = std::time::Instant::now();
+        changed |= split_face_with_non_closed_boundary(
+            i,
+            shell,
+            &mut poly_edges,
+            &mut param_boundary_cache,
+            &sp,
+            tol,
+        );
+        if debug_trace && started.elapsed().as_secs_f64() * 1000.0 >= 10.0 {
+            eprintln!(
+                "trace bool split_closed_faces non_closed face={i} elapsed_ms={:.3}",
+                started.elapsed().as_secs_f64() * 1000.0,
+            );
+        }
     });
     let len = shell.faces.len();
-    let closure = |i| split_face_with_non_simple_wire(i, shell, &mut poly_edges, &sp, tol);
+    let closure = |i| {
+        let started = std::time::Instant::now();
+        let result = split_face_with_non_simple_wire(
+            i,
+            shell,
+            &mut poly_edges,
+            &mut param_boundary_cache,
+            &sp,
+            tol,
+        );
+        if debug_trace && started.elapsed().as_secs_f64() * 1000.0 >= 10.0 {
+            eprintln!(
+                "trace bool split_closed_faces non_simple face={i} elapsed_ms={:.3}",
+                started.elapsed().as_secs_f64() * 1000.0,
+            );
+        }
+        result
+    };
     let new_faces: Vec<_> = (0..len).filter_map(closure).flatten().collect();
+    changed |= !new_faces.is_empty();
     shell.faces.extend(new_faces);
+    let len = shell.faces.len();
+    let closure = |i| {
+        let started = std::time::Instant::now();
+        let result = split_face_with_concave_wire(
+            i,
+            shell,
+            &mut poly_edges,
+            &mut param_boundary_cache,
+            &sp,
+            tol,
+        );
+        if debug_trace && started.elapsed().as_secs_f64() * 1000.0 >= 10.0 {
+            eprintln!(
+                "trace bool split_closed_faces concave face={i} elapsed_ms={:.3}",
+                started.elapsed().as_secs_f64() * 1000.0,
+            );
+        }
+        result
+    };
+    let new_faces: Vec<_> = (0..len).filter_map(closure).flatten().collect();
+    changed |= !new_faces.is_empty();
+    shell.faces.extend(new_faces);
+    changed
 }
 
 fn split_face_with_non_closed_boundary<C, S>(
     face_index: usize,
     shell: &mut Shell<Point3, C, S>,
     poly_edges: &mut Vec<PolylineCurve<Point3>>,
+    param_boundary_cache: &mut ParamBoundaryCache,
     sp: impl SP<S>,
     tol: f64,
-) -> Option<()>
+) -> bool
 where
     C: ParametricCurve3D
         + BoundedCurve
         + Cut
         + ParameterDivision1D<Point = Point3>
+        + ParameterBoundary2D<S>
         + SearchNearestParameter<CurveParameter, Point = Point3>
         + TryFrom<ParameterCurve<Line<Point2>, S>>,
     S: ParametricSurface3D,
 {
-    let (divisor, open, closed) =
-        non_closed_wires_in_param_divisor(face_index, shell, poly_edges, &sp)?;
+    let Some((divisor, open, closed)) = non_closed_wires_in_param_divisor(
+        face_index,
+        shell,
+        poly_edges,
+        param_boundary_cache,
+        &sp,
+        tol,
+    ) else {
+        return false;
+    };
     debug_assert_eq!(open.len(), 2);
-    take_vertices_to_intersections(divisor, face_index, shell, poly_edges, &sp, tol);
+    take_vertices_to_intersections(
+        divisor,
+        face_index,
+        shell,
+        poly_edges,
+        param_boundary_cache,
+        &sp,
+        tol,
+    );
     let Shell { faces, edges, .. } = shell;
-    let new_boundaries = split_boundaries_by_divisor(
-        &faces[face_index],
-        &closed,
+    let Some(new_boundaries) = split_boundaries_by_divisor(SplitBoundariesByDivisorInput {
+        face_index,
+        face: &faces[face_index],
+        closed: &closed,
         divisor,
         edges,
         poly_edges,
-        &sp,
+        param_boundary_cache,
+        sp: &sp,
         tol,
-    )?;
+    }) else {
+        return false;
+    };
     let boundaries = &mut faces[face_index].boundaries;
-    connect_open_boundaries(boundaries, new_boundaries, divisor, edges, open)
+    connect_open_boundaries(boundaries, new_boundaries, divisor, edges, open).is_some()
 }
 
 fn split_face_with_non_simple_wire<C, S>(
     face_index: usize,
     shell: &mut Shell<Point3, C, S>,
     poly_edges: &mut Vec<PolylineCurve<Point3>>,
+    param_boundary_cache: &mut ParamBoundaryCache,
     sp: impl SP<S>,
     tol: f64,
 ) -> Option<Vec<Face<S>>>
@@ -68,13 +215,80 @@ where
         + BoundedCurve
         + Cut
         + ParameterDivision1D<Point = Point3>
+        + ParameterBoundary2D<S>
         + SearchNearestParameter<CurveParameter, Point = Point3>
         + TryFrom<ParameterCurve<Line<Point2>, S>>,
     S: ParametricSurface3D,
 {
     let Face { boundaries, .. } = &shell.faces[face_index];
     let divisor = find_non_simple_wire_divisor(boundaries, &shell.edges, &shell.vertices)?;
-    split_face_by_divisor(face_index, divisor, shell, poly_edges, sp, tol)
+    split_face_by_divisor(
+        face_index,
+        divisor,
+        shell,
+        poly_edges,
+        param_boundary_cache,
+        sp,
+        tol,
+    )
+}
+
+fn split_face_with_concave_wire<C, S>(
+    face_index: usize,
+    shell: &mut Shell<Point3, C, S>,
+    poly_edges: &mut Vec<PolylineCurve<Point3>>,
+    param_boundary_cache: &mut ParamBoundaryCache,
+    sp: impl SP<S>,
+    tol: f64,
+) -> Option<Vec<Face<S>>>
+where
+    C: ParametricCurve3D
+        + BoundedCurve
+        + Cut
+        + ParameterDivision1D<Point = Point3>
+        + ParameterBoundary2D<S>
+        + SearchNearestParameter<CurveParameter, Point = Point3>
+        + TryFrom<ParameterCurve<Line<Point2>, S>>,
+    S: ParametricSurface3D,
+{
+    let Face {
+        boundaries,
+        surface,
+        ..
+    } = &shell.faces[face_index];
+    if boundaries.len() != 1 || boundaries[0].len() < 4 {
+        return None;
+    }
+    let param_boundaries = create_param_boundaries(
+        face_index,
+        boundaries,
+        surface,
+        ParamBoundaryInput {
+            edges: &shell.edges,
+            poly_edges,
+            param_boundary_cache,
+            sp: &sp,
+            tol,
+        },
+    )?;
+    let ordered_vertices: Vec<_> = {
+        let take_front = closure_take_front(&shell.edges);
+        boundaries[0]
+            .iter()
+            .zip(&param_boundaries[0])
+            .map(|(edge_index, param_edge)| (take_front(*edge_index), param_edge[0]))
+            .collect()
+    };
+    let divisor = concave_wire_divisor(&ordered_vertices)?;
+    split_face_by_divisor(
+        face_index,
+        divisor,
+        shell,
+        poly_edges,
+        param_boundary_cache,
+        sp,
+        tol,
+    )
 }
 
 // --- find_non_simple_wire_divisor ---
@@ -93,6 +307,9 @@ fn non_simple_wire_divisor<C>(
     edges: &[Edge<C>],
     vertices: &[Point3],
 ) -> Option<(usize, usize)> {
+    if boundary.len() < 2 {
+        return None;
+    }
     let (i0, j0) = boundary.iter().enumerate().find_map(find_loop())?;
     boundary.rotate_left(i0);
     let j0 = j0 - i0;
@@ -104,7 +321,11 @@ fn non_simple_wire_divisor<C>(
         .find_map(find_loop())
         .unwrap_or((j0, boundary.len()));
 
-    let (k0, k1) = (j0.div_ceil(2), (i1 + j1).div_ceil(2));
+    let last_index = boundary.len() - 1;
+    let (k0, k1) = (
+        j0.div_ceil(2).min(last_index),
+        (i1 + j1).div_ceil(2).min(last_index),
+    );
     let f = closure_take_front(edges);
     let pre_divisor = (f(boundary[k0]), f(boundary[k1]));
     nearest_correction(
@@ -114,6 +335,120 @@ fn non_simple_wire_divisor<C>(
         vertices,
         closure_take_front(edges),
     )
+}
+
+fn concave_wire_divisor(vertices: &[(usize, Point2)]) -> Option<(usize, usize)> {
+    if vertices.len() < 4 {
+        return None;
+    }
+    let polygon: Vec<_> = vertices.iter().map(|(_, point)| *point).collect();
+    let area = polygon_area(&polygon);
+    if area.so_small() {
+        return None;
+    }
+    let orientation = area.signum();
+    (0..polygon.len()).find_map(|i| {
+        reflex_vertex_index(&polygon, orientation, i).and_then(|_| {
+            (0..polygon.len())
+                .filter(|&j| diagonal_candidate_indices(i, j, polygon.len()))
+                .find(|&j| diagonal_is_inside(&polygon, i, j))
+                .map(|j| (vertices[i].0, vertices[j].0))
+        })
+    })
+}
+
+fn polygon_area(points: &[Point2]) -> f64 { polygon_loop(points).area() }
+
+fn polygon_loop(points: &[Point2]) -> PolylineCurve<Point2> {
+    let mut loop_points = points.to_vec();
+    if loop_points
+        .last()
+        .is_none_or(|last| loop_points[0].distance2(*last) > TOLERANCE * TOLERANCE)
+    {
+        loop_points.push(loop_points[0]);
+    }
+    PolylineCurve(loop_points)
+}
+
+fn reflex_vertex_index(points: &[Point2], orientation: f64, index: usize) -> Option<usize> {
+    let len = points.len();
+    let prev = points[(index + len - 1) % len];
+    let curr = points[index];
+    let next = points[(index + 1) % len];
+    let cross = (curr.x - prev.x) * (next.y - curr.y) - (curr.y - prev.y) * (next.x - curr.x);
+    (orientation * cross < -TOLERANCE).then_some(index)
+}
+
+fn diagonal_candidate_indices(i: usize, j: usize, len: usize) -> bool {
+    i != j && (i + 1) % len != j && (j + 1) % len != i
+}
+
+fn diagonal_is_inside(polygon: &[Point2], i: usize, j: usize) -> bool {
+    let start = polygon[i];
+    let end = polygon[j];
+    let midpoint = Point2::from_vec((start.to_vec() + end.to_vec()) * 0.5);
+    polygon_contains_point(polygon, midpoint) && !diagonal_intersects_edges(polygon, i, j)
+}
+
+fn diagonal_intersects_edges(polygon: &[Point2], i: usize, j: usize) -> bool {
+    (0..polygon.len()).any(|k| {
+        let next = (k + 1) % polygon.len();
+        if k == i || next == i || k == j || next == j {
+            false
+        } else {
+            segments_intersect_strict(polygon[i], polygon[j], polygon[k], polygon[next])
+        }
+    })
+}
+
+fn segments_intersect_strict(a0: Point2, a1: Point2, b0: Point2, b1: Point2) -> bool {
+    Line(a0, a1)
+        .intersection(Line(b0, b1))
+        .is_some_and(|(s, t, _)| {
+            let unit = TOLERANCE..(1.0 - TOLERANCE);
+            unit.contains(&s) && unit.contains(&t)
+        })
+}
+
+fn polygon_contains_point(polygon: &[Point2], point: Point2) -> bool {
+    let winding = polygon
+        .iter()
+        .copied()
+        .zip(polygon.iter().copied().cycle().skip(1).take(polygon.len()))
+        .fold(0isize, |acc, (start, end)| {
+            if segment_contains_point(start, end, point) {
+                return 1;
+            }
+            let upward = start.y <= point.y && end.y > point.y;
+            let downward = start.y > point.y && end.y <= point.y;
+            if upward || downward {
+                let cross = (end.x - start.x) * (point.y - start.y)
+                    - (end.y - start.y) * (point.x - start.x);
+                if upward && cross > TOLERANCE {
+                    acc + 1
+                } else if downward && cross < -TOLERANCE {
+                    acc - 1
+                } else {
+                    acc
+                }
+            } else {
+                acc
+            }
+        });
+    winding != 0
+}
+
+fn segment_contains_point(start: Point2, end: Point2, point: Point2) -> bool {
+    let edge = end - start;
+    let rel = point - start;
+    let cross = edge.x * rel.y - edge.y * rel.x;
+    if cross.abs() > TOLERANCE {
+        false
+    } else {
+        let dot = rel.dot(edge);
+        let len2 = edge.magnitude2();
+        dot >= -TOLERANCE && dot <= len2 + TOLERANCE
+    }
 }
 
 fn find_loop() -> impl FnMut((usize, &EdgeIndex)) -> Option<(usize, usize)> {
@@ -133,10 +468,15 @@ fn non_closed_wires_in_param_divisor<C, S>(
         ..
     }: &mut Shell<Point3, C, S>,
     poly_edges: &[PolylineCurve<Point3>],
+    param_boundary_cache: &mut ParamBoundaryCache,
     sp: impl SP<S>,
+    tol: f64,
 ) -> FindNonClosedWiresInParamDivisorResult
 where
-    C: ParametricCurve3D + BoundedCurve + TryFrom<ParameterCurve<Line<Point2>, S>>,
+    C: ParametricCurve3D
+        + BoundedCurve
+        + ParameterBoundary2D<S>
+        + TryFrom<ParameterCurve<Line<Point2>, S>>,
     S: ParametricSurface3D,
 {
     let Face {
@@ -144,11 +484,22 @@ where
         surface,
         ..
     } = &faces[face_index];
-    let param_boundaries = create_param_boundaries(boundaries, surface, poly_edges, sp)?;
+    let param_boundaries = create_param_boundaries(
+        face_index,
+        boundaries,
+        surface,
+        ParamBoundaryInput {
+            edges,
+            poly_edges,
+            param_boundary_cache,
+            sp,
+            tol,
+        },
+    )?;
     let (mut open, mut closed) = (Vec::new(), Vec::new());
     boundaries
         .iter()
-        .zip(&param_boundaries)
+        .zip(param_boundaries)
         .for_each(|(boundary, param_boundary)| {
             let poly = PolylineCurve(param_boundary.iter().flatten().copied().collect());
             match boundary_type(&poly) {
@@ -203,8 +554,7 @@ where
     };
     let pre_divisor_vec = open
         .iter()
-        .copied()
-        .map(create_pre_divisor)
+        .map(|entry| create_pre_divisor((entry.0, &entry.1)))
         .collect::<Option<Vec<_>>>()?;
     let open: Vec<_> = open.into_iter().map(|(w, _)| w.to_vec()).collect();
     let closed: Vec<_> = closed.into_iter().map(|(w, _)| w.to_vec()).collect();
@@ -225,6 +575,7 @@ fn split_face_by_divisor<C, S>(
     divisor: (usize, usize),
     shell: &mut Shell<Point3, C, S>,
     poly_edges: &mut Vec<PolylineCurve<Point3>>,
+    param_boundary_cache: &mut ParamBoundaryCache,
     sp: impl SP<S>,
     tol: f64,
 ) -> Option<Vec<Face<S>>>
@@ -232,31 +583,44 @@ where
     C: ParametricCurve3D
         + BoundedCurve
         + Cut
+        + ParameterBoundary2D<S>
         + ParameterDivision1D<Point = Point3>
         + SearchNearestParameter<CurveParameter, Point = Point3>
         + TryFrom<ParameterCurve<Line<Point2>, S>>,
     S: ParametricSurface3D,
 {
-    take_vertices_to_intersections(divisor, face_index, shell, poly_edges, &sp, tol);
-    let face = &shell.faces[face_index];
-    let new_boundaries = split_boundaries_by_divisor(
-        face,
-        &face.boundaries,
+    take_vertices_to_intersections(
         divisor,
-        &mut shell.edges,
+        face_index,
+        shell,
         poly_edges,
+        param_boundary_cache,
         &sp,
         tol,
-    )?;
-    divide_face(
-        &mut shell.faces[face_index],
-        new_boundaries,
+    );
+    let face = &shell.faces[face_index];
+    let new_boundaries = split_boundaries_by_divisor(SplitBoundariesByDivisorInput {
+        face_index,
+        face,
+        closed: &face.boundaries,
+        divisor,
+        edges: &mut shell.edges,
         poly_edges,
-        &sp,
-    )
+        param_boundary_cache,
+        sp: &sp,
+        tol,
+    })?;
+    divide_face(DivideFaceInput {
+        face_index,
+        face: &mut shell.faces[face_index],
+        new_boundaries,
+        edges: &shell.edges,
+        poly_edges,
+        param_boundary_cache,
+        sp: &sp,
+        tol,
+    })
 }
-
-// --- take_vertices_to_intersections ---
 
 fn take_vertices_to_intersections<C, S>(
     divisor: (usize, usize),
@@ -268,6 +632,7 @@ fn take_vertices_to_intersections<C, S>(
         ..
     }: &mut Shell<Point3, C, S>,
     poly_edges: &mut Vec<PolylineCurve<Point3>>,
+    param_boundary_cache: &mut ParamBoundaryCache,
     sp: impl SP<S>,
     tol: f64,
 ) -> Option<()>
@@ -275,6 +640,7 @@ where
     C: ParametricCurve3D
         + BoundedCurve
         + Cut
+        + ParameterBoundary2D<S>
         + SearchNearestParameter<CurveParameter, Point = Point3>
         + ParameterDivision1D<Point = Point3>,
     S: ParametricSurface3D,
@@ -284,17 +650,28 @@ where
         ref surface,
         ..
     } = faces[face_index];
-    let param_boundaries = create_param_boundaries(boundaries, surface, poly_edges, &sp)?;
+    let param_boundaries = create_param_boundaries(
+        face_index,
+        boundaries,
+        surface,
+        ParamBoundaryInput {
+            edges,
+            poly_edges,
+            param_boundary_cache,
+            sp: &sp,
+            tol,
+        },
+    )?;
     let (v0, v1) = divisor;
-    let p = zip_boundaries(boundaries, &param_boundaries)
-        .find_map(closure_find_vertex_parameter(v0, edges))?;
-    let q = zip_boundaries(boundaries, &param_boundaries)
-        .find_map(closure_find_vertex_parameter(v1, edges))?;
     let Face {
         ref boundaries,
         ref surface,
         ..
     } = faces[face_index];
+    let p = zip_boundaries(boundaries, &param_boundaries)
+        .find_map(closure_find_vertex_parameter(v0, edges))?;
+    let q = zip_boundaries(boundaries, &param_boundaries)
+        .find_map(closure_find_vertex_parameter(v1, edges))?;
     let periods = (surface.u_period(), surface.v_period());
     let q =
         periodic_iterator(q, periods).min_by(|q, r| p.distance2(*q).total_cmp(&p.distance2(*r)))?;
@@ -311,13 +688,20 @@ where
     let new_edges = zip_boundaries(boundaries, &param_boundaries)
         .map(cut_edge)
         .collect::<Option<Vec<_>>>()?;
-    let insert = |(index, erange): (usize, Range<usize>)| {
+    let mut insert = |(index, erange): (usize, Range<usize>)| {
         faces
             .iter_mut()
             .flat_map(|face| &mut face.boundaries)
             .for_each(|wire| insert_new_edges(wire, index, erange.clone()));
     };
-    new_edges.into_iter().flatten().for_each(insert);
+    let mut changed = false;
+    new_edges.into_iter().flatten().for_each(|entry| {
+        changed = true;
+        insert(entry);
+    });
+    if changed {
+        param_boundary_cache.clear();
+    }
     Some(())
 }
 
@@ -407,15 +791,15 @@ where
     let mut previous0 = t0;
     let mut previous1 = None;
     for _ in 0..100 {
-        let p = pcurve.evaluate(t0);
+        let p = pcurve.subs(t0);
         let t1 = curve.search_nearest_parameter(p, previous1, 100)?;
-        let q = curve.evaluate(t1);
+        let q = curve.subs(t1);
         t0 = pcurve.search_nearest_parameter(q, t0, 100)?;
         if let Some(previous1) = previous1
             && previous0.near(&t0)
             && previous1.near(&t1)
         {
-            return Some((t0, t1, pcurve.evaluate(t0)));
+            return Some((t0, t1, pcurve.subs(t0)));
         }
         previous0 = t0;
         previous1 = Some(t1);
@@ -437,20 +821,35 @@ where
     let edge = &mut edges[edge_index];
     let vfirst = vertices.len();
     vertices.extend(intersections.iter().map(|(_, p)| *p));
-    let intersections_iter = intersections.into_iter().enumerate().rev();
-    let closure = |(i, (t, _))| Edge {
-        vertices: (vfirst + i, vfirst + i + 1),
-        curve: edge.curve.cut(t),
-    };
-    let mut new_edges: Vec<_> = intersections_iter.map(closure).collect();
+    let original_back = edge.vertices.1;
+    let later_segments: Vec<_> = intersections
+        .into_iter()
+        .rev()
+        .map(|(t, _)| edge.curve.cut(t))
+        .collect();
+    let new_edges: Vec<_> = later_segments
+        .into_iter()
+        .rev()
+        .enumerate()
+        .map(|(i, curve)| Edge {
+            vertices: (
+                vfirst + i,
+                if i + 1 == vertices.len() - vfirst {
+                    original_back
+                } else {
+                    vfirst + i + 1
+                },
+            ),
+            curve,
+        })
+        .collect();
     let to_poly = closure_to_poly(tol);
     poly_edges[edge_index] = to_poly(edge);
     poly_edges.extend(new_edges.iter().map(to_poly));
-    let Some(last_new_edge) = new_edges.last_mut() else {
+    let Some(first_new_vertex) = (vfirst..vertices.len()).next() else {
         return edges.len()..edges.len();
     };
-    last_new_edge.vertices.1 = edge.vertices.1;
-    edge.vertices.1 = vfirst;
+    edge.vertices.1 = first_new_vertex;
     let efirst = edges.len();
     edges.extend(new_edges);
     efirst..edges.len()
@@ -484,24 +883,43 @@ fn insert_new_edges(wire: &mut Wire, pivot_edge_index: usize, inserted_range: Ra
 
 // --- split boundaries ---
 
-fn split_boundaries_by_divisor<C, S>(
-    Face {
-        boundaries,
-        surface,
-        ..
-    }: &Face<S>,
-    closed: &[Wire],
-    divisor: (usize, usize),
-    edges: &mut Vec<Edge<C>>,
-    poly_edges: &mut Vec<PolylineCurve<Point3>>,
-    sp: impl SP<S>,
-    tol: f64,
+fn split_boundaries_by_divisor<C, S, Sp>(
+    input: SplitBoundariesByDivisorInput<'_, C, S, Sp>,
 ) -> Option<Vec<Wire>>
 where
-    C: ParametricCurve3D + BoundedCurve + TryFrom<ParameterCurve<Line<Point2>, S>>,
+    C: ParametricCurve3D
+        + BoundedCurve
+        + ParameterBoundary2D<S>
+        + TryFrom<ParameterCurve<Line<Point2>, S>>,
     S: ParametricSurface3D,
-{
-    let param_boundaries = create_param_boundaries(boundaries, surface, poly_edges, &sp)?;
+    Sp: SP<S>, {
+    let SplitBoundariesByDivisorInput {
+        face_index,
+        face: Face {
+            boundaries,
+            surface,
+            ..
+        },
+        closed,
+        divisor,
+        edges,
+        poly_edges,
+        param_boundary_cache,
+        sp,
+        tol,
+    } = input;
+    let param_boundaries = create_param_boundaries(
+        face_index,
+        boundaries,
+        surface,
+        ParamBoundaryInput {
+            edges,
+            poly_edges,
+            param_boundary_cache,
+            sp,
+            tol,
+        },
+    )?;
     let param_vertices = create_param_vertices(boundaries, &param_boundaries, edges);
     let mut duplicated_edges = duplicated_edges(boundaries.iter().flatten().map(|ei| ei.index));
     let vertices_on_divisor = enumerate_vertices_on_divisor(divisor, &param_vertices, surface)?;
@@ -515,14 +933,110 @@ where
 
 // --- create_param_boundaries ---
 
-fn create_param_boundaries<S: ParametricSurface3D>(
+fn nearest_periodic_parameter(
+    point: Point2,
+    reference: Point2,
+    periods: (Option<f64>, Option<f64>),
+) -> Point2 {
+    let (u_period, v_period) = periods;
+    let us = match u_period {
+        Some(period) => vec![-2.0 * period, -period, 0.0, period, 2.0 * period],
+        None => vec![0.0],
+    };
+    let vs = match v_period {
+        Some(period) => vec![-2.0 * period, -period, 0.0, period, 2.0 * period],
+        None => vec![0.0],
+    };
+    us.into_iter()
+        .flat_map(|du| {
+            vs.iter()
+                .copied()
+                .map(move |dv| point + Vector2::new(du, dv))
+        })
+        .min_by(|lhs, rhs| {
+            lhs.distance2(reference)
+                .total_cmp(&rhs.distance2(reference))
+        })
+        .unwrap_or(point)
+}
+
+fn boundary_to_exact_param_polys<C, S>(
+    face_index: usize,
     boundaries: &[Wire],
     surface: &S,
-    poly_edges: &[PolylineCurve<Point3>],
-    sp: impl SP<S>,
-) -> Option<Vec<Vec<PolylineCurve<Point2>>>> {
-    let closure = |boundary: &Wire| boundary_to_param_polys(boundary, surface, poly_edges, &sp);
-    boundaries.iter().map(closure).collect()
+    edges: &[Edge<C>],
+    param_boundary_cache: &mut ParamBoundaryCache,
+    tol: f64,
+) -> Option<Vec<Vec<PolylineCurve<Point2>>>>
+where
+    C: ParameterBoundary2D<S>,
+    S: ParametricSurface3D,
+{
+    let periods = (surface.u_period(), surface.v_period());
+    let mut previous = None;
+    boundaries
+        .iter()
+        .map(|boundary| {
+            boundary
+                .iter()
+                .map(|edge_index| {
+                    let key = (face_index, edge_index.index, edge_index.orientation);
+                    let mut poly = param_boundary_cache
+                        .entry(key)
+                        .or_insert_with(|| {
+                            edges[edge_index.index]
+                                .curve
+                                .parameter_boundary_2d(surface, tol)
+                                .map(PolylineCurve)
+                        })
+                        .clone()?;
+                    if !edge_index.orientation {
+                        poly.reverse();
+                    }
+                    let normalized = poly
+                        .into_iter()
+                        .map(|point| {
+                            let adjusted = previous
+                                .map(|reference| {
+                                    nearest_periodic_parameter(point, reference, periods)
+                                })
+                                .unwrap_or(point);
+                            previous = Some(adjusted);
+                            adjusted
+                        })
+                        .collect::<Vec<_>>();
+                    Some(PolylineCurve(normalized))
+                })
+                .collect()
+        })
+        .collect()
+}
+
+fn create_param_boundaries<C, S, Sp>(
+    face_index: usize,
+    boundaries: &[Wire],
+    surface: &S,
+    input: ParamBoundaryInput<'_, C, Sp>,
+) -> Option<Vec<Vec<PolylineCurve<Point2>>>>
+where
+    C: ParameterBoundary2D<S>,
+    S: ParametricSurface3D,
+    Sp: SP<S>,
+{
+    boundary_to_exact_param_polys(
+        face_index,
+        boundaries,
+        surface,
+        input.edges,
+        input.param_boundary_cache,
+        input.tol,
+    )
+    .or_else(|| {
+        let closure = |boundary: &Wire| {
+            boundary_to_param_polys(boundary, surface, input.poly_edges, &input.sp)
+        };
+        boundaries.iter().map(closure).collect()
+    })
 }
 
 fn boundary_to_param_polys<S: ParametricSurface3D>(
@@ -531,8 +1045,8 @@ fn boundary_to_param_polys<S: ParametricSurface3D>(
     poly_edges: &[PolylineCurve<Point3>],
     sp: impl SP<S>,
 ) -> Option<Vec<PolylineCurve<Point2>>> {
-    let oriented_polyline = oriented_polyline_mapper(poly_edges);
-    let poly_boundary: Vec<_> = boundary.iter().copied().map(oriented_polyline).collect();
+    let get_poly = closure_get_poly(poly_edges);
+    let poly_boundary: Vec<_> = boundary.iter().copied().map(get_poly).collect();
     let poly_wire_iter = PolyWireIter::try_new(&poly_boundary)?;
     let closure = poly_project_to_uv(surface, sp);
     let mut long_poly = poly_wire_iter.map(closure).collect::<Option<Vec<_>>>()?;
@@ -590,10 +1104,10 @@ fn poly_project_to_uv<'a, S: ParametricSurface3D>(
     move |pt| {
         let (mut u, mut v) = sp(surface, pt, previous)?;
         if let (Some(up), Some((u0, _))) = (up, previous) {
-            u = periodic_min_difference(u, u0, up);
+            u = get_mindiff(u, u0, up);
         }
         if let (Some(vp), Some((_, v0))) = (vp, previous) {
-            v = periodic_min_difference(v, v0, vp);
+            v = get_mindiff(v, v0, vp);
         }
         previous = Some((u, v));
         Some(Point2::new(u, v))
@@ -604,7 +1118,7 @@ fn abs_diff(previous: f64) -> impl Fn(&f64, &f64) -> std::cmp::Ordering {
     let f = move |x: &f64| f64::abs(x - previous);
     move |x: &f64, y: &f64| f(x).total_cmp(&f(y))
 }
-fn periodic_min_difference(u: f64, u0: f64, up: f64) -> f64 {
+fn get_mindiff(u: f64, u0: f64, up: f64) -> f64 {
     let closure = |i| u + i as f64 * up;
     (-2..=2).map(closure).min_by(abs_diff(u0)).unwrap_or(u)
 }
@@ -625,7 +1139,7 @@ fn boundary_into_domain<S: ParametricSurface3D>(vec: &mut Vec<Point2>, surface: 
         && !vec[0].near(&last)
     {
         let Point2 { x: u0, y: v0 } = last;
-        if surface.derivative_u(u0, v0).so_small() || surface.derivative_v(u0, v0).so_small() {
+        if surface.uder(u0, v0).so_small() || surface.vder(u0, v0).so_small() {
             vec.push(vec[0]);
         }
     }
@@ -671,6 +1185,12 @@ fn enumerate_vertices_on_divisor<S: ParametricSurface>(
     });
     let mut vertices_on_divisor = iter.collect::<Option<Vec<_>>>()?;
     vertices_on_divisor.sort_by(|(s, _), (t, _)| s.total_cmp(t));
+    vertices_on_divisor.dedup_by(|(_, (lhs_vertex, lhs_uv)), (_, (rhs_vertex, rhs_uv))| {
+        lhs_vertex == rhs_vertex || (*lhs_uv).near(&*rhs_uv)
+    });
+    if vertices_on_divisor.len() % 2 != 0 {
+        return None;
+    }
     Some(vertices_on_divisor)
 }
 
@@ -686,7 +1206,13 @@ where
     C: TryFrom<ParameterCurve<Line<Point2>, S>>,
     S: ParametricSurface3D,
 {
+    if !vertices_on_divisor.len().is_multiple_of(2) {
+        return None;
+    }
     let make_edge = move |p: &[(f64, (usize, Point2))]| {
+        if p.len() < 2 {
+            return None;
+        }
         let ((_, (v0, uv0)), (_, (v1, uv1))) = (p[0], p[1]);
         let pcurve = ParameterCurve::new(Line(uv0, uv1), surface.clone());
         poly_edges.push(PolylineCurve::from_curve(&pcurve, (0.0, 1.0), tol));
@@ -781,39 +1307,34 @@ fn construct_boundaries<C>(
     Some(new_boundaries)
 }
 
-// --- divide_face ---
-
-fn divide_face<S: ParametricSurface3D>(
-    Face {
-        boundaries,
-        surface,
-        orientation,
-    }: &mut Face<S>,
-    new_boundaries: Vec<Wire>,
-    poly_edges: &[PolylineCurve<Point3>],
-    sp: impl SP<S>,
-) -> Option<Vec<Face<S>>> {
-    let mut face_boundaries = assort_boundary(surface, new_boundaries, poly_edges, sp)?.into_iter();
-    *boundaries = face_boundaries.next()?;
-    let create_face = |boundaries| Face {
-        boundaries,
-        surface: surface.clone(),
-        orientation: *orientation,
-    };
-    Some(face_boundaries.map(create_face).collect())
-}
-
-fn assort_boundary<S>(
-    surface: &S,
-    boundaries: Vec<Wire>,
-    poly_edges: &[PolylineCurve<Point3>],
-    sp: impl SP<S>,
-) -> Option<Vec<Vec<Wire>>>
+fn assort_boundary<C, S, Sp>(input: AssortBoundaryInput<'_, C, S, Sp>) -> Option<Vec<Vec<Wire>>>
 where
+    C: ParameterBoundary2D<S>,
     S: ParametricSurface3D,
-{
+    Sp: SP<S>, {
+    let AssortBoundaryInput {
+        face_index,
+        surface,
+        boundaries,
+        edges,
+        poly_edges,
+        param_boundary_cache,
+        sp,
+        tol,
+    } = input;
     let (mut positives, mut negatives) = (Vec::new(), Vec::new());
-    let param_boundaries = create_param_boundaries(&boundaries, surface, poly_edges, sp)?;
+    let param_boundaries = create_param_boundaries(
+        face_index,
+        &boundaries,
+        surface,
+        ParamBoundaryInput {
+            edges,
+            poly_edges,
+            param_boundary_cache,
+            sp,
+            tol,
+        },
+    )?;
     boundaries
         .into_iter()
         .zip(param_boundaries)
@@ -840,6 +1361,45 @@ where
         .map(|vec| vec.into_iter().map(|(x, _)| x).collect())
         .collect();
     Some(res)
+}
+
+fn divide_face<C, S, Sp>(input: DivideFaceInput<'_, C, S, Sp>) -> Option<Vec<Face<S>>>
+where
+    S: ParametricSurface3D,
+    C: ParameterBoundary2D<S>,
+    Sp: SP<S>, {
+    let DivideFaceInput {
+        face_index,
+        face: Face {
+            boundaries,
+            surface,
+            orientation,
+        },
+        new_boundaries,
+        edges,
+        poly_edges,
+        param_boundary_cache,
+        sp,
+        tol,
+    } = input;
+    let mut face_boundaries = assort_boundary(AssortBoundaryInput {
+        face_index,
+        surface,
+        boundaries: new_boundaries,
+        edges,
+        poly_edges,
+        param_boundary_cache,
+        sp,
+        tol,
+    })?
+    .into_iter();
+    *boundaries = face_boundaries.next()?;
+    let create_face = |boundaries| Face {
+        boundaries,
+        surface: surface.clone(),
+        orientation: *orientation,
+    };
+    Some(face_boundaries.map(create_face).collect())
 }
 
 // --- connect_open_boundaries ---
@@ -904,7 +1464,7 @@ fn closure_take_back<C>(edges: &[Edge<C>]) -> impl Fn(EdgeIndex) -> usize + '_ {
     }
 }
 
-fn oriented_polyline_mapper<P: Clone>(
+fn closure_get_poly<P: Clone>(
     poly_edges: &[PolylineCurve<P>],
 ) -> impl Fn(EdgeIndex) -> PolylineCurve<P> + '_ {
     move |edge_index: EdgeIndex| {
@@ -985,4 +1545,149 @@ fn nearest_correction(
             .total_cmp(&p1.distance2(vertices[*w]))
     })?;
     Some((v0, v1))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use monstertruck_topology::Shell;
+    use std::f64::consts::PI;
+
+    type Surface = RevolutionSurface<Line<Point3>>;
+
+    #[derive(
+        Clone,
+        Debug,
+        ParametricCurve,
+        BoundedCurve,
+        ParameterDivision1D,
+        Cut,
+        SearchNearestParameterD1,
+    )]
+    enum Curve {
+        Line(Line<Point3>),
+        Arc(TrimmedCurve<Processor<UnitCircle<Point3>, Matrix4>>),
+        ParameterCurve(ParameterCurve<Line<Point2>, Surface>),
+    }
+
+    impl From<ParameterCurve<Line<Point2>, Surface>> for Curve {
+        fn from(value: ParameterCurve<Line<Point2>, Surface>) -> Self {
+            Self::ParameterCurve(value)
+        }
+    }
+
+    impl ParameterBoundary2D<Surface> for Curve {
+        fn parameter_boundary_2d(&self, surface: &Surface, tolerance: f64) -> Option<Vec<Point2>> {
+            match self {
+                Self::Line(curve) => curve.parameter_boundary_2d(surface, tolerance),
+                Self::Arc(curve) => curve.parameter_boundary_2d(surface, tolerance),
+                Self::ParameterCurve(curve) => curve.parameter_boundary_2d(surface, tolerance),
+            }
+        }
+    }
+
+    fn sp(surface: &Surface, point: Point3, hint: Option<(f64, f64)>) -> Option<(f64, f64)> {
+        surface.search_parameter(point, hint, 10)
+    }
+
+    fn simple_cylinder_shell() -> CompressedShell<Point3, Curve, Surface> {
+        let vertices = vec![
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(-1.0, 0.0, 0.0),
+            Point3::new(1.0, 0.0, 1.0),
+            Point3::new(-1.0, 0.0, 1.0),
+        ];
+        let translate = Matrix4::from_translation(Vector3::unit_z());
+        let edges = vec![
+            CompressedEdge {
+                vertices: (0, 1),
+                curve: Curve::Arc(TrimmedCurve::new(
+                    Processor::new(UnitCircle::new()),
+                    (0.0, PI),
+                )),
+            },
+            CompressedEdge {
+                vertices: (1, 0),
+                curve: Curve::Arc(TrimmedCurve::new(
+                    Processor::new(UnitCircle::new()),
+                    (PI, 2.0 * PI),
+                )),
+            },
+            CompressedEdge {
+                vertices: (0, 2),
+                curve: Curve::Line(Line(vertices[0], vertices[2])),
+            },
+            CompressedEdge {
+                vertices: (2, 3),
+                curve: Curve::Arc(TrimmedCurve::new(
+                    Processor::new(UnitCircle::new()).transformed(translate),
+                    (0.0, PI),
+                )),
+            },
+            CompressedEdge {
+                vertices: (3, 2),
+                curve: Curve::Arc(TrimmedCurve::new(
+                    Processor::new(UnitCircle::new()).transformed(translate),
+                    (PI, 2.0 * PI),
+                )),
+            },
+        ];
+        let surface = RevolutionSurface::by_revolution(
+            Line(vertices[2], vertices[0]),
+            Point3::origin(),
+            Vector3::unit_z(),
+        );
+        let faces = vec![Face {
+            surface,
+            boundaries: vec![vec![
+                CompressedEdgeIndex {
+                    index: 1,
+                    orientation: true,
+                },
+                CompressedEdgeIndex {
+                    index: 2,
+                    orientation: true,
+                },
+                CompressedEdgeIndex {
+                    index: 4,
+                    orientation: false,
+                },
+                CompressedEdgeIndex {
+                    index: 3,
+                    orientation: false,
+                },
+                CompressedEdgeIndex {
+                    index: 2,
+                    orientation: false,
+                },
+                CompressedEdgeIndex {
+                    index: 0,
+                    orientation: true,
+                },
+            ]],
+            orientation: true,
+        }];
+        CompressedShell {
+            vertices,
+            edges,
+            faces,
+            vertex_stable_ids: None,
+            edge_stable_ids: None,
+            face_stable_ids: None,
+        }
+    }
+
+    #[test]
+    fn split_closed_faces_reports_change_only_on_first_normalizing_pass() {
+        let mut shell = simple_cylinder_shell();
+
+        assert!(split_closed_faces(&mut shell, 0.01, sp));
+        assert!(Shell::extract(shell.clone()).is_ok());
+
+        let stabilized = shell.clone();
+        assert!(!split_closed_faces(&mut shell, 0.01, sp));
+        assert_eq!(shell.vertices, stabilized.vertices);
+        assert_eq!(shell.edges.len(), stabilized.edges.len());
+        assert_eq!(shell.faces.len(), stabilized.faces.len());
+    }
 }

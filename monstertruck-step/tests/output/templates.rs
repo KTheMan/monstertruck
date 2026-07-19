@@ -14,7 +14,7 @@ fn default_shell_template() {
 HEADER;
 FILE_DESCRIPTION(('Shape Data from monstertruck'), '2;1');
 FILE_NAME('', '{time_stamp}', (''), (''), 'monstertruck', '', '');
-FILE_SCHEMA(('ISO-10303-042'));
+FILE_SCHEMA(('AUTOMOTIVE_DESIGN'));
 ENDSEC;
 DATA;
 #1 = APPLICATION_PROTOCOL_DEFINITION('international standard', 'automotive_design', 2000, #2);
@@ -67,7 +67,7 @@ fn default_solid_template() {
 HEADER;
 FILE_DESCRIPTION(('Shape Data from monstertruck'), '2;1');
 FILE_NAME('', '{time_stamp}', (''), (''), 'monstertruck', '', '');
-FILE_SCHEMA(('ISO-10303-042'));
+FILE_SCHEMA(('AUTOMOTIVE_DESIGN'));
 ENDSEC;
 DATA;
 #1 = APPLICATION_PROTOCOL_DEFINITION('international standard', 'automotive_design', 2000, #2);
@@ -129,7 +129,7 @@ HEADER;
 FILE_DESCRIPTION(('Shape Data from monstertruck'), '2;1');
 FILE_NAME('AMAZING_PRODUCT.step', '{time_stamp}', ('Tensai', 'Genius', 'Bokusama'), \
 ('Great Awesome Co. Ltd.', 'Univ. Clever Genius', 'Senkai'), 'monstertruck', 'Kusanagi Sword', 'IT'S ME!');
-FILE_SCHEMA(('ISO-10303-042'));
+FILE_SCHEMA(('AUTOMOTIVE_DESIGN'));
 ENDSEC;
 DATA;
 #1 = APPLICATION_PROTOCOL_DEFINITION('international standard', 'automotive_design', 2000, #2);

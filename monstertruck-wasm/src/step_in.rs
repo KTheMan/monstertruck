@@ -40,7 +40,9 @@ impl Table {
     pub fn from_step(step_str: &str) -> Option<Table> {
         StepTable::from_step(step_str)
             .map(Table)
-            .map_err(|e| console::error!(format!("{e}")))
+            .map_err(|e| {
+                console::error!(format!("{e}"));
+            })
             .ok()
     }
     /// Gets shell indices.
@@ -50,7 +52,9 @@ impl Table {
         let stepshell = self.shell.get(&idx)?;
         let shell = self
             .to_compressed_shell(stepshell)
-            .map_err(|e| console::error!(format!("{e}")))
+            .map_err(|e| {
+                console::error!(format!("{e}"));
+            })
             .ok()?;
         Some(SubShapeFromStep::Shell(shell).into())
     }

@@ -1010,9 +1010,11 @@ impl TryFrom<&SurfaceCurve> for Curve3D {
             })
             .collect::<Result<Vec<_>, _>>()?;
         let kind = match value.kind {
-            SurfaceCurveEntityKind::Surface => step_geometry::SurfaceCurveKind::Surface,
-            SurfaceCurveEntityKind::Seam => step_geometry::SurfaceCurveKind::Seam,
-            SurfaceCurveEntityKind::Intersection => step_geometry::SurfaceCurveKind::Intersection,
+            SurfaceCurveEntityKind::Surface => step_geometry::SurfaceCurveKind::SurfaceCurve,
+            SurfaceCurveEntityKind::Seam => step_geometry::SurfaceCurveKind::SeamCurve,
+            SurfaceCurveEntityKind::Intersection => {
+                step_geometry::SurfaceCurveKind::IntersectionCurve
+            }
         };
         let master_representation = match value.master_representation {
             PreferredSurfaceCurveRepresentation::Curve3D => {
@@ -1917,10 +1919,12 @@ impl EdgeCurve {
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 let kind = match c.kind {
-                    SurfaceCurveEntityKind::Surface => step_geometry::SurfaceCurveKind::Surface,
-                    SurfaceCurveEntityKind::Seam => step_geometry::SurfaceCurveKind::Seam,
+                    SurfaceCurveEntityKind::Surface => {
+                        step_geometry::SurfaceCurveKind::SurfaceCurve
+                    }
+                    SurfaceCurveEntityKind::Seam => step_geometry::SurfaceCurveKind::SeamCurve,
                     SurfaceCurveEntityKind::Intersection => {
-                        step_geometry::SurfaceCurveKind::Intersection
+                        step_geometry::SurfaceCurveKind::IntersectionCurve
                     }
                 };
                 let master_representation = match c.master_representation {
@@ -2391,6 +2395,28 @@ impl TryFrom<&ItemDefinedTransformation> for Matrix4 {
         Ok(mat2 * inv)
     }
 }
+
+// Deprecated aliases for types renamed per RFC 430 (C-CASE).
+#[deprecated(note = "renamed to BsplineCurveForm per RFC 430 (C-CASE)")]
+pub type BSplineCurveForm = BsplineCurveForm;
+#[deprecated(note = "renamed to BsplineCurveWithKnots per RFC 430 (C-CASE)")]
+pub type BSplineCurveWithKnots = BsplineCurveWithKnots;
+#[deprecated(note = "renamed to NonRationalBsplineCurve per RFC 430 (C-CASE)")]
+pub type NonRationalBSplineCurve = NonRationalBsplineCurve;
+#[deprecated(note = "renamed to RationalBsplineCurve per RFC 430 (C-CASE)")]
+pub type RationalBSplineCurve = RationalBsplineCurve;
+#[deprecated(note = "renamed to BsplineCurveAny per RFC 430 (C-CASE)")]
+pub type BSplineCurveAny = BsplineCurveAny;
+#[deprecated(note = "renamed to BsplineSurfaceAny per RFC 430 (C-CASE)")]
+pub type BSplineSurfaceAny = BsplineSurfaceAny;
+#[deprecated(note = "renamed to BsplineSurfaceForm per RFC 430 (C-CASE)")]
+pub type BSplineSurfaceForm = BsplineSurfaceForm;
+#[deprecated(note = "renamed to BsplineSurfaceWithKnots per RFC 430 (C-CASE)")]
+pub type BSplineSurfaceWithKnots = BsplineSurfaceWithKnots;
+#[deprecated(note = "renamed to NonRationalBsplineSurface per RFC 430 (C-CASE)")]
+pub type NonRationalBSplineSurface = NonRationalBsplineSurface;
+#[deprecated(note = "renamed to RationalBsplineSurface per RFC 430 (C-CASE)")]
+pub type RationalBSplineSurface = RationalBsplineSurface;
 
 #[cfg(test)]
 mod tests {

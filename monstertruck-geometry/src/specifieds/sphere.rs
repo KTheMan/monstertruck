@@ -189,7 +189,7 @@ impl IncludeCurve<NurbsCurve<Vector4>> for Sphere {
             .all(move |(window, i)| {
                 let t = i as f64 / degree as f64;
                 let t = window[0] * (1.0 - t) + window[1] * t;
-                self.include(curve.evaluate(t))
+                self.include(curve.subs(t))
             })
     }
 }

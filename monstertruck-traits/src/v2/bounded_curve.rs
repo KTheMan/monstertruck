@@ -1,4 +1,3 @@
-use super::RangeTuple1D;
 use super::curve::ParametricCurve;
 
 /// Scalar-generic bounded parametric curve.
@@ -7,5 +6,5 @@ use super::curve::ParametricCurve;
 /// [`ParametricCurve`](super::ParametricCurve) trait.
 pub trait BoundedCurve: ParametricCurve {
     /// Returns the parameter range as `(t_start, t_end)`.
-    fn range_tuple(&self) -> RangeTuple1D<Self::Scalar>;
+    fn range_tuple(&self) -> (Self::Scalar, Self::Scalar);
 }

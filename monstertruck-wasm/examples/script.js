@@ -1,4 +1,4 @@
-import init, * as Truck from "./monstertruck_wasm.js";
+import init, * as Truck from "./truck_js.js";
 await init();
 
 const cw = 768;
@@ -237,7 +237,7 @@ function fileRead(e) {
       const table = Truck.Table.from_step(stepStr);
       const indices = table.shell_indices();
       for (let i = 0; i < indices.length; i++) {
-        shape[i] = table.shape(indices[i]);
+        shape[i] = table.get_shape(indices[i]);
       }
       if (typeof shape === "undefined") {
         console.warn("invalid step");

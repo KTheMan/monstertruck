@@ -351,13 +351,131 @@ ENDSEC;\n",
     }
 }
 
+/// SI prefix applied to the base metre length unit in a STEP `SI_UNIT`.
+///
+/// [`Display`]ing a prefix yields the STEP enumeration token, e.g.
+/// [`SiPrefix::Milli`] -> `.MILLI.`. [`SiPrefix::None`] yields `$`, the STEP
+/// "unset optional" marker used when the unit is the unscaled metre.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SiPrefix {
+    /// `10^18`.
+    Exa,
+    /// `10^15`.
+    Peta,
+    /// `10^12`.
+    Tera,
+    /// `10^9`.
+    Giga,
+    /// `10^6`.
+    Mega,
+    /// `10^3`.
+    Kilo,
+    /// `10^2`.
+    Hecto,
+    /// `10^1`.
+    Deca,
+    /// No prefix -- the unscaled base unit.
+    None,
+    /// `10^-1`.
+    Deci,
+    /// `10^-2`.
+    Centi,
+    /// `10^-3`.
+    Milli,
+    /// `10^-6`.
+    Micro,
+    /// `10^-9`.
+    Nano,
+    /// `10^-12`.
+    Pico,
+    /// `10^-15`.
+    Femto,
+    /// `10^-18`.
+    Atto,
+}
+
+impl Display for SiPrefix {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        f.write_str(match self {
+            SiPrefix::Exa => ".EXA.",
+            SiPrefix::Peta => ".PETA.",
+            SiPrefix::Tera => ".TERA.",
+            SiPrefix::Giga => ".GIGA.",
+            SiPrefix::Mega => ".MEGA.",
+            SiPrefix::Kilo => ".KILO.",
+            SiPrefix::Hecto => ".HECTO.",
+            SiPrefix::Deca => ".DECA.",
+            SiPrefix::None => "$",
+            SiPrefix::Deci => ".DECI.",
+            SiPrefix::Centi => ".CENTI.",
+            SiPrefix::Milli => ".MILLI.",
+            SiPrefix::Micro => ".MICRO.",
+            SiPrefix::Nano => ".NANO.",
+            SiPrefix::Pico => ".PICO.",
+            SiPrefix::Femto => ".FEMTO.",
+            SiPrefix::Atto => ".ATTO.",
+        })
+    }
+}
+
+/// Length unit and distance accuracy written into the
+/// `GEOMETRIC_REPRESENTATION_CONTEXT` preamble of a saved model.
+///
+/// The default preserves the historical output: millimetre lengths and a
+/// `distance_accuracy_value` of `1.0E-6`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct StepMeasurementContext {
+    /// SI prefix of the base metre length unit.
+    pub length_prefix: SiPrefix,
+    /// `distance_accuracy_value` written into the `UNCERTAINTY_MEASURE_WITH_UNIT`.
+    pub distance_accuracy_value: f64,
+}
+
+impl Default for StepMeasurementContext {
+    fn default() -> Self {
+        Self {
+            length_prefix: SiPrefix::Milli,
+            distance_accuracy_value: 1.0e-6,
+        }
+    }
+}
+
+impl StepMeasurementContext {
+    /// STEP `REAL` literal for the distance accuracy value.
+    pub(super) fn accuracy(&self) -> StepReal { StepReal(self.distance_accuracy_value) }
+}
+
+/// Formats an `f64` as a STEP `REAL` literal: shortest round-tripping form with
+/// an uppercase exponent and a mantissa that always carries a decimal point.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct StepReal(pub f64);
+
+impl Display for StepReal {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        let text = format!("{:E}", self.0);
+        let (mantissa, exponent) = match text.split_once('E') {
+            Some((mantissa, exponent)) => (mantissa, Some(exponent)),
+            None => (text.as_str(), None),
+        };
+        f.write_str(mantissa)?;
+        if !mantissa.contains('.') {
+            f.write_str(".0")?;
+        }
+        match exponent {
+            Some(exponent) => f.write_fmt(format_args!("E{exponent}")),
+            None => Ok(()),
+        }
+    }
+}
+
 /// Display model with configurations
-pub struct StepModel<'a, P, C, S>(PreStepModel<'a, P, C, S>);
+pub struct StepModel<'a, P, C, S>(PreStepModel<'a, P, C, S>, StepMeasurementContext);
 
 /// Display models with configurations
 pub struct StepModels<'a, P, C, S> {
     models: Vec<PreStepModel<'a, P, C, S>>,
     next_idx: usize,
+    measurement_context: StepMeasurementContext,
 }
 
 impl<P, C, S> Debug for StepModel<'_, P, C, S> {
@@ -405,7 +523,11 @@ impl<T> CompleteStepDisplay<T> {
                 organization: header.organization,
                 origination_system: header.organization_system,
                 authorization: header.authorization,
-                schema: "ISO-10303-042".to_string(),
+                // The schema identifier must name the EXPRESS schema the file
+                // populates, not an ISO 10303 part number. The data section
+                // declares the `automotive_design` (AP214) application
+                // protocol, whose schema is `AUTOMOTIVE_DESIGN`.
+                schema: "AUTOMOTIVE_DESIGN".to_string(),
             },
         }
     }

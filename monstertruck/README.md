@@ -9,7 +9,7 @@ Enable only what you need, or use `full` for everything.
 
 ```toml
 [dependencies]
-monstertruck = { version = "0.2", features = ["full"] }
+monstertruck = { version = "0.1", features = ["full"] }
 ```
 
 ### Example -- spheres on cube corners with booleans and fillet
@@ -21,18 +21,12 @@ for the full runnable version with STEP export.
 
 ```rust
 use monstertruck_modeling::*;
-use monstertruck_solid::{difference, fillet_edges_by_id, or, FilletOptions};
+use monstertruck_solid::{difference, fillet_edges, or, FilletOptions};
 use std::f64::consts::PI;
 
 fn sphere(center: Point3, radius: f64) -> Solid {
     let top = builder::vertex(Point3::new(0.0, radius, 0.0));
-    let wire: Wire = builder::revolve(
-        &top,
-        Point3::origin(),
-        Vector3::unit_x(),
-        builder::SweepAngle::Partial(Rad(PI)),
-        3,
-    );
+    let wire: Wire = builder::revolve(&top, Point3::origin(), Vector3::unit_x(), Rad(PI), 3);
     let shell = builder::cone(&wire, Vector3::unit_y(), Rad(7.0), 4);
     builder::translated(&Solid::new(vec![shell]), center.to_vec())
 }
@@ -76,7 +70,7 @@ fn main() -> anyhow::Result<()> {
         .flat_map(|face| face.edge_iter())
         .map(|e| e.id())
         .collect();
-    fillet_edges_by_id(&mut shell, &edge_ids, Some(&FilletOptions::constant(0.05)))?;
+    fillet_edges(&mut shell, &edge_ids, Some(&FilletOptions::constant(0.05)))?;
 
     let result = Solid::new(vec![shell]);
     std::fs::write("output.json", serde_json::to_vec_pretty(&result)?)?;

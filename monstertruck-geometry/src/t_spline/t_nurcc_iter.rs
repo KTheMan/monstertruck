@@ -60,15 +60,17 @@ impl<P> Iterator for TnurccAcwPointIter<P> {
     type Item = Arc<RwLock<TnurccEdge<P>>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let ret = self.cur.as_ref().map(Arc::clone);
-        let edge = self.cur.as_ref()?;
+        let edge = Arc::clone(self.cur.as_ref()?);
+        let ret = Some(Arc::clone(&edge));
+
+        // Is point the origin or dest?
         let end = edge.read().point_end(Arc::clone(&self.point))?;
 
-        // Get the next ACW edge for point.
+        // Get the next ACW edge for point
         let new_edge = edge.read().acw_edge_from_end(end);
 
-        // If the new edge is the starting edge, stop the iterator by setting `cur` to none.
-        // Otherwise, keep going.
+        // If the new edge is the starting edge, stop the iterator by setting cur to none
+        // Otherwise, keep going
         if std::ptr::eq(self.start.as_ref(), new_edge.as_ref()) {
             self.cur = None;
         } else {
@@ -83,15 +85,17 @@ impl<P> Iterator for TnurccAcwFaceIter<P> {
     type Item = Arc<RwLock<TnurccEdge<P>>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let ret = self.cur.as_ref().map(Arc::clone);
-        let edge = self.cur.as_ref()?;
+        let edge = Arc::clone(self.cur.as_ref()?);
+        let ret = Some(Arc::clone(&edge));
+
+        // Is point the origin or dest?
         let side = edge.read().face_side(Arc::clone(&self.face))?;
 
-        // Get the next ACW edge for point.
+        // Get the next ACW edge for point
         let new_edge = edge.read().acw_edge_from_side(side);
 
-        // If the new edge is the starting edge, stop the iterator by setting `cur` to none.
-        // Otherwise, keep going.
+        // If the new edge is the starting edge, stop the iterator by setting cur to none
+        // Otherwise, keep going
         if std::ptr::eq(self.start.as_ref(), new_edge.as_ref()) {
             self.cur = None;
         } else {

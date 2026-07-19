@@ -287,6 +287,10 @@ struct WindowHandler {
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub struct RenderId(usize);
 
+/// Renamed to [`RenderId`] per RFC 430 (C-CASE).
+#[deprecated(note = "renamed to RenderId per RFC 430 (C-CASE)")]
+pub type RenderID = RenderId;
+
 /// Configuration for studio to shoot the scene.
 #[derive(Debug, Clone)]
 pub struct StudioConfig {

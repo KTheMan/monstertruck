@@ -327,7 +327,7 @@ fn shell_topology() -> Shell<Point3, PolylineCurve<Point3>, PolygonMesh> {
     );
 
     vec![
-        Face::new(
+        Face::try_new(
             vec![
                 vec![e[0].clone(), e[1].clone(), e[2].clone(), e[3].clone()].into(),
                 vec![
@@ -339,11 +339,13 @@ fn shell_topology() -> Shell<Point3, PolylineCurve<Point3>, PolygonMesh> {
                 .into(),
             ],
             polygon0,
-        ),
-        Face::new(
+        )
+        .unwrap(),
+        Face::try_new(
             vec![vec![e[0].clone(), e[6].inverse(), e[5].inverse(), e[4].inverse()].into()],
             polygon1,
         )
+        .unwrap()
         .inverse(),
     ]
     .into()

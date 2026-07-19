@@ -68,10 +68,49 @@ fn fillet_box_edge() {
     let initial_face_count = shell.len();
 
     let params = FilletOptions {
-        radius: FilletRadius::Constant(0.4),
+        radius: RadiusSpec::Constant(0.4),
         ..Default::default()
     };
     fillet_edges(&mut shell, &[edge[5].clone()], Some(&params)).unwrap();
 
     assert!(shell.len() > initial_face_count);
+}
+
+/// A shell containing a curve with no exact NURBS representation must refuse
+/// with a typed error, not silently resample it into a polyline NURBS.
+#[test]
+fn fillet_refuses_non_exact_curve_typed() {
+    let p = [
+        Point3::new(0.0, 0.0, 0.0),
+        Point3::new(1.0, 0.0, 0.0),
+        Point3::new(1.0, 1.0, 0.0),
+        Point3::new(0.0, 1.0, 0.0),
+    ];
+    let v: Vec<Vertex> = Vertex::from_points(p);
+    let plane = Plane::new(p[0], p[1], p[3]);
+    // A parameter curve (pcurve on the plane) tracing the bottom edge: it has
+    // no exact NURBS conversion, so filleting must refuse typed.
+    let pcurve = Curve::ParameterCurve(ParameterCurve::new(
+        Curve2D::Line(Line(Point2::new(0.0, 0.0), Point2::new(1.0, 0.0))),
+        Box::new(Surface::Plane(plane)),
+    ));
+    let edge = [
+        Edge::new(&v[0], &v[1], pcurve),
+        Edge::new(&v[1], &v[2], Curve::Line(Line(p[1], p[2]))),
+        Edge::new(&v[2], &v[3], Curve::Line(Line(p[2], p[3]))),
+        Edge::new(&v[3], &v[0], Curve::Line(Line(p[3], p[0]))),
+    ];
+    let wire: Wire = edge.iter().cloned().collect();
+    let face = Face::new(vec![wire], Surface::Plane(plane));
+    let mut shell: Shell = vec![face].into();
+
+    let params = FilletOptions {
+        radius: RadiusSpec::Constant(0.1),
+        ..Default::default()
+    };
+    let result = fillet_edges(&mut shell, &edge[..1], Some(&params));
+    assert!(
+        matches!(result, Err(FilletError::UnsupportedGeometry { .. })),
+        "expected typed refusal, got {result:?}"
+    );
 }

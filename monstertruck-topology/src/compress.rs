@@ -8,8 +8,6 @@
 //! They directly reflect the results of parsing data from json or STEP, and all member variables are public.
 //! Boundary connectivity and closure are checked when converting to proprietary data structures, `Vertex`, `Edge`, and so on.
 
-use std::hash::Hasher as _;
-
 use monstertruck_core::{ContentHasher, DeterministicContentHash};
 use rustc_hash::FxHashMap as HashMap;
 use serde::{Deserialize, Serialize};
@@ -197,7 +195,7 @@ impl<P: Clone, C: Clone> CompressDirector<P, C> {
         }
     }
     #[inline(always)]
-    fn vertex_index(&mut self, vertex: &Vertex<P>) -> usize {
+    fn get_vid(&mut self, vertex: &Vertex<P>) -> usize {
         let id = self.vmap.len();
         let vid = vertex.id();
         self.vertex_stable_ids
@@ -210,13 +208,13 @@ impl<P: Clone, C: Clone> CompressDirector<P, C> {
     }
 
     #[inline(always)]
-    fn edge_index(&mut self, edge: &Edge<P, C>) -> CompressedEdgeIndex {
+    fn get_eid(&mut self, edge: &Edge<P, C>) -> CompressedEdgeIndex {
         match self.emap.get(&edge.id()) {
             Some(got) => (got.0, edge.orientation()).into(),
             None => {
                 let id = self.emap.len();
-                let front_id = self.vertex_index(edge.absolute_front());
-                let back_id = self.vertex_index(edge.absolute_back());
+                let front_id = self.get_vid(edge.absolute_front());
+                let back_id = self.get_vid(edge.absolute_back());
                 let curve = edge.curve();
                 let cedge = CompressedEdge {
                     vertices: (front_id, back_id),
@@ -232,7 +230,7 @@ impl<P: Clone, C: Clone> CompressDirector<P, C> {
 
     #[inline(always)]
     fn create_boundary(&mut self, boundary: &Wire<P, C>) -> Vec<CompressedEdgeIndex> {
-        boundary.iter().map(|edge| self.edge_index(edge)).collect()
+        boundary.iter().map(|edge| self.get_eid(edge)).collect()
     }
 
     #[inline(always)]
@@ -248,7 +246,7 @@ impl<P: Clone, C: Clone> CompressDirector<P, C> {
         boundary
             .iter()
             .map(|edge| {
-                let CompressedEdgeIndex { index, orientation } = self.edge_index(edge);
+                let CompressedEdgeIndex { index, orientation } = self.get_eid(edge);
                 CompressedEdgeUse {
                     index,
                     orientation,
@@ -372,10 +370,12 @@ impl<P: Clone, C: Clone, S: Clone> Shell<P, C, S> {
     ) -> CompressedTrimmedShell<P, C, S, <C as ExactParameterBoundary2D<S>>::BoundaryCurve>
     where C: ExactParameterBoundary2D<S> {
         self.compress_with_face_trims(|edge, surface| {
-            edge.curve().exact_parameter_boundary_2d(surface)
+            edge.with_curve(|curve| curve.exact_parameter_boundary_2d(surface))
         })
     }
+}
 
+impl<P, C, S> Shell<P, C, S> {
     /// Extracts the serialized compressed shell into the shell.
     ///
     /// # Errors

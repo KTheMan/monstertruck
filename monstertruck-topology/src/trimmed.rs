@@ -228,7 +228,7 @@ impl<P: Clone, C: Clone> TrimmedCompressDirector<P, C> {
         }
     }
 
-    fn vertex_index(&mut self, vertex: &Vertex<P>) -> usize {
+    fn get_vid(&mut self, vertex: &Vertex<P>) -> usize {
         let id = self.vmap.len();
         self.vmap
             .entry(vertex.id())
@@ -236,13 +236,13 @@ impl<P: Clone, C: Clone> TrimmedCompressDirector<P, C> {
             .0
     }
 
-    fn edge_index(&mut self, edge: &Edge<P, C>) -> CompressedEdgeIndex {
+    fn get_eid(&mut self, edge: &Edge<P, C>) -> CompressedEdgeIndex {
         if let Some((index, _)) = self.emap.get(&edge.id()) {
             (*index, edge.orientation()).into()
         } else {
             let index = self.emap.len();
-            let front_id = self.vertex_index(edge.absolute_front());
-            let back_id = self.vertex_index(edge.absolute_back());
+            let front_id = self.get_vid(edge.absolute_front());
+            let back_id = self.get_vid(edge.absolute_back());
             let cedge = CompressedEdge {
                 vertices: (front_id, back_id),
                 curve: edge.curve(),
@@ -283,7 +283,7 @@ impl<P: Clone, C: Clone, S: Clone, T: Clone> From<&TrimmedShell<P, C, S, T>>
                             .zip(trim_wire.iter())
                             .map(|(edge, trim_curve)| {
                                 let CompressedEdgeIndex { index, orientation } =
-                                    director.edge_index(edge);
+                                    director.get_eid(edge);
                                 CompressedEdgeUse {
                                     index,
                                     orientation,

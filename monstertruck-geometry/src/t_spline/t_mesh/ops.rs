@@ -73,7 +73,7 @@ where P: ControlPoint<f64>
         dir: TmeshDirection,
         knot_ratio: f64,
     ) -> Result<Arc<RwLock<TmeshControlPoint<P>>>> {
-        match p.read().connection_type(dir) {
+        match p.read().con_type(dir) {
             TmeshConnectionType::Edge => return Err(Error::TmeshControlPointNotFound),
             TmeshConnectionType::Tjunction => return Err(Error::TmeshConnectionNotFound),
             _ => {}
@@ -98,7 +98,7 @@ where P: ControlPoint<f64>
         // [+] is the new control point to be inserted
         // <+> may or may not exist (can only insert if they are replaced with edge conditions)
         center_points.push({
-            match p.read().connection_type(dir.flip()) {
+            match p.read().con_type(dir.flip()) {
                 // Retrieve connected point
                 TmeshConnectionType::Point => Arc::clone(&p.read().connected_point(dir.flip())),
                 TmeshConnectionType::Edge => return Err(Error::TmeshControlPointNotFound),
@@ -116,7 +116,7 @@ where P: ControlPoint<f64>
         center_points.push({
             let borrow = center_points[2].read();
 
-            match borrow.connection_type(dir.flip()) {
+            match borrow.con_type(dir.flip()) {
                 // Retrieve connected point
                 TmeshConnectionType::Point => Arc::clone(&borrow.connected_point(dir)),
                 TmeshConnectionType::Edge => return Err(Error::TmeshControlPointNotFound),
@@ -272,7 +272,7 @@ where P: ControlPoint<f64>
             .filter(|point| (point.read().knot_coordinates().0 - knot_coords.0).so_small())
             // Filter those points to only include the point that straddles the T axis of insertion
             .filter(|point| {
-                if let Some(con) = point.read().connection(TmeshDirection::Up) {
+                if let Some(con) = point.read().get(TmeshDirection::Up) {
                     let temp_t_coord = point.read().knot_coordinates().1;
                     let temp_inter = con.1;
 
@@ -318,7 +318,7 @@ where P: ControlPoint<f64>
             .filter(|point| (point.read().knot_coordinates().1 - knot_coords.1).so_small())
             // Filter those points to only include the point that straddles the S axis of insertion
             .filter(|point| {
-                if let Some(con) = point.read().connection(TmeshDirection::Right) {
+                if let Some(con) = point.read().get(TmeshDirection::Right) {
                     let temp_s_coord = point.read().knot_coordinates().0;
                     let temp_inter = con.1;
 
@@ -393,7 +393,7 @@ where P: ControlPoint<f64>
         let mut h_t_levels: Vec<f64> = Vec::new();
         for cp in self.control_points.iter() {
             let r = cp.read();
-            if let Some(con) = r.connection(TmeshDirection::Right) {
+            if let Some(con) = r.get(TmeshDirection::Right) {
                 let cp_s = r.knot_coordinates().0;
                 let cp_t = r.knot_coordinates().1;
                 let ki = con.1;
@@ -419,7 +419,7 @@ where P: ControlPoint<f64>
         let mut v_s_levels: Vec<f64> = Vec::new();
         for cp in self.control_points.iter() {
             let r = cp.read();
-            if let Some(con) = r.connection(TmeshDirection::Up) {
+            if let Some(con) = r.get(TmeshDirection::Up) {
                 let cp_s = r.knot_coordinates().0;
                 let cp_t = r.knot_coordinates().1;
                 let ki = con.1;
@@ -458,7 +458,7 @@ where P: ControlPoint<f64>
     ///
     /// # Borrows
     /// Immutably borrows every control point in `self`.
-    pub fn try_evaluate(&self, s: f64, t: f64) -> Result<P> {
+    pub fn subs(&self, s: f64, t: f64) -> Result<P> {
         // Generate knot vectors if stale.
         if self.knot_vectors.read().is_none() {
             self.generate_knot_vectors()?;
@@ -549,8 +549,8 @@ impl<P> fmt::Display for Tmesh<P> {
                 .iter()
                 .find(|p| p.read().knot_coordinates().0 == *s_level)
             {
-                vertical_cons[i] = point.read().connection_type(TmeshDirection::Up)
-                    != TmeshConnectionType::Tjunction;
+                vertical_cons[i] =
+                    point.read().con_type(TmeshDirection::Up) != TmeshConnectionType::Tjunction;
             }
         }
         write!(f, "       ")?;
@@ -576,17 +576,15 @@ impl<P> fmt::Display for Tmesh<P> {
                     .iter()
                     .find(|p| p.read().knot_coordinates().0 == *s_level)
                 {
-                    if point.read().connection_type(TmeshDirection::Left)
-                        == TmeshConnectionType::Edge
-                    {
+                    if point.read().con_type(TmeshDirection::Left) == TmeshConnectionType::Edge {
                         line.push_str("--");
                         has_left_edge = true;
                     }
 
                     line.push('+');
-                    vertical_cons[i] = point.read().connection_type(TmeshDirection::Down)
+                    vertical_cons[i] = point.read().con_type(TmeshDirection::Down)
                         != TmeshConnectionType::Tjunction;
-                    line.push_str(match point.read().connection_type(TmeshDirection::Right) {
+                    line.push_str(match point.read().con_type(TmeshDirection::Right) {
                         TmeshConnectionType::Edge => "--",
                         TmeshConnectionType::Point => {
                             has_right_edge = true;
@@ -683,9 +681,7 @@ where P: Clone
         let righties: Vec<_> = self
             .control_points()
             .iter()
-            .filter(|p| {
-                p.read().connection_type(TmeshDirection::Right) == TmeshConnectionType::Point
-            })
+            .filter(|p| p.read().con_type(TmeshDirection::Right) == TmeshConnectionType::Point)
             .map(Arc::clone)
             .collect();
 
@@ -710,7 +706,7 @@ where P: Clone
         let uppies: Vec<_> = self
             .control_points()
             .iter()
-            .filter(|p| p.read().connection_type(TmeshDirection::Up) == TmeshConnectionType::Point)
+            .filter(|p| p.read().con_type(TmeshDirection::Up) == TmeshConnectionType::Point)
             .map(Arc::clone)
             .collect();
 
@@ -771,7 +767,7 @@ where P: Clone
             // sub-vectors in point_connections will be ordered in the same way, and will be read the same
             // way during connection establishment.
             for dir in TmeshDirection::iter() {
-                match point.read().connection_type(dir) {
+                match point.read().con_type(dir) {
                     // Some((None, f64))
                     TmeshConnectionType::Edge => last.push(Some((
                         None,
@@ -788,7 +784,7 @@ where P: Clone
                         (Some(
                             self.control_points
                                 .iter()
-                                .position(|p| std::ptr::eq(p.as_ref(), connected_point.as_ref())).expect("All connected points must be stored in t_mesh control_points vector"),
+                                .position(|p| std::ptr::eq(p.as_ref(), connected_point.as_ref())).expect("All connected points must be stored in tmesh control_points vector"),
                         ), point.read().connection_knot(dir).expect("Point connection types must have a knot interval.")),
                     ))
                     }
@@ -812,7 +808,7 @@ where P: Clone
                     if let Some(con_index) = con.0 {
                         // Connections has already been established. Connect will also add the connection to points_copy[con_index],
                         // so when points_copy[con_index] is reached by 'points_loop, the connection will already exist, so we skip it.
-                        if points_copy[point_index].read().connection_type(dir)
+                        if points_copy[point_index].read().con_type(dir)
                             == TmeshConnectionType::Point
                         {
                             continue 'connections_loop;
@@ -842,7 +838,7 @@ where P: Clone
                     } else {
                         points_copy[point_index]
                             .write()
-                            .set_edge_connection_weight(dir, con.1)
+                            .set_edge_con_weight(dir, con.1)
                             .expect(
                                 "Unmodified control points have edge conditions in all directions.",
                             );
@@ -920,8 +916,8 @@ where P: ControlPoint<f64> + Debug + Clone
         quad_faces: &[[usize; 4]],
         subdivision_levels: usize,
     ) -> Result<Self> {
-        let t_nurcc_surface = TnurccSurface::from_quad_mesh(positions, quad_faces)?;
-        t_nurcc_surface.to_t_mesh(subdivision_levels)
+        let tnurcc = Tnurcc::from_quad_mesh(positions, quad_faces)?;
+        tnurcc.to_tmesh(subdivision_levels)
     }
 
     /// Converts a cubic `BsplineSurface` into a T-mesh with a regular rectangular grid.

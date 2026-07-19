@@ -14,29 +14,29 @@ where T: StepFormat + StepLength
     fn step_length(&self) -> usize { StepLength::step_length(self) }
 }
 
-enum StepAssociatedGeometry<'a, S> {
+enum StepAssociatedGeometry<'a> {
     ExactParameterCurve(&'a dyn StepAssociatedEntity),
-    Surface(&'a S),
+    /// Reference to an already-emitted surface entity (the adjacent face's
+    /// surface). It emits nothing and claims no entity index; the enclosing
+    /// `SURFACE_CURVE` argument list points at the stored index directly,
+    /// instead of re-emitting the whole surface once per bounding edge.
+    SurfaceRef(usize),
 }
 
-impl<S> StepFormat for StepAssociatedGeometry<'_, S>
-where S: StepFormat + StepLength
-{
+impl StepFormat for StepAssociatedGeometry<'_> {
     fn fmt(&self, idx: usize, formatter: &mut Formatter<'_>) -> Result {
         match self {
             Self::ExactParameterCurve(curve) => curve.fmt(idx, formatter),
-            Self::Surface(surface) => StepFormat::fmt(surface, idx, formatter),
+            Self::SurfaceRef(_) => Ok(()),
         }
     }
 }
 
-impl<S> StepLength for StepAssociatedGeometry<'_, S>
-where S: StepLength
-{
+impl StepLength for StepAssociatedGeometry<'_> {
     fn step_length(&self) -> usize {
         match self {
             Self::ExactParameterCurve(curve) => curve.step_length(),
-            Self::Surface(surface) => surface.step_length(),
+            Self::SurfaceRef(_) => 0,
         }
     }
 }
@@ -47,15 +47,24 @@ struct StepFace<'a, S> {
     surface: &'a S,
 }
 
-struct StepSurfaceCurve<'a, C, S> {
-    leader: &'a C,
-    associated_geometry: Vec<StepAssociatedGeometry<'a, S>>,
+/// An edge-to-geometry association captured before surface entity indices are
+/// assigned. [`StepShell::from_parts`] resolves each [`Self::FaceSurface`] to a
+/// [`StepAssociatedGeometry::SurfaceRef`] once the face surface indices exist,
+/// so a surface is emitted once (as the face geometry) and referenced, not
+/// duplicated, per bounding edge.
+enum EdgeAssociationSource<'a> {
+    ExactParameterCurve(&'a dyn StepAssociatedEntity),
+    /// Position of the adjacent face in the shell's face list.
+    FaceSurface(usize),
 }
 
-impl<C, S> StepFormat for StepSurfaceCurve<'_, C, S>
-where
-    C: StepFormat + StepLength,
-    S: StepFormat + StepLength,
+struct StepSurfaceCurve<'a, C> {
+    leader: &'a C,
+    associated_geometry: Vec<StepAssociatedGeometry<'a>>,
+}
+
+impl<C> StepFormat for StepSurfaceCurve<'_, C>
+where C: StepFormat + StepLength
 {
     fn fmt(&self, idx: usize, formatter: &mut Formatter<'_>) -> Result {
         let leader_idx = idx + 1;
@@ -64,9 +73,17 @@ where
                 Vec::<usize>::with_capacity(self.associated_geometry.len()),
                 leader_idx + self.leader.step_length(),
             ),
-            |(mut indices, cursor), entry| {
-                indices.push(cursor);
-                (indices, cursor + StepLength::step_length(entry))
+            |(mut indices, cursor), entry| match entry {
+                // A referenced surface contributes the referenced index and no
+                // cursor advance -- nothing new is emitted for it.
+                StepAssociatedGeometry::SurfaceRef(surface_idx) => {
+                    indices.push(*surface_idx);
+                    (indices, cursor)
+                }
+                _ => {
+                    indices.push(cursor);
+                    (indices, cursor + StepLength::step_length(entry))
+                }
             },
         );
         formatter.write_fmt(format_args!(
@@ -81,10 +98,8 @@ where
     }
 }
 
-impl<C, S> StepLength for StepSurfaceCurve<'_, C, S>
-where
-    C: StepLength,
-    S: StepLength,
+impl<C> StepLength for StepSurfaceCurve<'_, C>
+where C: StepLength
 {
     fn step_length(&self) -> usize {
         1 + self.leader.step_length()
@@ -96,21 +111,19 @@ where
     }
 }
 
-impl<C, S> StepCurve for StepSurfaceCurve<'_, C, S>
+impl<C> StepCurve for StepSurfaceCurve<'_, C>
 where C: StepCurve
 {
     fn same_sense(&self) -> bool { self.leader.same_sense() }
 }
 
-enum StepEdgeGeometry<'a, C, S> {
+enum StepEdgeGeometry<'a, C> {
     Curve(&'a C),
-    SurfaceCurve(StepSurfaceCurve<'a, C, S>),
+    SurfaceCurve(StepSurfaceCurve<'a, C>),
 }
 
-impl<C, S> StepFormat for StepEdgeGeometry<'_, C, S>
-where
-    C: StepFormat + StepLength,
-    S: StepFormat + StepLength,
+impl<C> StepFormat for StepEdgeGeometry<'_, C>
+where C: StepFormat + StepLength
 {
     fn fmt(&self, idx: usize, formatter: &mut Formatter<'_>) -> Result {
         match self {
@@ -120,10 +133,8 @@ where
     }
 }
 
-impl<C, S> StepLength for StepEdgeGeometry<'_, C, S>
-where
-    C: StepLength,
-    S: StepLength,
+impl<C> StepLength for StepEdgeGeometry<'_, C>
+where C: StepLength
 {
     fn step_length(&self) -> usize {
         match self {
@@ -133,7 +144,7 @@ where
     }
 }
 
-impl<C, S> StepCurve for StepEdgeGeometry<'_, C, S>
+impl<C> StepCurve for StepEdgeGeometry<'_, C>
 where C: StepCurve
 {
     fn same_sense(&self) -> bool {
@@ -153,7 +164,7 @@ pub(super) struct StepShell<'a, P, C, S> {
     ep_edges: usize,
     ep_vertices: usize,
     surface_indices: Vec<usize>,
-    edge_geometries: Vec<StepEdgeGeometry<'a, C, S>>,
+    edge_geometries: Vec<StepEdgeGeometry<'a, C>>,
     curve_indices: Vec<usize>,
     ep_points: usize,
     is_open: bool,
@@ -175,7 +186,7 @@ where
                 surface: &face.surface,
             })
             .collect::<Vec<_>>();
-        let edge_associations = std::iter::repeat_with(Vec::<StepAssociatedGeometry<'a, S>>::new)
+        let edge_associations = std::iter::repeat_with(Vec::<EdgeAssociationSource<'a>>::new)
             .take(shell.edges.len())
             .collect::<Vec<_>>();
         Self::from_parts(
@@ -198,15 +209,14 @@ where
                 surface: &face.surface,
             })
             .collect::<Vec<_>>();
-        let mut edge_associations =
-            std::iter::repeat_with(Vec::<StepAssociatedGeometry<'a, S>>::new)
-                .take(shell.edges.len())
-                .collect::<Vec<_>>();
-        faces.iter().for_each(|face| {
+        let mut edge_associations = std::iter::repeat_with(Vec::<EdgeAssociationSource<'a>>::new)
+            .take(shell.edges.len())
+            .collect::<Vec<_>>();
+        faces.iter().enumerate().for_each(|(face_pos, face)| {
             face.boundaries.iter().for_each(|wire| {
                 wire.iter().for_each(|ce| {
                     if let Some(associations) = edge_associations.get_mut(ce.index) {
-                        associations.push(StepAssociatedGeometry::Surface(face.surface));
+                        associations.push(EdgeAssociationSource::FaceSurface(face_pos));
                     }
                 });
             });
@@ -262,18 +272,17 @@ where
                 surface: &face.surface,
             })
             .collect::<Vec<_>>();
-        let mut edge_associations =
-            std::iter::repeat_with(Vec::<StepAssociatedGeometry<'a, S>>::new)
-                .take(shell.edges.len())
-                .collect::<Vec<_>>();
-        shell.faces.iter().for_each(|face| {
+        let mut edge_associations = std::iter::repeat_with(Vec::<EdgeAssociationSource<'a>>::new)
+            .take(shell.edges.len())
+            .collect::<Vec<_>>();
+        shell.faces.iter().enumerate().for_each(|(face_pos, face)| {
             face.boundaries.iter().for_each(|wire| {
                 wire.iter().for_each(|edge_use| {
                     let association = edge_use
                         .trim_curve
                         .as_ref()
-                        .map(|trim_curve| StepAssociatedGeometry::ExactParameterCurve(trim_curve))
-                        .unwrap_or_else(|| StepAssociatedGeometry::Surface(&face.surface));
+                        .map(|trim_curve| EdgeAssociationSource::ExactParameterCurve(trim_curve))
+                        .unwrap_or(EdgeAssociationSource::FaceSurface(face_pos));
                     edge_associations[edge_use.index].push(association);
                 });
             });
@@ -292,7 +301,7 @@ where
         vertices: &'a [P],
         edges: &'a [CompressedEdge<C>],
         faces: Vec<StepFace<'a, S>>,
-        mut edge_associations: Vec<Vec<StepAssociatedGeometry<'a, S>>>,
+        mut edge_associations: Vec<Vec<EdgeAssociationSource<'a>>>,
         idx: usize,
         is_open: bool,
     ) -> Self {
@@ -302,8 +311,12 @@ where
             .map(|face| {
                 let res = cursor;
                 cursor += match face.boundaries.is_empty() {
+                    // `advanced_face`, `face_bound`, `vertex_loop`,
+                    // `vertex_point`, `point_on_surface`.
                     true => 5,
                     false => {
+                        // One `advanced_face` plus, per boundary, a `face_bound`,
+                        // an `edge_loop`, and one `oriented_edge` per edge.
                         1 + face
                             .boundaries
                             .iter()
@@ -329,12 +342,26 @@ where
             .iter()
             .enumerate()
             .map(|(i, edge)| {
-                if edge_associations[i].is_empty() {
+                let sources = std::mem::take(&mut edge_associations[i]);
+                if sources.is_empty() {
                     StepEdgeGeometry::Curve(&edge.curve)
                 } else {
+                    // Resolve each face-surface association to a reference to
+                    // that face's already-counted surface entity.
+                    let associated_geometry = sources
+                        .into_iter()
+                        .map(|source| match source {
+                            EdgeAssociationSource::ExactParameterCurve(curve) => {
+                                StepAssociatedGeometry::ExactParameterCurve(curve)
+                            }
+                            EdgeAssociationSource::FaceSurface(face_pos) => {
+                                StepAssociatedGeometry::SurfaceRef(surface_indices[face_pos])
+                            }
+                        })
+                        .collect();
                     StepEdgeGeometry::SurfaceCurve(StepSurfaceCurve {
                         leader: &edge.curve,
-                        associated_geometry: std::mem::take(&mut edge_associations[i]),
+                        associated_geometry,
                     })
                 }
             })
@@ -409,8 +436,14 @@ where
                     f.boundaries.iter().map(closure).collect()
                 }
             };
+            // `advanced_face` is the AP203/AP214/AP242 canonical shell face: a
+            // `face_surface` subtype placed directly into the shell instead of
+            // an `oriented_face`/`face_surface` pair. The former pair's face
+            // orientation is folded into `same_sense` as `orientation ==
+            // surface same_sense`, so a reload rebuilds the same
+            // `CompressedFace` orientation.
             formatter.write_fmt(format_args!(
-                "#{idx} = FACE_SURFACE('', {face_bound}, #{face_geometry}, {same_sense});\n",
+                "#{idx} = ADVANCED_FACE('', {face_bound}, #{face_geometry}, {same_sense});\n",
                 same_sense = BooleanDisplay(f.orientation == f.surface.same_sense()),
                 face_bound = IndexSliceDisplay(face_bounds.clone()),
             ))?;
@@ -435,7 +468,7 @@ where
                 formatter.write_fmt(format_args!(
                     "#{face_bound_idx} = FACE_BOUND('', #{edge_loop_idx}, {orientation});
 #{edge_loop_idx} = EDGE_LOOP('', {oriented_edge_indices});\n",
-                    orientation = BooleanDisplay(f.orientation),
+                    orientation = BooleanDisplay(true),
                     oriented_edge_indices =
                         IndexSliceDisplay(ep_oriented_edges..ep_oriented_edges + b.len()),
                 ))?;
@@ -694,7 +727,9 @@ where
     C: StepLength,
     S: StepLength,
 {
-    fn from(shell: &'a CompressedShell<P, C, S>) -> Self { Self(shell.into()) }
+    fn from(shell: &'a CompressedShell<P, C, S>) -> Self {
+        Self(shell.into(), StepMeasurementContext::default())
+    }
 }
 
 impl<'a, P, C, S> From<&'a CompressedSolid<P, C, S>> for StepModel<'a, P, C, S>
@@ -703,7 +738,9 @@ where
     C: StepLength,
     S: StepLength,
 {
-    fn from(solid: &'a CompressedSolid<P, C, S>) -> Self { Self(solid.into()) }
+    fn from(solid: &'a CompressedSolid<P, C, S>) -> Self {
+        Self(solid.into(), StepMeasurementContext::default())
+    }
 }
 
 impl<'a, P, C, S> StepModel<'a, P, C, S>
@@ -714,15 +751,30 @@ where
 {
     /// Creates a STEP model that exports only shared 3-dimensional edge curves.
     pub fn from_curve3d_only_shell(shell: &'a CompressedShell<P, C, S>) -> Self {
-        Self(PreStepModel::Shell(StepShell::new_curve3d_only(
-            shell, 17, true,
-        )))
+        Self(
+            PreStepModel::Shell(StepShell::new_curve3d_only(shell, 17, true)),
+            StepMeasurementContext::default(),
+        )
     }
 
     /// Creates a STEP model that exports only shared 3-dimensional edge curves.
     pub fn from_curve3d_only_solid(solid: &'a CompressedSolid<P, C, S>) -> Self {
-        Self(PreStepModel::Solid(StepSolid::new_curve3d_only(solid, 16)))
+        Self(
+            PreStepModel::Solid(StepSolid::new_curve3d_only(solid, 16)),
+            StepMeasurementContext::default(),
+        )
     }
+
+    /// Overrides the length unit and distance accuracy written into the
+    /// representation-context preamble. The default preserves millimetre
+    /// lengths and a `1.0E-6` `distance_accuracy_value`.
+    pub fn with_measurement_context(mut self, context: StepMeasurementContext) -> Self {
+        self.1 = context;
+        self
+    }
+
+    /// Returns the length unit and distance accuracy written into the preamble.
+    pub fn measurement_context(&self) -> StepMeasurementContext { self.1 }
 }
 
 impl<'a, P, C, S, T> From<&'a CompressedTrimmedShell<P, C, S, T>> for StepModel<'a, P, C, S>
@@ -732,7 +784,9 @@ where
     S: StepLength,
     T: StepFormat + StepLength,
 {
-    fn from(shell: &'a CompressedTrimmedShell<P, C, S, T>) -> Self { Self(shell.into()) }
+    fn from(shell: &'a CompressedTrimmedShell<P, C, S, T>) -> Self {
+        Self(shell.into(), StepMeasurementContext::default())
+    }
 }
 
 impl<'a, P, C, S, T> From<&'a CompressedTrimmedSolid<P, C, S, T>> for StepModel<'a, P, C, S>
@@ -742,7 +796,9 @@ where
     S: StepLength,
     T: StepFormat + StepLength,
 {
-    fn from(solid: &'a CompressedTrimmedSolid<P, C, S, T>) -> Self { Self(solid.into()) }
+    fn from(solid: &'a CompressedTrimmedSolid<P, C, S, T>) -> Self {
+        Self(solid.into(), StepMeasurementContext::default())
+    }
 }
 
 impl<P, C, S> Display for StepModel<'_, P, C, S>
@@ -752,7 +808,9 @@ where
     S: StepFormat + StepLength + StepSurface,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        f.pad(
+        let length_prefix = self.1.length_prefix;
+        let accuracy = self.1.accuracy();
+        f.write_fmt(format_args!(
 "#1 = APPLICATION_PROTOCOL_DEFINITION('international standard', 'automotive_design', 2000, #2);
 #2 = APPLICATION_CONTEXT('core data for automotive mechanical design processes');
 #3 = SHAPE_DEFINITION_REPRESENTATION(#4, #10);
@@ -769,11 +827,11 @@ where
     GLOBAL_UNIT_ASSIGNED_CONTEXT((#12, #13, #14))
     REPRESENTATION_CONTEXT('Context #1', '3D Context with UNIT and UNCERTAINTY')
 );
-#12 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) );
+#12 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT({length_prefix},.METRE.) );
 #13 = ( NAMED_UNIT(*) PLANE_ANGLE_UNIT() SI_UNIT($,.RADIAN.) );
 #14 = ( NAMED_UNIT(*) SI_UNIT($,.STERADIAN.) SOLID_ANGLE_UNIT() );
-#15 = UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.0E-6), #12, 'distance_accuracy_value','confusion accuracy');\n"
-        )?;
+#15 = UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE({accuracy}), #12, 'distance_accuracy_value','confusion accuracy');\n"
+        ))?;
         Display::fmt(&self.0, f)
     }
 }
@@ -783,6 +841,7 @@ impl<P, C, S> Default for StepModels<'_, P, C, S> {
         Self {
             models: Vec::new(),
             next_idx: 16,
+            measurement_context: StepMeasurementContext::default(),
         }
     }
 }
@@ -795,6 +854,17 @@ where
 {
     /// The next available entity index after all pushed models.
     pub fn next_idx(&self) -> usize { self.next_idx }
+
+    /// Overrides the length unit and distance accuracy written into the
+    /// representation-context preamble. The default preserves millimetre
+    /// lengths and a `1.0E-6` `distance_accuracy_value`.
+    pub fn with_measurement_context(mut self, context: StepMeasurementContext) -> Self {
+        self.measurement_context = context;
+        self
+    }
+
+    /// Returns the length unit and distance accuracy written into the preamble.
+    pub fn measurement_context(&self) -> StepMeasurementContext { self.measurement_context }
     /// push a shell to step models
     pub fn push_shell(&mut self, shell: &'a CompressedShell<P, C, S>) {
         let model = PreStepModel::Shell(StepShell::new(shell, self.next_idx + 1, true));
@@ -863,7 +933,11 @@ where
                 model
             })
             .collect();
-        Self { models, next_idx }
+        Self {
+            models,
+            next_idx,
+            measurement_context: StepMeasurementContext::default(),
+        }
     }
 }
 
@@ -883,7 +957,11 @@ where
                 model
             })
             .collect();
-        Self { models, next_idx }
+        Self {
+            models,
+            next_idx,
+            measurement_context: StepMeasurementContext::default(),
+        }
     }
 }
 
@@ -905,7 +983,11 @@ where
                 model
             })
             .collect();
-        Self { models, next_idx }
+        Self {
+            models,
+            next_idx,
+            measurement_context: StepMeasurementContext::default(),
+        }
     }
 }
 
@@ -927,7 +1009,11 @@ where
                 model
             })
             .collect();
-        Self { models, next_idx }
+        Self {
+            models,
+            next_idx,
+            measurement_context: StepMeasurementContext::default(),
+        }
     }
 }
 
@@ -955,17 +1041,19 @@ where
         f.write_fmt(format_args!(
             "#10 = ADVANCED_BREP_SHAPE_REPRESENTATION('', {models_slice}, #11);\n"
         ))?;
-        f.pad("#11 = (
+        let length_prefix = self.measurement_context.length_prefix;
+        let accuracy = self.measurement_context.accuracy();
+        f.write_fmt(format_args!("#11 = (
     GEOMETRIC_REPRESENTATION_CONTEXT(3) 
     GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((#15))
     GLOBAL_UNIT_ASSIGNED_CONTEXT((#12, #13, #14))
     REPRESENTATION_CONTEXT('Context #1', '3D Context with UNIT and UNCERTAINTY')
 );
-#12 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) );
+#12 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT({length_prefix},.METRE.) );
 #13 = ( NAMED_UNIT(*) PLANE_ANGLE_UNIT() SI_UNIT($,.RADIAN.) );
 #14 = ( NAMED_UNIT(*) SI_UNIT($,.STERADIAN.) SOLID_ANGLE_UNIT() );
-#15 = UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.0E-6), #12, 'distance_accuracy_value','confusion accuracy');\n"
-        )?;
+#15 = UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE({accuracy}), #12, 'distance_accuracy_value','confusion accuracy');\n"
+        ))?;
         self.models
             .iter()
             .try_for_each(|model| Display::fmt(model, f))

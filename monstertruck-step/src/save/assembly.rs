@@ -24,12 +24,13 @@ const COMMON_REPRESENTATION_CONTEXT_INDEX: usize = 2;
 const GLOBAL_IDENTITY_MATRIX: usize =
     COMMON_REPRESENTATION_CONTEXT_INDEX + MonstertruckRepresentationContext::LENGTH;
 
-/// Boilerplate representation-context preamble used by every emitted STEP
-/// file: a three-dimensional geometric context with millimetre lengths,
-/// radian angles, steradian solid angles, and a 1e-6 distance accuracy
-/// tolerance.
+/// Representation-context preamble used by every emitted STEP file: a
+/// three-dimensional geometric context whose length unit and distance
+/// accuracy come from the wrapped [`StepMeasurementContext`] (millimetre
+/// lengths and a `1.0E-6` tolerance by default), with radian angles and
+/// steradian solid angles.
 #[derive(Clone, Copy, Debug)]
-struct MonstertruckRepresentationContext;
+struct MonstertruckRepresentationContext(StepMeasurementContext);
 
 impl StepFormat for MonstertruckRepresentationContext {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
@@ -38,6 +39,8 @@ impl StepFormat for MonstertruckRepresentationContext {
         let plane_angle_unit_idx = idx + 2;
         let solid_angle_unit_idx = idx + 3;
         let tolerance_idx = idx + 4;
+        let length_prefix = self.0.length_prefix;
+        let accuracy = self.0.accuracy();
         f.write_fmt(format_args!(
 "#{context_idx} = (
     GEOMETRIC_REPRESENTATION_CONTEXT(3)
@@ -45,10 +48,10 @@ impl StepFormat for MonstertruckRepresentationContext {
     GLOBAL_UNIT_ASSIGNED_CONTEXT((#{length_unit_idx}, #{plane_angle_unit_idx}, #{solid_angle_unit_idx}))
     REPRESENTATION_CONTEXT('Context #1', '3D Context with UNIT and UNCERTAINTY')
 );
-#{length_unit_idx} = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.));
+#{length_unit_idx} = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT({length_prefix},.METRE.));
 #{plane_angle_unit_idx} = ( NAMED_UNIT(*) PLANE_ANGLE_UNIT() SI_UNIT($,.RADIAN.) );
 #{solid_angle_unit_idx} = ( NAMED_UNIT(*) SI_UNIT($,.STERADIAN.) SOLID_ANGLE_UNIT() );
-#{tolerance_idx} = UNCERTAINTY_MEASURE_WITH_UNIT(1.0E-6, \
+#{tolerance_idx} = UNCERTAINTY_MEASURE_WITH_UNIT({accuracy}, \
 #{length_unit_idx}, 'distance_accuracy_value', 'confusion accuracy');\n"
         ))
     }
@@ -247,6 +250,7 @@ impl StepLength for EdgeDisplay<'_> {
 pub struct StepDesign<Model, Models, Matrix = Matrix4> {
     assembly: Assembly<Models, PartAttributes, Matrix, PartAttributes>,
     application_context: String,
+    measurement_context: StepMeasurementContext,
     _model_ty: std::marker::PhantomData<Model>,
 }
 
@@ -257,6 +261,7 @@ impl<Model, Models, Matrix> StepDesign<Model, Models, Matrix> {
         Self {
             assembly,
             application_context: "generated shape data".to_string(),
+            measurement_context: StepMeasurementContext::default(),
             _model_ty: std::marker::PhantomData,
         }
     }
@@ -270,9 +275,23 @@ impl<Model, Models, Matrix> StepDesign<Model, Models, Matrix> {
         Self {
             assembly,
             application_context,
+            measurement_context: StepMeasurementContext::default(),
             _model_ty: std::marker::PhantomData,
         }
     }
+
+    /// Overrides the length unit and distance accuracy written into the
+    /// representation-context preamble. The default preserves millimetre
+    /// lengths and a `1.0E-6` `distance_accuracy_value`.
+    #[inline]
+    pub fn with_measurement_context(mut self, context: StepMeasurementContext) -> Self {
+        self.measurement_context = context;
+        self
+    }
+
+    /// Returns the length unit and distance accuracy written into the preamble.
+    #[inline]
+    pub fn measurement_context(&self) -> StepMeasurementContext { self.measurement_context }
 }
 
 impl<Model> StepDesign<Model, Option<Model>, Matrix4> {
@@ -297,7 +316,7 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         use std::collections::HashMap;
         let representation_context_display = StepDisplay::new(
-            MonstertruckRepresentationContext,
+            MonstertruckRepresentationContext(self.measurement_context),
             COMMON_REPRESENTATION_CONTEXT_INDEX,
         );
         let application_context = &self.application_context;

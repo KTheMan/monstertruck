@@ -1,6 +1,6 @@
 [package]
 name = "monstertruck-modeling"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["Yoshinori Tanimura <tanimura@ricos.co.jp>", "Moritz Moeller <virtualritz@protonmail.com>"]
 edition = "2024"
 description = "Integrated geometric and topological modeling algorithms"
@@ -35,3 +35,5 @@ ttf-parser = { workspace = true, optional = true }
 anyhow = { workspace = true }
 proptest = { workspace = true }
 serde_json = { workspace = true }
+monstertruck-core = { workspace = true }
+monstertruck-topology = { workspace = true }

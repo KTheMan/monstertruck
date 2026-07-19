@@ -44,6 +44,7 @@ pub mod decorators;
 /// T-Spline and T-NURCC surface types.
 pub mod t_spline;
 
+mod analytic_surface;
 /// [`DeterministicContentHash`](monstertruck_core::DeterministicContentHash) impls for geometry types.
 mod content_hash_impls;
 
@@ -54,6 +55,10 @@ mod parameter_boundary;
 /// re-export all modules.
 pub mod prelude {
     use crate::*;
+    pub use analytic_surface::{
+        AnalyticSurfaceKind, HomogeneousExtrusionSurface, SphericalRevolutionSurface,
+        SurfaceParameterAxis, TryIntoAnalyticSurfaceKind,
+    };
     pub use base::*;
     pub use bspline_conversion::{
         SupportsExactPatchDomains, TryIntoBsplineSurface, TryIntoHomogeneousBsplineCurve,

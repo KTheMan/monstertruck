@@ -22,12 +22,24 @@ pub(super) fn take_ori<T>(ori: bool, (a, b): (T, T)) -> T {
     }
 }
 
+/// Prints a sub-step failure diagnostic when `MT_FILLET_DEBUG` is set, so a
+/// `GeometryFailed("cut face by bezier")` can be localized without a
+/// debugger.
+fn cut_debug(message: impl FnOnce() -> String) {
+    if std::env::var_os("MT_FILLET_DEBUG").is_some() {
+        eprintln!("debug cut_face_by_bezier: {}", message());
+    }
+}
+
 pub(super) fn cut_face_by_bezier(
     face: &Face,
     mut bezier: NurbsCurve<Vector4>,
     filleted_edge_id: EdgeId,
 ) -> Option<(Face, Edge)> {
-    let (front_edge, back_edge) = find_adjacent_edge(face, filleted_edge_id)?;
+    let Some((front_edge, back_edge)) = find_adjacent_edge(face, filleted_edge_id) else {
+        cut_debug(|| format!("adjacent edges not found for {filleted_edge_id:?}"));
+        return None;
+    };
 
     let new_front_edge = {
         let curve = front_edge.curve();
@@ -37,10 +49,28 @@ pub(super) fn cut_face_by_bezier(
             (bezier.range_tuple(), curve.range_tuple()),
             10,
         );
-        let (t0, t1) = search_closest_parameter(&bezier, &curve, hint, 100)?;
-        let v0 = Vertex::new(bezier.evaluate(t0));
+        let Some((t0, t1)) = search_closest_parameter(&bezier, &curve, hint, 100) else {
+            cut_debug(|| format!("front closest-parameter search failed (hint={hint:?})"));
+            return None;
+        };
+        let v0 = Vertex::new(bezier.subs(t0));
         bezier = bezier.cut(t0);
-        front_edge.not_strictly_cut_with_parameter(&v0, t1)?.0
+        let Some(cut) = front_edge.not_strictly_cut_with_parameter(&v0, t1) else {
+            cut_debug(|| {
+                let (b0, b1) = bezier.range_tuple();
+                format!(
+                    "front edge cut failed at t={t1} (edge range {:?}); \
+                     t0={t0} rail=({:?})..({:?}) edge=({:?})..({:?})",
+                    curve.range_tuple(),
+                    bezier.subs(b0),
+                    bezier.subs(b1),
+                    front_edge.front().point(),
+                    front_edge.back().point(),
+                )
+            });
+            return None;
+        };
+        cut.0
     };
 
     let new_back_edge = {
@@ -51,10 +81,32 @@ pub(super) fn cut_face_by_bezier(
             (bezier.range_tuple(), curve.range_tuple()),
             10,
         );
-        let (t0, t1) = search_closest_parameter(&bezier, &curve, hint, 100)?;
-        let v1 = Vertex::new(bezier.evaluate(t0));
+        let Some((t0, t1)) = search_closest_parameter(&bezier, &curve, hint, 100) else {
+            cut_debug(|| {
+                let (b0, b1) = bezier.range_tuple();
+                format!(
+                    "back closest-parameter search failed (hint={hint:?}); \
+                     rail=({:?})..({:?}) edge=({:?})..({:?})",
+                    bezier.subs(b0),
+                    bezier.subs(b1),
+                    back_edge.front().point(),
+                    back_edge.back().point(),
+                )
+            });
+            return None;
+        };
+        let v1 = Vertex::new(bezier.subs(t0));
         bezier.cut(t0);
-        back_edge.not_strictly_cut_with_parameter(&v1, t1)?.1
+        let Some(cut) = back_edge.not_strictly_cut_with_parameter(&v1, t1) else {
+            cut_debug(|| {
+                format!(
+                    "back edge cut failed at t={t1} (edge range {:?})",
+                    curve.range_tuple()
+                )
+            });
+            return None;
+        };
+        cut.1
     };
 
     let fillet_edge = Edge::new(new_front_edge.back(), new_back_edge.front(), bezier.into());
@@ -82,7 +134,13 @@ pub(super) fn cut_face_by_bezier(
             boundary
         })
         .collect::<Vec<_>>();
-    let mut new_face = Face::try_new(new_boundaries, face.surface()).ok()?;
+    let mut new_face = match Face::try_new(new_boundaries, face.surface()) {
+        Ok(new_face) => new_face,
+        Err(error) => {
+            cut_debug(|| format!("rebuilt boundary rejected: {error}"));
+            return None;
+        }
+    };
     if !face.orientation() {
         new_face.invert();
     }
@@ -272,6 +330,7 @@ pub(super) fn fillet_surfaces_along_wire(
                 fillet_division,
                 radius_on_edge,
                 extend,
+                false,
             )?;
             if first_wire {
                 rs.pop();

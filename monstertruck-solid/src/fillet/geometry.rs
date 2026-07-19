@@ -46,35 +46,15 @@ fn circum_center(pt0: Point3, pt1: Point3, pt2: Point3) -> Point3 {
 }
 
 fn unit_circle_arc(angle: Rad<f64>, w0: f64, w1: f64) -> NurbsCurve<Vector4> {
-    use monstertruck_core::newton::{self, CalcOutput};
     let p0 = Vector3::new(w0, 0.0, w0);
     let p1 = Vector3::new(Rad::cos(angle), Rad::sin(angle), 1.0) * w1;
-    let pt = Vector3::new(Rad::cos(angle / 2.0), Rad::sin(angle / 2.0), 1.0);
-    let d = p1 - p0;
-    let function = |Vector2 { x, y }| CalcOutput {
-        value: Vector2::new(
-            x * x + y * y - 0.5,
-            d.x * x + d.y * y + d.z / f64::sqrt(2.0),
-        ),
-        derivation: Matrix2::new(2.0 * x, d.x, 2.0 * y, d.y),
-    };
-    let Vector2 { x, y } = match newton::solve(function, pt.truncate(), 100) {
-        Ok(solution) => solution,
-        Err(_) => pt.truncate(),
-    };
-
-    let n = Vector3::new(x, y, 1.0 / f64::sqrt(2.0));
-    let y_axis = Vector3::new(-n.x, -n.y, n.z);
-    let x_axis = y_axis.cross(n);
-    let parab_apex = n * n.dot(p0);
-
-    let xt = (p0 + p1).dot(x_axis) / 2.0;
-    let d0 = p0 - parab_apex;
-    let (x0, y0) = (d0.dot(x_axis), d0.dot(y_axis));
-    let yt = y0 / (x0 * x0) * xt * xt;
-    let pt = parab_apex + xt * x_axis + yt * y_axis;
-
-    let c = 2.0 * pt - (p0 + p1) / 2.0;
+    let (sin_half, cos_half) = (angle / 2.0).sin_cos();
+    let middle_weight = f64::sqrt(w0 * w1);
+    let c = Vector3::new(
+        middle_weight * cos_half,
+        middle_weight * sin_half,
+        middle_weight * cos_half,
+    );
     let mut curve = BsplineCurve::new(
         KnotVector::bezier_knot(2),
         vec![
@@ -91,7 +71,7 @@ fn unit_circle_arc(angle: Rad<f64>, w0: f64, w1: f64) -> NurbsCurve<Vector4> {
 }
 
 #[inline(always)]
-pub(super) fn unit_circle_knot_vector() -> KnotVector { KnotVector::uniform_knot(2, 4) }
+pub(super) fn unit_circle_knot_vec() -> KnotVector { KnotVector::uniform_knot(2, 4) }
 
 #[inline(always)]
 pub(super) const fn number_of_cpts_of_unit_circle() -> usize { 6 }
@@ -99,7 +79,7 @@ pub(super) const fn number_of_cpts_of_unit_circle() -> usize { 6 }
 #[test]
 fn unit_circle_info() {
     let uc = unit_circle_arc(Rad(PI), 1.0, 1.0);
-    assert_eq!(uc.knot_vector(), &unit_circle_knot_vector());
+    assert_eq!(uc.knot_vector(), &unit_circle_knot_vec());
     assert_eq!(uc.control_points().len(), number_of_cpts_of_unit_circle());
 }
 
@@ -116,14 +96,14 @@ proptest::proptest! {
         const N: usize = 10;
         for i in 0..=N {
             let t = i as f64 / N as f64;
-            let p = uc.evaluate(t).to_vec();
-            let v = uc.derivative(t);
+            let p = uc.subs(t).to_vec();
+            let v = uc.der(t);
             prop_assert_near!(p.magnitude2(), 1.0, "{w0} {w1} {p:?} {angle}");
             prop_assert!(p.z.so_small2());
             prop_assert!(p.x * v.y - p.y * v.x > 0.0, "minus area {:?}", uc.control_point(1));
         }
-        prop_assert_near!(uc.evaluate(0.0), Point3::new(1.0, 0.0, 0.0));
-        prop_assert_near!(uc.evaluate(1.0), Point3::new(f64::cos(angle), f64::sin(angle), 0.0));
+        prop_assert_near!(uc.subs(0.0), Point3::new(1.0, 0.0, 0.0));
+        prop_assert_near!(uc.subs(1.0), Point3::new(f64::cos(angle), f64::sin(angle), 0.0));
     }
 }
 
@@ -144,7 +124,7 @@ pub(super) fn composite_line_bezier(
     let curve = ParameterCurve::new(line, surface.non_rationalized());
     let degree = surface.udegree() + surface.vdegree();
     let points = (0..=degree)
-        .map(|i| curve.evaluate(i as f64 / degree as f64))
+        .map(|i| curve.subs(i as f64 / degree as f64))
         .collect::<Vec<_>>();
     interpolate_bezier(&points)
 }
@@ -173,10 +153,17 @@ impl RelaySphere {
         // origin and normal
         plane1: (Point3, Vector3),
         radius: f64,
+        flip_side: bool,
     ) -> Option<(Point3, Point3, Point3)> {
         let ((p, der), (p0, n0), (p1, n1)) = (point_on_curve, plane0, plane1);
         let n = n0.cross(n1);
-        let sign = f64::signum(n.dot(der));
+        // Which side of the edge the sphere sits on is keyed off the seam
+        // direction relative to the surface normals; `flip_side` selects the
+        // opposite solution for shells wound the other way (swapping the
+        // faces cannot flip it: that negates both the cross product and
+        // `der`, leaving the sign invariant).
+        let orientation = if flip_side { -1.0 } else { 1.0 };
+        let sign = f64::signum(n.dot(der)) * orientation;
         let mat = Matrix3::from_cols(n, n0, n1).transpose();
         let vec = Vector3::new(
             n.dot(p.to_vec()),
@@ -194,8 +181,8 @@ impl RelaySphere {
         (u, v): (f64, f64),
         (p, q): (Point3, Point3),
     ) -> Option<(Point3, (f64, f64))> {
-        let uder = surface.derivative_u(u, v);
-        let vder = surface.derivative_v(u, v);
+        let uder = surface.uder(u, v);
+        let vder = surface.vder(u, v);
         let d = q - p;
         let uu = uder.dot(uder);
         let uv = uder.dot(vder);
@@ -204,7 +191,7 @@ impl RelaySphere {
         let vec = Vector2::new(uder.dot(d), vder.dot(d));
         let del = mat.invert()? * vec;
         let (u, v) = (u + del.x, v + del.y);
-        Some((surface.evaluate(u, v), (u, v)))
+        Some((surface.subs(u, v), (u, v)))
     }
 
     pub(super) fn generate(
@@ -220,6 +207,7 @@ impl RelaySphere {
              + SearchNearestParameter<SurfaceParameter, Point = Point3>
          ),
         radius: f64,
+        flip_side: bool,
     ) -> Option<Self> {
         let (p, der) = point_on_curve;
         let (mut p0, mut p1) = (p, p);
@@ -233,7 +221,7 @@ impl RelaySphere {
         let mut center = Point3::origin();
         for _ in 0..100 {
             let (n0, n1) = (surface0.normal(u0, v0), surface1.normal(u1, v1));
-            let (c, q0, q1) = Self::contact_point((p, der), (p0, n0), (p1, n1), radius)?;
+            let (c, q0, q1) = Self::contact_point((p, der), (p0, n0), (p1, n1), radius, flip_side)?;
             if p0.near(&q0) && p1.near(&q1) {
                 center = c;
                 converged = true;
@@ -270,6 +258,7 @@ pub(super) fn relay_spheres(
     division: usize,
     radius: impl Fn(f64) -> f64,
     extend: bool,
+    flip_side: bool,
 ) -> Option<Vec<RelaySphere>> {
     let (t0, t1) = curve.range_tuple();
     let generator = move |i: isize| {
@@ -281,10 +270,11 @@ pub(super) fn relay_spheres(
                 let b = a + offset;
                 let t = (1.0 - b) * t0 + b * t1;
                 RelaySphere::generate(
-                    (curve.evaluate(t), curve.derivative(t)),
+                    (curve.subs(t), curve.der(t)),
                     surface0,
                     surface1,
                     radius(b),
+                    flip_side,
                 )
             })
     };
@@ -299,12 +289,12 @@ pub(super) fn relay_spheres(
 fn almost_fillet_patch(rs0: RelaySphere, rs1: RelaySphere) -> BsplineSurface<Vector4> {
     let nurbs0 = rs0.fillet_wire();
     let nurbs1 = rs1.fillet_wire();
-    let knot_vectors = (KnotVector::bezier_knot(1), nurbs0.knot_vector().clone());
+    let knot_vecs = (KnotVector::bezier_knot(1), nurbs0.knot_vector().clone());
     let control_points = vec![
         nurbs0.control_points().clone(),
         nurbs1.control_points().clone(),
     ];
-    BsplineSurface::new(knot_vectors, control_points)
+    BsplineSurface::new(knot_vecs, control_points)
 }
 
 pub(super) fn expand_fillet(
@@ -331,12 +321,12 @@ pub(super) fn expand_fillet(
         let fillet_wires = iter
             .map(|(i, (p0, p1))| {
                 let t = i as f64 / (cpts0.len() - 1) as f64;
-                let transit = transit_line.evaluate(t);
+                let transit = transit_line.subs(t);
                 circle_arc_by_three_points(*p0, *p1, transit)
             })
             .collect::<Vec<_>>();
         let homo_surface = BsplineSurface::new(
-            (bezier0.knot_vector().clone(), unit_circle_knot_vector()),
+            (bezier0.knot_vector().clone(), unit_circle_knot_vec()),
             fillet_wires
                 .into_iter()
                 .map(|wire| BsplineCurve::from(wire).destruct().1)
@@ -360,8 +350,8 @@ pub(super) fn expand_fillet(
         .map(|curve| curve.destruct().1)
         .collect::<Vec<_>>();
 
-    let knot_vectors = (unit_circle_knot_vector(), knot_vector_v);
-    let mut bsp_surface = BsplineSurface::new(knot_vectors, control_points);
+    let knot_vecs = (unit_circle_knot_vec(), knot_vector_v);
+    let mut bsp_surface = BsplineSurface::new(knot_vecs, control_points);
     bsp_surface.knot_normalize();
     NurbsSurface::new(bsp_surface)
 }
@@ -416,8 +406,8 @@ pub(super) fn expand_chamfer(
         .map(|curve| curve.destruct().1)
         .collect::<Vec<_>>();
 
-    let knot_vectors = (KnotVector::bezier_knot(1), knot_vector_v);
-    let mut bsp_surface = BsplineSurface::new(knot_vectors, control_points);
+    let knot_vecs = (KnotVector::bezier_knot(1), knot_vector_v);
+    let mut bsp_surface = BsplineSurface::new(knot_vecs, control_points);
     bsp_surface.knot_normalize();
     NurbsSurface::new(bsp_surface)
 }
@@ -448,7 +438,7 @@ pub(super) fn expand_ridge(
             .enumerate()
             .map(|(i, (p0, p1))| {
                 let t = i as f64 / (cpts0.len() - 1) as f64;
-                let transit = transit_line.evaluate(t);
+                let transit = transit_line.subs(t);
                 BsplineCurve::new(
                     KnotVector::uniform_knot(1, 2),
                     vec![*p0, transit.to_homogeneous(), *p1],
@@ -483,8 +473,8 @@ pub(super) fn expand_ridge(
         .map(|curve| curve.destruct().1)
         .collect::<Vec<_>>();
 
-    let knot_vectors = (KnotVector::uniform_knot(1, 2), knot_vector_v);
-    let mut bsp_surface = BsplineSurface::new(knot_vectors, control_points);
+    let knot_vecs = (KnotVector::uniform_knot(1, 2), knot_vector_v);
+    let mut bsp_surface = BsplineSurface::new(knot_vecs, control_points);
     bsp_surface.knot_normalize();
     NurbsSurface::new(bsp_surface)
 }
@@ -496,8 +486,11 @@ pub(super) fn ridge_fillet_surface(
     division: usize,
     radius: impl Fn(f64) -> f64,
     extend: bool,
+    flip_side: bool,
 ) -> Option<NurbsSurface<Vector4>> {
-    let relay_spheres = relay_spheres(surface0, surface1, curve, division, radius, extend)?;
+    let relay_spheres = relay_spheres(
+        surface0, surface1, curve, division, radius, extend, flip_side,
+    )?;
     Some(expand_ridge(&relay_spheres, surface0, surface1))
 }
 
@@ -552,7 +545,7 @@ pub(super) fn expand_custom(
             .enumerate()
             .map(|(i, (p0, p1))| {
                 let t = i as f64 / (cpts0.len() - 1) as f64;
-                let transit = transit_line.evaluate(t);
+                let transit = transit_line.subs(t);
                 map_profile_to_3d(p0, p1, transit, profile)
             })
             .collect();
@@ -581,12 +574,17 @@ pub(super) fn expand_custom(
         .map(|curve| curve.destruct().1)
         .collect::<Vec<_>>();
 
-    let knot_vectors = (profile.knot_vector().clone(), knot_vector_v);
-    let mut bsp_surface = BsplineSurface::new(knot_vectors, control_points);
+    let knot_vecs = (profile.knot_vector().clone(), knot_vector_v);
+    let mut bsp_surface = BsplineSurface::new(knot_vecs, control_points);
     bsp_surface.knot_normalize();
     NurbsSurface::new(bsp_surface)
 }
 
+// One argument past the lint threshold: `radius: impl Fn` resists struct
+// bundling and the sibling builders (`chamfer_fillet_surface`,
+// `rolling_ball_fillet_surface`) share this argument shape, so a params struct
+// here would either desync those signatures or ripple through `relay_spheres`.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn custom_fillet_surface(
     surface0: &NurbsSurface<Vector4>,
     surface1: &NurbsSurface<Vector4>,
@@ -594,9 +592,12 @@ pub(super) fn custom_fillet_surface(
     division: usize,
     radius: impl Fn(f64) -> f64,
     extend: bool,
+    flip_side: bool,
     profile: &BsplineCurve<Point2>,
 ) -> Option<NurbsSurface<Vector4>> {
-    let relay_spheres = relay_spheres(surface0, surface1, curve, division, radius, extend)?;
+    let relay_spheres = relay_spheres(
+        surface0, surface1, curve, division, radius, extend, flip_side,
+    )?;
     Some(expand_custom(&relay_spheres, surface0, surface1, profile))
 }
 
@@ -607,8 +608,11 @@ pub(super) fn chamfer_fillet_surface(
     division: usize,
     radius: impl Fn(f64) -> f64,
     extend: bool,
+    flip_side: bool,
 ) -> Option<NurbsSurface<Vector4>> {
-    let relay_spheres = relay_spheres(surface0, surface1, curve, division, radius, extend)?;
+    let relay_spheres = relay_spheres(
+        surface0, surface1, curve, division, radius, extend, flip_side,
+    )?;
     Some(expand_chamfer(&relay_spheres, surface0, surface1))
 }
 
@@ -620,7 +624,10 @@ pub(super) fn rolling_ball_fillet_surface(
     division: usize,
     radius: impl Fn(f64) -> f64,
     extend: bool,
+    flip_side: bool,
 ) -> Option<NurbsSurface<Vector4>> {
-    let relay_spheres = relay_spheres(surface0, surface1, curve, division, radius, extend)?;
+    let relay_spheres = relay_spheres(
+        surface0, surface1, curve, division, radius, extend, flip_side,
+    )?;
     Some(expand_fillet(&relay_spheres, surface0, surface1))
 }

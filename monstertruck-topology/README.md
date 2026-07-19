@@ -10,7 +10,7 @@ Topological data structures: vertices, edges, wires, faces, shells, and solids.
 monstertruck_topology::prelude!((), (), ());
 
 // Build a tetrahedron from vertices and edges
-let v = Vertex::from_points(&[(); 4]);
+let v = Vertex::news(&[(); 4]);
 let edge = [
     Edge::new(&v[0], &v[1], ()), Edge::new(&v[0], &v[2], ()),
     Edge::new(&v[0], &v[3], ()), Edge::new(&v[1], &v[2], ()),

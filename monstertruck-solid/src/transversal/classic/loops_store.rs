@@ -1,6 +1,13 @@
+//! Classic (0.3.2) boolean loops store.
+//!
+//! Ported verbatim from the published 0.3.2 crate's `transversal::loops_store`,
+//! adjusted only for the graft: the marching intersection-curve backend now
+//! yields a raw [`IntersectionCurve`] leader (the 0.3.2 parameter wrapper was
+//! dropped), so the `.into()` that unwrapped the wrapper is gone.
+
 #![allow(clippy::many_single_char_names)]
 
-use super::*;
+use super::intersection_curve;
 use monstertruck_core::cgmath64::*;
 use monstertruck_geometry::prelude::*;
 use monstertruck_meshing::prelude::*;
@@ -10,7 +17,7 @@ use rustc_hash::FxHashMap as HashMap;
 type PolylineCurve = monstertruck_meshing::prelude::PolylineCurve<Point3>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ShapesOpStatus {
+pub(super) enum ShapesOpStatus {
     Unknown,
     And,
     Or,
@@ -27,23 +34,18 @@ impl ShapesOpStatus {
 }
 
 #[derive(Clone, Debug)]
-pub struct BoundaryWire<P, C> {
+pub(super) struct BoundaryWire<P, C> {
     wire: Wire<P, C>,
     status: ShapesOpStatus,
 }
 
 impl<P, C> BoundaryWire<P, C> {
     #[inline(always)]
-    pub fn new(wire: Wire<P, C>, status: ShapesOpStatus) -> Self { Self { wire, status } }
+    pub(super) fn new(wire: Wire<P, C>, status: ShapesOpStatus) -> Self { Self { wire, status } }
     #[inline(always)]
-    pub fn status(&self) -> ShapesOpStatus { self.status }
+    pub(super) fn status(&self) -> ShapesOpStatus { self.status }
     #[inline(always)]
-    pub fn invert(&mut self) {
-        self.wire.invert();
-        self.status = self.status.not();
-    }
-    #[inline(always)]
-    pub fn inverse(&self) -> Self {
+    pub(super) fn inverse(&self) -> Self {
         Self {
             wire: self.wire.inverse(),
             status: self.status.not(),
@@ -82,9 +84,9 @@ impl<P, C> std::ops::DerefMut for BoundaryWire<P, C> {
 }
 
 #[derive(Clone, Debug)]
-pub struct Loops<P, C>(Vec<BoundaryWire<P, C>>);
+pub(super) struct Loops<P, C>(Vec<BoundaryWire<P, C>>);
 #[derive(Clone, Debug)]
-pub struct LoopsStore<P, C>(Vec<Loops<P, C>>);
+pub(super) struct LoopsStore<P, C>(Vec<Loops<P, C>>);
 
 impl<P, C> std::ops::Deref for Loops<P, C> {
     type Target = Vec<BoundaryWire<P, C>>;
@@ -434,14 +436,14 @@ where
 }
 
 #[allow(dead_code)]
-pub struct LoopsStoreQuadruple<C> {
-    pub geom_loops_store0: LoopsStore<Point3, C>,
-    pub poly_loops_store0: LoopsStore<Point3, PolylineCurve>,
-    pub geom_loops_store1: LoopsStore<Point3, C>,
-    pub poly_loops_store1: LoopsStore<Point3, PolylineCurve>,
+pub(super) struct LoopsStoreQuadruple<C> {
+    pub(super) geom_loops_store0: LoopsStore<Point3, C>,
+    pub(super) poly_loops_store0: LoopsStore<Point3, PolylineCurve>,
+    pub(super) geom_loops_store1: LoopsStore<Point3, C>,
+    pub(super) poly_loops_store1: LoopsStore<Point3, PolylineCurve>,
 }
 
-pub fn create_loops_stores<C, S>(
+pub(super) fn create_loops_stores<C, S>(
     geom_shell0: &Shell<Point3, C, S>,
     poly_shell0: &Shell<Point3, PolylineCurve, Option<PolygonMesh>>,
     geom_shell1: &Shell<Point3, C, S>,
@@ -453,6 +455,7 @@ where
         + Cut<Point = Point3, Vector = Vector3>
         + From<IntersectionCurve<PolylineCurve, S, S>>,
     S: ParametricSurface3D
+        + Clone
         + SearchParameter<SurfaceParameter, Point = Point3>
         + SearchNearestParameter<SurfaceParameter, Point = Point3>,
 {
@@ -478,8 +481,7 @@ where
                 &polygon1,
             )?
             .into_iter()
-            .try_for_each(|(polyline, intersection_curve)| {
-                let mut intersection_curve = intersection_curve.into();
+            .try_for_each(|(polyline, mut intersection_curve)| {
                 let status = ShapesOpStatus::from_is_curve(&intersection_curve)?;
                 let (status0, status1) = match (ori0, ori1) {
                     (true, true) => (status, status.not()),
@@ -576,6 +578,3 @@ where
         poly_loops_store1,
     })
 }
-
-#[cfg(test)]
-mod tests;

@@ -477,6 +477,31 @@ impl PolyBoundaryPiece {
                 let uv = initial_uv
                     .take()
                     .or_else(|| sp(surface, pt, *previous))
+                    .or_else(|| {
+                        // Revolve-pole fallback. At the revolution axis the surface
+                        // is singular -- every v maps to the same 3D point -- so the
+                        // parameter search (both exact and nearest) can fail to
+                        // converge there and return `None`. The pole nonetheless
+                        // coincides with a u-endpoint for EVERY v, so reuse the
+                        // adjacent vertex's v and let the singular-bridge below
+                        // carry the loop across the pole, instead of dropping the
+                        // entire face's mesh (the corner-100 in-cube polar cap).
+                        //
+                        // Gate on v-invariance of the u-endpoint (the exact,
+                        // scale-free signature of a revolution pole) so this fires
+                        // only at a genuine axis point, never masking a real
+                        // projection failure; the vertex only has to sit within a
+                        // coarse mesh chord of that pole (a boundary polyline sample
+                        // near the pole is a fraction off the exact axis point).
+                        let (_, v_prev) = (*previous)?;
+                        let (u0, u1) = surface.try_range_tuple().0?;
+                        [u0, u1].into_iter().find_map(|u_end| {
+                            let pole = surface.subs(u_end, v_prev);
+                            let is_pole = pole.near(&surface.subs(u_end, v_prev + 1.0));
+                            let at_pole = (pole - pt).magnitude2() < 1.0e-6;
+                            (is_pole && at_pole).then_some((u_end, v_prev))
+                        })
+                    })
                     .and_then(|uv| Self::normalize_uv(surface, uv, *previous))
                     .map(|(u, v)| {
                         let points = if let Some((u0, v0)) = *previous {

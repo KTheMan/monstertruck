@@ -249,6 +249,18 @@ pub type EdgeId<C> = Id<Mutex<C>>;
 /// ```
 pub type FaceId<S> = Id<Mutex<S>>;
 
+/// Renamed to [`VertexId`] per RFC 430 (C-CASE).
+#[deprecated(note = "renamed to VertexId per RFC 430 (C-CASE)")]
+pub type VertexID<P> = VertexId<P>;
+
+/// Renamed to [`EdgeId`] per RFC 430 (C-CASE).
+#[deprecated(note = "renamed to EdgeId per RFC 430 (C-CASE)")]
+pub type EdgeID<C> = EdgeId<C>;
+
+/// Renamed to [`FaceId`] per RFC 430 (C-CASE).
+#[deprecated(note = "renamed to FaceId per RFC 430 (C-CASE)")]
+pub type FaceID<S> = FaceId<S>;
+
 /// configuration for vertex display format.
 #[derive(Clone, Copy, Debug)]
 pub enum VertexDisplayFormat {

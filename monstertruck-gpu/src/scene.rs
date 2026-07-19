@@ -2,12 +2,12 @@ use crate::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use winit::window::Window;
 
-static MAX_ID: AtomicUsize = AtomicUsize::new(0);
+static MAXID: AtomicUsize = AtomicUsize::new(0);
 
 impl RenderId {
     /// Generate the unique `RenderId`.
     #[inline(always)]
-    pub fn generate() -> Self { RenderId(MAX_ID.fetch_add(1, Ordering::SeqCst)) }
+    pub fn generate() -> Self { RenderId(MAXID.fetch_add(1, Ordering::SeqCst)) }
 }
 
 async fn init_default_device(

@@ -30,18 +30,12 @@ mod compat;
 /// Scalar-generic algorithm helpers.
 pub mod algo;
 
-/// Bounded parameter range tuple for a scalar-generic curve.
-pub type RangeTuple1D<T> = (T, T);
-
-/// Bounded parameter range tuple for a scalar-generic surface.
-pub type RangeTuple2D<T> = (RangeTuple1D<T>, RangeTuple1D<T>);
-
 pub use bounded_curve::BoundedCurve;
 pub use bounded_surface::BoundedSurface;
 pub use curve::ParametricCurve;
 pub use curve3d::ParametricCurve3D;
 pub use cut::Cut;
-pub use division::{ParameterDivision1D, ParameterDivision2D};
+pub use division::{ParameterDivision1D, ParameterDivision2D, SurfaceParameterRange};
 pub use parameter_boundary::ParameterBoundary2D;
 pub use search_parameter::{
     CurveParameter, ParameterRange, SearchNearestParameter, SearchParameter,

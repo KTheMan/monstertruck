@@ -162,7 +162,7 @@ macro_rules! impl_shape {
             pub fn to_json(&self) -> Vec<u8> {
                 // SAFETY: serialization of valid shape data to JSON should not fail.
                 serde_json::to_vec_pretty(&self.0)
-                    .map_err(|e| gloo::console::error!(format!("{e}")))
+                    .map_err(|e| { gloo::console::error!(format!("{e}")); })
                     .unwrap()
             }
             /// write shape to STEP
@@ -186,7 +186,9 @@ impl Shell {
     /// Creates Solid if `self` is a closed shell.
     pub fn into_solid(self) -> Option<Solid> {
         monstertruck_modeling::Solid::try_new(vec![self.0])
-            .map_err(|e| gloo::console::error!(format!("{e}")))
+            .map_err(|e| {
+                gloo::console::error!(format!("{e}"));
+            })
             .ok()
             .map(IntoWasm::into_wasm)
     }

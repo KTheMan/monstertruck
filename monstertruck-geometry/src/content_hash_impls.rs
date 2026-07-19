@@ -8,7 +8,6 @@ use monstertruck_core::One;
 use crate::decorators::*;
 use crate::nurbs::*;
 use crate::specifieds::*;
-use crate::t_spline::TmeshDirection;
 
 // ---------------------------------------------------------------------------
 // NURBS primitives.
@@ -179,6 +178,8 @@ impl<
 
 impl<P: DeterministicContentHash> DeterministicContentHash for crate::t_spline::Tmesh<P> {
     fn content_hash<H: Hasher>(&self, state: &mut H) {
+        use crate::t_spline::TmeshDirection;
+
         let cps = self.control_points();
         state.write_usize(cps.len());
 
@@ -198,7 +199,7 @@ impl<P: DeterministicContentHash> DeterministicContentHash for crate::t_spline::
             // and neighbor index (resolved via Arc identity against the
             // control-point vector).
             dirs.iter().for_each(|&dir| {
-                match guard.connection(dir) {
+                match guard.get(dir) {
                     None => {
                         // T-junction.
                         state.write_u8(0);

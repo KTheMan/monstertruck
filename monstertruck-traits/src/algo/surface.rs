@@ -16,7 +16,7 @@ const MAX_PARAMETER_DIVISION_RECURSION: usize = 100;
 pub fn presearch<S>(
     surface: &S,
     point: S::Point,
-    (urange, vrange): ((f64, f64), (f64, f64)),
+    (urange, vrange): SurfaceParameterRange,
     division: usize,
 ) -> (f64, f64)
 where
@@ -49,7 +49,7 @@ pub trait SearchNearestParameterVector: InnerSpace<Scalar = f64> + Tolerance {
     #[doc(hidden)]
     type Matrix: Jacobian<Self>;
     #[doc(hidden)]
-    fn residual<S>(surface: &S, point: Self::Point, param: Self) -> CalcOutput<Self, Self::Matrix>
+    fn subs<S>(surface: &S, point: Self::Point, param: Self) -> CalcOutput<Self, Self::Matrix>
     where S: ParametricSurface<Point = Self::Point, Vector = Self>;
     #[doc(hidden)]
     fn into_param(self) -> (f64, f64);
@@ -60,7 +60,7 @@ pub trait SearchNearestParameterVector: InnerSpace<Scalar = f64> + Tolerance {
 impl SearchNearestParameterVector for Vector2 {
     type Point = Point2;
     type Matrix = Matrix2;
-    fn residual<S>(
+    fn subs<S>(
         surface: &S,
         point: Point2,
         Vector2 { x: u, y: v }: Vector2,
@@ -80,7 +80,7 @@ impl SearchNearestParameterVector for Vector2 {
 impl SearchNearestParameterVector for Vector3 {
     type Point = Point3;
     type Matrix = Matrix3;
-    fn residual<S>(
+    fn subs<S>(
         surface: &S,
         point: Self::Point,
         Vector3 { x: u, y: v, z: w }: Vector3,
@@ -121,8 +121,7 @@ where
     P::Diff: SearchNearestParameterVector<Point = P>,
     S: ParametricSurface<Point = P, Vector = P::Diff>,
 {
-    let function =
-        move |param: P::Diff| SearchNearestParameterVector::residual(surface, point, param);
+    let function = move |param: P::Diff| SearchNearestParameterVector::subs(surface, point, param);
     let res = newton::solve(function, P::Diff::from_param(hint), trials);
     res.ok().map(P::Diff::into_param)
 }
@@ -132,13 +131,13 @@ pub trait SearchParameterVector: InnerSpace<Scalar = f64> + Tolerance {
     #[doc(hidden)]
     type Point;
     #[doc(hidden)]
-    fn residual<S>(surface: &S, point: Self::Point, param: Vector2) -> CalcOutput<Vector2, Matrix2>
+    fn subs<S>(surface: &S, point: Self::Point, param: Vector2) -> CalcOutput<Vector2, Matrix2>
     where S: ParametricSurface<Point = Self::Point, Vector = Self>;
 }
 
 impl SearchParameterVector for Vector2 {
     type Point = Point2;
-    fn residual<S>(
+    fn subs<S>(
         surface: &S,
         point: Point2,
         Vector2 { x: u, y: v }: Vector2,
@@ -155,7 +154,7 @@ impl SearchParameterVector for Vector2 {
 
 impl SearchParameterVector for Vector3 {
     type Point = Point3;
-    fn residual<S>(
+    fn subs<S>(
         surface: &S,
         point: Self::Point,
         Vector2 { x: u, y: v }: Vector2,
@@ -191,7 +190,7 @@ where
     P::Diff: SearchParameterVector<Point = P>,
     S: ParametricSurface<Point = P, Vector = P::Diff>,
 {
-    let function = move |param: Vector2| SearchParameterVector::residual(surface, point, param);
+    let function = move |param: Vector2| SearchParameterVector::subs(surface, point, param);
     let res = newton::solve(function, hint.into(), trials);
     res.ok().and_then(
         |Vector2 { x: u, y: v }| match surface.evaluate(u, v).near(&point) {
@@ -237,7 +236,7 @@ where
 #[inline(always)]
 pub fn parameter_division<S>(
     surface: &S,
-    (urange, vrange): ((f64, f64), (f64, f64)),
+    (urange, vrange): SurfaceParameterRange,
     tol: f64,
 ) -> (Vec<f64>, Vec<f64>)
 where

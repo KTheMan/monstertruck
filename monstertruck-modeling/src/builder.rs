@@ -73,7 +73,7 @@ pub fn vertices<P: Into<Point3>>(points: impl IntoIterator<Item = P>) -> Vec<Ver
 /// # const N: usize = 10;
 /// # for i in 0..=N {
 /// #     let t = i as f64 / N as f64;
-/// #     assert!(curve.evaluate(t).near2(&(pt0 + t * (pt1 - pt0))));
+/// #     assert!(curve.subs(t).near2(&(pt0 + t * (pt1 - pt0))));
 /// # }
 /// ```
 pub fn line<C>(vertex0: &Vertex, vertex1: &Vertex) -> Edge<C>
@@ -135,7 +135,7 @@ pub enum CircularArcConstraint {
 /// # const N: usize = 10;
 /// # for i in 0..=N {
 /// #       let t = curve.knot_vector()[0] + curve.knot_vector().range_length() * i as f64 / N as f64;
-/// #       assert!(curve.evaluate(t).to_vec().magnitude().near(&1.0));
+/// #       assert!(curve.subs(t).to_vec().magnitude().near(&1.0));
 /// # }
 /// ```
 /// ```
@@ -210,7 +210,7 @@ where
 /// # for i in 0..=N {
 /// #       let t = i as f64 / N as f64;
 /// #       let pt = Point3::new(t * 3.0, 6.0 * t * t * t - 9.0 * t * t + 3.0 * t, 0.0);
-/// #       assert!(curve.evaluate(t).near(&pt));
+/// #       assert!(curve.subs(t).near(&pt));
 /// # }
 /// ```
 pub fn bezier<C>(vertex0: &Vertex, vertex1: &Vertex, mut inter_points: Vec<Point3>) -> Edge<C>
@@ -245,7 +245,7 @@ where BsplineCurve<Point3>: ToSameGeometry<C> {
 /// #           let s = i as f64 / N as f64;
 /// #           let t = j as f64 / N as f64;
 /// #           let pt = Point3::new(s * (1.0 - t), t, s * t);
-/// #           assert!(surface.evaluate(s, t).near(&pt));
+/// #           assert!(surface.subs(s, t).near(&pt));
 /// #       }
 /// # }
 /// ```
@@ -457,16 +457,11 @@ where
 /// ```
 /// # fn main() -> anyhow::Result<()> {
 /// use monstertruck_modeling::*;
+/// use monstertruck_modeling::builder::SweepAngle;
 ///
 /// // make a disk by attaching a plane into circle
 /// let vertex: Vertex = builder::vertex(Point3::new(1.0, 0.0, 0.0));
-/// let circle: Wire = builder::revolve(
-///     &vertex,
-///     Point3::origin(),
-///     Vector3::unit_y(),
-///     builder::SweepAngle::Closed,
-///     2,
-/// );
+/// let circle: Wire = builder::revolve(&vertex, Point3::origin(), Vector3::unit_y(), SweepAngle::Closed, 2);
 /// let disk: Face = builder::try_attach_plane(vec![circle])?;
 /// # let surface = disk.oriented_surface();
 /// # let normal = surface.normal(0.5, 0.5);
@@ -522,7 +517,7 @@ where
                     let p0 = edge.front().point();
                     let curve = edge.curve();
                     let (t0, t1) = curve.range_tuple();
-                    let p1 = curve.evaluate((t0 + t1) / 2.0);
+                    let p1 = curve.subs((t0 + t1) / 2.0);
                     [p0, p1]
                 })
                 .collect()
@@ -640,22 +635,11 @@ where T: Sweep<Matrix4, LineConnector, ExtrudeConnector, Swept> {
 /// ```
 /// // Torus
 /// use monstertruck_modeling::*;
+/// use monstertruck_modeling::builder::SweepAngle;
 ///
 /// let v = builder::vertex(Point3::new(3.0, 0.0, 0.0));
-/// let circle = builder::revolve(
-///     &v,
-///     Point3::new(2.0, 0.0, 0.0),
-///     Vector3::unit_z(),
-///     builder::SweepAngle::Closed,
-///     2,
-/// );
-/// let torus = builder::revolve(
-///     &circle,
-///     Point3::origin(),
-///     Vector3::unit_y(),
-///     builder::SweepAngle::Closed,
-///     2,
-/// );
+/// let circle = builder::revolve(&v, Point3::new(2.0, 0.0, 0.0), Vector3::unit_z(), SweepAngle::Closed, 2);
+/// let torus = builder::revolve(&circle, Point3::origin(), Vector3::unit_y(), SweepAngle::Closed, 2);
 /// let solid: Solid = Solid::new(vec![torus]);
 /// #
 /// # assert!(solid.is_geometric_consistent());
@@ -667,7 +651,7 @@ where T: Sweep<Matrix4, LineConnector, ExtrudeConnector, Swept> {
 /// #       for j in 0..=N {
 /// #           let u = i as f64 / N as f64;
 /// #           let v = j as f64 / N as f64;
-/// #           let pt = surface.evaluate(u, v);
+/// #           let pt = surface.subs(u, v);
 /// #
 /// #           // this surface is a part of torus.
 /// #           let tmp = f64::sqrt(pt[0] * pt[0] + pt[2] * pt[2]) - 2.0;
@@ -680,17 +664,12 @@ where T: Sweep<Matrix4, LineConnector, ExtrudeConnector, Swept> {
 /// ```
 /// // Modeling a pipe.
 /// use monstertruck_modeling::*;
+/// use monstertruck_modeling::builder::SweepAngle;
 /// const PI: Rad<f64> = Rad(std::f64::consts::PI);
 ///
 /// // Creates the base circle
 /// let v: Vertex = builder::vertex(Point3::new(1.0, 0.0, 4.0));
-/// let circle: Wire = builder::revolve(
-///     &v,
-///     Point3::new(2.0, 0.0, 4.0),
-///     -Vector3::unit_z(),
-///     builder::SweepAngle::Closed,
-///     2,
-/// );
+/// let circle: Wire = builder::revolve(&v, Point3::new(2.0, 0.0, 4.0), -Vector3::unit_z(), SweepAngle::Closed, 2);
 ///
 /// // the result shell of the pipe.
 /// let mut pipe: Shell = Shell::new();
@@ -708,7 +687,7 @@ where T: Sweep<Matrix4, LineConnector, ExtrudeConnector, Swept> {
 ///     &another_circle,
 ///     Point3::origin(),
 ///     Vector3::unit_y(),
-///     builder::SweepAngle::Partial(PI / 2.0),
+///     SweepAngle::Partial(PI / 2.0),
 ///     2,
 /// );
 /// # let surface = bend_part[0].surface();
@@ -729,7 +708,7 @@ where T: Sweep<Matrix4, LineConnector, ExtrudeConnector, Swept> {
 /// #    for j in 0..=N {
 /// #        let u = i as f64 / N as f64;
 /// #        let v = j as f64 / N as f64;
-/// #        let pt = surface.evaluate(u, v);
+/// #        let pt = surface.subs(u, v);
 /// #
 /// #        // the y coordinate is positive.
 /// #        //assert!(pt[1] >= 0.0);
@@ -886,7 +865,7 @@ where
         let mut curve = edge.curve();
         let (t0, t1) = curve.range_tuple();
         let t = (t0 + t1) * 0.5;
-        let v1 = Vertex::new(curve.evaluate(t));
+        let v1 = Vertex::new(curve.subs(t));
         let curve1 = curve.cut(t);
         wire.push_back(Edge::debug_new(&v0, &v1, curve));
         wire.push_back(Edge::debug_new(&v1, &v2, curve1));
@@ -974,7 +953,7 @@ mod partial_torus {
             panic!();
         };
         let (u, v) = ((u0 + u1) / 2.0, (v0 + v1) / 2.0);
-        let p = surface.evaluate(u, v);
+        let p = surface.subs(u, v);
         let q = Point3::from_vec(Vector3::new(p.x, p.y, 0.0).normalize() * 0.75);
         let n0 = sign * (p - q).normalize();
         let n1 = surface.normal(u, v);
@@ -989,11 +968,7 @@ mod partial_torus {
             .flat_map(|edge| {
                 let curve = edge.oriented_curve();
                 let (t0, t1) = curve.range_tuple();
-                [
-                    curve.evaluate(t0),
-                    curve.evaluate((t0 + t1) / 2.0),
-                    curve.evaluate(t1),
-                ]
+                [curve.subs(t0), curve.subs((t0 + t1) / 2.0), curve.subs(t1)]
             })
             .map(|p| surface.search_parameter(p, None, 100).unwrap())
             .collect::<Vec<_>>();

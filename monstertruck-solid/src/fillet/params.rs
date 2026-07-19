@@ -17,7 +17,7 @@ pub enum FilletProfile {
 }
 
 /// Radius specification for fillet operations.
-pub enum FilletRadius {
+pub enum RadiusSpec {
     /// Constant radius along the entire edge/wire.
     Constant(f64),
     /// Variable radius as a function of normalized parameter `t` in `[0, 1]`.
@@ -30,7 +30,7 @@ pub enum FilletRadius {
     PerEdge(Vec<f64>),
 }
 
-impl std::fmt::Debug for FilletRadius {
+impl std::fmt::Debug for RadiusSpec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Constant(r) => f.debug_tuple("Constant").field(r).finish(),
@@ -44,7 +44,7 @@ impl std::fmt::Debug for FilletRadius {
 #[derive(Debug)]
 pub struct FilletOptions {
     /// Radius specification.
-    pub radius: FilletRadius,
+    pub radius: RadiusSpec,
     /// Number of divisions for the rolling ball algorithm. Default: 5.
     pub divisions: NonZeroUsize,
     /// Profile shape. Default: [`FilletProfile::Round`].
@@ -54,7 +54,7 @@ pub struct FilletOptions {
 impl Default for FilletOptions {
     fn default() -> Self {
         Self {
-            radius: FilletRadius::Constant(0.1),
+            radius: RadiusSpec::Constant(0.1),
             // SAFETY: 5 is a non-zero constant.
             divisions: NonZeroUsize::new(5).unwrap(),
             profile: FilletProfile::default(),
@@ -66,7 +66,7 @@ impl FilletOptions {
     /// Creates options with a constant radius.
     pub fn constant(radius: f64) -> Self {
         Self {
-            radius: FilletRadius::Constant(radius),
+            radius: RadiusSpec::Constant(radius),
             ..Default::default()
         }
     }
@@ -74,13 +74,13 @@ impl FilletOptions {
     /// Creates options with a variable radius function.
     pub fn variable(radius: impl Fn(f64) -> f64 + 'static) -> Self {
         Self {
-            radius: FilletRadius::Variable(Box::new(radius)),
+            radius: RadiusSpec::Variable(Box::new(radius)),
             ..Default::default()
         }
     }
 
     /// Sets the fillet radius specification.
-    pub fn with_radius(mut self, radius: FilletRadius) -> Self {
+    pub fn with_radius(mut self, radius: RadiusSpec) -> Self {
         self.radius = radius;
         self
     }
