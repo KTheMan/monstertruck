@@ -113,6 +113,9 @@ pub enum Error {
     /// ```
     #[error("This shell is not a manifold.")]
     NotManifold,
+    /// Serialized tracking arrays do not match compressed topology dimensions.
+    #[error("Serialized topology tracking metadata has inconsistent dimensions.")]
+    InvalidTrackingMetadata,
 }
 
 #[test]

@@ -587,6 +587,8 @@ impl<P, C, S> Shell<P, C, S> {
                     .collect::<Option<Vec<_>>>()?;
                 let surface = surface_mapping(&*face.surface.lock())?;
                 let mut new_face = Face::debug_new(wires, surface).ok()?;
+                new_face.stable_id = face.stable_id;
+                new_face.tracking_id.clone_from(&face.tracking_id);
                 if !face.orientation() {
                     new_face.invert();
                 }
@@ -681,6 +683,8 @@ impl<P, C, S> Shell<P, C, S> {
                     .collect();
                 let surface = surface_mapping(&*face.surface.lock());
                 let mut new_face = Face::new_unchecked(wires, surface);
+                new_face.stable_id = face.stable_id;
+                new_face.tracking_id.clone_from(&face.tracking_id);
                 if !face.orientation() {
                     new_face.invert();
                 }

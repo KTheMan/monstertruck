@@ -247,6 +247,9 @@ pub mod basis;
 /// Compatibility normalization for collections of curves and surfaces.
 pub mod compat;
 
+/// Persistent continuity contracts for parametric replay.
+pub mod contract;
+
 /// Geometric-continuity orders and surface capability diagnostics.
 pub mod continuity;
 
@@ -347,7 +350,7 @@ mod basis_window_tests {
         assert_eq!(window.len(), 0);
         assert_eq!(window.start_index(), 0);
         assert_eq!(window.total_length(), 5);
-        assert_eq!(window.values(), &[]);
+        assert!(window.values().is_empty());
         assert_eq!(window.to_full_values(), vec![0.0; 5]);
     }
 

@@ -16,15 +16,20 @@ impl<P> Vertex<P> {
         Vertex {
             point: Arc::new(Mutex::new(point)),
             stable_id: StableId::UNASSIGNED,
+            tracking_id: None,
         }
     }
 
-    /// Creates a vertex with an explicit [`StableId`].
     #[inline(always)]
-    pub fn new_with_id(point: P, stable_id: StableId) -> Vertex<P> {
+    pub(crate) fn new_with_ids(
+        point: P,
+        stable_id: StableId,
+        tracking_id: Option<TrackingId>,
+    ) -> Vertex<P> {
         Vertex {
             point: Arc::new(Mutex::new(point)),
             stable_id,
+            tracking_id,
         }
     }
 
@@ -32,9 +37,16 @@ impl<P> Vertex<P> {
     #[inline(always)]
     pub fn stable_id(&self) -> StableId { self.stable_id }
 
-    /// Sets the stable persistent identifier of this vertex.
+    /// Sets the stable persistent identifier of this vertex internally.
     #[inline(always)]
-    pub fn set_stable_id(&mut self, id: StableId) { self.stable_id = id; }
+    pub(crate) fn set_stable_id(&mut self, id: StableId) { self.stable_id = id; }
+
+    /// Returns the immutable session-scoped tracking identifier, when assigned.
+    #[inline(always)]
+    pub fn tracking_id(&self) -> Option<&TrackingId> { self.tracking_id.as_ref() }
+
+    #[inline(always)]
+    pub(crate) fn set_tracking_id(&mut self, id: Option<TrackingId>) { self.tracking_id = id; }
 
     /// Creates distinct vertices from points.
     /// # Examples
@@ -88,9 +100,10 @@ impl<P> Vertex<P> {
         &self,
         mut point_mapping: impl FnMut(&P) -> Option<Q>,
     ) -> Option<Vertex<Q>> {
-        Some(Vertex::new_with_id(
+        Some(Vertex::new_with_ids(
             point_mapping(&*self.point.lock())?,
             self.stable_id,
+            self.tracking_id.clone(),
         ))
     }
 
@@ -108,7 +121,11 @@ impl<P> Vertex<P> {
     #[doc(hidden)]
     #[inline(always)]
     pub fn mapped<Q>(&self, mut point_mapping: impl FnMut(&P) -> Q) -> Vertex<Q> {
-        Vertex::new_with_id(point_mapping(&*self.point.lock()), self.stable_id)
+        Vertex::new_with_ids(
+            point_mapping(&*self.point.lock()),
+            self.stable_id,
+            self.tracking_id.clone(),
+        )
     }
 
     /// Returns the id of the vertex.
@@ -178,6 +195,7 @@ impl<P> Clone for Vertex<P> {
         Vertex {
             point: Arc::clone(&self.point),
             stable_id: self.stable_id,
+            tracking_id: self.tracking_id.clone(),
         }
     }
 }
@@ -219,7 +237,8 @@ impl<P: Debug> Debug for DebugDisplay<'_, Vertex<P>, VertexDisplayFormat> {
 #[test]
 fn vertex_stable_id_survives_clone() {
     let mut alloc = StableIdAllocator::new();
-    let v = Vertex::new_with_id((), alloc.allocate());
+    let mut v = Vertex::new(());
+    v.set_stable_id(alloc.allocate());
     let v2 = v.clone();
     assert_eq!(v.stable_id(), v2.stable_id());
     assert!(v.stable_id().is_assigned());

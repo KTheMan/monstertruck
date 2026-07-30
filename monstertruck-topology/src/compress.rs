@@ -12,7 +12,7 @@ use monstertruck_core::{ContentHasher, DeterministicContentHash};
 use rustc_hash::FxHashMap as HashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::*;
+use crate::{errors::Error, *};
 
 /// Serialized compressed edge
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -146,6 +146,26 @@ pub struct CompressedShell<P, C, S> {
     pub face_stable_ids: Option<Vec<StableId>>,
 }
 
+/// Tracking metadata parallel to a [`CompressedShell`]'s topology arrays.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CompressedTopologyTracking {
+    /// Tracking IDs for vertices (same order as `vertices`).
+    pub vertices: Vec<Option<TrackingId>>,
+    /// Tracking IDs for edges (same order as `edges`).
+    pub edges: Vec<Option<TrackingId>>,
+    /// Tracking IDs for faces (same order as `faces`).
+    pub faces: Vec<Option<TrackingId>>,
+}
+
+/// A compressed shell accompanied by immutable topology tracking metadata.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TrackedCompressedShell<P, C, S> {
+    /// Compressed topology and geometry.
+    pub topology: CompressedShell<P, C, S>,
+    /// Tracking metadata parallel to the topology arrays.
+    pub tracking: CompressedTopologyTracking,
+}
+
 /// Serialized compressed shell with exact face-local trim storage.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CompressedTrimmedShell<P, C, S, T> {
@@ -170,6 +190,29 @@ pub struct CompressedSolid<P, C, S> {
     pub attributes: Option<SolidAttributes>,
 }
 
+/// A compressed solid accompanied by per-boundary tracking metadata.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TrackedCompressedSolid<P, C, S> {
+    /// Compressed topology and geometry.
+    pub topology: CompressedSolid<P, C, S>,
+    /// Tracking metadata parallel to `topology.boundaries`.
+    pub tracking: Vec<CompressedTopologyTracking>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+enum ShellSerialization<P, C, S> {
+    Tracked(TrackedCompressedShell<P, C, S>),
+    Legacy(CompressedShell<P, C, S>),
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+enum SolidSerialization<P, C, S> {
+    Tracked(TrackedCompressedSolid<P, C, S>),
+    Legacy(CompressedSolid<P, C, S>),
+}
+
 /// Serialized compressed solid with exact face-local trim storage.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CompressedTrimmedSolid<P, C, S, T> {
@@ -182,7 +225,18 @@ struct CompressDirector<P, C> {
     emap: HashMap<EdgeId<C>, (usize, CompressedEdge<C>)>,
     vertex_stable_ids: HashMap<VertexId<P>, (usize, StableId)>,
     edge_stable_ids: HashMap<EdgeId<C>, (usize, StableId)>,
+    vertex_tracking_ids: HashMap<VertexId<P>, (usize, Option<TrackingId>)>,
+    edge_tracking_ids: HashMap<EdgeId<C>, (usize, Option<TrackingId>)>,
 }
+
+type PersistentTopologyParts<P, C> = (
+    Vec<P>,
+    Vec<CompressedEdge<C>>,
+    Vec<StableId>,
+    Vec<StableId>,
+    Vec<Option<TrackingId>>,
+    Vec<Option<TrackingId>>,
+);
 
 impl<P: Clone, C: Clone> CompressDirector<P, C> {
     #[inline(always)]
@@ -192,6 +246,8 @@ impl<P: Clone, C: Clone> CompressDirector<P, C> {
             emap: HashMap::default(),
             vertex_stable_ids: HashMap::default(),
             edge_stable_ids: HashMap::default(),
+            vertex_tracking_ids: HashMap::default(),
+            edge_tracking_ids: HashMap::default(),
         }
     }
     #[inline(always)]
@@ -201,6 +257,9 @@ impl<P: Clone, C: Clone> CompressDirector<P, C> {
         self.vertex_stable_ids
             .entry(vid)
             .or_insert_with(|| (id, vertex.stable_id()));
+        self.vertex_tracking_ids
+            .entry(vid)
+            .or_insert_with(|| (id, vertex.tracking_id().cloned()));
         self.vmap
             .entry(vid)
             .or_insert_with(|| (id, vertex.point()))
@@ -222,6 +281,8 @@ impl<P: Clone, C: Clone> CompressDirector<P, C> {
                 };
                 self.edge_stable_ids
                     .insert(edge.id(), (id, edge.stable_id()));
+                self.edge_tracking_ids
+                    .insert(edge.id(), (id, edge.tracking_id().cloned()));
                 self.emap.insert(edge.id(), (id, cedge));
                 (id, edge.orientation()).into()
             }
@@ -303,12 +364,14 @@ impl<P: Clone, C: Clone> CompressDirector<P, C> {
     }
 
     #[inline(always)]
-    fn stable_ids(self) -> (Vec<P>, Vec<CompressedEdge<C>>, Vec<StableId>, Vec<StableId>) {
+    fn persistent_ids(self) -> PersistentTopologyParts<P, C> {
         let vertices = Self::map2vec(self.vmap);
         let edges = Self::map2vec(self.emap);
         let vsids = Self::map2vec_simple(self.vertex_stable_ids);
         let esids = Self::map2vec_simple(self.edge_stable_ids);
-        (vertices, edges, vsids, esids)
+        let vtids = Self::map2vec_simple(self.vertex_tracking_ids);
+        let etids = Self::map2vec_simple(self.edge_tracking_ids);
+        (vertices, edges, vsids, esids, vtids, etids)
     }
 
     #[inline(always)]
@@ -320,27 +383,53 @@ impl<P: Clone, C: Clone> CompressDirector<P, C> {
 }
 
 impl<P: Clone, C: Clone, S: Clone> Shell<P, C, S> {
-    /// Compresses the shell into the serialized compressed shell.
-    pub fn compress(&self) -> CompressedShell<P, C, S> {
+    fn compressed_with_tracking_parts(
+        &self,
+    ) -> (CompressedShell<P, C, S>, CompressedTopologyTracking) {
         let mut director = CompressDirector::new();
-        let face_stable_ids: Vec<StableId> = self.iter().map(|f| f.stable_id()).collect();
+        let face_stable_ids: Vec<StableId> = self.iter().map(|face| face.stable_id()).collect();
+        let face_tracking_ids = self
+            .iter()
+            .map(|face| face.tracking_id().cloned())
+            .collect();
         let mut face_closure = |face: &Face<P, C, S>| director.create_cface(face);
         let faces: Vec<_> = self.iter().map(&mut face_closure).collect();
-        let (vertices, edges, vsids, esids) = director.stable_ids();
+        let (vertices, edges, vsids, esids, vtids, etids) = director.persistent_ids();
         let has_any_stable_id = vsids.iter().any(|id| id.is_assigned())
             || esids.iter().any(|id| id.is_assigned())
             || face_stable_ids.iter().any(|id| id.is_assigned());
-        CompressedShell {
-            vertices,
-            edges,
-            faces,
-            vertex_stable_ids: if has_any_stable_id { Some(vsids) } else { None },
-            edge_stable_ids: if has_any_stable_id { Some(esids) } else { None },
-            face_stable_ids: if has_any_stable_id {
-                Some(face_stable_ids)
-            } else {
-                None
+        (
+            CompressedShell {
+                vertices,
+                edges,
+                faces,
+                vertex_stable_ids: if has_any_stable_id { Some(vsids) } else { None },
+                edge_stable_ids: if has_any_stable_id { Some(esids) } else { None },
+                face_stable_ids: if has_any_stable_id {
+                    Some(face_stable_ids)
+                } else {
+                    None
+                },
             },
+            CompressedTopologyTracking {
+                vertices: vtids,
+                edges: etids,
+                faces: face_tracking_ids,
+            },
+        )
+    }
+
+    /// Compresses the shell into the serialized compressed shell.
+    pub fn compress(&self) -> CompressedShell<P, C, S> {
+        self.compressed_with_tracking_parts().0
+    }
+
+    /// Compresses this shell with immutable topology tracking metadata.
+    pub fn compress_tracked(&self) -> TrackedCompressedShell<P, C, S> {
+        let (topology, tracking) = self.compressed_with_tracking_parts();
+        TrackedCompressedShell {
+            topology,
+            tracking,
         }
     }
 
@@ -379,7 +468,7 @@ impl<P, C, S> Shell<P, C, S> {
     /// Extracts the serialized compressed shell into the shell.
     ///
     /// # Errors
-    /// Returns [`Error::NotSimpleWire`](crate::errors::Error::NotSimpleWire) if any boundary wire has repeated vertices.
+    /// Returns [`Error::NotSimpleWire`] if any boundary wire has repeated vertices.
     /// STEP files from other CAD systems often produce such wires. To handle this,
     /// apply `SplitClosedEdgesAndFaces` or `RobustSplitClosedEdgesAndFaces`
     /// (from `monstertruck-solid`) to the `CompressedShell` before calling `extract`.
@@ -420,6 +509,58 @@ impl<P, C, S> Shell<P, C, S> {
             Ok(Shell::from(face_list))
         } else {
             Ok(shell)
+        }
+    }
+
+    /// Extracts compressed topology and restores immutable tracking metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidTrackingMetadata`] when a tracking array does
+    /// not match its corresponding compressed topology array.
+    pub fn extract_tracked(tracked: TrackedCompressedShell<P, C, S>) -> Result<Self> {
+        let TrackedCompressedShell { topology, tracking } = tracked;
+        if tracking.vertices.len() != topology.vertices.len()
+            || tracking.edges.len() != topology.edges.len()
+            || tracking.faces.len() != topology.faces.len()
+        {
+            return Err(Error::InvalidTrackingMetadata);
+        }
+        let mut shell = Self::extract(topology)?;
+        apply_tracking_metadata(&mut shell, tracking);
+        Ok(shell)
+    }
+}
+
+fn apply_tracking_metadata<P, C, S>(
+    shell: &mut Shell<P, C, S>,
+    tracking: CompressedTopologyTracking,
+) {
+    let mut vertex_indices = HashMap::<VertexId<P>, usize>::default();
+    let mut edge_indices = HashMap::<EdgeId<C>, usize>::default();
+    for (face_index, face) in shell.face_iter_mut().enumerate() {
+        face.set_tracking_id(tracking.faces[face_index].clone());
+        for edge in face.boundaries.iter_mut().flat_map(Wire::edge_iter_mut) {
+            let edge_index = match edge_indices.get(&edge.id()) {
+                Some(index) => *index,
+                None => {
+                    let index = edge_indices.len();
+                    edge_indices.insert(edge.id(), index);
+                    index
+                }
+            };
+            edge.set_tracking_id(tracking.edges[edge_index].clone());
+            for vertex in [&mut edge.vertices.0, &mut edge.vertices.1] {
+                let vertex_index = match vertex_indices.get(&vertex.id()) {
+                    Some(index) => *index,
+                    None => {
+                        let index = vertex_indices.len();
+                        vertex_indices.insert(vertex.id(), index);
+                        index
+                    }
+                };
+                vertex.set_tracking_id(tracking.vertices[vertex_index].clone());
+            }
         }
     }
 }
@@ -663,6 +804,33 @@ impl<P: Clone, C: Clone, S: Clone> Solid<P, C, S> {
         }
     }
 
+    /// Compresses this solid with immutable topology tracking metadata.
+    pub fn compress_tracked(&self) -> TrackedCompressedSolid<P, C, S> {
+        let tracked_boundaries: Vec<_> = self
+            .boundaries()
+            .iter()
+            .map(Shell::compress_tracked)
+            .collect();
+        TrackedCompressedSolid {
+            topology: CompressedSolid {
+                boundaries: tracked_boundaries
+                    .iter()
+                    .map(|boundary| boundary.topology.clone())
+                    .collect(),
+                id_allocator: Some(self.id_allocator.clone()),
+                attributes: if self.attributes.is_empty() {
+                    None
+                } else {
+                    Some(self.attributes.clone())
+                },
+            },
+            tracking: tracked_boundaries
+                .into_iter()
+                .map(|boundary| boundary.tracking)
+                .collect(),
+        }
+    }
+
     /// Compresses the solid into serialized compressed topology with face-local trims.
     pub fn compress_with_face_trims<T, F>(
         &self,
@@ -697,6 +865,33 @@ impl<P: Clone, C: Clone, S: Clone> Solid<P, C, S> {
         let shells: Result<Vec<Shell<P, C, S>>> =
             csolid.boundaries.into_iter().map(Shell::extract).collect();
         let mut solid = Solid::try_new(shells?)?;
+        solid.id_allocator = id_allocator;
+        solid.attributes = attributes;
+        Ok(solid)
+    }
+
+    /// Extracts a compressed solid and restores immutable tracking metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidTrackingMetadata`] when the tracking shell
+    /// count or any nested tracking array does not match the topology.
+    pub fn extract_tracked(tracked: TrackedCompressedSolid<P, C, S>) -> Result<Self> {
+        let TrackedCompressedSolid { topology, tracking } = tracked;
+        if tracking.len() != topology.boundaries.len() {
+            return Err(Error::InvalidTrackingMetadata);
+        }
+        let id_allocator = topology.id_allocator.unwrap_or_default();
+        let attributes = topology.attributes.unwrap_or_default();
+        let shells = topology
+            .boundaries
+            .into_iter()
+            .zip(tracking)
+            .map(|(topology, tracking)| {
+                Shell::extract_tracked(TrackedCompressedShell { topology, tracking })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let mut solid = Solid::try_new(shells)?;
         solid.id_allocator = id_allocator;
         solid.attributes = attributes;
         Ok(solid)
@@ -1000,7 +1195,11 @@ where
     where
         Serializer: serde::Serializer,
     {
-        self.compress().serialize(serializer)
+        if self.tracking_ids().is_empty() {
+            ShellSerialization::Legacy(self.compress()).serialize(serializer)
+        } else {
+            ShellSerialization::Tracked(self.compress_tracked()).serialize(serializer)
+        }
     }
 }
 
@@ -1013,8 +1212,14 @@ where
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where D: serde::Deserializer<'de> {
         use serde::de::Error;
-        let compressed = CompressedShell::<P, C, S>::deserialize(deserializer)?;
-        Shell::extract(compressed).map_err(D::Error::custom)
+        match ShellSerialization::<P, C, S>::deserialize(deserializer)? {
+            ShellSerialization::Tracked(tracked) => {
+                Shell::extract_tracked(tracked).map_err(D::Error::custom)
+            }
+            ShellSerialization::Legacy(compressed) => {
+                Shell::extract(compressed).map_err(D::Error::custom)
+            }
+        }
     }
 }
 
@@ -1031,7 +1236,11 @@ where
     where
         Serializer: serde::Serializer,
     {
-        self.compress().serialize(serializer)
+        if self.tracking_ids().is_empty() {
+            SolidSerialization::Legacy(self.compress()).serialize(serializer)
+        } else {
+            SolidSerialization::Tracked(self.compress_tracked()).serialize(serializer)
+        }
     }
 }
 
@@ -1044,8 +1253,14 @@ where
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where D: serde::Deserializer<'de> {
         use serde::de::Error;
-        let compressed = CompressedSolid::<P, C, S>::deserialize(deserializer)?;
-        Solid::extract(compressed).map_err(D::Error::custom)
+        match SolidSerialization::<P, C, S>::deserialize(deserializer)? {
+            SolidSerialization::Tracked(tracked) => {
+                Solid::extract_tracked(tracked).map_err(D::Error::custom)
+            }
+            SolidSerialization::Legacy(compressed) => {
+                Solid::extract(compressed).map_err(D::Error::custom)
+            }
+        }
     }
 }
 

@@ -81,7 +81,11 @@
     unused_qualifications
 )]
 
-pub use monstertruck_core::{StableId, StableIdAllocator};
+pub use monstertruck_core::{
+    FeatureId, LineageEvent, LineageRelation, OperationKind, SemanticBinding, SemanticLabel,
+    SemanticTopologyRef, StableId, StableIdAllocator, TopologyKind, TrackingError,
+    TrackingGeneration, TrackingId, TrackingSession, TrackingSessionId,
+};
 use monstertruck_core::{id::Id, tolerance::*};
 use monstertruck_traits::*;
 use parking_lot::Mutex;
@@ -110,6 +114,7 @@ const SEARCH_PARAMETER_TRIALS: usize = 100;
 pub struct Vertex<P> {
     point: Arc<Mutex<P>>,
     stable_id: StableId,
+    tracking_id: Option<TrackingId>,
 }
 
 /// Edge, which consists two vertices.
@@ -130,6 +135,7 @@ pub struct Edge<P, C> {
     orientation: bool,
     curve: Arc<Mutex<C>>,
     stable_id: StableId,
+    tracking_id: Option<TrackingId>,
 }
 
 /// Wire, a path or cycle which consists some edges.
@@ -162,6 +168,7 @@ pub struct Face<P, C, S> {
     orientation: bool,
     surface: Arc<Mutex<S>>,
     stable_id: StableId,
+    tracking_id: Option<TrackingId>,
 }
 
 /// Shell, a connected compounded faces.
@@ -407,6 +414,8 @@ pub mod face;
 /// classifies shell conditions and defines the face iterators.
 pub mod shell;
 mod solid;
+mod tracking;
+pub use tracking::{TopologyTracking, TrackingReport, TrackingResult};
 /// Runtime topology with face-local trim storage.
 pub mod trimmed;
 mod vertex;

@@ -38,6 +38,14 @@ pub mod newton;
 pub mod scalar;
 /// Setting Tolerance
 pub mod tolerance;
+/// Session-scoped topology tracking and deterministic operation lineage.
+pub mod tracking;
+
+pub use tracking::{
+    FeatureId, LineageEvent, LineageRelation, OperationKind, SemanticBinding, SemanticLabel,
+    SemanticTopologyRef, TopologyKind, TrackingError, TrackingGeneration, TrackingId,
+    TrackingResult, TrackingSession, TrackingSessionId,
+};
 
 pub use crate::cgmath_extend_traits::*;
 pub use crate::derivatives::*;

@@ -39,6 +39,7 @@ impl<P, C> Edge<P, C> {
             orientation: true,
             curve: Arc::new(Mutex::new(curve)),
             stable_id: StableId::UNASSIGNED,
+            tracking_id: None,
         }
     }
 
@@ -46,9 +47,16 @@ impl<P, C> Edge<P, C> {
     #[inline(always)]
     pub fn stable_id(&self) -> StableId { self.stable_id }
 
-    /// Sets the stable persistent identifier of this edge.
+    /// Sets the stable persistent identifier of this edge internally.
     #[inline(always)]
-    pub fn set_stable_id(&mut self, id: StableId) { self.stable_id = id; }
+    pub(crate) fn set_stable_id(&mut self, id: StableId) { self.stable_id = id; }
+
+    /// Returns the immutable session-scoped tracking identifier, when assigned.
+    #[inline(always)]
+    pub fn tracking_id(&self) -> Option<&TrackingId> { self.tracking_id.as_ref() }
+
+    #[inline(always)]
+    pub(crate) fn set_tracking_id(&mut self, id: Option<TrackingId>) { self.tracking_id = id; }
 
     /// Generates the edge from `front` to `back`.
     /// # Remarks
@@ -120,6 +128,7 @@ impl<P, C> Edge<P, C> {
             orientation: !self.orientation,
             curve: Arc::clone(&self.curve),
             stable_id: self.stable_id,
+            tracking_id: self.tracking_id.clone(),
         }
     }
 
@@ -222,6 +231,7 @@ impl<P, C> Edge<P, C> {
             curve: Arc::clone(&self.curve),
             orientation: true,
             stable_id: self.stable_id,
+            tracking_id: self.tracking_id.clone(),
         }
     }
 
@@ -391,6 +401,8 @@ impl<P, C> Edge<P, C> {
         let v1 = self.absolute_back().mapped(&mut point_mapping);
         let curve = curve_mapping(&*self.curve.lock());
         let mut edge = Edge::debug_new(&v0, &v1, curve);
+        edge.stable_id = self.stable_id;
+        edge.tracking_id.clone_from(&self.tracking_id);
         if edge.orientation() != self.orientation() {
             edge.invert();
         }
@@ -421,12 +433,14 @@ impl<P, C> Edge<P, C> {
             orientation: self.orientation,
             curve: Arc::new(Mutex::new(curve0)),
             stable_id: StableId::UNASSIGNED,
+            tracking_id: None,
         };
         let edge1 = Edge {
             vertices: (vertex.clone(), self.absolute_back().clone()),
             orientation: self.orientation,
             curve: Arc::new(Mutex::new(curve1)),
             stable_id: StableId::UNASSIGNED,
+            tracking_id: None,
         };
         match self.orientation {
             true => (edge0, edge1),
@@ -567,6 +581,7 @@ impl<P, C> Clone for Edge<P, C> {
             orientation: self.orientation,
             curve: Arc::clone(&self.curve),
             stable_id: self.stable_id,
+            tracking_id: self.tracking_id.clone(),
         }
     }
 }

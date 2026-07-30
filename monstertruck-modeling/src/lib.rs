@@ -112,6 +112,8 @@ pub mod primitive;
 pub mod profile;
 mod sweep;
 mod topo_impls;
+/// Modeling operations with deterministic topology tracking and lineage.
+pub mod tracked;
 
 #[cfg(feature = "fillet")]
 mod fillet_impl;
