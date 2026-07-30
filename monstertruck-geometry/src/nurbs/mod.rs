@@ -253,6 +253,9 @@ pub mod contract;
 /// Geometric-continuity orders and surface capability diagnostics.
 pub mod continuity;
 
+/// Variational geometric-continuity solver for NURBS surface boundaries.
+pub mod continuity_solver;
+
 /// Fairing and reparameterization utilities for curves.
 pub mod fair;
 
