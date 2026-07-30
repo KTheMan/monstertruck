@@ -726,6 +726,18 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineCurve<P> {
         self
     }
 
+    /// Elevates this curve to at least `target_degree`.
+    ///
+    /// The geometry and parameterization are preserved. This method is a
+    /// no-op when the current degree already meets or exceeds the target.
+    pub fn elevate_degree_to(&mut self, target_degree: usize) -> &mut Self {
+        let current_degree = self.degree();
+        (current_degree..target_degree).for_each(|_| {
+            self.elevate_degree();
+        });
+        self
+    }
+
     /// Makes the B-spline curve clamped
     /// # Examples
     /// ```

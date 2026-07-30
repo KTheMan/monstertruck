@@ -253,6 +253,14 @@ impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V> + Tolerance> Nur
         self
     }
 
+    /// Elevates this curve to at least `target_degree`.
+    ///
+    /// The rational geometry and parameterization are preserved.
+    pub fn elevate_degree_to(&mut self, target_degree: usize) -> &mut Self {
+        self.0.elevate_degree_to(target_degree);
+        self
+    }
+
     /// Makes the NURBS curve clamped. cf.[`BsplineCurve::clamp`]
     #[inline(always)]
     pub fn clamp(&mut self) -> &mut Self {

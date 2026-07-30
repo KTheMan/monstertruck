@@ -194,6 +194,9 @@ the number of control points: {1}"
     /// ```
     #[error("Gaussian elimination is failed.")]
     GaussianEliminationFailure,
+    /// The requested continuity order exceeds the validated kernel limit.
+    #[error("Continuity order {0} exceeds the validated maximum order {1}.")]
+    UnsupportedContinuityOrder(usize, usize),
     /// Cannot connect T-mesh control point to an existing connection.
     #[error("Cannot connect T-mesh control point to an existing connection.")]
     TmeshExistingConnection,

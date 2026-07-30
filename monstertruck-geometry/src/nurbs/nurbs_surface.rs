@@ -374,10 +374,28 @@ impl<V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V> + Tolerance> Nur
         self.0.elevate_udegree();
         self
     }
+    /// Elevates the `u` direction to at least `target_degree`.
+    #[inline(always)]
+    pub fn elevate_udegree_to(&mut self, target_degree: usize) -> &mut Self {
+        self.0.elevate_udegree_to(target_degree);
+        self
+    }
     /// Elevates the vdegree.
     #[inline(always)]
     pub fn elevate_vdegree(&mut self) -> &mut Self {
         self.0.elevate_vdegree();
+        self
+    }
+    /// Elevates the `v` direction to at least `target_degree`.
+    #[inline(always)]
+    pub fn elevate_vdegree_to(&mut self, target_degree: usize) -> &mut Self {
+        self.0.elevate_vdegree_to(target_degree);
+        self
+    }
+    /// Elevates both parameter directions to at least `target_degrees`.
+    #[inline(always)]
+    pub fn elevate_degrees_to(&mut self, target_degrees: (usize, usize)) -> &mut Self {
+        self.0.elevate_degrees_to(target_degrees);
         self
     }
     /// Aligns the udegree with the same degrees.

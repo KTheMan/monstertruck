@@ -247,8 +247,14 @@ pub mod basis;
 /// Compatibility normalization for collections of curves and surfaces.
 pub mod compat;
 
+/// Geometric-continuity orders and surface capability diagnostics.
+pub mod continuity;
+
 /// Fairing and reparameterization utilities for curves.
 pub mod fair;
+
+/// Allocation-light derivative jets for curves and surfaces.
+pub mod jet;
 
 /// Curve and surface offset operations.
 pub mod offset;
