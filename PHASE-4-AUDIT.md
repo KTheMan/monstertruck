@@ -33,10 +33,10 @@ The published review stack, observed on 2026-07-30, is:
 | --- | --- | --- | --- | --- |
 | [`KTheMan/monstertruck#1`](https://github.com/KTheMan/monstertruck/pull/1) | `agent/phase-3-variational-continuity` | `agent/phase-4-validation-audit` | Charter and acceptance program at `285e1550`. | Open and mergeable; no reported checks or review decision. |
 | [`KTheMan/monstertruck#2`](https://github.com/KTheMan/monstertruck/pull/2) | `agent/phase-4-validation-audit` | `agent/phase-4-audit-repairs` | Audit ledger and focused repairs through `33eff4da`. | Open and mergeable; no reported checks or review decision. |
+| [`KTheMan/monstertruck#3`](https://github.com/KTheMan/monstertruck/pull/3) | `agent/phase-4-audit-repairs` | `agent/phase-4-real-world-validation` | Solved-transition API, edit replay, corpus, certifier, receipt, and claim promotion. | Open, draft, and mergeable; no reported checks or review decision. |
 
 These pull requests are intentionally stacked. Pull request 2 depends on pull
-request 1. The committed `agent/phase-4-real-world-validation` branch is the
-third stack layer and targets `agent/phase-4-audit-repairs`.
+request 1, and pull request 3 depends on pull request 2.
 
 ## Review scope and manual deferral
 
@@ -279,4 +279,4 @@ The checkout and toolchain observations in this table were refreshed on
 | Focused repair commits | `bd29b3eb`, `552177b8`, `99fb3835`, `06fedf9c`, `48da2bd1`, `b003bb47`, and `404b4e33`; all are in pull request 2. |
 | Solved transition and replay evidence | `fe3c58a8` and `5e22e3a3` on the third stack layer. |
 | Corpus and independent certifier | `4c259080`; 18 cases, v3 baseline, and raw Windows/MSVC evidence receipt. |
-| Evidence records and final claim promotion | Complete in this documentation update; third stacked pull request pending publication. |
+| Evidence records and final claim promotion | Complete in draft stacked pull request [`KTheMan/monstertruck#3`](https://github.com/KTheMan/monstertruck/pull/3). |
