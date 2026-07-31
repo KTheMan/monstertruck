@@ -15,7 +15,7 @@ Every material claim uses one of these states:
 
 | State | Meaning |
 | --- | --- |
-| Implemented | The code path exists and has focused automated coverage. |
+| Implemented | The code path exists and has focused automated coverage for the stated behavior. This does not imply realistic validation or release readiness. |
 | Analytically verified | Independent mathematical checks support the result; the solver's own objective or collocation set is not the sole verifier. |
 | Realistically validated | Reproducible tests exercise imported or CAD-like models, representative edits, scale variation, and failure cases. |
 | Not yet substantiated | The implementation or evidence is insufficient for the claim. |
@@ -52,6 +52,12 @@ Phase 4 does not include a GUI, interactive modeler, general constraint system,
 or an assertion that geometric continuity alone establishes visual surface
 quality.
 
+The Phase 4 audit is an engineering architecture, numerical, and robustness
+review. It is not a formal security audit, threat model, exploitability
+assessment, or third-party dependency review. An unfinished optional automated
+security-classification workflow cannot promote or clear any claim in this
+document; the deferred checks require manual maintainer review.
+
 ## Claim register
 
 This table is deliberately conservative. Evidence is promoted only after the
@@ -59,16 +65,19 @@ named artifact and command are committed and reproducible.
 
 | Claim | Current state | Required Phase 4 evidence |
 | --- | --- | --- |
-| The kernel exposes `G0`--`G3` continuity primitives and a variational repair path. | Implemented | Independent formula audit, dense residual certification, and corpus results. |
-| Rational and multi-span boundaries are supported. | Implemented | Quintic and rational cases with non-unit weights, multiple spans, and verifier samples disjoint from solver collocation. |
-| Unequal parameterizations and reversed alignment are supported. | Implemented | Nonlinear and reversed mapping cases with endpoint and interior derivative checks. |
-| Failed solves and replay do not partially mutate tracked geometry. | Implemented | Adversarial and unsatisfiable replay cases that compare complete pre/post state. |
-| Replay after upstream edits is deterministic and dependency ordered. | Implemented | A multi-contract edit/replay scenario repeated across fresh processes. |
-| Public inputs have practical allocation and iteration bounds. | Not yet substantiated | Audit of every caller-controlled size/count and tests at each rejected boundary. |
-| Serialized tracking and continuity data is robust against malformed input. | Not yet substantiated | Schema/round-trip audit plus malformed and oversized input coverage. |
-| Results are deterministic. | Not yet substantiated | Repeated-run canonical result digests and stable diagnostic ordering. |
-| The continuity path is usable on Wasm. | Not yet substantiated | A documented Wasm compile/test gate or a precise external blocker. |
-| The implementation provides production `G4`. | Not yet substantiated | Not required. Keep `G4` experimental unless a separate evidence set passes. |
+| The kernel exposes `G0`--`G3` continuity primitives and a variational repair path. | Realistically validated for the recorded CAD-like cases | Exact `G0`--`G3`, one nonzero-offset `G1` repair, dense public-evaluation certification, and typed failures are committed. Nonzero-offset `G2`/`G3` remains pending. |
+| Nonuniform rational multi-span boundaries are supported. | Realistically validated for exact G3 | Curved-seam quintic rational cases with positive nonuniform weights pass independent certification. |
+| Multi-span boundaries are supported. | Realistically validated for the recorded knot layouts | Polynomial and rational cases contain multiple cross and seam spans; repeated-knot variants remain pending. |
+| Unequal parameterizations and reversed alignment are supported. | Realistically validated for the recorded cases | Nonlinear unequal/reversed `G1`, reversed `G3`, and unequal cross-domain `G3` pass mapped-boundary and interior certification. |
+| Failed solves and replay do not partially mutate tracked geometry or tracking sessions. | Implemented with focused replay validation | Initializer and topology regressions plus a multi-contract late replay failure preserve caller-visible inputs. Equivalent injected failure for every modeling wrapper remains pending. |
+| Replay after upstream edits is dependency ordered. | Realistically validated for the synthetic chain | Changed-generation geometry, stale-ID rejection, lexically conflicting contract IDs, dependency ordering, and downstream failure are covered. |
+| Solver inputs have practical allocation and iteration bounds. | Implemented | Checked budgets cover control points, spans, samples, variables, residuals, Jacobian/QR elements, and iterations. Host deserialization limits remain separate. |
+| Serialized tracking topology rejects the audited malformed indices and kind mismatch. | Implemented | Focused regressions cover index correspondence, checked references, face cardinality, tracking dimensions, and kind mismatch. Oversized deserializer allocation remains pending. |
+| Results are deterministic on the recorded Windows/MSVC host. | Realistically validated | Immediate reruns and a separate-process full verify reproduce all 18 v3 digests. Cross-platform equality is not claimed. |
+| The geometry continuity test target compiles to Wasm. | Implemented | Preserve the committed compile receipt and run it in CI. |
+| The continuity path is usable on Wasm. | Not yet substantiated | Runtime execution in a supported Wasm host, including deterministic replay and bounded failure cases. |
+| Experimental `G4` is reachable. | Realistically validated as experimental | The rational quintic G4 case certifies with maximum normalized order-four residual `1.224951875e-4`; production G4 remains not substantiated. |
+| The implementation provides production `G4`. | Not yet substantiated | Not required. Keep `G4` experimental pending nonzero-offset and imported evidence. |
 | The implementation provides "Class-A" surfacing. | Not yet substantiated | No Phase 4 claim is planned; this requires broader fairness and visual-quality criteria. |
 
 ## Validation corpus
@@ -133,11 +142,12 @@ replay integrity, numeric validation, and Wasm behavior is kept as a distinct
 audit artifact. Numerical correctness and product-readiness claims require
 their own evidence and are not inferred from a classification workflow.
 
-An optional automated vulnerability-classification workflow was deferred after
-the execution platform rejected a delegated crash-reproducer request. Phase 4
-does not work around that control. [`PHASE-4-AUDIT.md`](PHASE-4-AUDIT.md)
-records the exact unfinished checks and carries the underlying engineering
-issues as robustness findings so the remainder of Phase 4 can proceed.
+An optional automated security-classification workflow was deferred after the
+execution platform rejected a delegated dynamic crash-reproduction request.
+Phase 4 did not retry or reframe that request. The partial workflow supplies no
+security finding, severity, or clearance. [`PHASE-4-AUDIT.md`](PHASE-4-AUDIT.md)
+records the manual-review boundary and carries independently observed
+engineering issues as robustness findings.
 
 ## Quality gates
 
@@ -155,10 +165,11 @@ precisely documented with ownership and a reproduction command:
 - relevant package tests pass;
 - `cargo clippy --all-targets -- -W warnings` passes, or pre-existing unrelated
   workspace failures are recorded with exact locations;
-- formatting is checked with the repository's declared toolchain, or its
-  unavailable toolchain is recorded as a reproducible infrastructure blocker;
-- Wasm compatibility is tested, or the dependency/toolchain blocker is recorded
-  precisely;
+- formatting is checked with the repository's declared nightly toolchain;
+  existing workspace-wide drift is resolved or explicitly accepted rather than
+  described as a missing-toolchain blocker;
+- the Wasm compile gate passes, and any runtime-usability claim has a
+  supported-host execution receipt or remains explicitly not substantiated;
 - commits are coherent and the stacked pull requests state intent, evidence,
   validation commands, known limits, and dependency order.
 
