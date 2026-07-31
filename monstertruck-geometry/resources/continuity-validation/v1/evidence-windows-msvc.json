@@ -1,0 +1,792 @@
+{
+  "schema_version": 1,
+  "digest_version": "xxh3-64-public-transition-v3",
+  "fixture_version": "multispan_quintic_curved_seam_v2",
+  "cases": {
+    "invalid-degenerate-first-boundary": {
+      "outcome": "\"degenerate_boundary\"",
+      "digest": "39386d671d7edd28",
+      "dense": null,
+      "work": null,
+      "error": {
+        "endpoint": "First",
+        "kind": "degenerate_boundary",
+        "sample": 0
+      },
+      "run_elapsed_milliseconds": [
+        0,
+        0
+      ]
+    },
+    "invalid-insufficient-cross-degree": {
+      "outcome": "\"unsupported_capability\"",
+      "digest": "4aca0543e130ff3f",
+      "dense": null,
+      "work": null,
+      "error": {
+        "capability": {
+          "boundary": "UEnd",
+          "cross_control_rows": 3,
+          "cross_degree": 2,
+          "level": "Unsupported",
+          "requested": 3
+        },
+        "endpoint": "First",
+        "kind": "unsupported_capability"
+      },
+      "run_elapsed_milliseconds": [
+        0,
+        0
+      ]
+    },
+    "invalid-samples-per-span": {
+      "outcome": "\"invalid_config\"",
+      "digest": "9afab8c3d4161d68",
+      "dense": null,
+      "work": null,
+      "error": {
+        "kind": "invalid_config",
+        "message": "samples_per_span must be in 1..=64"
+      },
+      "run_elapsed_milliseconds": [
+        0,
+        0
+      ]
+    },
+    "invalid-zero-second-weight": {
+      "outcome": "\"non_positive_weight\"",
+      "digest": "8e194fbc97264e94",
+      "dense": null,
+      "work": null,
+      "error": {
+        "column": 2,
+        "endpoint": "Second",
+        "kind": "non_positive_weight",
+        "row": 0,
+        "weight": 0.0
+      },
+      "run_elapsed_milliseconds": [
+        0,
+        0
+      ]
+    },
+    "polynomial-quintic-aligned-g3-scale-1": {
+      "outcome": "converged",
+      "digest": "23fecd664bc46b74",
+      "dense": {
+        "maximum_absolute_residual_by_order": [
+          3.3335590258932494e-16,
+          6.836828025106348e-13,
+          2.619361516852294e-10,
+          2.3843238433603106e-7
+        ],
+        "maximum_normalized_residual_by_order": [
+          3.3335590258932494e-16,
+          6.836828025106348e-13,
+          2.619361516852294e-10,
+          2.3843238433603106e-7
+        ],
+        "maximum_normal_angle": 2.580956827951785e-8,
+        "worst_seam_by_order": [
+          0.7230785280403228,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "worst_mixed_derivative_by_order": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            2,
+            1
+          ]
+        ]
+      },
+      "work": {
+        "iterations": 0,
+        "accepted_steps": 0,
+        "rejected_steps": 0,
+        "variable_count": 207,
+        "residual_count": 717
+      },
+      "error": null,
+      "run_elapsed_milliseconds": [
+        14865,
+        12579
+      ]
+    },
+    "polynomial-quintic-aligned-g3-scale-large": {
+      "outcome": "converged",
+      "digest": "0cdca239de6c46d3",
+      "dense": {
+        "maximum_absolute_residual_by_order": [
+          2.278173318171838e-13,
+          6.998548433423886e-10,
+          4.768953623117584e-7,
+          0.00018409619921895835
+        ],
+        "maximum_normalized_residual_by_order": [
+          2.278173318171838e-16,
+          6.998548433423885e-13,
+          4.768953623117584e-10,
+          1.8409619921895835e-7
+        ],
+        "maximum_normal_angle": 2.1073424255447017e-8,
+        "worst_seam_by_order": [
+          0.7081469612302543,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "worst_mixed_derivative_by_order": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            3,
+            0
+          ]
+        ]
+      },
+      "work": {
+        "iterations": 0,
+        "accepted_steps": 0,
+        "rejected_steps": 0,
+        "variable_count": 207,
+        "residual_count": 717
+      },
+      "error": null,
+      "run_elapsed_milliseconds": [
+        10409,
+        11112
+      ]
+    },
+    "polynomial-quintic-aligned-g3-scale-small": {
+      "outcome": "converged",
+      "digest": "4aa11c3339a343da",
+      "dense": {
+        "maximum_absolute_residual_by_order": [
+          2.1726353818624857e-19,
+          1.2999306428145565e-16,
+          3.9079906304043785e-13,
+          3.2563411800307045e-10
+        ],
+        "maximum_normalized_residual_by_order": [
+          2.1726353818624857e-16,
+          1.2999306428145564e-13,
+          3.9079906304043783e-10,
+          3.2563411800307044e-7
+        ],
+        "maximum_normal_angle": 2.1073424255447017e-8,
+        "worst_seam_by_order": [
+          0.9581469612302546,
+          0.8194429766980396,
+          1.0,
+          1.0
+        ],
+        "worst_mixed_derivative_by_order": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            2,
+            1
+          ]
+        ]
+      },
+      "work": {
+        "iterations": 0,
+        "accepted_steps": 0,
+        "rejected_steps": 0,
+        "variable_count": 207,
+        "residual_count": 717
+      },
+      "error": null,
+      "run_elapsed_milliseconds": [
+        11098,
+        10798
+      ]
+    },
+    "polynomial-quintic-aligned-g3-unequal-cross-domain": {
+      "outcome": "converged",
+      "digest": "3579b443ca5009df",
+      "dense": {
+        "maximum_absolute_residual_by_order": [
+          3.3335590258932494e-16,
+          6.836828025106348e-13,
+          5.820782799772705e-10,
+          6.854554589444993e-7
+        ],
+        "maximum_normalized_residual_by_order": [
+          3.3335590258932494e-16,
+          6.836828025106348e-13,
+          5.820782799772705e-10,
+          6.854554589444993e-7
+        ],
+        "maximum_normal_angle": 2.580956827951785e-8,
+        "worst_seam_by_order": [
+          0.7230785280403228,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "worst_mixed_derivative_by_order": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            2,
+            1
+          ]
+        ]
+      },
+      "work": {
+        "iterations": 0,
+        "accepted_steps": 0,
+        "rejected_steps": 0,
+        "variable_count": 207,
+        "residual_count": 717
+      },
+      "error": null,
+      "run_elapsed_milliseconds": [
+        10803,
+        10233
+      ]
+    },
+    "polynomial-quintic-curved-aligned-g2": {
+      "outcome": "converged",
+      "digest": "b0772a30ed56cfd9",
+      "dense": {
+        "maximum_absolute_residual_by_order": [
+          3.3335590258932494e-16,
+          6.836828025106348e-13,
+          2.619361516852294e-10
+        ],
+        "maximum_normalized_residual_by_order": [
+          3.3335590258932494e-16,
+          6.836828025106348e-13,
+          2.619361516852294e-10
+        ],
+        "maximum_normal_angle": 2.580956827951785e-8,
+        "worst_seam_by_order": [
+          0.7230785280403228,
+          1.0,
+          1.0
+        ],
+        "worst_mixed_derivative_by_order": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ]
+        ]
+      },
+      "work": {
+        "iterations": 0,
+        "accepted_steps": 0,
+        "rejected_steps": 0,
+        "variable_count": 169,
+        "residual_count": 475
+      },
+      "error": null,
+      "run_elapsed_milliseconds": [
+        4077,
+        3999
+      ]
+    },
+    "polynomial-quintic-curved-offset-repair-g1": {
+      "outcome": "converged",
+      "digest": "46e89cc0beed0724",
+      "dense": {
+        "maximum_absolute_residual_by_order": [
+          3.3422138886441676e-16,
+          3.410605131648481e-13
+        ],
+        "maximum_normalized_residual_by_order": [
+          3.3422138886441676e-16,
+          3.410605131648481e-13
+        ],
+        "maximum_normal_angle": 2.1073424255447017e-8,
+        "worst_seam_by_order": [
+          0.5269214719596769,
+          1.0
+        ],
+        "worst_mixed_derivative_by_order": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "work": {
+        "iterations": 2,
+        "accepted_steps": 2,
+        "rejected_steps": 0,
+        "variable_count": 131,
+        "residual_count": 284
+      },
+      "error": null,
+      "run_elapsed_milliseconds": [
+        3927,
+        3747
+      ]
+    },
+    "polynomial-quintic-planar-aligned-g0": {
+      "outcome": "converged",
+      "digest": "4daf9ff38753d4d5",
+      "dense": {
+        "maximum_absolute_residual_by_order": [
+          3.3306690738754696e-16
+        ],
+        "maximum_normalized_residual_by_order": [
+          3.3306690738754696e-16
+        ],
+        "maximum_normal_angle": 0.0,
+        "worst_seam_by_order": [
+          0.7230785280403228
+        ],
+        "worst_mixed_derivative_by_order": [
+          [
+            0,
+            0
+          ]
+        ]
+      },
+      "work": {
+        "iterations": 0,
+        "accepted_steps": 0,
+        "rejected_steps": 0,
+        "variable_count": 93,
+        "residual_count": 144
+      },
+      "error": null,
+      "run_elapsed_milliseconds": [
+        527,
+        575
+      ]
+    },
+    "polynomial-quintic-reversed-g3-scale-1": {
+      "outcome": "converged",
+      "digest": "c5406bf71e2cb24b",
+      "dense": {
+        "maximum_absolute_residual_by_order": [
+          2.237726045655905e-16,
+          4.558700657768871e-13,
+          2.330082116268234e-10,
+          1.7978144454976402e-7
+        ],
+        "maximum_normalized_residual_by_order": [
+          2.237726045655905e-16,
+          4.558700657768871e-13,
+          2.330082116268234e-10,
+          1.7978144454976402e-7
+        ],
+        "maximum_normal_angle": 2.1073424255447017e-8,
+        "worst_seam_by_order": [
+          0.45814696123025456,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "worst_mixed_derivative_by_order": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            3,
+            0
+          ]
+        ]
+      },
+      "work": {
+        "iterations": 0,
+        "accepted_steps": 0,
+        "rejected_steps": 0,
+        "variable_count": 207,
+        "residual_count": 717
+      },
+      "error": null,
+      "run_elapsed_milliseconds": [
+        12071,
+        13326
+      ]
+    },
+    "polynomial-quintic-unequal-g1-scale-1": {
+      "outcome": "converged",
+      "digest": "2758843172037559",
+      "dense": {
+        "maximum_absolute_residual_by_order": [
+          3.3371679465427684e-16,
+          6.439623492299518e-9
+        ],
+        "maximum_normalized_residual_by_order": [
+          3.3371679465427684e-16,
+          6.439623492299518e-9
+        ],
+        "maximum_normal_angle": 2.1073424255447017e-8,
+        "worst_seam_by_order": [
+          0.6805570233019593,
+          0.3554909677983856
+        ],
+        "worst_mixed_derivative_by_order": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            1
+          ]
+        ]
+      },
+      "work": {
+        "iterations": 2,
+        "accepted_steps": 2,
+        "rejected_steps": 0,
+        "variable_count": 146,
+        "residual_count": 335
+      },
+      "error": null,
+      "run_elapsed_milliseconds": [
+        7398,
+        6813
+      ]
+    },
+    "rational-quintic-aligned-g3-scale-1": {
+      "outcome": "converged",
+      "digest": "ef1fcbc3482d6514",
+      "dense": {
+        "maximum_absolute_residual_by_order": [
+          2.249796576380341e-16,
+          9.098554527100288e-13,
+          9.32586483052888e-10,
+          4.776776999723468e-7
+        ],
+        "maximum_normalized_residual_by_order": [
+          2.249796576380341e-16,
+          9.098554527100288e-13,
+          9.32586483052888e-10,
+          4.776776999723468e-7
+        ],
+        "maximum_normal_angle": 2.1073424255447017e-8,
+        "worst_seam_by_order": [
+          0.7769214719596768,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "worst_mixed_derivative_by_order": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            3,
+            0
+          ]
+        ]
+      },
+      "work": {
+        "iterations": 0,
+        "accepted_steps": 0,
+        "rejected_steps": 0,
+        "variable_count": 207,
+        "residual_count": 717
+      },
+      "error": null,
+      "run_elapsed_milliseconds": [
+        12642,
+        11438
+      ]
+    },
+    "rational-quintic-aligned-g3-scale-large": {
+      "outcome": "converged",
+      "digest": "518192cfdfa04ea7",
+      "dense": {
+        "maximum_absolute_residual_by_order": [
+          3.4174446490932425e-13,
+          9.336502459931566e-10,
+          4.793045997803073e-7,
+          0.0002442988985342368
+        ],
+        "maximum_normalized_residual_by_order": [
+          3.4174446490932423e-16,
+          9.336502459931566e-13,
+          4.793045997803072e-10,
+          2.442988985342368e-7
+        ],
+        "maximum_normal_angle": 2.1073424255447017e-8,
+        "worst_seam_by_order": [
+          0.9581469612302546,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "worst_mixed_derivative_by_order": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            3,
+            0
+          ]
+        ]
+      },
+      "work": {
+        "iterations": 0,
+        "accepted_steps": 0,
+        "rejected_steps": 0,
+        "variable_count": 207,
+        "residual_count": 717
+      },
+      "error": null,
+      "run_elapsed_milliseconds": [
+        11695,
+        11293
+      ]
+    },
+    "rational-quintic-aligned-g4-experimental": {
+      "outcome": "converged",
+      "digest": "4f324e3c12ed3f60",
+      "dense": {
+        "maximum_absolute_residual_by_order": [
+          2.2301825219878386e-16,
+          8.631046991809755e-14,
+          3.4980304584009144e-10,
+          5.144710900393626e-7,
+          0.00012249518751169457
+        ],
+        "maximum_normalized_residual_by_order": [
+          2.2301825219878386e-16,
+          8.631046991809755e-14,
+          3.4980304584009144e-10,
+          5.144710900393626e-7,
+          0.00012249518751169457
+        ],
+        "maximum_normal_angle": 2.1073424255447017e-8,
+        "worst_seam_by_order": [
+          0.75,
+          0.973078528040323,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "worst_mixed_derivative_by_order": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            2,
+            1
+          ],
+          [
+            4,
+            0
+          ]
+        ]
+      },
+      "work": {
+        "iterations": 0,
+        "accepted_steps": 0,
+        "rejected_steps": 0,
+        "variable_count": 254,
+        "residual_count": 1019
+      },
+      "error": null,
+      "run_elapsed_milliseconds": [
+        27662,
+        27114
+      ]
+    },
+    "rational-quintic-unequal-reversed-g1-scale-1": {
+      "outcome": "converged",
+      "digest": "6cb34b3f4309fb22",
+      "dense": {
+        "maximum_absolute_residual_by_order": [
+          3.357306211760598e-16,
+          3.2758117259830634e-9
+        ],
+        "maximum_normalized_residual_by_order": [
+          3.357306211760598e-16,
+          3.2758117259830634e-9
+        ],
+        "maximum_normal_angle": 2.1073424255447017e-8,
+        "worst_seam_by_order": [
+          0.8945090322016128,
+          0.3554909677983853
+        ],
+        "worst_mixed_derivative_by_order": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            1
+          ]
+        ]
+      },
+      "work": {
+        "iterations": 2,
+        "accepted_steps": 2,
+        "rejected_steps": 0,
+        "variable_count": 146,
+        "residual_count": 416
+      },
+      "error": null,
+      "run_elapsed_milliseconds": [
+        8869,
+        8877
+      ]
+    },
+    "unsatisfied-large-offset-one-iteration": {
+      "outcome": "\"did_not_converge\"",
+      "digest": "70865f5f127f10df",
+      "dense": null,
+      "work": null,
+      "error": {
+        "kind": "did_not_converge",
+        "report": {
+          "accepted_steps": 1,
+          "damping": 0.0003333333333333333,
+          "final_objective": 21687212536999.113,
+          "gradient_infinity_norm": 6436726191885626.0,
+          "initial_objective": 1.3951296957738035e+17,
+          "iterations": 1,
+          "maturity": "Production",
+          "numerical_rank": 207,
+          "rejected_steps": 0,
+          "residual_count": 717,
+          "residuals": [
+            {
+              "cross_derivative": 0,
+              "maximum": 2.258124385543483e-16,
+              "order": 0,
+              "rms": 1.192993822094744e-16,
+              "seam_derivative": 0,
+              "validation_sample": true,
+              "worst_sample": 86
+            },
+            {
+              "cross_derivative": 1,
+              "maximum": 0.006083711959698842,
+              "order": 1,
+              "rms": 0.003629162490980769,
+              "seam_derivative": 0,
+              "validation_sample": false,
+              "worst_sample": 16
+            },
+            {
+              "cross_derivative": 2,
+              "maximum": 0.1227412553728588,
+              "order": 2,
+              "rms": 0.05987086081716253,
+              "seam_derivative": 0,
+              "validation_sample": false,
+              "worst_sample": 16
+            },
+            {
+              "cross_derivative": 3,
+              "maximum": 1.3004041694041621,
+              "order": 3,
+              "rms": 0.5506052053975403,
+              "seam_derivative": 0,
+              "validation_sample": false,
+              "worst_sample": 0
+            }
+          ],
+          "step_norm": 0.17194002412588544,
+          "termination": "MaximumIterations",
+          "variable_count": 207
+        }
+      },
+      "run_elapsed_milliseconds": [
+        21769,
+        20978
+      ]
+    }
+  }
+}

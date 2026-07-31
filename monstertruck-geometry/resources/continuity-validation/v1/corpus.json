@@ -1,0 +1,413 @@
+{
+  "schema_version": 1,
+  "fixture_version": "multispan_quintic_curved_seam_v2",
+  "dense_defaults": {
+    "seam_samples": 33,
+    "stencil_radius": 4,
+    "normalized_step": 0.005
+  },
+  "cases": [
+    {
+      "id": "polynomial-quintic-aligned-g3-scale-1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0
+      },
+      "request": {
+        "first_boundary": "UEnd",
+        "second_boundary": "UStart",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Production",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 1e-3],
+        "maximum_normal_angle": 1e-7
+      }
+    },
+    {
+      "id": "rational-quintic-aligned-g3-scale-1",
+      "geometry": {
+        "weight_model": "rational",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0
+      },
+      "request": {
+        "first_boundary": "UEnd",
+        "second_boundary": "UStart",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Production",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 1e-3],
+        "maximum_normal_angle": 1e-7
+      }
+    },
+    {
+      "id": "polynomial-quintic-reversed-g3-scale-1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "reversed",
+        "scale": 1.0
+      },
+      "request": {
+        "first_boundary": "UEnd",
+        "second_boundary": "UStart",
+        "alignment": "Reversed",
+        "order": 3
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Production",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 1e-3],
+        "maximum_normal_angle": 1e-7
+      }
+    },
+    {
+      "id": "polynomial-quintic-unequal-g1-scale-1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "unequal",
+        "scale": 1.0
+      },
+      "request": {
+        "first_boundary": "UEnd",
+        "second_boundary": "UStart",
+        "alignment": "Aligned",
+        "order": 1
+      },
+      "solver": {
+        "max_iterations": 80,
+        "samples_per_span": 4,
+        "transition_degree": 8,
+        "anchor_weight": 1.0,
+        "fairness_weight": 0.0,
+        "transition_weight": 0.0,
+        "experimental_g4": false
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Production",
+        "maximum_dense_residual_by_order": [1e-8, 1e-5],
+        "maximum_normal_angle": 1e-5
+      }
+    },
+    {
+      "id": "rational-quintic-unequal-reversed-g1-scale-1",
+      "geometry": {
+        "weight_model": "rational",
+        "second_seam_parameterization": "unequal_reversed",
+        "scale": 1.0
+      },
+      "request": {
+        "first_boundary": "UEnd",
+        "second_boundary": "UStart",
+        "alignment": "Reversed",
+        "order": 1
+      },
+      "solver": {
+        "max_iterations": 80,
+        "samples_per_span": 4,
+        "transition_degree": 8,
+        "anchor_weight": 1.0,
+        "fairness_weight": 0.0,
+        "transition_weight": 0.0,
+        "experimental_g4": false
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Production",
+        "maximum_dense_residual_by_order": [1e-8, 1e-5],
+        "maximum_normal_angle": 1e-5
+      }
+    },
+    {
+      "id": "polynomial-quintic-aligned-g3-scale-small",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 0.001
+      },
+      "request": {
+        "first_boundary": "UEnd",
+        "second_boundary": "UStart",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Production",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 1e-3],
+        "maximum_normal_angle": 1e-7
+      }
+    },
+    {
+      "id": "rational-quintic-aligned-g3-scale-large",
+      "geometry": {
+        "weight_model": "rational",
+        "second_seam_parameterization": "equal",
+        "scale": 1000.0
+      },
+      "request": {
+        "first_boundary": "UEnd",
+        "second_boundary": "UStart",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Production",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 1e-3],
+        "maximum_normal_angle": 1e-7
+      }
+    },
+    {
+      "id": "rational-quintic-aligned-g4-experimental",
+      "geometry": {
+        "weight_model": "rational",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0
+      },
+      "request": {
+        "first_boundary": "UEnd",
+        "second_boundary": "UStart",
+        "alignment": "Aligned",
+        "order": 4
+      },
+      "solver": {
+        "max_iterations": 80,
+        "samples_per_span": 3,
+        "transition_degree": 4,
+        "anchor_weight": 0.0,
+        "fairness_weight": 0.0,
+        "transition_weight": 0.000001,
+        "experimental_g4": true
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Experimental",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 1e-3, 0.1],
+        "maximum_normal_angle": 1e-7
+      }
+    },
+    {
+      "id": "polynomial-quintic-planar-aligned-g0",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_boundary": "UEnd",
+        "second_boundary": "UStart",
+        "alignment": "Aligned",
+        "order": 0
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Production",
+        "maximum_dense_residual_by_order": [1e-9],
+        "maximum_normal_angle": 0.0
+      }
+    },
+    {
+      "id": "polynomial-quintic-curved-aligned-g2",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0
+      },
+      "request": {
+        "first_boundary": "UEnd",
+        "second_boundary": "UStart",
+        "alignment": "Aligned",
+        "order": 2
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Production",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5],
+        "maximum_normal_angle": 1e-7
+      }
+    },
+    {
+      "id": "polynomial-quintic-aligned-g3-unequal-cross-domain",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "second_cross_domain_scale": 3.0
+      },
+      "request": {
+        "first_boundary": "UEnd",
+        "second_boundary": "UStart",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Production",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 1e-3],
+        "maximum_normal_angle": 1e-7
+      }
+    },
+    {
+      "id": "polynomial-quintic-aligned-g3-scale-large",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1000.0
+      },
+      "request": {
+        "first_boundary": "UEnd",
+        "second_boundary": "UStart",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Production",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 1e-3],
+        "maximum_normal_angle": 1e-7
+      }
+    },
+    {
+      "id": "polynomial-quintic-curved-offset-repair-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "boundary_offset": 0.001
+      },
+      "request": {
+        "first_boundary": "UEnd",
+        "second_boundary": "UStart",
+        "alignment": "Aligned",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Production",
+        "maximum_dense_residual_by_order": [1e-8, 1e-5],
+        "maximum_normal_angle": 1e-5
+      }
+    },
+    {
+      "id": "invalid-zero-second-weight",
+      "geometry": {
+        "weight_model": "rational",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "mutation": "zero_second_weight"
+      },
+      "request": {
+        "first_boundary": "UEnd",
+        "second_boundary": "UStart",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "expectation": {
+        "kind": "error",
+        "error": "non_positive_weight"
+      }
+    },
+    {
+      "id": "invalid-insufficient-cross-degree",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "cross_degree": 2
+      },
+      "request": {
+        "first_boundary": "UEnd",
+        "second_boundary": "UStart",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "expectation": {
+        "kind": "error",
+        "error": "unsupported_capability"
+      }
+    },
+    {
+      "id": "invalid-degenerate-first-boundary",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "mutation": "degenerate_first_boundary"
+      },
+      "request": {
+        "first_boundary": "UEnd",
+        "second_boundary": "UStart",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "expectation": {
+        "kind": "error",
+        "error": "degenerate_boundary"
+      }
+    },
+    {
+      "id": "unsatisfied-large-offset-one-iteration",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "boundary_offset": 0.05
+      },
+      "request": {
+        "first_boundary": "UEnd",
+        "second_boundary": "UStart",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "solver": {
+        "max_iterations": 1,
+        "samples_per_span": 3,
+        "transition_degree": 3,
+        "anchor_weight": 0.0,
+        "fairness_weight": 0.0,
+        "transition_weight": 0.000001,
+        "experimental_g4": false
+      },
+      "expectation": {
+        "kind": "error",
+        "error": "did_not_converge"
+      }
+    },
+    {
+      "id": "invalid-samples-per-span",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0
+      },
+      "request": {
+        "first_boundary": "UEnd",
+        "second_boundary": "UStart",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "solver": {
+        "max_iterations": 40,
+        "samples_per_span": 65,
+        "transition_degree": 3,
+        "anchor_weight": 0.0,
+        "fairness_weight": 0.0,
+        "transition_weight": 0.000001,
+        "experimental_g4": false
+      },
+      "expectation": {
+        "kind": "error",
+        "error": "invalid_config"
+      }
+    }
+  ]
+}
