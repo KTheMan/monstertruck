@@ -640,6 +640,26 @@ impl TrackingSession {
             .map_err(|_| TrackingError::UnknownSemanticReference(reference.clone()))
     }
 
+    /// Returns the semantic binding for a current runtime identifier.
+    ///
+    /// An allocated identifier may be intentionally unbound, in which case
+    /// this returns `Ok(None)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same session, generation, and allocation errors as
+    /// [`Self::validate_current`].
+    pub fn binding_for_tracking_id(
+        &self,
+        tracking_id: &TrackingId,
+    ) -> TrackingResult<Option<&SemanticBinding>> {
+        self.validate_current(tracking_id)?;
+        Ok(self
+            .bindings
+            .iter()
+            .find(|binding| binding.tracking_id == *tracking_id))
+    }
+
     /// Validates that an identifier belongs to this current session generation.
     ///
     /// # Errors

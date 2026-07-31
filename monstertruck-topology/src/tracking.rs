@@ -137,7 +137,14 @@ impl<'a> TrackingState<'a> {
     ) -> TrackingResult<TrackingId> {
         let ordinal = self.next_ordinal(kind);
         if let Some(existing) = existing {
-            self.session.validate_current(existing)?;
+            if let Some(binding) = self.session.binding_for_tracking_id(existing)?
+                && binding.reference().kind() != kind
+            {
+                return Err(TrackingError::TopologyKindMismatch {
+                    expected: kind,
+                    actual: binding.reference().kind(),
+                });
+            }
             if self.used.insert(existing.clone()) {
                 self.all_ids.push(existing.clone());
                 self.preserved_ids.push(existing.clone());
