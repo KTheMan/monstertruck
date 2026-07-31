@@ -88,6 +88,16 @@ fn record_generated(
     Ok(())
 }
 
+fn commit_session<T>(
+    session: &mut TrackingSession,
+    operation: impl FnOnce(&mut TrackingSession) -> Result<T>,
+) -> Result<T> {
+    let mut staged_session = session.clone();
+    let output = operation(&mut staged_session)?;
+    *session = staged_session;
+    Ok(output)
+}
+
 /// Transforms topology while preserving its current tracking identities.
 ///
 /// The wrapper rejects untracked sources and mapped results whose ordered
@@ -103,7 +113,9 @@ where
 {
     let source = current_ids(topology, session)?;
     let output = builder::transformed(topology, matrix);
-    record_preserved(&source, &output, session, OperationKind::Map)?;
+    commit_session(session, |session| {
+        record_preserved(&source, &output, session, OperationKind::Map)
+    })?;
     Ok(output)
 }
 
@@ -125,7 +137,9 @@ where
 {
     let source = current_ids(topology, session)?;
     let output = builder::rotated(topology, origin, axis, angle);
-    record_preserved(&source, &output, session, OperationKind::Rotate)?;
+    commit_session(session, |session| {
+        record_preserved(&source, &output, session, OperationKind::Rotate)
+    })?;
     Ok(output)
 }
 
@@ -152,9 +166,11 @@ where
 {
     let source = current_ids(topology, session)?;
     let mut output = topology.sweep(mapping, point_connector, curve_connector);
-    let report = output.initialize_tracking(session, feature)?;
-    let generated: Vec<_> = report.generated_ids().cloned().collect();
-    record_generated(&source, &generated, session, OperationKind::Sweep)?;
+    commit_session(session, |session| {
+        let report = output.initialize_tracking(session, feature)?;
+        let generated: Vec<_> = report.generated_ids().cloned().collect();
+        record_generated(&source, &generated, session, OperationKind::Sweep)
+    })?;
     Ok(output)
 }
 
@@ -179,9 +195,11 @@ where
 {
     let source = current_ids(topology, session)?;
     let mut output = builder::extrude(topology, vector);
-    let report = output.initialize_tracking(session, feature)?;
-    let generated: Vec<_> = report.generated_ids().cloned().collect();
-    record_generated(&source, &generated, session, OperationKind::Extrude)?;
+    commit_session(session, |session| {
+        let report = output.initialize_tracking(session, feature)?;
+        let generated: Vec<_> = report.generated_ids().cloned().collect();
+        record_generated(&source, &generated, session, OperationKind::Extrude)
+    })?;
     Ok(output)
 }
 
@@ -209,9 +227,11 @@ where
 {
     let source = current_ids(topology, session)?;
     let mut output = builder::revolve(topology, origin, axis, sweep, division);
-    let report = output.initialize_tracking(session, feature)?;
-    let generated: Vec<_> = report.generated_ids().cloned().collect();
-    record_generated(&source, &generated, session, OperationKind::Revolve)?;
+    commit_session(session, |session| {
+        let report = output.initialize_tracking(session, feature)?;
+        let generated: Vec<_> = report.generated_ids().cloned().collect();
+        record_generated(&source, &generated, session, OperationKind::Revolve)
+    })?;
     Ok(output)
 }
 
