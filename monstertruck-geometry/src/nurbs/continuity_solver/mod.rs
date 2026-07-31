@@ -49,9 +49,9 @@ pub use replay::{
 };
 pub use resource::ContinuityResourceBudget;
 pub use types::{
-    BoundaryContinuityRequest, BoundaryContinuitySolution, BoundaryEndpoint, ContinuityResource,
-    ContinuitySolveError, ContinuitySolveReport, ContinuitySolverConfig, ContinuityTermination,
-    OrderResidual,
+    BoundaryContinuityRequest, BoundaryContinuitySolution, BoundaryEndpoint, BoundaryTransition,
+    ContinuityResource, ContinuitySolveError, ContinuitySolveReport, ContinuitySolverConfig,
+    ContinuityTermination, OrderResidual,
 };
 
 #[cfg(test)]

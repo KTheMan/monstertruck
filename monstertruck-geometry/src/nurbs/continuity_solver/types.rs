@@ -9,6 +9,8 @@ use crate::base::Vector4;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+const MAX_TRANSITION_CONTROL_COUNT: usize = 66;
+
 /// Identifies one endpoint of a boundary-continuity problem.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BoundaryEndpoint {
@@ -496,7 +498,10 @@ impl ContinuitySolveReport {
         self.damping
     }
 
-    /// Returns the detected numerical rank.
+    /// Returns the numerical rank of the most recently solved damped augmented
+    /// system.
+    ///
+    /// Returns zero when certification succeeds before the first linear solve.
     pub const fn numerical_rank(&self) -> usize {
         self.numerical_rank
     }
@@ -529,11 +534,165 @@ pub(super) struct ContinuitySolveReportData {
     pub(super) residual_count: usize,
 }
 
+/// Immutable solved coordinate transition from the master seam to the second surface.
+///
+/// The transition maps a normalized master seam coordinate and the solver's
+/// signed common cross-seam coordinate to normalized coordinates on the second
+/// boundary frame. The cross-seam coordinate is zero on the seam and positive
+/// into the second surface, so it is the negative of the first surface's
+/// normalized inward coordinate. The transition exposes the solved
+/// reparameterization needed by independent residual certifiers without
+/// exposing optimizer variables or mutable solver state.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BoundaryTransition {
+    order: ContinuityOrder,
+    alignment: BoundaryAlignment,
+    seam_map_log_increments: Vec<f64>,
+    alpha_fields: Vec<Vec<f64>>,
+    log_beta_field: Vec<f64>,
+    higher_beta_fields: Vec<Vec<f64>>,
+}
+
+impl BoundaryTransition {
+    pub(super) const fn new(
+        order: ContinuityOrder,
+        alignment: BoundaryAlignment,
+        seam_map_log_increments: Vec<f64>,
+        alpha_fields: Vec<Vec<f64>>,
+        log_beta_field: Vec<f64>,
+        higher_beta_fields: Vec<Vec<f64>>,
+    ) -> Self {
+        Self {
+            order,
+            alignment,
+            seam_map_log_increments,
+            alpha_fields,
+            log_beta_field,
+            higher_beta_fields,
+        }
+    }
+
+    /// Returns the second boundary's orientation relative to the master.
+    pub const fn alignment(&self) -> BoundaryAlignment {
+        self.alignment
+    }
+
+    /// Returns the solved transition order.
+    pub const fn order(&self) -> ContinuityOrder {
+        self.order
+    }
+
+    /// Returns the configured Bernstein degree of the transition fields.
+    pub fn field_degree(&self) -> usize {
+        self.seam_map_log_increments.len()
+    }
+
+    /// Maps a normalized master seam coordinate and signed cross-seam
+    /// coordinate to the second frame.
+    ///
+    /// `cross` is zero on the seam and positive into the second surface. It is
+    /// the negative of the first surface's normalized inward coordinate.
+    ///
+    /// Returns `None` when either input or the evaluated transition is
+    /// non-finite.
+    pub fn mapped_coordinates(&self, seam: f64, cross: f64) -> Option<(f64, f64)> {
+        if !seam.is_finite() || !cross.is_finite() {
+            None
+        } else {
+            let mapped_seam = self.mapped_seam(seam)?;
+            if self.order == ContinuityOrder::G0 {
+                Some((mapped_seam, cross))
+            } else {
+                let second_seam = self.alpha_fields.iter().enumerate().try_fold(
+                    mapped_seam,
+                    |value, (index, field)| {
+                        let order = index + 1;
+                        bernstein_value(field, seam).map(|coefficient| {
+                            value + coefficient * cross.powi(order as i32) / factorial(order)
+                        })
+                    },
+                )?;
+                let first_beta = bernstein_value(&self.log_beta_field, seam)?.exp();
+                let second_cross = self.higher_beta_fields.iter().enumerate().try_fold(
+                    first_beta * cross,
+                    |value, (index, field)| {
+                        let order = index + 2;
+                        bernstein_value(field, seam).map(|coefficient| {
+                            value + coefficient * cross.powi(order as i32) / factorial(order)
+                        })
+                    },
+                )?;
+                (second_seam.is_finite() && second_cross.is_finite())
+                    .then_some((second_seam, second_cross))
+            }
+        }
+    }
+
+    fn mapped_seam(&self, seam: f64) -> Option<f64> {
+        let total = self
+            .seam_map_log_increments
+            .iter()
+            .try_fold(1.0, |total, value| {
+                let increment = value.exp();
+                let next = total + increment;
+                (increment.is_finite() && next.is_finite()).then_some(next)
+            })?;
+        let control_count = self
+            .seam_map_log_increments
+            .len()
+            .checked_add(2)
+            .filter(|&count| count <= MAX_TRANSITION_CONTROL_COUNT)?;
+        let mut controls = [0.0; MAX_TRANSITION_CONTROL_COUNT];
+        let mut cumulative = 0.0;
+        self.seam_map_log_increments
+            .iter()
+            .map(|value| value.exp())
+            .chain(std::iter::once(1.0))
+            .enumerate()
+            .for_each(|(index, increment)| {
+                cumulative += increment / total;
+                controls[index + 1] = cumulative;
+            });
+        let mapped = bernstein_value(&controls[..control_count], seam)?;
+        let aligned = match self.alignment {
+            BoundaryAlignment::Aligned => mapped,
+            BoundaryAlignment::Reversed => 1.0 - mapped,
+        };
+        aligned.is_finite().then_some(aligned)
+    }
+}
+
+fn bernstein_value(coefficients: &[f64], parameter: f64) -> Option<f64> {
+    if coefficients.is_empty() || coefficients.len() > MAX_TRANSITION_CONTROL_COUNT {
+        None
+    } else {
+        let mut level = [0.0; MAX_TRANSITION_CONTROL_COUNT];
+        level[..coefficients.len()].copy_from_slice(coefficients);
+        (1..coefficients.len()).for_each(|remaining| {
+            (0..coefficients.len() - remaining).for_each(|index| {
+                level[index] = (1.0 - parameter) * level[index] + parameter * level[index + 1];
+            });
+        });
+        level[0].is_finite().then_some(level[0])
+    }
+}
+
+const fn factorial(value: usize) -> f64 {
+    match value {
+        0 | 1 => 1.0,
+        2 => 2.0,
+        3 => 6.0,
+        4 => 24.0,
+        _ => f64::INFINITY,
+    }
+}
+
 /// Owned, transactional output from a successful continuity solve.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BoundaryContinuitySolution {
     first: NurbsSurface<Vector4>,
     second: NurbsSurface<Vector4>,
+    transition: BoundaryTransition,
     report: ContinuitySolveReport,
 }
 
@@ -541,11 +700,13 @@ impl BoundaryContinuitySolution {
     pub(super) const fn new(
         first: NurbsSurface<Vector4>,
         second: NurbsSurface<Vector4>,
+        transition: BoundaryTransition,
         report: ContinuitySolveReport,
     ) -> Self {
         Self {
             first,
             second,
+            transition,
             report,
         }
     }
@@ -558,6 +719,11 @@ impl BoundaryContinuitySolution {
     /// Returns the solved second surface.
     pub const fn second(&self) -> &NurbsSurface<Vector4> {
         &self.second
+    }
+
+    /// Returns the solved master-to-second coordinate transition.
+    pub const fn transition(&self) -> &BoundaryTransition {
+        &self.transition
     }
 
     /// Returns the convergence report.
@@ -574,6 +740,19 @@ impl BoundaryContinuitySolution {
         ContinuitySolveReport,
     ) {
         (self.first, self.second, self.report)
+    }
+
+    /// Consumes the result and returns both surfaces, the solved transition,
+    /// and the report.
+    pub fn into_parts_with_transition(
+        self,
+    ) -> (
+        NurbsSurface<Vector4>,
+        NurbsSurface<Vector4>,
+        BoundaryTransition,
+        ContinuitySolveReport,
+    ) {
+        (self.first, self.second, self.transition, self.report)
     }
 }
 

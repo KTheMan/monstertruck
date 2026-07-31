@@ -6,8 +6,8 @@ use super::resource::ContinuityResourceBudget;
 use super::sampling::{nonzero_span_count, seam_samples, seam_validation_samples};
 use super::taylor::{JetScalar, TaylorJet};
 use super::types::{
-    BoundaryContinuityRequest, BoundaryEndpoint, ContinuityResource, ContinuitySolveError,
-    ContinuitySolverConfig, OrderResidual,
+    BoundaryContinuityRequest, BoundaryEndpoint, BoundaryTransition, ContinuityResource,
+    ContinuitySolveError, ContinuitySolverConfig, OrderResidual,
 };
 use crate::base::{InnerSpace, Vector3, Vector4};
 use crate::nurbs::continuity::{ContinuityOrder, SurfaceAxis, SurfaceContinuityCapability};
@@ -357,6 +357,26 @@ impl PreparedProblem {
         surface
     }
 
+    pub(super) fn solved_transition(&self, variables: &[f64]) -> BoundaryTransition {
+        let order = self.request.order();
+        BoundaryTransition::new(
+            order,
+            self.request.alignment(),
+            self.transition.seam_map(variables).to_vec(),
+            (1..=order.as_usize())
+                .map(|derivative| self.transition.alpha(variables, derivative).to_vec())
+                .collect(),
+            if order == ContinuityOrder::G0 {
+                Vec::new()
+            } else {
+                self.transition.log_beta(variables).to_vec()
+            },
+            (2..=order.as_usize())
+                .map(|derivative| self.transition.beta(variables, derivative).to_vec())
+                .collect(),
+        )
+    }
+
     pub(super) fn evaluate(
         &self,
         variables: &[f64],
@@ -651,20 +671,20 @@ impl TransitionLayout {
         self.variable_count
     }
 
-    fn seam_map(self, variables: &[Dual]) -> &[Dual] {
+    fn seam_map<T>(self, variables: &[T]) -> &[T] {
         &variables[self.seam_map_offset..self.seam_map_offset + self.seam_map_variable_count]
     }
 
-    fn alpha(self, variables: &[Dual], order: usize) -> &[Dual] {
+    fn alpha<T>(self, variables: &[T], order: usize) -> &[T] {
         let start = self.alpha_offset + (order - 1) * self.field_count;
         &variables[start..start + self.field_count]
     }
 
-    fn log_beta(self, variables: &[Dual]) -> &[Dual] {
+    fn log_beta<T>(self, variables: &[T]) -> &[T] {
         &variables[self.log_beta_offset..self.log_beta_offset + self.field_count]
     }
 
-    fn beta(self, variables: &[Dual], order: usize) -> &[Dual] {
+    fn beta<T>(self, variables: &[T], order: usize) -> &[T] {
         let start = self.higher_beta_offset + (order - 2) * self.field_count;
         &variables[start..start + self.field_count]
     }
