@@ -116,6 +116,24 @@ pub enum Error {
     /// Serialized tracking arrays do not match compressed topology dimensions.
     #[error("Serialized topology tracking metadata has inconsistent dimensions.")]
     InvalidTrackingMetadata,
+    /// A compressed topology reference is outside its corresponding array.
+    #[error(
+        "Compressed {entity} index {index} is outside the array of length {len}."
+    )]
+    InvalidCompressedTopologyIndex {
+        /// Referenced compressed entity kind.
+        entity: &'static str,
+        /// Invalid array index.
+        index: usize,
+        /// Referenced array length.
+        len: usize,
+    },
+    /// A serialized [`Face`](crate::Face) did not contain exactly one face.
+    #[error("Serialized face wrapper contains {count} faces instead of exactly one.")]
+    InvalidCompressedFaceCount {
+        /// Number of extracted faces.
+        count: usize,
+    },
 }
 
 #[test]
