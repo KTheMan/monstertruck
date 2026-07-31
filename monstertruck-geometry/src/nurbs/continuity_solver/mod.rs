@@ -37,6 +37,7 @@ mod lm;
 mod problem;
 mod qr;
 mod replay;
+mod resource;
 mod sampling;
 mod taylor;
 mod types;
@@ -46,9 +47,11 @@ pub use replay::{
     ContinuityReplaySolution, ResolvedBoundaryContinuityRequest, TrackedSurfaceIdRegistry,
     execute_boundary_continuity_contracts, prepare_boundary_continuity_requests,
 };
+pub use resource::ContinuityResourceBudget;
 pub use types::{
-    BoundaryContinuityRequest, BoundaryContinuitySolution, BoundaryEndpoint, ContinuitySolveError,
-    ContinuitySolveReport, ContinuitySolverConfig, ContinuityTermination, OrderResidual,
+    BoundaryContinuityRequest, BoundaryContinuitySolution, BoundaryEndpoint, ContinuityResource,
+    ContinuitySolveError, ContinuitySolveReport, ContinuitySolverConfig, ContinuityTermination,
+    OrderResidual,
 };
 
 #[cfg(test)]
@@ -58,6 +61,7 @@ mod tests;
 #[derive(Clone, Debug, PartialEq)]
 pub struct BoundaryContinuitySolver {
     config: ContinuitySolverConfig,
+    resource_budget: ContinuityResourceBudget,
 }
 
 impl BoundaryContinuitySolver {
@@ -66,15 +70,41 @@ impl BoundaryContinuitySolver {
     /// # Errors
     ///
     /// Returns [`ContinuitySolveError::InvalidConfig`] when a convergence,
-    /// damping, sampling, rank, or regularization control is invalid.
+    /// damping, sampling, rank, or regularization control is invalid, and
+    /// [`ContinuitySolveError::ResourceLimitExceeded`] when the requested
+    /// iteration count exceeds the default resource budget.
     pub fn new(config: ContinuitySolverConfig) -> Result<Self, ContinuitySolveError> {
+        Self::new_with_resource_budget(config, ContinuityResourceBudget::default())
+    }
+
+    /// Creates a solver with an explicit dense-work resource budget.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContinuitySolveError::InvalidConfig`] when the solver controls
+    /// are invalid, and
+    /// [`ContinuitySolveError::ResourceLimitExceeded`] when the requested
+    /// iteration count exceeds the supplied budget.
+    pub fn new_with_resource_budget(
+        config: ContinuitySolverConfig,
+        resource_budget: ContinuityResourceBudget,
+    ) -> Result<Self, ContinuitySolveError> {
         config.validate()?;
-        Ok(Self { config })
+        resource_budget.ensure(ContinuityResource::Iterations, config.max_iterations())?;
+        Ok(Self {
+            config,
+            resource_budget,
+        })
     }
 
     /// Returns the validated solver configuration.
     pub const fn config(&self) -> &ContinuitySolverConfig {
         &self.config
+    }
+
+    /// Returns the validated dense-work resource budget.
+    pub const fn resource_budget(&self) -> &ContinuityResourceBudget {
+        &self.resource_budget
     }
 
     /// Solves one boundary-continuity request without mutating either input.
@@ -86,14 +116,15 @@ impl BoundaryContinuitySolver {
     /// # Errors
     ///
     /// Returns a typed [`ContinuitySolveError`] when either surface cannot
-    /// represent the requested order, the sampled boundary is invalid, or the
-    /// nonlinear solve does not meet every requested tolerance.
+    /// represent the requested order, a checked work dimension exceeds the
+    /// resource budget, the sampled boundary is invalid, or the nonlinear
+    /// solve does not meet every requested tolerance.
     pub fn solve(
         &self,
         first: &crate::nurbs::NurbsSurface<crate::base::Vector4>,
         second: &crate::nurbs::NurbsSurface<crate::base::Vector4>,
         request: BoundaryContinuityRequest,
     ) -> Result<BoundaryContinuitySolution, ContinuitySolveError> {
-        lm::solve(first, second, request, &self.config)
+        lm::solve(first, second, request, &self.config, self.resource_budget)
     }
 }
