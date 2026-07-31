@@ -128,10 +128,16 @@ Each finding is recorded with:
 - reproducer and regression command;
 - effect on the claim register.
 
-The security-style review of deserialization, resource exhaustion, failure
-safety, replay integrity, numeric validation, and Wasm attack surfaces is kept
-as a distinct audit artifact. Numerical correctness and product-readiness
-claims require their own evidence and are not inferred from a security result.
+The robustness review of deserialization, resource limits, failure safety,
+replay integrity, numeric validation, and Wasm behavior is kept as a distinct
+audit artifact. Numerical correctness and product-readiness claims require
+their own evidence and are not inferred from a classification workflow.
+
+An optional automated vulnerability-classification workflow was deferred after
+the execution platform rejected a delegated crash-reproducer request. Phase 4
+does not work around that control. [`PHASE-4-AUDIT.md`](PHASE-4-AUDIT.md)
+records the exact unfinished checks and carries the underlying engineering
+issues as robustness findings so the remainder of Phase 4 can proceed.
 
 ## Quality gates
 

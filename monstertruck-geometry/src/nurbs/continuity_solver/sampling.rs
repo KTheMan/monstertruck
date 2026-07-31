@@ -3,6 +3,28 @@
 use super::super::KnotVector;
 use std::f64::consts::PI;
 
+pub(super) fn nonzero_span_count(
+    knots: &KnotVector,
+    degree: usize,
+    control_count: usize,
+) -> Option<usize> {
+    if control_count == 0 || degree >= knots.len() || control_count >= knots.len() {
+        None
+    } else {
+        let start = knots[degree];
+        let end = knots[control_count];
+        if !start.is_finite() || !end.is_finite() || start >= end {
+            None
+        } else {
+            let count = knots[degree..=control_count]
+                .windows(2)
+                .filter(|span| span[0].is_finite() && span[1].is_finite() && span[0] < span[1])
+                .count();
+            (count > 0).then_some(count)
+        }
+    }
+}
+
 pub(super) fn seam_samples(
     knots: &KnotVector,
     degree: usize,

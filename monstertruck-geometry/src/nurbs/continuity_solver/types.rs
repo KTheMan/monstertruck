@@ -18,6 +18,27 @@ pub enum BoundaryEndpoint {
     Second,
 }
 
+/// Caller-controlled dimension constrained by a [`ContinuityResourceBudget`](super::ContinuityResourceBudget).
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ContinuityResource {
+    /// Nonlinear solver iterations.
+    Iterations,
+    /// Combined input-surface control points.
+    ControlPoints,
+    /// Combined nonzero seam knot spans.
+    Spans,
+    /// Optimizer and independent validation samples.
+    Samples,
+    /// Dense automatic-differentiation variables.
+    Variables,
+    /// Optimizer and independent validation residuals.
+    Residuals,
+    /// Dense optimizer Jacobian elements.
+    JacobianElements,
+    /// Dense augmented QR matrix elements.
+    QrElements,
+}
+
 /// Geometric-continuity request between two tensor-product surface boundaries.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BoundaryContinuityRequest {
@@ -562,6 +583,16 @@ pub enum ContinuitySolveError {
     /// A solver configuration invariant was violated.
     #[error("invalid continuity solver configuration: {0}")]
     InvalidConfig(&'static str),
+    /// A checked caller-controlled dimension exceeded its solver budget.
+    #[error("continuity solver {resource:?} budget exceeded: requested {requested}, limit {limit}")]
+    ResourceLimitExceeded {
+        /// Dimension that exceeded the budget.
+        resource: ContinuityResource,
+        /// Checked required count.
+        requested: usize,
+        /// Configured maximum count.
+        limit: usize,
+    },
     /// G4 was requested without explicit experimental opt-in.
     #[error("G4 continuity solving requires explicit experimental opt-in")]
     ExperimentalG4Disabled,

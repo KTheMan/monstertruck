@@ -107,7 +107,7 @@ where
     // A non-finite deviation never satisfies the tolerance test and a range that
     // can no longer be halved never improves; both would otherwise subdivide all
     // the way down to the depth cap, i.e. an exponential amount of work.
-    let unsplittable = !dist2.is_finite() || !(range.0 < mid_param && mid_param < range.1);
+    let unsplittable = !(dist2.is_finite() && range.0 < mid_param && mid_param < range.1);
     if dist2 < tol * tol || trials == 0 || unsplittable {
         (vec![range.0, range.1], vec![ends.0, ends.1])
     } else {

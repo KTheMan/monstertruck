@@ -137,7 +137,14 @@ impl<'a> TrackingState<'a> {
     ) -> TrackingResult<TrackingId> {
         let ordinal = self.next_ordinal(kind);
         if let Some(existing) = existing {
-            self.session.validate_current(existing)?;
+            if let Some(binding) = self.session.binding_for_tracking_id(existing)?
+                && binding.reference().kind() != kind
+            {
+                return Err(TrackingError::TopologyKindMismatch {
+                    expected: kind,
+                    actual: binding.reference().kind(),
+                });
+            }
             if self.used.insert(existing.clone()) {
                 self.all_ids.push(existing.clone());
                 self.preserved_ids.push(existing.clone());
@@ -240,16 +247,32 @@ fn unique_ids(ids: impl IntoIterator<Item = TrackingId>) -> Vec<TrackingId> {
         .collect()
 }
 
+fn initialize_transactionally<T: Clone>(
+    topology: &mut T,
+    session: &mut TrackingSession,
+    feature: FeatureId,
+    initialize: impl FnOnce(&mut T, &mut TrackingSession, FeatureId) -> TrackingResult<TrackingReport>,
+) -> TrackingResult<TrackingReport> {
+    let mut staged_topology = topology.clone();
+    let mut staged_session = session.clone();
+    let report = initialize(&mut staged_topology, &mut staged_session, feature)?;
+    *topology = staged_topology;
+    *session = staged_session;
+    Ok(report)
+}
+
 impl<P> TopologyTracking for Vertex<P> {
     fn initialize_tracking(
         &mut self,
         session: &mut TrackingSession,
         feature: FeatureId,
     ) -> TrackingResult<TrackingReport> {
-        let mut state = TrackingState::new(session, feature);
-        let mut vertices = HashMap::default();
-        track_vertex(self, &mut state, &mut vertices)?;
-        Ok(state.finish())
+        initialize_transactionally(self, session, feature, |vertex, session, feature| {
+            let mut state = TrackingState::new(session, feature);
+            let mut vertices = HashMap::default();
+            track_vertex(vertex, &mut state, &mut vertices)?;
+            Ok(state.finish())
+        })
     }
 
     fn tracking_ids(&self) -> Vec<TrackingId> {
@@ -268,11 +291,13 @@ impl<P, C> TopologyTracking for Edge<P, C> {
         session: &mut TrackingSession,
         feature: FeatureId,
     ) -> TrackingResult<TrackingReport> {
-        let mut state = TrackingState::new(session, feature);
-        let mut vertices = HashMap::default();
-        let mut edges = HashMap::default();
-        track_edge(self, &mut state, &mut vertices, &mut edges)?;
-        Ok(state.finish())
+        initialize_transactionally(self, session, feature, |edge, session, feature| {
+            let mut state = TrackingState::new(session, feature);
+            let mut vertices = HashMap::default();
+            let mut edges = HashMap::default();
+            track_edge(edge, &mut state, &mut vertices, &mut edges)?;
+            Ok(state.finish())
+        })
     }
 
     fn tracking_ids(&self) -> Vec<TrackingId> {
@@ -299,12 +324,14 @@ impl<P, C> TopologyTracking for Wire<P, C> {
         session: &mut TrackingSession,
         feature: FeatureId,
     ) -> TrackingResult<TrackingReport> {
-        let mut state = TrackingState::new(session, feature);
-        let mut vertices = HashMap::default();
-        let mut edges = HashMap::default();
-        self.edge_iter_mut()
-            .try_for_each(|edge| track_edge(edge, &mut state, &mut vertices, &mut edges))?;
-        Ok(state.finish())
+        initialize_transactionally(self, session, feature, |wire, session, feature| {
+            let mut state = TrackingState::new(session, feature);
+            let mut vertices = HashMap::default();
+            let mut edges = HashMap::default();
+            wire.edge_iter_mut()
+                .try_for_each(|edge| track_edge(edge, &mut state, &mut vertices, &mut edges))?;
+            Ok(state.finish())
+        })
     }
 
     fn tracking_ids(&self) -> Vec<TrackingId> {
@@ -327,7 +354,9 @@ impl<P, C, S> TopologyTracking for Face<P, C, S> {
         session: &mut TrackingSession,
         feature: FeatureId,
     ) -> TrackingResult<TrackingReport> {
-        initialize_faces([self], session, feature)
+        initialize_transactionally(self, session, feature, |face, session, feature| {
+            initialize_faces([face], session, feature)
+        })
     }
 
     fn tracking_ids(&self) -> Vec<TrackingId> {
@@ -365,7 +394,9 @@ impl<P, C, S> TopologyTracking for Shell<P, C, S> {
         session: &mut TrackingSession,
         feature: FeatureId,
     ) -> TrackingResult<TrackingReport> {
-        initialize_faces(self.face_iter_mut(), session, feature)
+        initialize_transactionally(self, session, feature, |shell, session, feature| {
+            initialize_faces(shell.face_iter_mut(), session, feature)
+        })
     }
 
     fn tracking_ids(&self) -> Vec<TrackingId> {
@@ -393,11 +424,23 @@ impl<P, C, S> TopologyTracking for Solid<P, C, S> {
         session: &mut TrackingSession,
         feature: FeatureId,
     ) -> TrackingResult<TrackingReport> {
-        initialize_faces(
-            self.boundaries.iter_mut().flat_map(Shell::face_iter_mut),
-            session,
+        let mut staged_topology = Solid {
+            boundaries: self.boundaries.clone(),
+            id_allocator: self.id_allocator.clone(),
+            attributes: self.attributes.clone(),
+        };
+        let mut staged_session = session.clone();
+        let report = initialize_faces(
+            staged_topology
+                .boundaries
+                .iter_mut()
+                .flat_map(Shell::face_iter_mut),
+            &mut staged_session,
             feature,
-        )
+        )?;
+        *self = staged_topology;
+        *session = staged_session;
+        Ok(report)
     }
 
     fn tracking_ids(&self) -> Vec<TrackingId> {
@@ -450,7 +493,8 @@ impl<P, C> Edge<P, C> {
         let Some((mut first, mut second)) = self.cut(vertex) else {
             return Ok(None);
         };
-        let mut state = TrackingState::new(session, feature);
+        let mut staged_session = session.clone();
+        let mut state = TrackingState::new(&mut staged_session, feature);
         let mut vertices = HashMap::default();
         let mut edges = HashMap::default();
         track_edge(&mut first, &mut state, &mut vertices, &mut edges)?;
@@ -460,12 +504,13 @@ impl<P, C> Edge<P, C> {
             .tracking_id()
             .cloned()
             .expect("the child was tracked");
-        session.record_lineage(
+        staged_session.record_lineage(
             OperationKind::Cut,
             LineageRelation::Split,
             parent,
             [first_id, second_id],
         )?;
+        *session = staged_session;
         Ok(Some((first, second)))
     }
 
@@ -494,7 +539,8 @@ impl<P, C> Edge<P, C> {
         let Some((mut first, mut second)) = self.cut_with_parameter(vertex, parameter) else {
             return Ok(None);
         };
-        let mut state = TrackingState::new(session, feature);
+        let mut staged_session = session.clone();
+        let mut state = TrackingState::new(&mut staged_session, feature);
         let mut vertices = HashMap::default();
         let mut edges = HashMap::default();
         track_edge(&mut first, &mut state, &mut vertices, &mut edges)?;
@@ -506,12 +552,13 @@ impl<P, C> Edge<P, C> {
                 .cloned()
                 .expect("the child was tracked"),
         ];
-        session.record_lineage(
+        staged_session.record_lineage(
             OperationKind::Split,
             LineageRelation::Split,
             parent,
             children,
         )?;
+        *session = staged_session;
         Ok(Some((first, second)))
     }
 }
@@ -540,7 +587,8 @@ impl<P, C, S> Face<P, C, S> {
         let Some((mut first, mut second)) = self.cut_by_edge(edge) else {
             return Ok(None);
         };
-        let mut state = TrackingState::new(session, feature);
+        let mut staged_session = session.clone();
+        let mut state = TrackingState::new(&mut staged_session, feature);
         let mut vertices = HashMap::default();
         let mut edges = HashMap::default();
         track_face(&mut first, &mut state, &mut vertices, &mut edges)?;
@@ -552,7 +600,13 @@ impl<P, C, S> Face<P, C, S> {
                 .cloned()
                 .expect("the child was tracked"),
         ];
-        session.record_lineage(OperationKind::Cut, LineageRelation::Split, parent, children)?;
+        staged_session.record_lineage(
+            OperationKind::Cut,
+            LineageRelation::Split,
+            parent,
+            children,
+        )?;
+        *session = staged_session;
         Ok(Some((first, second)))
     }
 }

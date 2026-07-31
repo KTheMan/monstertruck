@@ -2,11 +2,12 @@
 
 use super::boundary::BoundaryFrame;
 use super::dual::Dual;
-use super::sampling::{seam_samples, seam_validation_samples};
+use super::resource::ContinuityResourceBudget;
+use super::sampling::{nonzero_span_count, seam_samples, seam_validation_samples};
 use super::taylor::{JetScalar, TaylorJet};
 use super::types::{
-    BoundaryContinuityRequest, BoundaryEndpoint, ContinuitySolveError, ContinuitySolverConfig,
-    OrderResidual,
+    BoundaryContinuityRequest, BoundaryEndpoint, ContinuityResource, ContinuitySolveError,
+    ContinuitySolverConfig, OrderResidual,
 };
 use crate::base::{InnerSpace, Vector3, Vector4};
 use crate::nurbs::continuity::{ContinuityOrder, SurfaceAxis, SurfaceContinuityCapability};
@@ -29,6 +30,7 @@ pub(super) struct PreparedProblem {
     transition: TransitionLayout,
     initial_variables: Vec<f64>,
     strip_rows: usize,
+    qr_elements: usize,
 }
 
 pub(super) struct ResidualEvaluation {
@@ -47,6 +49,7 @@ struct TransitionLayout {
     log_beta_offset: usize,
     higher_beta_offset: usize,
     order: usize,
+    variable_count: usize,
 }
 
 impl PreparedProblem {
@@ -55,6 +58,7 @@ impl PreparedProblem {
         second: &NurbsSurface<Vector4>,
         request: BoundaryContinuityRequest,
         config: &ContinuitySolverConfig,
+        resource_budget: ContinuityResourceBudget,
     ) -> Result<Self, ContinuitySolveError> {
         config.validate()?;
         if request.order() == ContinuityOrder::G4 && !config.allows_experimental_g4() {
@@ -79,6 +83,48 @@ impl PreparedProblem {
         validate_weights(first, BoundaryEndpoint::First, config.minimum_weight())?;
         validate_weights(second, BoundaryEndpoint::Second, config.minimum_weight())?;
 
+        let control_point_count = checked_add(
+            checked_mul(
+                first_frame.u_control_count(),
+                first_frame.v_control_count(),
+                "surface control-point dimension overflowed",
+            )?,
+            checked_mul(
+                second_frame.u_control_count(),
+                second_frame.v_control_count(),
+                "surface control-point dimension overflowed",
+            )?,
+            "surface control-point dimension overflowed",
+        )?;
+        resource_budget.ensure(ContinuityResource::ControlPoints, control_point_count)?;
+        let first_spans = frame_span_count(first, first_frame, BoundaryEndpoint::First)?;
+        let second_spans = frame_span_count(second, second_frame, BoundaryEndpoint::Second)?;
+        let span_count = checked_add(first_spans, second_spans, "seam span count overflowed")?;
+        resource_budget.ensure(ContinuityResource::Spans, span_count)?;
+        let validation_density = validation_density(first_frame, second_frame, request, config)?;
+        let optimizer_sample_upper = checked_mul(
+            span_count,
+            checked_add(
+                config.samples_per_span(),
+                2,
+                "optimizer sample density overflowed",
+            )?,
+            "optimizer sample count overflowed",
+        )?;
+        let validation_sample_upper = checked_mul(
+            span_count,
+            validation_density,
+            "validation sample count overflowed",
+        )?;
+        resource_budget.ensure(
+            ContinuityResource::Samples,
+            checked_add(
+                optimizer_sample_upper,
+                validation_sample_upper,
+                "total sample count overflowed",
+            )?,
+        )?;
+
         let mut samples = frame_samples(first, first_frame, config.samples_per_span())
             .into_iter()
             .chain(
@@ -97,14 +143,6 @@ impl PreparedProblem {
                 BoundaryEndpoint::First,
             ));
         }
-        let validation_density = first_frame
-            .along_degree()
-            .max(second_frame.along_degree())
-            .saturating_add(request.order().as_usize())
-            .saturating_add(config.transition_degree())
-            .saturating_add(1)
-            .saturating_mul(2)
-            .clamp(8, 64);
         let mut validation_samples =
             frame_validation_samples(first, first_frame, validation_density)
                 .into_iter()
@@ -129,6 +167,111 @@ impl PreparedProblem {
                 BoundaryEndpoint::First,
             ));
         }
+        resource_budget.ensure(
+            ContinuityResource::Samples,
+            checked_add(
+                samples.len(),
+                validation_samples.len(),
+                "total sample count overflowed",
+            )?,
+        )?;
+
+        let strip_rows =
+            (request.order().constrained_rows() + 2).min(second_frame.cross_control_count());
+        let strip_control_count = checked_mul(
+            strip_rows,
+            second_frame.along_control_count(),
+            "boundary strip dimension overflowed",
+        )?;
+        let control_variable_count = checked_mul(
+            3,
+            strip_control_count,
+            "control variable dimension overflowed",
+        )?;
+        let transition = TransitionLayout::try_new(
+            request.order().as_usize(),
+            config.transition_degree().checked_add(1).ok_or(
+                ContinuitySolveError::InvalidConfig("transition field dimension overflowed"),
+            )?,
+            control_variable_count,
+        )?;
+        let variable_count = checked_add(
+            control_variable_count,
+            transition.variable_count(),
+            "optimization variable dimension overflowed",
+        )?;
+        resource_budget.ensure(ContinuityResource::Variables, variable_count)?;
+        let taylor_terms = checked_mul(
+            request.order().as_usize() + 1,
+            request.order().as_usize() + 2,
+            "Taylor residual dimension overflowed",
+        )? / 2;
+        let continuity_residuals = checked_mul(
+            checked_mul(samples.len(), 3, "continuity residual dimension overflowed")?,
+            taylor_terms,
+            "continuity residual dimension overflowed",
+        )?;
+        let fairness_stencils = if strip_rows < 3 || config.fairness_weight() == 0.0 {
+            0
+        } else {
+            strip_rows
+                .saturating_sub(1)
+                .min(second_frame.cross_control_count().saturating_sub(2))
+        };
+        let fairness_residuals = checked_mul(
+            checked_mul(
+                fairness_stencils,
+                second_frame.along_control_count(),
+                "fairness residual dimension overflowed",
+            )?,
+            3,
+            "fairness residual dimension overflowed",
+        )?;
+        let optimizer_residuals = [
+            continuity_residuals,
+            control_variable_count,
+            fairness_residuals,
+            transition.variable_count(),
+        ]
+        .into_iter()
+        .try_fold(0usize, |total, count| {
+            checked_add(total, count, "optimizer residual dimension overflowed")
+        })?;
+        let validation_residuals = checked_mul(
+            checked_mul(
+                validation_samples.len(),
+                3,
+                "validation residual dimension overflowed",
+            )?,
+            taylor_terms,
+            "validation residual dimension overflowed",
+        )?;
+        resource_budget.ensure(
+            ContinuityResource::Residuals,
+            checked_add(
+                optimizer_residuals,
+                validation_residuals,
+                "total residual dimension overflowed",
+            )?,
+        )?;
+        resource_budget.ensure(
+            ContinuityResource::JacobianElements,
+            checked_mul(
+                optimizer_residuals,
+                variable_count,
+                "Jacobian dimension overflowed",
+            )?,
+        )?;
+        let qr_elements = checked_mul(
+            checked_add(
+                optimizer_residuals,
+                variable_count,
+                "augmented QR row dimension overflowed",
+            )?,
+            variable_count,
+            "augmented QR dimension overflowed",
+        )?;
+
         let characteristic_length = characteristic_length(first, first_frame, &samples)?;
         validate_regular_boundary(
             first,
@@ -145,8 +288,6 @@ impl PreparedProblem {
             characteristic_length,
         )?;
 
-        let strip_rows =
-            (request.order().constrained_rows() + 2).min(second_frame.cross_control_count());
         let control_indices = second_frame
             .control_strip_indices(strip_rows)
             .map_err(|_| ContinuitySolveError::InvalidBoundary(BoundaryEndpoint::Second))?;
@@ -158,14 +299,6 @@ impl PreparedProblem {
             .for_each(|(index, &(row, column))| {
                 control_offsets[row][column] = Some(3 * index);
             });
-        let control_variable_count = 3 * control_indices.len();
-        let transition = TransitionLayout::try_new(
-            request.order().as_usize(),
-            config.transition_degree().checked_add(1).ok_or(
-                ContinuitySolveError::InvalidConfig("transition field dimension overflowed"),
-            )?,
-            control_variable_count,
-        )?;
         let initial_variables = control_indices
             .iter()
             .flat_map(|&(row, column)| {
@@ -189,6 +322,7 @@ impl PreparedProblem {
             transition,
             initial_variables,
             strip_rows,
+            qr_elements,
         })
     }
 
@@ -198,6 +332,10 @@ impl PreparedProblem {
 
     pub(super) fn variable_count(&self) -> usize {
         self.initial_variables.len()
+    }
+
+    pub(super) const fn qr_elements(&self) -> usize {
+        self.qr_elements
     }
 
     pub(super) fn first(&self) -> &NurbsSurface<Vector4> {
@@ -484,6 +622,19 @@ impl TransitionLayout {
                 .ok_or(ContinuitySolveError::InvalidConfig(
                     "transition field dimension overflowed",
                 ))?;
+        let variable_count = if order == 0 {
+            seam_map_variable_count
+        } else {
+            checked_add(
+                seam_map_variable_count,
+                checked_mul(
+                    checked_mul(2, order, "transition field dimension overflowed")?,
+                    field_count,
+                    "transition field dimension overflowed",
+                )?,
+                "transition field dimension overflowed",
+            )?
+        };
         Ok(Self {
             field_count,
             seam_map_offset,
@@ -492,15 +643,12 @@ impl TransitionLayout {
             log_beta_offset,
             higher_beta_offset,
             order,
+            variable_count,
         })
     }
 
     fn variable_count(self) -> usize {
-        if self.order == 0 {
-            self.seam_map_variable_count
-        } else {
-            self.seam_map_variable_count + 2 * self.order * self.field_count
-        }
+        self.variable_count
     }
 
     fn seam_map(self, variables: &[Dual]) -> &[Dual] {
@@ -520,6 +668,62 @@ impl TransitionLayout {
         let start = self.higher_beta_offset + (order - 2) * self.field_count;
         &variables[start..start + self.field_count]
     }
+}
+
+fn checked_add(
+    first: usize,
+    second: usize,
+    message: &'static str,
+) -> Result<usize, ContinuitySolveError> {
+    first
+        .checked_add(second)
+        .ok_or(ContinuitySolveError::InvalidConfig(message))
+}
+
+fn checked_mul(
+    first: usize,
+    second: usize,
+    message: &'static str,
+) -> Result<usize, ContinuitySolveError> {
+    first
+        .checked_mul(second)
+        .ok_or(ContinuitySolveError::InvalidConfig(message))
+}
+
+fn frame_span_count(
+    surface: &NurbsSurface<Vector4>,
+    frame: BoundaryFrame,
+    endpoint: BoundaryEndpoint,
+) -> Result<usize, ContinuitySolveError> {
+    let knots = match frame.along_axis() {
+        SurfaceAxis::U => surface.knot_vector_u(),
+        SurfaceAxis::V => surface.knot_vector_v(),
+    };
+    nonzero_span_count(knots, frame.along_degree(), frame.along_control_count())
+        .ok_or(ContinuitySolveError::InvalidBoundary(endpoint))
+}
+
+fn validation_density(
+    first: BoundaryFrame,
+    second: BoundaryFrame,
+    request: BoundaryContinuityRequest,
+    config: &ContinuitySolverConfig,
+) -> Result<usize, ContinuitySolveError> {
+    checked_mul(
+        [
+            first.along_degree().max(second.along_degree()),
+            request.order().as_usize(),
+            config.transition_degree(),
+            1,
+        ]
+        .into_iter()
+        .try_fold(0usize, |total, count| {
+            checked_add(total, count, "validation sample density overflowed")
+        })?,
+        2,
+        "validation sample density overflowed",
+    )
+    .map(|density| density.clamp(8, 64))
 }
 
 fn validate_capability(

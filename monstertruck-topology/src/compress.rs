@@ -26,8 +26,20 @@ pub struct CompressedEdge<C> {
 impl<C> CompressedEdge<C> {
     #[inline(always)]
     fn create_edge<P>(self, v: &[Vertex<P>]) -> Result<Edge<P, C>> {
-        let front = &v[self.vertices.0];
-        let back = &v[self.vertices.1];
+        let front = v
+            .get(self.vertices.0)
+            .ok_or(Error::InvalidCompressedTopologyIndex {
+                entity: "vertex",
+                index: self.vertices.0,
+                len: v.len(),
+            })?;
+        let back = v
+            .get(self.vertices.1)
+            .ok_or(Error::InvalidCompressedTopologyIndex {
+                entity: "vertex",
+                index: self.vertices.1,
+                len: v.len(),
+            })?;
         Edge::try_new(front, back, self.curve)
     }
 }
@@ -104,20 +116,28 @@ pub struct CompressedTrimmedFace<S, T> {
 
 impl<S> CompressedFace<S> {
     fn create_face<P, C>(self, edges: &[Edge<P, C>]) -> Result<Face<P, C, S>> {
-        let wires: Vec<Wire<P, C>> = self
+        let wires = self
             .boundaries
             .into_iter()
             .map(|wire| {
                 wire.into_iter()
-                    .map(
-                        |CompressedEdgeIndex { index, orientation }| match orientation {
-                            true => edges[index].clone(),
-                            false => edges[index].inverse(),
-                        },
-                    )
-                    .collect()
+                    .map(|CompressedEdgeIndex { index, orientation }| {
+                        let edge =
+                            edges
+                                .get(index)
+                                .ok_or(Error::InvalidCompressedTopologyIndex {
+                                    entity: "edge",
+                                    index,
+                                    len: edges.len(),
+                                })?;
+                        Ok(match orientation {
+                            true => edge.clone(),
+                            false => edge.inverse(),
+                        })
+                    })
+                    .collect::<Result<Wire<P, C>>>()
             })
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
         let mut face = Face::try_new(wires, self.surface)?;
         if !self.orientation {
             face.invert();
@@ -474,6 +494,13 @@ impl<P, C, S> Shell<P, C, S> {
     /// (from `monstertruck-solid`) to the `CompressedShell` before calling `extract`.
     /// The convenience function `monstertruck_solid::extract_healed` does both steps.
     pub fn extract(cshell: CompressedShell<P, C, S>) -> Result<Self> {
+        Self::extract_with_tracking(cshell, None)
+    }
+
+    fn extract_with_tracking(
+        cshell: CompressedShell<P, C, S>,
+        tracking: Option<CompressedTopologyTracking>,
+    ) -> Result<Self> {
         let CompressedShell {
             vertices,
             edges,
@@ -482,34 +509,60 @@ impl<P, C, S> Shell<P, C, S> {
             edge_stable_ids,
             face_stable_ids,
         } = cshell;
+        let (vertex_tracking_ids, edge_tracking_ids, face_tracking_ids) = match tracking {
+            Some(tracking) => (
+                Some(tracking.vertices),
+                Some(tracking.edges),
+                Some(tracking.faces),
+            ),
+            None => (None, None, None),
+        };
         let mut vertices: Vec<_> = vertices.into_iter().map(Vertex::new).collect();
         if let Some(vsids) = vertex_stable_ids {
-            for (v, sid) in vertices.iter_mut().zip(vsids) {
-                v.set_stable_id(sid);
-            }
+            vertices
+                .iter_mut()
+                .zip(vsids)
+                .for_each(|(vertex, stable_id)| vertex.set_stable_id(stable_id));
+        }
+        if let Some(tracking_ids) = vertex_tracking_ids {
+            vertices
+                .iter_mut()
+                .zip(tracking_ids)
+                .for_each(|(vertex, tracking_id)| vertex.set_tracking_id(tracking_id));
         }
         let mut edges = edges
             .into_iter()
             .map(move |edge| edge.create_edge(&vertices))
             .collect::<Result<Vec<_>>>()?;
         if let Some(esids) = edge_stable_ids {
-            for (e, sid) in edges.iter_mut().zip(esids) {
-                e.set_stable_id(sid);
-            }
+            edges
+                .iter_mut()
+                .zip(esids)
+                .for_each(|(edge, stable_id)| edge.set_stable_id(stable_id));
         }
-        let shell: Shell<P, C, S> = faces
+        if let Some(tracking_ids) = edge_tracking_ids {
+            edges
+                .iter_mut()
+                .zip(tracking_ids)
+                .for_each(|(edge, tracking_id)| edge.set_tracking_id(tracking_id));
+        }
+        let mut faces = faces
             .into_iter()
             .map(move |face| face.create_face(&edges))
-            .collect::<Result<Self>>()?;
+            .collect::<Result<Vec<_>>>()?;
         if let Some(fsids) = face_stable_ids {
-            let mut face_list: Vec<Face<P, C, S>> = shell.into_iter().collect();
-            for (f, sid) in face_list.iter_mut().zip(fsids) {
-                f.set_stable_id(sid);
-            }
-            Ok(Shell::from(face_list))
-        } else {
-            Ok(shell)
+            faces
+                .iter_mut()
+                .zip(fsids)
+                .for_each(|(face, stable_id)| face.set_stable_id(stable_id));
         }
+        if let Some(tracking_ids) = face_tracking_ids {
+            faces
+                .iter_mut()
+                .zip(tracking_ids)
+                .for_each(|(face, tracking_id)| face.set_tracking_id(tracking_id));
+        }
+        Ok(Shell::from(faces))
     }
 
     /// Extracts compressed topology and restores immutable tracking metadata.
@@ -526,42 +579,7 @@ impl<P, C, S> Shell<P, C, S> {
         {
             return Err(Error::InvalidTrackingMetadata);
         }
-        let mut shell = Self::extract(topology)?;
-        apply_tracking_metadata(&mut shell, tracking);
-        Ok(shell)
-    }
-}
-
-fn apply_tracking_metadata<P, C, S>(
-    shell: &mut Shell<P, C, S>,
-    tracking: CompressedTopologyTracking,
-) {
-    let mut vertex_indices = HashMap::<VertexId<P>, usize>::default();
-    let mut edge_indices = HashMap::<EdgeId<C>, usize>::default();
-    for (face_index, face) in shell.face_iter_mut().enumerate() {
-        face.set_tracking_id(tracking.faces[face_index].clone());
-        for edge in face.boundaries.iter_mut().flat_map(Wire::edge_iter_mut) {
-            let edge_index = match edge_indices.get(&edge.id()) {
-                Some(index) => *index,
-                None => {
-                    let index = edge_indices.len();
-                    edge_indices.insert(edge.id(), index);
-                    index
-                }
-            };
-            edge.set_tracking_id(tracking.edges[edge_index].clone());
-            for vertex in [&mut edge.vertices.0, &mut edge.vertices.1] {
-                let vertex_index = match vertex_indices.get(&vertex.id()) {
-                    Some(index) => *index,
-                    None => {
-                        let index = vertex_indices.len();
-                        vertex_indices.insert(vertex.id(), index);
-                        index
-                    }
-                };
-                vertex.set_tracking_id(tracking.vertices[vertex_index].clone());
-            }
-        }
+        Self::extract_with_tracking(topology, Some(tracking))
     }
 }
 
@@ -1289,10 +1307,18 @@ where
 {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where D: serde::Deserializer<'de> {
-        Shell::deserialize(deserializer).map(|mut shell| {
-            // SAFETY: a serialized Face round-trips through a single-element Shell, so pop always succeeds.
-            shell.pop().unwrap()
-        })
+        use serde::de::Error as _;
+
+        let mut shell = Shell::deserialize(deserializer)?;
+        if shell.len() == 1 {
+            shell
+                .pop()
+                .ok_or_else(|| D::Error::custom(Error::InvalidCompressedFaceCount { count: 0 }))
+        } else {
+            Err(D::Error::custom(Error::InvalidCompressedFaceCount {
+                count: shell.len(),
+            }))
+        }
     }
 }
 

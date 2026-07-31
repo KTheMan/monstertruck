@@ -2,9 +2,10 @@
 
 use super::problem::{PreparedProblem, ResidualEvaluation};
 use super::qr::solve_column_pivoted;
+use super::resource::ContinuityResourceBudget;
 use super::types::{
-    BoundaryContinuityRequest, BoundaryContinuitySolution, ContinuitySolveError,
-    ContinuitySolveReport, ContinuitySolveReportData, ContinuitySolverConfig,
+    BoundaryContinuityRequest, BoundaryContinuitySolution, ContinuityResource,
+    ContinuitySolveError, ContinuitySolveReport, ContinuitySolveReportData, ContinuitySolverConfig,
     ContinuityTermination, OrderResidual,
 };
 use crate::base::Vector4;
@@ -15,8 +16,9 @@ pub(super) fn solve(
     second: &NurbsSurface<Vector4>,
     request: BoundaryContinuityRequest,
     config: &ContinuitySolverConfig,
+    resource_budget: ContinuityResourceBudget,
 ) -> Result<BoundaryContinuitySolution, ContinuitySolveError> {
-    let problem = PreparedProblem::new(first, second, request, config)?;
+    let problem = PreparedProblem::new(first, second, request, config, resource_budget)?;
     let mut variables = problem.initial_variables().to_vec();
     let mut evaluation = problem.evaluate(&variables, config, true)?;
     let initial_objective = evaluation.objective;
@@ -50,6 +52,7 @@ pub(super) fn solve(
         ));
     }
 
+    resource_budget.ensure(ContinuityResource::QrElements, problem.qr_elements())?;
     for iteration in 1..=config.max_iterations() {
         let (rows, rhs) = augmented_system(&evaluation, damping, problem.variable_count());
         let least_squares = solve_column_pivoted(&rows, &rhs, config.rank_tolerance())

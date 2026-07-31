@@ -197,15 +197,16 @@ impl SurfaceContinuityCapability {
         boundary: SurfaceBoundary,
         requested: ContinuityOrder,
     ) -> Self {
-        Self::from_degrees_and_dimensions(
-            surface.degrees(),
-            (
-                surface.control_points().len(),
-                surface.control_points()[0].len(),
-            ),
-            boundary,
-            requested,
-        )
+        let dimensions = (
+            surface.control_points().len(),
+            surface.control_points().first().map_or(0, Vec::len),
+        );
+        let degrees = if dimensions.0 == 0 || dimensions.1 == 0 {
+            (0, 0)
+        } else {
+            surface.degrees()
+        };
+        Self::from_degrees_and_dimensions(degrees, dimensions, boundary, requested)
     }
 
     /// Inspects a rational B-spline surface boundary.
@@ -214,15 +215,16 @@ impl SurfaceContinuityCapability {
         boundary: SurfaceBoundary,
         requested: ContinuityOrder,
     ) -> Self {
-        Self::from_degrees_and_dimensions(
-            surface.degrees(),
-            (
-                surface.control_points().len(),
-                surface.control_points()[0].len(),
-            ),
-            boundary,
-            requested,
-        )
+        let dimensions = (
+            surface.control_points().len(),
+            surface.control_points().first().map_or(0, Vec::len),
+        );
+        let degrees = if dimensions.0 == 0 || dimensions.1 == 0 {
+            (0, 0)
+        } else {
+            surface.degrees()
+        };
+        Self::from_degrees_and_dimensions(degrees, dimensions, boundary, requested)
     }
 
     fn from_degrees_and_dimensions(
