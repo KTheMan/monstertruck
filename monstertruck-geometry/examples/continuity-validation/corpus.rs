@@ -1,10 +1,8 @@
-use monstertruck_geometry::nurbs::continuity::{
-    ContinuityMaturity, ContinuityOrder, SurfaceBoundary,
-};
+use monstertruck_geometry::nurbs::continuity::BoundaryAlignment;
+use monstertruck_geometry::nurbs::continuity::{ContinuityOrder, SurfaceBoundary};
 use monstertruck_geometry::nurbs::continuity_solver::{
     BoundaryContinuityRequest, ContinuitySolverConfig,
 };
-use monstertruck_geometry::nurbs::contract::BoundaryAlignment;
 use serde::{Deserialize, Serialize};
 
 /// Versioned continuity-validation corpus.
@@ -165,7 +163,8 @@ pub struct DenseSpec {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Expectation {
     Converged {
-        maturity: ContinuityMaturity,
+        /// Legacy v1 evidence label retained for digest compatibility.
+        maturity: String,
         maximum_dense_residual_by_order: Vec<f64>,
         maximum_normal_angle: f64,
     },

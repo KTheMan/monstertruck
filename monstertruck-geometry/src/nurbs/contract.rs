@@ -8,10 +8,13 @@
 //! [`monstertruck_core::TrackingSession`]. No solver state,
 //! cached geometry, or control-point data enters the serialized contract.
 //!
-//! G0 through G3 are production targets. G4 remains an experimental target,
-//! but uses the same versioned contract representation so later solver work
-//! does not require a schema migration.
+//! G0 is the established solver target. G1 through G3 currently have
+//! procedural evidence and imported workflow execution, while independent
+//! higher-order certification remains pending. G4 remains an experimental
+//! target. Every order uses the same versioned contract representation so
+//! later solver work does not require a schema migration.
 
+pub use super::continuity::BoundaryAlignment;
 use super::continuity::{ContinuityOrder, SurfaceBoundary};
 use monstertruck_core::{
     SemanticTopologyRef, TopologyKind, TrackingError, TrackingId, TrackingSession,
@@ -61,15 +64,6 @@ impl<'de> Deserialize<'de> for ContractId {
         let value = String::deserialize(deserializer)?;
         Self::new(value).map_err(serde::de::Error::custom)
     }
-}
-
-/// Orientation of the second boundary relative to the first.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub enum BoundaryAlignment {
-    /// Both boundaries use the same traversal direction.
-    Aligned,
-    /// The second boundary uses the opposite traversal direction.
-    Reversed,
 }
 
 /// Persistent reference to one boundary of a semantic surface face.
@@ -145,6 +139,41 @@ pub struct ContinuityContract {
 
 impl ContinuityContract {
     /// Creates a version-one continuity contract.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use monstertruck_core::{
+    ///     FeatureId, SemanticLabel, SemanticTopologyRef, TopologyKind,
+    /// };
+    /// use monstertruck_geometry::nurbs::continuity::{
+    ///     BoundaryAlignment, ContinuityOrder, SurfaceBoundary,
+    /// };
+    /// use monstertruck_geometry::nurbs::contract::{
+    ///     ContinuityContract, ContractId, SurfaceBoundaryRef,
+    /// };
+    ///
+    /// let feature = FeatureId::new("body").expect("the feature identifier is valid");
+    /// let boundary = |label, edge| {
+    ///     let topology = SemanticTopologyRef::new(
+    ///         feature.clone(),
+    ///         TopologyKind::Face,
+    ///         SemanticLabel::new(label).expect("the semantic label is valid"),
+    ///     );
+    ///     SurfaceBoundaryRef::new(topology, edge)
+    ///         .expect("the semantic reference identifies a face")
+    /// };
+    /// let contract = ContinuityContract::new(
+    ///     ContractId::new("hood-to-fender").expect("the contract identifier is valid"),
+    ///     boundary("hood", SurfaceBoundary::UEnd),
+    ///     boundary("fender", SurfaceBoundary::UStart),
+    ///     BoundaryAlignment::Aligned,
+    ///     ContinuityOrder::G2,
+    /// )?;
+    ///
+    /// assert_eq!(contract.order(), ContinuityOrder::G2);
+    /// # Ok::<(), monstertruck_geometry::nurbs::contract::ContractError>(())
+    /// ```
     ///
     /// # Errors
     ///

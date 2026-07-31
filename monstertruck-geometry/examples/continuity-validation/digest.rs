@@ -15,7 +15,7 @@ pub fn solved(
     fixture_version: &str,
     case: &CaseSpec,
     dense_spec: DenseSpec,
-    solution: &BoundaryContinuitySolution,
+    solution: &BoundaryContinuitySolution<'_>,
     dense: &DenseMetrics,
 ) -> Result<String> {
     let mut hasher = ContentHasher::new();
@@ -63,7 +63,7 @@ fn hash_context(
 }
 
 fn hash_transition(
-    solution: &BoundaryContinuitySolution,
+    solution: &BoundaryContinuitySolution<'_>,
     hasher: &mut ContentHasher,
 ) -> Result<()> {
     let transition = solution.transition();

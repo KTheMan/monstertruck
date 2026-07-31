@@ -18,15 +18,19 @@
 //! independently after collocation and can veto convergence between optimizer
 //! samples.
 //!
-//! G0 through G3 are production targets. G4 uses the same order-generic jet
-//! representation and residual machinery but requires explicit experimental
-//! opt-in. Solver tolerances belong only to the unclamped `f64` styling layer;
-//! topology sewing and solidification tolerances are intentionally absent.
+//! G0 is the established solver target. G1 through G3 have procedural
+//! polynomial and rational evidence and imported workflow execution, but still
+//! require independent higher-order certification before a production-readiness
+//! claim. G4 uses the same order-generic jet representation and residual
+//! machinery but requires explicit experimental opt-in. Solver tolerances
+//! belong only to the unclamped `f64` styling layer; topology sewing and
+//! solidification tolerances are intentionally absent.
 //!
 //! [`crate::nurbs::continuity_solver::BoundaryContinuitySolver::solve`] and
 //! [`crate::nurbs::continuity_solver::execute_boundary_continuity_contracts`] are transactional:
 //! they borrow
-//! inputs and return owned solved clones. Replay resolves persistent semantic
+//! inputs, borrow the unchanged master, and own only the solved dependent
+//! surface. Replay resolves persistent semantic
 //! contracts against current-generation tracking IDs, orders acyclic
 //! master-to-dependent chains, and rejects coupled multi-boundary systems until
 //! a future joint solver can preserve all obligations simultaneously.
@@ -105,9 +109,57 @@ impl BoundaryContinuitySolver {
 
     /// Solves one boundary-continuity request without mutating either input.
     ///
-    /// The first surface is the fixed master. The returned solution owns an
-    /// unchanged clone of that surface and a solved clone of the second
-    /// surface, so callers can apply both outputs transactionally.
+    /// The first surface is the fixed master. The returned solution borrows
+    /// that surface and owns a solved clone of the second surface, so callers
+    /// can apply the modified output transactionally without copying the
+    /// unchanged master.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use monstertruck_geometry::base::Vector4;
+    /// use monstertruck_geometry::nurbs::continuity::{
+    ///     BoundaryAlignment, ContinuityOrder, SurfaceBoundary,
+    /// };
+    /// use monstertruck_geometry::nurbs::continuity_solver::{
+    ///     BoundaryContinuityRequest, BoundaryContinuitySolver, ContinuitySolverConfig,
+    /// };
+    /// use monstertruck_geometry::nurbs::{BsplineSurface, KnotVector, NurbsSurface};
+    ///
+    /// let plane = |x_start| {
+    ///     let control_points = vec![
+    ///         vec![
+    ///             Vector4::new(x_start, 0.0, 0.0, 1.0),
+    ///             Vector4::new(x_start, 1.0, 0.0, 1.0),
+    ///         ],
+    ///         vec![
+    ///             Vector4::new(x_start + 1.0, 0.0, 0.0, 1.0),
+    ///             Vector4::new(x_start + 1.0, 1.0, 0.0, 1.0),
+    ///         ],
+    ///     ];
+    ///     NurbsSurface::new(BsplineSurface::new(
+    ///         (
+    ///             KnotVector::bezier_knot(1),
+    ///             KnotVector::bezier_knot(1),
+    ///         ),
+    ///         control_points,
+    ///     ))
+    /// };
+    /// let first = plane(-1.0);
+    /// let second = plane(0.0);
+    /// let request = BoundaryContinuityRequest::new(
+    ///     SurfaceBoundary::UEnd,
+    ///     SurfaceBoundary::UStart,
+    ///     BoundaryAlignment::Aligned,
+    ///     ContinuityOrder::G0,
+    /// );
+    /// let solver = BoundaryContinuitySolver::new(ContinuitySolverConfig::default())?;
+    /// let solution = solver.solve(&first, &second, request)?;
+    ///
+    /// assert_eq!(solution.first(), &first);
+    /// assert_eq!(solution.second(), &second);
+    /// # Ok::<(), monstertruck_geometry::nurbs::continuity_solver::ContinuitySolveError>(())
+    /// ```
     ///
     /// # Errors
     ///
@@ -115,12 +167,12 @@ impl BoundaryContinuitySolver {
     /// represent the requested order, a checked work dimension exceeds the
     /// resource budget, the sampled boundary is invalid, or the nonlinear
     /// solve does not meet every requested tolerance.
-    pub fn solve(
+    pub fn solve<'first>(
         &self,
-        first: &crate::nurbs::NurbsSurface<crate::base::Vector4>,
+        first: &'first crate::nurbs::NurbsSurface<crate::base::Vector4>,
         second: &crate::nurbs::NurbsSurface<crate::base::Vector4>,
         request: BoundaryContinuityRequest,
-    ) -> Result<BoundaryContinuitySolution, ContinuitySolveError> {
+    ) -> Result<BoundaryContinuitySolution<'first>, ContinuitySolveError> {
         lm::solve(first, second, request, &self.config, self.resource_budget)
     }
 }

@@ -1,8 +1,11 @@
 //! Geometric-continuity orders and surface capability diagnostics.
 //!
-//! G0 through G3 are production targets. G4 is a validated representation
-//! target with experimental solver maturity. The checked order type and
-//! capability model deliberately avoid a G3-specific ceiling.
+//! G0 is the established solver target. G1 through G3 are procedurally covered
+//! by generated polynomial and rational cases and exercised through imported
+//! CAD workflows, but independent higher-order certification remains pending.
+//! G4 is a validated representation target with experimental solver maturity.
+//! The checked order type and capability model deliberately avoid a
+//! G3-specific ceiling.
 
 use super::{BsplineSurface, NurbsSurface};
 use crate::errors::{Error, Result};
@@ -55,9 +58,8 @@ impl ContinuityOrder {
     #[inline(always)]
     pub const fn as_usize(self) -> usize { self.0 as usize }
 
-    /// Returns the solver maturity associated with this order.
     #[inline(always)]
-    pub const fn maturity(self) -> ContinuityMaturity {
+    pub(crate) const fn maturity(self) -> ContinuityMaturity {
         if self.0 <= Self::G3.0 {
             ContinuityMaturity::Production
         } else {
@@ -106,10 +108,12 @@ impl<'de> Deserialize<'de> for ContinuityOrder {
     }
 }
 
-/// Maturity of a requested continuity order.
+/// Internal compatibility label retained by the version-one evidence schema.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ContinuityMaturity {
-    /// Covered by the production G0 through G3 target.
+pub(crate) enum ContinuityMaturity {
+    /// Covered by the established `G0` through `G3` solver target.
+    ///
+    /// This variant does not imply imported-workflow or external validation.
     Production,
     /// Available for experimentation but not a production guarantee.
     Experimental,
@@ -135,6 +139,15 @@ pub enum SurfaceBoundary {
     VStart,
     /// Boundary at the end of the `v` parameter range.
     VEnd,
+}
+
+/// Orientation of the second boundary relative to the first.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BoundaryAlignment {
+    /// Both boundaries use the same traversal direction.
+    Aligned,
+    /// The second boundary uses the opposite traversal direction.
+    Reversed,
 }
 
 impl SurfaceBoundary {
@@ -263,9 +276,9 @@ impl SurfaceContinuityCapability {
     #[inline(always)]
     pub const fn level(self) -> ContinuityCapabilityLevel { self.level }
 
-    /// Returns the maturity of the requested solver target.
     #[inline(always)]
-    pub const fn maturity(self) -> ContinuityMaturity { self.requested.maturity() }
+    #[cfg(test)]
+    pub(crate) const fn maturity(self) -> ContinuityMaturity { self.requested.maturity() }
 
     /// Returns the control rows remaining beyond the constrained boundary jet.
     #[inline(always)]

@@ -11,13 +11,13 @@ use super::types::{
 use crate::base::Vector4;
 use crate::nurbs::NurbsSurface;
 
-pub(super) fn solve(
-    first: &NurbsSurface<Vector4>,
+pub(super) fn solve<'first>(
+    first: &'first NurbsSurface<Vector4>,
     second: &NurbsSurface<Vector4>,
     request: BoundaryContinuityRequest,
     config: &ContinuitySolverConfig,
     resource_budget: ContinuityResourceBudget,
-) -> Result<BoundaryContinuitySolution, ContinuitySolveError> {
+) -> Result<BoundaryContinuitySolution<'first>, ContinuitySolveError> {
     let problem = PreparedProblem::new(first, second, request, config, resource_budget)?;
     let mut variables = problem.initial_variables().to_vec();
     let mut evaluation = problem.evaluate(&variables, config, true)?;
@@ -46,7 +46,7 @@ pub(super) fn solve(
             problem.variable_count(),
         );
         return Ok(BoundaryContinuitySolution::new(
-            problem.first().clone(),
+            first,
             problem.solved_second(&variables),
             problem.solved_transition(&variables),
             report,
@@ -100,7 +100,7 @@ pub(super) fn solve(
                     problem.variable_count(),
                 );
                 return Ok(BoundaryContinuitySolution::new(
-                    problem.first().clone(),
+                    first,
                     problem.solved_second(&variables),
                     problem.solved_transition(&variables),
                     report,
@@ -181,7 +181,7 @@ fn tolerances_met(
 }
 
 fn certified_residuals(
-    problem: &PreparedProblem,
+    problem: &PreparedProblem<'_>,
     variables: &[f64],
     evaluation: &ResidualEvaluation,
     request: BoundaryContinuityRequest,
@@ -196,7 +196,7 @@ fn certified_residuals(
 }
 
 fn combined_residuals(
-    problem: &PreparedProblem,
+    problem: &PreparedProblem<'_>,
     variables: &[f64],
     evaluation: &ResidualEvaluation,
     config: &ContinuitySolverConfig,

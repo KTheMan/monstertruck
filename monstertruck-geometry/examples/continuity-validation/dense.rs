@@ -24,7 +24,7 @@ pub struct DenseMetrics {
 
 /// Certifies a solved transition without using solver collocation residuals.
 pub fn certify(
-    solution: &BoundaryContinuitySolution,
+    solution: &BoundaryContinuitySolution<'_>,
     request: BoundaryContinuityRequest,
     spec: DenseSpec,
     scale: f64,
@@ -151,7 +151,7 @@ pub fn certify(
 }
 
 fn certification_seams(
-    solution: &BoundaryContinuitySolution,
+    solution: &BoundaryContinuitySolution<'_>,
     request: BoundaryContinuityRequest,
     chebyshev_count: usize,
     margin: f64,
@@ -218,7 +218,7 @@ fn certification_seams(
     Ok(seams)
 }
 
-fn transition_preimage(solution: &BoundaryContinuitySolution, target: f64) -> Result<f64> {
+fn transition_preimage(solution: &BoundaryContinuitySolution<'_>, target: f64) -> Result<f64> {
     let transition = solution.transition();
     let mapped_start = transition
         .mapped_coordinates(0.0, 0.0)
@@ -272,7 +272,7 @@ fn ensure_nonzero_finite_vector(vector: Vector3) -> Result<()> {
 }
 
 fn sample_grids(
-    solution: &BoundaryContinuitySolution,
+    solution: &BoundaryContinuitySolution<'_>,
     request: BoundaryContinuityRequest,
     seam: f64,
     seam_nodes: &[f64],
