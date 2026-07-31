@@ -326,21 +326,13 @@ impl PreparedProblem {
         })
     }
 
-    pub(super) fn initial_variables(&self) -> &[f64] {
-        &self.initial_variables
-    }
+    pub(super) fn initial_variables(&self) -> &[f64] { &self.initial_variables }
 
-    pub(super) fn variable_count(&self) -> usize {
-        self.initial_variables.len()
-    }
+    pub(super) fn variable_count(&self) -> usize { self.initial_variables.len() }
 
-    pub(super) const fn qr_elements(&self) -> usize {
-        self.qr_elements
-    }
+    pub(super) const fn qr_elements(&self) -> usize { self.qr_elements }
 
-    pub(super) fn first(&self) -> &NurbsSurface<Vector4> {
-        &self.first
-    }
+    pub(super) fn first(&self) -> &NurbsSurface<Vector4> { &self.first }
 
     pub(super) fn solved_second(&self, variables: &[f64]) -> NurbsSurface<Vector4> {
         let mut surface = self.second.clone();
@@ -667,9 +659,7 @@ impl TransitionLayout {
         })
     }
 
-    fn variable_count(self) -> usize {
-        self.variable_count
-    }
+    fn variable_count(self) -> usize { self.variable_count }
 
     fn seam_map<T>(self, variables: &[T]) -> &[T] {
         &variables[self.seam_map_offset..self.seam_map_offset + self.seam_map_variable_count]
@@ -1104,9 +1094,7 @@ fn physical_control_scalar(
         })
 }
 
-fn physical_coordinate(point: &Vector4, coordinate: usize) -> f64 {
-    point[coordinate] / point.w
-}
+fn physical_coordinate(point: &Vector4, coordinate: usize) -> f64 { point[coordinate] / point.w }
 
 fn order_residuals(
     residuals: &[(usize, usize, usize, usize, [Dual; 3])],

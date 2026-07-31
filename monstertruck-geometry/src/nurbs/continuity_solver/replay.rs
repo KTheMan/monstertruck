@@ -7,8 +7,8 @@ use thiserror::Error;
 use monstertruck_core::{TrackingError, TrackingId, TrackingSession};
 
 use super::{
-    BoundaryContinuityRequest, BoundaryContinuitySolver, BoundaryEndpoint, ContinuitySolveError,
-    ContinuitySolveReport,
+    BoundaryContinuityRequest, BoundaryContinuitySolver, BoundaryEndpoint, BoundaryTransition,
+    ContinuitySolveError, ContinuitySolveReport,
 };
 use crate::base::Vector4;
 use crate::nurbs::NurbsSurface;
@@ -64,27 +64,19 @@ impl TrackedSurfaceIdRegistry {
 
     /// Returns whether a current-generation surface ID is registered.
     #[inline(always)]
-    pub fn contains(&self, tracking_id: &TrackingId) -> bool {
-        self.ids.contains(tracking_id)
-    }
+    pub fn contains(&self, tracking_id: &TrackingId) -> bool { self.ids.contains(tracking_id) }
 
     /// Returns the number of registered surface IDs.
     #[inline(always)]
-    pub fn len(&self) -> usize {
-        self.ids.len()
-    }
+    pub fn len(&self) -> usize { self.ids.len() }
 
     /// Returns whether no surface IDs are registered.
     #[inline(always)]
-    pub fn is_empty(&self) -> bool {
-        self.ids.is_empty()
-    }
+    pub fn is_empty(&self) -> bool { self.ids.is_empty() }
 
     /// Iterates over registered IDs in canonical tracking-ID order.
     #[inline(always)]
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = &TrackingId> {
-        self.ids.iter()
-    }
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = &TrackingId> { self.ids.iter() }
 }
 
 /// One resolved contract ready to pair with two NURBS surfaces.
@@ -102,27 +94,19 @@ pub struct ResolvedBoundaryContinuityRequest {
 impl ResolvedBoundaryContinuityRequest {
     /// Returns the persistent contract identifier.
     #[inline(always)]
-    pub const fn contract_id(&self) -> &ContractId {
-        &self.contract_id
-    }
+    pub const fn contract_id(&self) -> &ContractId { &self.contract_id }
 
     /// Returns the current-generation fixed-surface ID.
     #[inline(always)]
-    pub const fn first_surface(&self) -> &TrackingId {
-        &self.first_surface
-    }
+    pub const fn first_surface(&self) -> &TrackingId { &self.first_surface }
 
     /// Returns the current-generation optimized-surface ID.
     #[inline(always)]
-    pub const fn second_surface(&self) -> &TrackingId {
-        &self.second_surface
-    }
+    pub const fn second_surface(&self) -> &TrackingId { &self.second_surface }
 
     /// Returns the surface-only solver request.
     #[inline(always)]
-    pub const fn request(&self) -> BoundaryContinuityRequest {
-        self.request
-    }
+    pub const fn request(&self) -> BoundaryContinuityRequest { self.request }
 
     fn from_contract(
         contract: &ContinuityContract,
@@ -212,19 +196,19 @@ pub fn prepare_boundary_continuity_requests(
 #[derive(Clone, Debug, PartialEq)]
 pub struct ContinuityContractSolve {
     contract_id: ContractId,
+    transition: BoundaryTransition,
     report: ContinuitySolveReport,
 }
 
 impl ContinuityContractSolve {
     /// Returns the persistent contract identifier.
-    pub const fn contract_id(&self) -> &ContractId {
-        &self.contract_id
-    }
+    pub const fn contract_id(&self) -> &ContractId { &self.contract_id }
+
+    /// Returns the accepted local [`BoundaryTransition`] for this contract.
+    pub const fn transition(&self) -> &BoundaryTransition { &self.transition }
 
     /// Returns deterministic solver diagnostics.
-    pub const fn report(&self) -> &ContinuitySolveReport {
-        &self.report
-    }
+    pub const fn report(&self) -> &ContinuitySolveReport { &self.report }
 }
 
 /// Owned result of a transactional continuity-contract replay.
@@ -236,14 +220,10 @@ pub struct ContinuityReplaySolution {
 
 impl ContinuityReplaySolution {
     /// Returns the solved surfaces keyed by current-generation tracking ID.
-    pub const fn surfaces(&self) -> &BTreeMap<TrackingId, NurbsSurface<Vector4>> {
-        &self.surfaces
-    }
+    pub const fn surfaces(&self) -> &BTreeMap<TrackingId, NurbsSurface<Vector4>> { &self.surfaces }
 
     /// Returns contract diagnostics in deterministic dependency order.
-    pub fn solves(&self) -> &[ContinuityContractSolve] {
-        &self.solves
-    }
+    pub fn solves(&self) -> &[ContinuityContractSolve] { &self.solves }
 
     /// Consumes the replay result.
     pub fn into_parts(
@@ -305,10 +285,11 @@ pub fn execute_boundary_continuity_contracts(
                 contract_id: resolved.contract_id().clone(),
                 source,
             })?;
-        let (_, solved_second, report) = solution.into_parts();
+        let (_, solved_second, transition, report) = solution.into_parts_with_transition();
         solved_surfaces.insert(resolved.second_surface().clone(), solved_second);
         solves.push(ContinuityContractSolve {
             contract_id: resolved.contract_id().clone(),
+            transition,
             report,
         });
         Ok::<(), ContinuityReplayExecutionError>(())
@@ -767,6 +748,13 @@ mod tests {
         assert_eq!(replay.surfaces(), &surfaces);
         assert_eq!(replay.solves().len(), 1);
         assert_eq!(replay.solves()[0].contract_id().as_str(), "g0-replay");
+        assert_eq!(replay.solves()[0].transition().order(), ContinuityOrder::G0,);
+        assert_eq!(
+            replay.solves()[0]
+                .transition()
+                .mapped_coordinates(0.25, 0.0),
+            Some((0.25, 0.0)),
+        );
         assert_eq!(
             replay.solves()[0].report().termination(),
             super::super::ContinuityTermination::Converged

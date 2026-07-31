@@ -440,17 +440,12 @@ impl<P: Clone, C: Clone, S: Clone> Shell<P, C, S> {
     }
 
     /// Compresses the shell into the serialized compressed shell.
-    pub fn compress(&self) -> CompressedShell<P, C, S> {
-        self.compressed_with_tracking_parts().0
-    }
+    pub fn compress(&self) -> CompressedShell<P, C, S> { self.compressed_with_tracking_parts().0 }
 
     /// Compresses this shell with immutable topology tracking metadata.
     pub fn compress_tracked(&self) -> TrackedCompressedShell<P, C, S> {
         let (topology, tracking) = self.compressed_with_tracking_parts();
-        TrackedCompressedShell {
-            topology,
-            tracking,
-        }
+        TrackedCompressedShell { topology, tracking }
     }
 
     /// Compresses the shell into serialized compressed topology with face-local trims.

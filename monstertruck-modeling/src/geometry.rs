@@ -10,7 +10,9 @@ pub use monstertruck_geometry::prelude::{algo, inv_or_zero};
 pub use monstertruck_geometry::{decorators::*, nurbs::*, specifieds::*, t_spline::*};
 pub use monstertruck_mesh::PolylineCurve;
 use monstertruck_topology::compress::{CompressedTrimmedShell, CompressedTrimmedSolid};
-use monstertruck_topology::trimmed::{TrimmedFace, TrimmedShell, TrimmedSolid};
+#[cfg(not(target_arch = "wasm32"))]
+use monstertruck_topology::trimmed::TrimmedFace;
+use monstertruck_topology::trimmed::{TrimmedShell, TrimmedSolid};
 use monstertruck_traits::SnapCurveEndpoints;
 #[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;

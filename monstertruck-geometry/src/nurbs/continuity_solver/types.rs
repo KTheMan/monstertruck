@@ -67,24 +67,16 @@ impl BoundaryContinuityRequest {
     }
 
     /// Returns the boundary on the fixed reference surface.
-    pub const fn first_boundary(self) -> SurfaceBoundary {
-        self.first_boundary
-    }
+    pub const fn first_boundary(self) -> SurfaceBoundary { self.first_boundary }
 
     /// Returns the boundary on the optimized surface.
-    pub const fn second_boundary(self) -> SurfaceBoundary {
-        self.second_boundary
-    }
+    pub const fn second_boundary(self) -> SurfaceBoundary { self.second_boundary }
 
     /// Returns the seam-parameter alignment.
-    pub const fn alignment(self) -> BoundaryAlignment {
-        self.alignment
-    }
+    pub const fn alignment(self) -> BoundaryAlignment { self.alignment }
 
     /// Returns the requested geometric-continuity order.
-    pub const fn order(self) -> ContinuityOrder {
-        self.order
-    }
+    pub const fn order(self) -> ContinuityOrder { self.order }
 }
 
 /// Deterministic convergence controls for [`BoundaryContinuitySolver`](super::BoundaryContinuitySolver).
@@ -130,21 +122,15 @@ impl Default for ContinuitySolverConfig {
 
 impl ContinuitySolverConfig {
     /// Returns the maximum number of nonlinear iterations.
-    pub const fn max_iterations(&self) -> usize {
-        self.max_iterations
-    }
+    pub const fn max_iterations(&self) -> usize { self.max_iterations }
 
     /// Returns the number of optimizer Gauss--Legendre samples per seam span.
     ///
     /// Independent post-validation uses a denser degree-aware grid.
-    pub const fn samples_per_span(&self) -> usize {
-        self.samples_per_span
-    }
+    pub const fn samples_per_span(&self) -> usize { self.samples_per_span }
 
     /// Returns the Bernstein degree used for seam-transition fields.
-    pub const fn transition_degree(&self) -> usize {
-        self.transition_degree
-    }
+    pub const fn transition_degree(&self) -> usize { self.transition_degree }
 
     /// Returns the normalized residual tolerance for `order`.
     pub fn tolerance(&self, order: ContinuityOrder) -> f64 {
@@ -152,49 +138,31 @@ impl ContinuitySolverConfig {
     }
 
     /// Returns the initial Levenberg--Marquardt damping.
-    pub const fn initial_damping(&self) -> f64 {
-        self.initial_damping
-    }
+    pub const fn initial_damping(&self) -> f64 { self.initial_damping }
 
     /// Returns the minimum Levenberg--Marquardt damping.
-    pub const fn minimum_damping(&self) -> f64 {
-        self.minimum_damping
-    }
+    pub const fn minimum_damping(&self) -> f64 { self.minimum_damping }
 
     /// Returns the maximum Levenberg--Marquardt damping.
-    pub const fn maximum_damping(&self) -> f64 {
-        self.maximum_damping
-    }
+    pub const fn maximum_damping(&self) -> f64 { self.maximum_damping }
 
     /// Returns the relative rank threshold for column-pivoted QR.
-    pub const fn rank_tolerance(&self) -> f64 {
-        self.rank_tolerance
-    }
+    pub const fn rank_tolerance(&self) -> f64 { self.rank_tolerance }
 
     /// Returns the thin-strip fairness weight.
-    pub const fn fairness_weight(&self) -> f64 {
-        self.fairness_weight
-    }
+    pub const fn fairness_weight(&self) -> f64 { self.fairness_weight }
 
     /// Returns the control-point displacement anchor weight.
-    pub const fn anchor_weight(&self) -> f64 {
-        self.anchor_weight
-    }
+    pub const fn anchor_weight(&self) -> f64 { self.anchor_weight }
 
     /// Returns the seam-reparameterization regularization weight.
-    pub const fn transition_weight(&self) -> f64 {
-        self.transition_weight
-    }
+    pub const fn transition_weight(&self) -> f64 { self.transition_weight }
 
     /// Returns the minimum accepted rational weight.
-    pub const fn minimum_weight(&self) -> f64 {
-        self.minimum_weight
-    }
+    pub const fn minimum_weight(&self) -> f64 { self.minimum_weight }
 
     /// Returns whether experimental G4 solving is enabled.
-    pub const fn allows_experimental_g4(&self) -> bool {
-        self.allow_experimental_g4
-    }
+    pub const fn allows_experimental_g4(&self) -> bool { self.allow_experimental_g4 }
 
     /// Sets the maximum nonlinear iteration count.
     pub const fn with_max_iterations(mut self, max_iterations: usize) -> Self {
@@ -369,39 +337,25 @@ impl OrderResidual {
     }
 
     /// Returns the derivative order.
-    pub const fn order(self) -> ContinuityOrder {
-        self.order
-    }
+    pub const fn order(self) -> ContinuityOrder { self.order }
 
     /// Returns the root-mean-square normalized residual.
-    pub const fn rms(self) -> f64 {
-        self.rms
-    }
+    pub const fn rms(self) -> f64 { self.rms }
 
     /// Returns the maximum normalized residual.
-    pub const fn maximum(self) -> f64 {
-        self.maximum
-    }
+    pub const fn maximum(self) -> f64 { self.maximum }
 
     /// Returns the index of the sample with the maximum residual.
-    pub const fn worst_sample(self) -> usize {
-        self.worst_sample
-    }
+    pub const fn worst_sample(self) -> usize { self.worst_sample }
 
     /// Returns whether `worst_sample` belongs to the independent validation grid.
-    pub const fn is_validation_sample(self) -> bool {
-        self.validation_sample
-    }
+    pub const fn is_validation_sample(self) -> bool { self.validation_sample }
 
     /// Returns the cross-boundary derivative order of the worst residual.
-    pub const fn cross_derivative(self) -> usize {
-        self.cross_derivative
-    }
+    pub const fn cross_derivative(self) -> usize { self.cross_derivative }
 
     /// Returns the seam-direction derivative order of the worst residual.
-    pub const fn seam_derivative(self) -> usize {
-        self.seam_derivative
-    }
+    pub const fn seam_derivative(self) -> usize { self.seam_derivative }
 }
 
 /// Deterministic diagnostics from one continuity solve.
@@ -444,77 +398,49 @@ impl ContinuitySolveReport {
     }
 
     /// Returns the termination state.
-    pub const fn termination(&self) -> ContinuityTermination {
-        self.termination
-    }
+    pub const fn termination(&self) -> ContinuityTermination { self.termination }
 
     /// Returns the production or experimental maturity.
-    pub const fn maturity(&self) -> ContinuityMaturity {
-        self.maturity
-    }
+    pub const fn maturity(&self) -> ContinuityMaturity { self.maturity }
 
     /// Returns the number of attempted nonlinear iterations.
-    pub const fn iterations(&self) -> usize {
-        self.iterations
-    }
+    pub const fn iterations(&self) -> usize { self.iterations }
 
     /// Returns the number of accepted steps.
-    pub const fn accepted_steps(&self) -> usize {
-        self.accepted_steps
-    }
+    pub const fn accepted_steps(&self) -> usize { self.accepted_steps }
 
     /// Returns the number of rejected steps.
-    pub const fn rejected_steps(&self) -> usize {
-        self.rejected_steps
-    }
+    pub const fn rejected_steps(&self) -> usize { self.rejected_steps }
 
     /// Returns the initial scaled least-squares objective.
-    pub const fn initial_objective(&self) -> f64 {
-        self.initial_objective
-    }
+    pub const fn initial_objective(&self) -> f64 { self.initial_objective }
 
     /// Returns the final scaled least-squares objective.
-    pub const fn final_objective(&self) -> f64 {
-        self.final_objective
-    }
+    pub const fn final_objective(&self) -> f64 { self.final_objective }
 
     /// Returns per-order residual diagnostics.
-    pub fn residuals(&self) -> &[OrderResidual] {
-        &self.residuals
-    }
+    pub fn residuals(&self) -> &[OrderResidual] { &self.residuals }
 
     /// Returns the final gradient infinity norm.
-    pub const fn gradient_infinity_norm(&self) -> f64 {
-        self.gradient_infinity_norm
-    }
+    pub const fn gradient_infinity_norm(&self) -> f64 { self.gradient_infinity_norm }
 
     /// Returns the final step norm.
-    pub const fn step_norm(&self) -> f64 {
-        self.step_norm
-    }
+    pub const fn step_norm(&self) -> f64 { self.step_norm }
 
     /// Returns the final damping value.
-    pub const fn damping(&self) -> f64 {
-        self.damping
-    }
+    pub const fn damping(&self) -> f64 { self.damping }
 
     /// Returns the numerical rank of the most recently solved damped augmented
     /// system.
     ///
     /// Returns zero when certification succeeds before the first linear solve.
-    pub const fn numerical_rank(&self) -> usize {
-        self.numerical_rank
-    }
+    pub const fn numerical_rank(&self) -> usize { self.numerical_rank }
 
     /// Returns the number of optimization variables.
-    pub const fn variable_count(&self) -> usize {
-        self.variable_count
-    }
+    pub const fn variable_count(&self) -> usize { self.variable_count }
 
     /// Returns the number of scalar residuals.
-    pub const fn residual_count(&self) -> usize {
-        self.residual_count
-    }
+    pub const fn residual_count(&self) -> usize { self.residual_count }
 }
 
 pub(super) struct ContinuitySolveReportData {
@@ -534,15 +460,24 @@ pub(super) struct ContinuitySolveReportData {
     pub(super) residual_count: usize,
 }
 
-/// Immutable solved coordinate transition from the master seam to the second surface.
+/// Immutable local coordinate transition from the master seam to the second surface.
 ///
 /// The transition maps a normalized master seam coordinate and the solver's
 /// signed common cross-seam coordinate to normalized coordinates on the second
 /// boundary frame. The cross-seam coordinate is zero on the seam and positive
 /// into the second surface, so it is the negative of the first surface's
-/// normalized inward coordinate. The transition exposes the solved
-/// reparameterization needed by independent residual certifiers without
-/// exposing optimizer variables or mutable solver state.
+/// normalized inward coordinate.
+///
+/// Cross-seam terms are the solver's Taylor expansion about `cross = 0`,
+/// truncated at [`Self::order`]. The expansion is intended for local seam
+/// certification. Finite output away from the seam does not guarantee that the
+/// mapped coordinates remain in either surface domain or that the truncated
+/// map is globally invertible. For `G0`, only the seam correspondence is
+/// solved; the identity cross coordinate returned away from the seam is a
+/// convention.
+///
+/// The transition exposes the accepted reparameterization without exposing
+/// optimizer variables or mutable solver state.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BoundaryTransition {
     order: ContinuityOrder,
@@ -573,25 +508,23 @@ impl BoundaryTransition {
     }
 
     /// Returns the second boundary's orientation relative to the master.
-    pub const fn alignment(&self) -> BoundaryAlignment {
-        self.alignment
-    }
+    pub const fn alignment(&self) -> BoundaryAlignment { self.alignment }
 
     /// Returns the solved transition order.
-    pub const fn order(&self) -> ContinuityOrder {
-        self.order
-    }
+    pub const fn order(&self) -> ContinuityOrder { self.order }
 
     /// Returns the configured Bernstein degree of the transition fields.
-    pub fn field_degree(&self) -> usize {
-        self.seam_map_log_increments.len()
-    }
+    pub fn field_degree(&self) -> usize { self.seam_map_log_increments.len() }
 
     /// Maps a normalized master seam coordinate and signed cross-seam
     /// coordinate to the second frame.
     ///
     /// `cross` is zero on the seam and positive into the second surface. It is
     /// the negative of the first surface's normalized inward coordinate.
+    ///
+    /// This evaluates the local Taylor expansion through [`Self::order`].
+    /// Callers performing certification should use a one-sided stencil within
+    /// each surface domain and keep cross-seam samples near zero.
     ///
     /// Returns `None` when either input or the evaluated transition is
     /// non-finite.
@@ -712,24 +645,16 @@ impl BoundaryContinuitySolution {
     }
 
     /// Returns the unchanged reference surface clone.
-    pub const fn first(&self) -> &NurbsSurface<Vector4> {
-        &self.first
-    }
+    pub const fn first(&self) -> &NurbsSurface<Vector4> { &self.first }
 
     /// Returns the solved second surface.
-    pub const fn second(&self) -> &NurbsSurface<Vector4> {
-        &self.second
-    }
+    pub const fn second(&self) -> &NurbsSurface<Vector4> { &self.second }
 
     /// Returns the solved master-to-second coordinate transition.
-    pub const fn transition(&self) -> &BoundaryTransition {
-        &self.transition
-    }
+    pub const fn transition(&self) -> &BoundaryTransition { &self.transition }
 
     /// Returns the convergence report.
-    pub const fn report(&self) -> &ContinuitySolveReport {
-        &self.report
-    }
+    pub const fn report(&self) -> &ContinuitySolveReport { &self.report }
 
     /// Consumes the result and returns both surfaces and the report.
     pub fn into_parts(
@@ -828,4 +753,28 @@ pub enum ContinuitySolveError {
     /// Iteration stopped before every requested order met tolerance.
     #[error("continuity solver did not converge")]
     DidNotConverge(Box<ContinuitySolveReport>),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn local_transition_evaluates_nonidentity_cross_fields() {
+        let transition = BoundaryTransition::new(
+            ContinuityOrder::G2,
+            BoundaryAlignment::Aligned,
+            vec![0.0],
+            vec![vec![2.0, 2.0], vec![6.0, 6.0]],
+            vec![2.0_f64.ln(), 2.0_f64.ln()],
+            vec![vec![6.0, 6.0]],
+        );
+
+        let (seam, cross) = transition
+            .mapped_coordinates(0.5, 0.1)
+            .expect("the finite local transition evaluates");
+
+        assert!((seam - 0.73).abs() < 1.0e-14);
+        assert!((cross - 0.23).abs() < 1.0e-14);
+    }
 }

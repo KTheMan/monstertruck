@@ -355,7 +355,7 @@
       }
     },
     {
-      "id": "unsatisfied-large-offset-one-iteration",
+      "id": "iteration-bounded-large-offset",
       "geometry": {
         "weight_model": "polynomial",
         "second_seam_parameterization": "equal",

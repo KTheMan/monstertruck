@@ -34,14 +34,24 @@ pub fn certify(
     ensure!(spec.normalized_step.is_finite() && spec.normalized_step > 0.0);
     let order = request.order().as_usize();
     let radius = spec.stencil_radius;
-    let nodes = (-(radius as isize)..=radius as isize)
+    let centered_seam_nodes = (-(radius as isize)..=radius as isize)
         .map(|index| index as f64 * spec.normalized_step)
         .collect::<Vec<_>>();
-    let weights = (0..=order)
-        .map(|derivative| finite_difference_weights(&nodes, derivative))
+    let first_cross_nodes = (0..=2 * radius)
+        .map(|index| -((2 * radius - index) as f64) * spec.normalized_step)
+        .collect::<Vec<_>>();
+    let second_cross_nodes = (0..=2 * radius)
+        .map(|index| index as f64 * spec.normalized_step)
+        .collect::<Vec<_>>();
+    let first_cross_weights = (0..=order)
+        .map(|derivative| finite_difference_weights(&first_cross_nodes, derivative))
+        .collect::<Result<Vec<_>>>()?;
+    let second_cross_weights = (0..=order)
+        .map(|derivative| finite_difference_weights(&second_cross_nodes, derivative))
         .collect::<Result<Vec<_>>>()?;
     let margin = (radius as f64 + 1.0) * spec.normalized_step;
     ensure!(margin < 0.25);
+    ensure!(2.0 * radius as f64 * spec.normalized_step <= 1.0);
 
     let mut maximum_absolute_residual_by_order = vec![0.0_f64; order + 1];
     let mut maximum_normalized_residual_by_order = vec![0.0_f64; order + 1];
@@ -60,25 +70,31 @@ pub fn certify(
                     .map(|index| -((2 * radius - index) as f64) * spec.normalized_step)
                     .collect::<Vec<_>>()
             } else {
-                nodes.clone()
+                centered_seam_nodes.clone()
             };
             let seam_weights = (0..=order)
                 .map(|derivative| finite_difference_weights(&seam_nodes, derivative))
                 .collect::<Result<Vec<_>>>()?;
-            let (first_grid, second_grid) =
-                sample_grids(solution, request, seam, &seam_nodes, &nodes)?;
+            let (first_grid, second_grid) = sample_grids(
+                solution,
+                request,
+                seam,
+                &seam_nodes,
+                &first_cross_nodes,
+                &second_cross_nodes,
+            )?;
             (0..=order).try_for_each(|total| -> Result<()> {
                 (0..=total).try_for_each(|cross_order| -> Result<()> {
                     let seam_order = total - cross_order;
                     let first = mixed_derivative(
                         &first_grid,
                         &seam_weights[seam_order],
-                        &weights[cross_order],
+                        &first_cross_weights[cross_order],
                     );
                     let second = mixed_derivative(
                         &second_grid,
                         &seam_weights[seam_order],
-                        &weights[cross_order],
+                        &second_cross_weights[cross_order],
                     );
                     let absolute = (first - second).magnitude();
                     let normalized = absolute / scale;
@@ -97,10 +113,14 @@ pub fn certify(
                 Ok(())
             })?;
             if order >= 1 {
-                let first_seam = mixed_derivative(&first_grid, &seam_weights[1], &weights[0]);
-                let first_cross = mixed_derivative(&first_grid, &seam_weights[0], &weights[1]);
-                let second_seam = mixed_derivative(&second_grid, &seam_weights[1], &weights[0]);
-                let second_cross = mixed_derivative(&second_grid, &seam_weights[0], &weights[1]);
+                let first_seam =
+                    mixed_derivative(&first_grid, &seam_weights[1], &first_cross_weights[0]);
+                let first_cross =
+                    mixed_derivative(&first_grid, &seam_weights[0], &first_cross_weights[1]);
+                let second_seam =
+                    mixed_derivative(&second_grid, &seam_weights[1], &second_cross_weights[0]);
+                let second_cross =
+                    mixed_derivative(&second_grid, &seam_weights[0], &second_cross_weights[1]);
                 [first_seam, first_cross, second_seam, second_cross]
                     .into_iter()
                     .try_for_each(ensure_nonzero_finite_vector)?;
@@ -256,12 +276,13 @@ fn sample_grids(
     request: BoundaryContinuityRequest,
     seam: f64,
     seam_nodes: &[f64],
-    cross_nodes: &[f64],
+    first_cross_nodes: &[f64],
+    second_cross_nodes: &[f64],
 ) -> Result<(SampleGrid, SampleGrid)> {
     let first = seam_nodes
         .iter()
         .map(|&seam_delta| {
-            cross_nodes
+            first_cross_nodes
                 .iter()
                 .map(|&cross| {
                     evaluate_boundary(
@@ -277,7 +298,7 @@ fn sample_grids(
     let second = seam_nodes
         .iter()
         .map(|&seam_delta| {
-            cross_nodes
+            second_cross_nodes
                 .iter()
                 .map(|&cross| {
                     let (mapped_seam, mapped_cross) = solution
@@ -303,6 +324,15 @@ fn evaluate_boundary(
     seam: f64,
     inward: f64,
 ) -> Result<Point3> {
+    const DOMAIN_EPSILON: f64 = 1.0e-9;
+    ensure!(
+        (-DOMAIN_EPSILON..=1.0 + DOMAIN_EPSILON).contains(&seam)
+            && (-DOMAIN_EPSILON..=1.0 + DOMAIN_EPSILON).contains(&inward),
+        "dense certification attempted to sample outside {boundary:?}: \
+         seam={seam}, inward={inward}",
+    );
+    let seam = seam.clamp(0.0, 1.0);
+    let inward = inward.clamp(0.0, 1.0);
     let u = surface.knot_vector_u();
     let v = surface.knot_vector_v();
     let (u_start, u_end) = (u[0], u[u.len() - 1]);

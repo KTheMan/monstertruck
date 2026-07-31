@@ -8,7 +8,7 @@ use std::hash::Hasher;
 use crate::corpus::{CaseSpec, DenseSpec};
 use crate::dense::DenseMetrics;
 
-pub const DIGEST_VERSION: &str = "xxh3-64-public-transition-v3";
+pub const DIGEST_VERSION: &str = "xxh3-64-public-transition-v4";
 
 /// Hashes a successful solved case in canonical index order.
 pub fn solved(
@@ -74,7 +74,7 @@ fn hash_transition(
     ))?);
     let samples = (0..=65)
         .flat_map(|index| {
-            [-0.4, -0.3, -0.2, -0.1, 0.0, 0.1, 0.2, 0.3, 0.4]
+            [-0.04, -0.03, -0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.04]
                 .map(move |cross| transition.mapped_coordinates(index as f64 / 65.0, cross))
         })
         .collect::<Vec<_>>();

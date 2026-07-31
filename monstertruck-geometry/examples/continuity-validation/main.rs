@@ -209,7 +209,7 @@ fn run_case(
                 actual == *expected,
                 "expected error {expected:?}, got {actual:?}: {error}",
             );
-            let outcome = serde_json::to_string(&actual)?;
+            let outcome = actual.as_str().to_owned();
             let error = error_evidence(&error);
             Ok(CaseEvidence {
                 outcome: outcome.clone(),

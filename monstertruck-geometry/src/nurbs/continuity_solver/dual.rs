@@ -26,13 +26,9 @@ impl Dual {
         }
     }
 
-    pub(super) const fn value(&self) -> f64 {
-        self.value
-    }
+    pub(super) const fn value(&self) -> f64 { self.value }
 
-    pub(super) fn gradient(&self) -> &[f64] {
-        &self.gradient
-    }
+    pub(super) fn gradient(&self) -> &[f64] { &self.gradient }
 
     fn gradient_len(&self, other: &Self) -> usize {
         match (self.gradient.len(), other.gradient.len()) {
@@ -47,9 +43,7 @@ impl Dual {
         }
     }
 
-    fn derivative(&self, index: usize) -> f64 {
-        self.gradient.get(index).copied().unwrap_or(0.0)
-    }
+    fn derivative(&self, index: usize) -> f64 { self.gradient.get(index).copied().unwrap_or(0.0) }
 }
 
 impl Add for Dual {
@@ -116,17 +110,11 @@ impl Div for Dual {
 }
 
 impl JetScalar for Dual {
-    fn zero() -> Self {
-        Self::constant(0.0)
-    }
+    fn zero() -> Self { Self::constant(0.0) }
 
-    fn one() -> Self {
-        Self::constant(1.0)
-    }
+    fn one() -> Self { Self::constant(1.0) }
 
-    fn from_f64(value: f64) -> Self {
-        Self::constant(value)
-    }
+    fn from_f64(value: f64) -> Self { Self::constant(value) }
 
     fn exp(self) -> Self {
         let value = self.value.exp();

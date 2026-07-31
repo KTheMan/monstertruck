@@ -108,9 +108,7 @@ fn commit_session<T>(
 /// Returns [`enum@Error`] when the source is untracked, an identity is not current,
 /// the mapping changes topology identity, or lineage recording fails.
 pub fn transformed<T>(topology: &T, matrix: Matrix4, session: &mut TrackingSession) -> Result<T>
-where
-    T: Mapped<Matrix4> + TopologyTracking,
-{
+where T: Mapped<Matrix4> + TopologyTracking {
     let source = current_ids(topology, session)?;
     let output = builder::transformed(topology, matrix);
     commit_session(session, |session| {
@@ -263,9 +261,7 @@ mod tests {
         face
     }
 
-    fn ids<T: TopologyTracking>(topology: &T) -> Vec<TrackingId> {
-        topology.tracking_ids()
-    }
+    fn ids<T: TopologyTracking>(topology: &T) -> Vec<TrackingId> { topology.tracking_ids() }
 
     fn entry(
         kind: &str,

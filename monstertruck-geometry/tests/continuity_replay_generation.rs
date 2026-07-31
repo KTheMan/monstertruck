@@ -97,7 +97,7 @@ fn replay_resolves_edited_generation_and_rejects_stale_geometry_atomically() {
     invalid_dependent.control_point_mut(0, 0).w = 0.0;
     let surfaces = BTreeMap::from([
         (current_ids[0].clone(), plane(0.0, 1.75)),
-        (current_ids[1].clone(), plane(1.0, 1.75)),
+        (current_ids[1].clone(), plane(1.0, 1.5)),
         (current_ids[2].clone(), invalid_dependent),
     ]);
     let original_surfaces = surfaces.clone();
@@ -115,8 +115,16 @@ fn replay_resolves_edited_generation_and_rejects_stale_geometry_atomically() {
         &surfaces,
         std::slice::from_ref(&upstream),
     )
-    .expect("the exact upstream contract replays in the edited generation");
-    assert_eq!(successful.surfaces(), &surfaces);
+    .expect("the upstream repair replays in the edited generation");
+    assert_ne!(successful.surfaces(), &surfaces);
+    assert_ne!(
+        successful.surfaces()[&current_ids[1]],
+        surfaces[&current_ids[1]],
+    );
+    assert_eq!(
+        successful.surfaces()[&current_ids[2]],
+        surfaces[&current_ids[2]],
+    );
     assert_ne!(
         successful.surfaces()[&current_ids[0]],
         stale_surfaces[&stale_ids[0]],

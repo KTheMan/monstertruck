@@ -18,27 +18,19 @@ pub(super) struct ParameterDomain {
 impl ParameterDomain {
     /// Returns the lower parameter bound.
     #[inline(always)]
-    pub(super) const fn start(self) -> f64 {
-        self.start
-    }
+    pub(super) const fn start(self) -> f64 { self.start }
 
     /// Returns the upper parameter bound.
     #[inline(always)]
-    pub(super) const fn end(self) -> f64 {
-        self.end
-    }
+    pub(super) const fn end(self) -> f64 { self.end }
 
     /// Returns the positive parameter span.
     #[inline(always)]
-    pub(super) fn span(self) -> f64 {
-        self.end - self.start
-    }
+    pub(super) fn span(self) -> f64 { self.end - self.start }
 
     /// Maps a normalized coordinate to this domain.
     #[inline(always)]
-    pub(super) fn parameter(self, normalized: f64) -> f64 {
-        self.start + normalized * self.span()
-    }
+    pub(super) fn parameter(self, normalized: f64) -> f64 { self.start + normalized * self.span() }
 }
 
 /// Canonical coordinates and control-net layout for one [`SurfaceBoundary`].
@@ -91,33 +83,23 @@ impl BoundaryFrame {
     /// Returns the selected surface boundary.
     #[inline(always)]
     #[cfg(test)]
-    pub(super) const fn boundary(self) -> SurfaceBoundary {
-        self.boundary
-    }
+    pub(super) const fn boundary(self) -> SurfaceBoundary { self.boundary }
 
     /// Returns the surface's `u` domain.
     #[inline(always)]
-    pub(super) const fn u_domain(self) -> ParameterDomain {
-        self.u_domain
-    }
+    pub(super) const fn u_domain(self) -> ParameterDomain { self.u_domain }
 
     /// Returns the surface's `v` domain.
     #[inline(always)]
-    pub(super) const fn v_domain(self) -> ParameterDomain {
-        self.v_domain
-    }
+    pub(super) const fn v_domain(self) -> ParameterDomain { self.v_domain }
 
     /// Returns the parameter axis running along the seam.
     #[inline(always)]
-    pub(super) const fn along_axis(self) -> SurfaceAxis {
-        self.boundary.boundary_axis()
-    }
+    pub(super) const fn along_axis(self) -> SurfaceAxis { self.boundary.boundary_axis() }
 
     /// Returns the parameter axis pointing across the seam.
     #[inline(always)]
-    pub(super) const fn cross_axis(self) -> SurfaceAxis {
-        self.boundary.cross_axis()
-    }
+    pub(super) const fn cross_axis(self) -> SurfaceAxis { self.boundary.cross_axis() }
 
     /// Returns the domain running along the seam.
     #[inline(always)]
@@ -176,27 +158,19 @@ impl BoundaryFrame {
 
     /// Returns the surface's `u` control-point count.
     #[inline(always)]
-    pub(super) const fn u_control_count(self) -> usize {
-        self.u_control_count
-    }
+    pub(super) const fn u_control_count(self) -> usize { self.u_control_count }
 
     /// Returns the surface's `v` control-point count.
     #[inline(always)]
-    pub(super) const fn v_control_count(self) -> usize {
-        self.v_control_count
-    }
+    pub(super) const fn v_control_count(self) -> usize { self.v_control_count }
 
     /// Returns the positive scale from normalized seam coordinates.
     #[inline(always)]
-    pub(super) fn along_parameter_span(self) -> f64 {
-        self.along_domain().span()
-    }
+    pub(super) fn along_parameter_span(self) -> f64 { self.along_domain().span() }
 
     /// Returns the positive scale from normalized cross-boundary coordinates.
     #[inline(always)]
-    pub(super) fn cross_parameter_span(self) -> f64 {
-        self.cross_domain().span()
-    }
+    pub(super) fn cross_parameter_span(self) -> f64 { self.cross_domain().span() }
 
     /// Returns the sign of increasing normalized inward distance.
     #[inline(always)]

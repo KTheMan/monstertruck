@@ -89,9 +89,7 @@ where
         let curve_mapping = GeometricMapping::<C>::mapping(trans);
         let connect_points = point_connector.connector();
         let connect_curves = curve_connector.connector();
-        let edge = self
-            .mapped(point_mapping, curve_mapping)
-            .into_untracked();
+        let edge = self.mapped(point_mapping, curve_mapping).into_untracked();
         connect_edges(self, &edge, connect_points, connect_curves)
     }
 }
@@ -166,9 +164,7 @@ where
         let curve_mapping = GeometricMapping::<C>::mapping(trans);
         let connect_points = point_connector.connector();
         let connect_curves = curve_connector.connector();
-        let wire = self
-            .mapped(point_mapping, curve_mapping)
-            .into_untracked();
+        let wire = self.mapped(point_mapping, curve_mapping).into_untracked();
         connect_wires(self, &wire, connect_points, connect_curves).collect()
     }
 }

@@ -117,9 +117,7 @@ pub enum Error {
     #[error("Serialized topology tracking metadata has inconsistent dimensions.")]
     InvalidTrackingMetadata,
     /// A compressed topology reference is outside its corresponding array.
-    #[error(
-        "Compressed {entity} index {index} is outside the array of length {len}."
-    )]
+    #[error("Compressed {entity} index {index} is outside the array of length {len}.")]
     InvalidCompressedTopologyIndex {
         /// Referenced compressed entity kind.
         entity: &'static str,

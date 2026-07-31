@@ -73,20 +73,20 @@ named artifact and command are committed and reproducible.
 | Replay after upstream edits is dependency ordered. | Realistically validated for the synthetic chain | Changed-generation geometry, stale-ID rejection, lexically conflicting contract IDs, dependency ordering, and downstream failure are covered. |
 | Solver inputs have practical allocation and iteration bounds. | Implemented | Checked budgets cover control points, spans, samples, variables, residuals, Jacobian/QR elements, and iterations. Host deserialization limits remain separate. |
 | Serialized tracking topology rejects the audited malformed indices and kind mismatch. | Implemented | Focused regressions cover index correspondence, checked references, face cardinality, tracking dimensions, and kind mismatch. Oversized deserializer allocation remains pending. |
-| Results are deterministic on the recorded Windows/MSVC host. | Realistically validated | Immediate reruns and a separate-process full verify reproduce all 18 v3 digests. Cross-platform equality is not claimed. |
+| Results are deterministic on the recorded Windows/MSVC host. | Realistically validated | Immediate reruns and a separate-process full verify reproduce all 18 v4 digests. Cross-platform equality is not claimed. |
 | The geometry continuity test target compiles to Wasm. | Implemented | Preserve the committed compile receipt and run it in CI. |
 | The continuity path is usable on Wasm. | Not yet substantiated | Runtime execution in a supported Wasm host, including deterministic replay and bounded failure cases. |
-| Experimental `G4` is reachable. | Realistically validated as experimental | The rational quintic G4 case certifies with maximum normalized order-four residual `1.224951875e-4`; production G4 remains not substantiated. |
+| Experimental `G4` is reachable. | Realistically validated as experimental | The rational quintic G4 case certifies with maximum normalized order-four residual `3.874577898e-3` using domain-valid one-sided cross stencils; production G4 remains not substantiated. |
 | The implementation provides production `G4`. | Not yet substantiated | Not required. Keep `G4` experimental pending nonzero-offset and imported evidence. |
 | The implementation provides "Class-A" surfacing. | Not yet substantiated | No Phase 4 claim is planned; this requires broader fairness and visual-quality criteria. |
 
 ## Validation corpus
 
 The corpus and its runner must be deterministic, versioned, and runnable with
-`cargo test` or `cargo run`. Each case records:
+`cargo test` or `cargo run`. Each corpus version records:
 
-- a stable case identifier and short provenance;
-- geometry source and whether it is generated, CAD-like, or imported;
+- stable case identifiers and corpus-level generated-fixture provenance;
+- per-case geometry source and licensing when a fixture is imported;
 - requested continuity order and whether experimental behavior is enabled;
 - boundary orientation and parameter mapping;
 - scale, degree, spans, knot multiplicities, and rational weight range;
@@ -105,7 +105,7 @@ The minimum corpus covers:
 | Rational behavior | Non-unit, nonuniform weights and safe rejection of invalid weights. |
 | Scale | Geometrically equivalent cases at small, unit, and large scales. |
 | Edit/replay | Upstream surface edits followed by dependency-ordered contract replay. |
-| Failure | Degenerate boundaries, insufficient degree, contradictory constraints, malformed values, and bounded-count violations. |
+| Failure | Degenerate boundaries, insufficient degree, malformed values, bounded-count violations, and deterministic iteration-bounded nonconvergence. Contradictory multi-contract evidence remains deferred. |
 | Determinism | Identical case results across repeated fresh-process runs. |
 
 Imported assets may demonstrate loader and model integration, but an imported
@@ -115,10 +115,13 @@ boundary, orientation, and residuals are identified explicitly.
 ## Independent certification
 
 The certification path must not reuse the solver's convergence decision as its
-proof. It evaluates the repaired surfaces on a denser, degree-aware sample set
-that is distinct from the optimization collocation set. For every requested
-order it records absolute and scale-normalized residuals, including endpoints,
-span boundaries, and interior points.
+proof. It evaluates the repaired surfaces with independent public surface
+evaluation and finite-difference machinery on a denser, degree-aware sample
+set. Mandatory endpoints, knot boundaries, and occasional interior
+coordinates may overlap the optimization collocation set; additional
+span-distributed samples and all residual calculations are independent. For
+every requested order it records absolute and scale-normalized residuals,
+including endpoints, span boundaries, and interior points.
 
 Certification must reject non-finite values and report the worst parameter and
 derivative order. A case passes only when all required residuals are within its
@@ -160,7 +163,9 @@ precisely documented with ownership and a reproduction command:
 - all high- and medium-impact in-scope findings are fixed or explicitly
   accepted;
 - the committed corpus passes `G0`--`G3` independent certification;
-- unsatisfiable and invalid cases preserve input state and return typed errors;
+- invalid and deliberately iteration-bounded nonconvergence cases preserve
+  input state and return typed errors; contradictory multi-contract evidence
+  is explicitly deferred;
 - repeated runs produce the same canonical result digest;
 - relevant package tests pass;
 - `cargo clippy --all-targets -- -W warnings` passes, or pre-existing unrelated

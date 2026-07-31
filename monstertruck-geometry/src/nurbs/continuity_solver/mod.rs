@@ -98,14 +98,10 @@ impl BoundaryContinuitySolver {
     }
 
     /// Returns the validated solver configuration.
-    pub const fn config(&self) -> &ContinuitySolverConfig {
-        &self.config
-    }
+    pub const fn config(&self) -> &ContinuitySolverConfig { &self.config }
 
     /// Returns the validated dense-work resource budget.
-    pub const fn resource_budget(&self) -> &ContinuityResourceBudget {
-        &self.resource_budget
-    }
+    pub const fn resource_budget(&self) -> &ContinuityResourceBudget { &self.resource_budget }
 
     /// Solves one boundary-continuity request without mutating either input.
     ///

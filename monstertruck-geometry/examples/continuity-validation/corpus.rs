@@ -192,6 +192,26 @@ pub enum ErrorKind {
     ResourceLimitExceeded,
 }
 
+impl ErrorKind {
+    /// Returns the stable evidence-schema name.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::InvalidConfig => "invalid_config",
+            Self::ExperimentalG4Disabled => "experimental_g4_disabled",
+            Self::UnsupportedCapability => "unsupported_capability",
+            Self::InvalidBoundary => "invalid_boundary",
+            Self::NonPositiveWeight => "non_positive_weight",
+            Self::NonFiniteControlPoint => "non_finite_control_point",
+            Self::DegenerateBoundary => "degenerate_boundary",
+            Self::NonFiniteResidual => "non_finite_residual",
+            Self::NonFiniteJacobian => "non_finite_jacobian",
+            Self::NoDescentDirection => "no_descent_direction",
+            Self::DidNotConverge => "did_not_converge",
+            Self::ResourceLimitExceeded => "resource_limit_exceeded",
+        }
+    }
+}
+
 /// Baseline file containing reviewed deterministic digests.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Baseline {
