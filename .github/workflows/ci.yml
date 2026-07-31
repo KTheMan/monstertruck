@@ -104,6 +104,24 @@ jobs:
       - run: just meshing-features
 
   wasm-build:
+    name: cargo build (wasm32)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # CI cannot clone the `.blueprints` submodule (agent tooling), so do
+          # not recurse. Jobs that compile or run code fetch the public
+          # `resources` submodule explicitly below.
+          submodules: false
+      - run: git submodule update --init resources
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: extractions/setup-just@v2
+      - run: just wasm-build
+
+  geometry-wasm-tests:
     name: monstertruck-geometry tests (wasm32 compile)
     runs-on: ubuntu-latest
     steps:

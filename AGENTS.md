@@ -99,8 +99,13 @@ cargo clippy --all-targets -- -W warnings
 - **CRITICAL: Address ALL warnings before EVERY commit!** This includes unused imports, dead code, deprecated API usage, and clippy warnings.
 - Never use `#[allow(warnings)]` or similar suppressions without explicit user approval.
 - **CRITICAL: Never modify test files** -- tests encode human intent.
+  The only exception is a specific test correction explicitly authorized by
+  the user to restore verified upstream behavior or API compatibility. Record
+  the obsolete assertion and its replacement, and do not weaken unrelated
+  coverage.
 - **CRITICAL: Never run tests with `RUST_TEST_UPDATE=1`** -- this modifies test expectations which is equivalent to changing tests.
-- **CRITICAL: Never change expected test outputs** -- these are the ground truth.
+- **CRITICAL: Never change expected test outputs outside the explicit
+  compatibility exception above** -- otherwise these are the ground truth.
 
 ## Visual Debugging for Meshing/Trim Bugs
 
