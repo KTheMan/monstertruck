@@ -48,6 +48,7 @@ pub(super) fn solve(
         return Ok(BoundaryContinuitySolution::new(
             problem.first().clone(),
             problem.solved_second(&variables),
+            problem.solved_transition(&variables),
             report,
         ));
     }
@@ -101,6 +102,7 @@ pub(super) fn solve(
                 return Ok(BoundaryContinuitySolution::new(
                     problem.first().clone(),
                     problem.solved_second(&variables),
+                    problem.solved_transition(&variables),
                     report,
                 ));
             }

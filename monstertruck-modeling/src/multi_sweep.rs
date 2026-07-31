@@ -47,9 +47,7 @@ where
         let mut edge = self.clone();
         (0..division)
             .map(move |_| {
-                let new_edge = edge
-                    .mapped(point_mapping, curve_mapping)
-                    .into_untracked();
+                let new_edge = edge.mapped(point_mapping, curve_mapping).into_untracked();
                 let face = connect_edges(&edge, &new_edge, connect_points, connect_curves);
                 edge = new_edge;
                 face
@@ -81,9 +79,7 @@ where
         let mut wire = self.clone();
         (0..division)
             .flat_map(move |_| {
-                let new_wire = wire
-                    .mapped(point_mapping, curve_mapping)
-                    .into_untracked();
+                let new_wire = wire.mapped(point_mapping, curve_mapping).into_untracked();
                 let shell: Vec<_> =
                     connect_wires(&wire, &new_wire, connect_points, connect_curves).collect();
                 wire = new_wire;

@@ -20,8 +20,7 @@ pub(crate) trait JetScalar:
     + Add<Self, Output = Self>
     + Sub<Self, Output = Self>
     + Mul<Self, Output = Self>
-    + Div<Self, Output = Self>
-{
+    + Div<Self, Output = Self> {
     /// Returns additive identity.
     fn zero() -> Self;
 
@@ -37,24 +36,16 @@ pub(crate) trait JetScalar:
 
 impl JetScalar for f64 {
     #[inline(always)]
-    fn zero() -> Self {
-        0.0
-    }
+    fn zero() -> Self { 0.0 }
 
     #[inline(always)]
-    fn one() -> Self {
-        1.0
-    }
+    fn one() -> Self { 1.0 }
 
     #[inline(always)]
-    fn from_f64(value: f64) -> Self {
-        value
-    }
+    fn from_f64(value: f64) -> Self { value }
 
     #[inline(always)]
-    fn exp(self) -> Self {
-        f64::exp(self)
-    }
+    fn exp(self) -> Self { f64::exp(self) }
 }
 
 /// Factorial-normalized bivariate Taylor polynomial truncated by total order.
@@ -142,9 +133,7 @@ impl<S: JetScalar> TaylorJet<S> {
 
     /// Returns the active total order.
     #[inline(always)]
-    pub(crate) const fn order(&self) -> usize {
-        self.order
-    }
+    pub(crate) const fn order(&self) -> usize { self.order }
 
     /// Returns factorial-normalized coefficient `(i, j)`.
     ///
@@ -174,9 +163,7 @@ impl<S: JetScalar> TaylorJet<S> {
     }
 
     /// Multiplies every active coefficient by an `f64` constant.
-    pub(crate) fn scaled_f64(self, scalar: f64) -> Self {
-        self.scaled(S::from_f64(scalar))
-    }
+    pub(crate) fn scaled_f64(self, scalar: f64) -> Self { self.scaled(S::from_f64(scalar)) }
 
     /// Returns the multiplicative reciprocal, truncated to this jet's order.
     pub(crate) fn reciprocal(&self) -> Self {

@@ -58,9 +58,7 @@ macro_rules! string_identifier {
             }
 
             #[doc = concat!("Returns this ", $kind, " as a string slice.")]
-            pub fn as_str(&self) -> &str {
-                &self.0
-            }
+            pub fn as_str(&self) -> &str { &self.0 }
         }
 
         impl Display for $name {
@@ -72,16 +70,12 @@ macro_rules! string_identifier {
         impl FromStr for $name {
             type Err = TrackingError;
 
-            fn from_str(value: &str) -> TrackingResult<Self> {
-                Self::new(value)
-            }
+            fn from_str(value: &str) -> TrackingResult<Self> { Self::new(value) }
         }
 
         impl<'de> Deserialize<'de> for $name {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where
-                D: Deserializer<'de>,
-            {
+            where D: Deserializer<'de> {
                 let value = String::deserialize(deserializer)?;
                 Self::new(value).map_err(serde::de::Error::custom)
             }
@@ -123,9 +117,7 @@ impl TrackingSessionId {
     }
 
     /// Returns this tracking-session identifier as a string slice.
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
+    pub fn as_str(&self) -> &str { &self.0 }
 }
 
 impl Display for TrackingSessionId {
@@ -137,25 +129,19 @@ impl Display for TrackingSessionId {
 impl FromStr for TrackingSessionId {
     type Err = TrackingError;
 
-    fn from_str(value: &str) -> TrackingResult<Self> {
-        Self::new(value)
-    }
+    fn from_str(value: &str) -> TrackingResult<Self> { Self::new(value) }
 }
 
 impl<'de> Deserialize<'de> for TrackingSessionId {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
+    where D: Deserializer<'de> {
         let value = String::deserialize(deserializer)?;
         Self::new(value).map_err(serde::de::Error::custom)
     }
 }
 
 impl DeterministicContentHash for TrackingSessionId {
-    fn content_hash<H: Hasher>(&self, state: &mut H) {
-        self.0.content_hash(state);
-    }
+    fn content_hash<H: Hasher>(&self, state: &mut H) { self.0.content_hash(state); }
 }
 
 /// Kind of topological element addressed by a [`SemanticTopologyRef`].
@@ -189,37 +175,25 @@ impl SemanticTopologyRef {
     }
 
     /// Returns the feature that owns the topology result.
-    pub const fn feature(&self) -> &FeatureId {
-        &self.feature
-    }
+    pub const fn feature(&self) -> &FeatureId { &self.feature }
 
     /// Returns the addressed topology kind.
-    pub const fn kind(&self) -> TopologyKind {
-        self.kind
-    }
+    pub const fn kind(&self) -> TopologyKind { self.kind }
 
     /// Returns the semantic label within the feature result.
-    pub const fn label(&self) -> &SemanticLabel {
-        &self.label
-    }
+    pub const fn label(&self) -> &SemanticLabel { &self.label }
 }
 
 impl DeterministicContentHash for FeatureId {
-    fn content_hash<H: Hasher>(&self, state: &mut H) {
-        self.0.content_hash(state);
-    }
+    fn content_hash<H: Hasher>(&self, state: &mut H) { self.0.content_hash(state); }
 }
 
 impl DeterministicContentHash for SemanticLabel {
-    fn content_hash<H: Hasher>(&self, state: &mut H) {
-        self.0.content_hash(state);
-    }
+    fn content_hash<H: Hasher>(&self, state: &mut H) { self.0.content_hash(state); }
 }
 
 impl DeterministicContentHash for TopologyKind {
-    fn content_hash<H: Hasher>(&self, state: &mut H) {
-        (*self as u8).content_hash(state);
-    }
+    fn content_hash<H: Hasher>(&self, state: &mut H) { (*self as u8).content_hash(state); }
 }
 
 impl DeterministicContentHash for SemanticTopologyRef {
@@ -242,14 +216,10 @@ impl TrackingGeneration {
     pub const INITIAL: Self = Self(0);
 
     /// Creates a generation from its numeric value.
-    pub const fn new(value: u64) -> Self {
-        Self(value)
-    }
+    pub const fn new(value: u64) -> Self { Self(value) }
 
     /// Returns the numeric generation.
-    pub const fn raw(self) -> u64 {
-        self.0
-    }
+    pub const fn raw(self) -> u64 { self.0 }
 
     fn next(self) -> TrackingResult<Self> {
         self.0
@@ -266,9 +236,7 @@ impl Display for TrackingGeneration {
 }
 
 impl DeterministicContentHash for TrackingGeneration {
-    fn content_hash<H: Hasher>(&self, state: &mut H) {
-        self.0.content_hash(state);
-    }
+    fn content_hash<H: Hasher>(&self, state: &mut H) { self.0.content_hash(state); }
 }
 
 /// Immutable runtime topology identifier.
@@ -292,19 +260,13 @@ impl TrackingId {
     }
 
     /// Returns the owning tracking session.
-    pub const fn session(&self) -> &TrackingSessionId {
-        &self.session
-    }
+    pub const fn session(&self) -> &TrackingSessionId { &self.session }
 
     /// Returns the replay generation in which this identifier was allocated.
-    pub const fn generation(&self) -> TrackingGeneration {
-        self.generation
-    }
+    pub const fn generation(&self) -> TrackingGeneration { self.generation }
 
     /// Returns the generation-local monotonic serial.
-    pub const fn serial(&self) -> u64 {
-        self.serial
-    }
+    pub const fn serial(&self) -> u64 { self.serial }
 }
 
 impl Display for TrackingId {
@@ -360,18 +322,14 @@ impl FromStr for TrackingId {
 
 impl Serialize for TrackingId {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
+    where S: Serializer {
         serializer.collect_str(self)
     }
 }
 
 impl<'de> Deserialize<'de> for TrackingId {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
+    where D: Deserializer<'de> {
         let value = String::deserialize(deserializer)?;
         value.parse().map_err(serde::de::Error::custom)
     }
@@ -418,15 +376,11 @@ pub enum LineageRelation {
 }
 
 impl DeterministicContentHash for OperationKind {
-    fn content_hash<H: Hasher>(&self, state: &mut H) {
-        (*self as u8).content_hash(state);
-    }
+    fn content_hash<H: Hasher>(&self, state: &mut H) { (*self as u8).content_hash(state); }
 }
 
 impl DeterministicContentHash for LineageRelation {
-    fn content_hash<H: Hasher>(&self, state: &mut H) {
-        (*self as u8).content_hash(state);
-    }
+    fn content_hash<H: Hasher>(&self, state: &mut H) { (*self as u8).content_hash(state); }
 }
 
 /// One parent-to-children topology lineage event.
@@ -454,24 +408,16 @@ impl LineageEvent {
     }
 
     /// Returns the operation that produced this event.
-    pub const fn operation(&self) -> OperationKind {
-        self.operation
-    }
+    pub const fn operation(&self) -> OperationKind { self.operation }
 
     /// Returns the parent-to-child relationship.
-    pub const fn relation(&self) -> LineageRelation {
-        self.relation
-    }
+    pub const fn relation(&self) -> LineageRelation { self.relation }
 
     /// Returns the parent identifier.
-    pub const fn parent(&self) -> &TrackingId {
-        &self.parent
-    }
+    pub const fn parent(&self) -> &TrackingId { &self.parent }
 
     /// Returns the child identifiers in deterministic operation order.
-    pub fn children(&self) -> &[TrackingId] {
-        &self.children
-    }
+    pub fn children(&self) -> &[TrackingId] { &self.children }
 }
 
 impl DeterministicContentHash for LineageEvent {
@@ -499,14 +445,10 @@ impl SemanticBinding {
     }
 
     /// Returns the persistent semantic reference.
-    pub const fn reference(&self) -> &SemanticTopologyRef {
-        &self.reference
-    }
+    pub const fn reference(&self) -> &SemanticTopologyRef { &self.reference }
 
     /// Returns the current runtime identifier.
-    pub const fn tracking_id(&self) -> &TrackingId {
-        &self.tracking_id
-    }
+    pub const fn tracking_id(&self) -> &TrackingId { &self.tracking_id }
 }
 
 impl DeterministicContentHash for SemanticBinding {
@@ -539,29 +481,19 @@ impl TrackingSession {
     }
 
     /// Returns the session identifier.
-    pub const fn id(&self) -> &TrackingSessionId {
-        &self.id
-    }
+    pub const fn id(&self) -> &TrackingSessionId { &self.id }
 
     /// Returns the current replay generation.
-    pub const fn generation(&self) -> TrackingGeneration {
-        self.generation
-    }
+    pub const fn generation(&self) -> TrackingGeneration { self.generation }
 
     /// Returns the serial that the next allocation will receive.
-    pub const fn next_serial(&self) -> u64 {
-        self.next_serial
-    }
+    pub const fn next_serial(&self) -> u64 { self.next_serial }
 
     /// Returns semantic bindings in canonical semantic-reference order.
-    pub fn bindings(&self) -> &[SemanticBinding] {
-        &self.bindings
-    }
+    pub fn bindings(&self) -> &[SemanticBinding] { &self.bindings }
 
     /// Returns current-generation lineage in recording order.
-    pub fn lineage(&self) -> &[LineageEvent] {
-        &self.lineage
-    }
+    pub fn lineage(&self) -> &[LineageEvent] { &self.lineage }
 
     /// Allocates a fresh current-generation [`TrackingId`].
     ///
@@ -793,9 +725,7 @@ struct TrackingSessionRepresentation {
 
 impl<'de> Deserialize<'de> for TrackingSession {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
+    where D: Deserializer<'de> {
         let representation = TrackingSessionRepresentation::deserialize(deserializer)?;
         let session = Self {
             id: representation.id,

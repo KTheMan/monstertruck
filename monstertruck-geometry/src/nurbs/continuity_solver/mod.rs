@@ -49,9 +49,9 @@ pub use replay::{
 };
 pub use resource::ContinuityResourceBudget;
 pub use types::{
-    BoundaryContinuityRequest, BoundaryContinuitySolution, BoundaryEndpoint, ContinuityResource,
-    ContinuitySolveError, ContinuitySolveReport, ContinuitySolverConfig, ContinuityTermination,
-    OrderResidual,
+    BoundaryContinuityRequest, BoundaryContinuitySolution, BoundaryEndpoint, BoundaryTransition,
+    ContinuityResource, ContinuitySolveError, ContinuitySolveReport, ContinuitySolverConfig,
+    ContinuityTermination, OrderResidual,
 };
 
 #[cfg(test)]
@@ -98,14 +98,10 @@ impl BoundaryContinuitySolver {
     }
 
     /// Returns the validated solver configuration.
-    pub const fn config(&self) -> &ContinuitySolverConfig {
-        &self.config
-    }
+    pub const fn config(&self) -> &ContinuitySolverConfig { &self.config }
 
     /// Returns the validated dense-work resource budget.
-    pub const fn resource_budget(&self) -> &ContinuityResourceBudget {
-        &self.resource_budget
-    }
+    pub const fn resource_budget(&self) -> &ContinuityResourceBudget { &self.resource_budget }
 
     /// Solves one boundary-continuity request without mutating either input.
     ///

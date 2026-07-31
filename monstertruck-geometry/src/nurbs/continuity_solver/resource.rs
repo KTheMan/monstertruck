@@ -55,44 +55,28 @@ impl ContinuityResourceBudget {
     }
 
     /// Returns the nonlinear iteration limit.
-    pub const fn max_iterations(self) -> usize {
-        self.max_iterations
-    }
+    pub const fn max_iterations(self) -> usize { self.max_iterations }
 
     /// Returns the combined surface control-point limit.
-    pub const fn max_control_points(self) -> usize {
-        self.max_control_points
-    }
+    pub const fn max_control_points(self) -> usize { self.max_control_points }
 
     /// Returns the combined nonzero seam-span limit.
-    pub const fn max_spans(self) -> usize {
-        self.max_spans
-    }
+    pub const fn max_spans(self) -> usize { self.max_spans }
 
     /// Returns the combined optimizer and certification sample limit.
-    pub const fn max_samples(self) -> usize {
-        self.max_samples
-    }
+    pub const fn max_samples(self) -> usize { self.max_samples }
 
     /// Returns the optimization-variable limit.
-    pub const fn max_variables(self) -> usize {
-        self.max_variables
-    }
+    pub const fn max_variables(self) -> usize { self.max_variables }
 
     /// Returns the combined optimizer and certification residual limit.
-    pub const fn max_residuals(self) -> usize {
-        self.max_residuals
-    }
+    pub const fn max_residuals(self) -> usize { self.max_residuals }
 
     /// Returns the optimizer Jacobian element limit.
-    pub const fn max_jacobian_elements(self) -> usize {
-        self.max_jacobian_elements
-    }
+    pub const fn max_jacobian_elements(self) -> usize { self.max_jacobian_elements }
 
     /// Returns the augmented QR matrix element limit.
-    pub const fn max_qr_elements(self) -> usize {
-        self.max_qr_elements
-    }
+    pub const fn max_qr_elements(self) -> usize { self.max_qr_elements }
 
     /// Sets the nonlinear iteration limit.
     pub const fn with_max_iterations(mut self, limit: usize) -> Self {

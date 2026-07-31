@@ -53,9 +53,7 @@ impl ContinuityOrder {
 
     /// Returns the numeric derivative order.
     #[inline(always)]
-    pub const fn as_usize(self) -> usize {
-        self.0 as usize
-    }
+    pub const fn as_usize(self) -> usize { self.0 as usize }
 
     /// Returns the solver maturity associated with this order.
     #[inline(always)]
@@ -69,9 +67,7 @@ impl ContinuityOrder {
 
     /// Returns the mathematical minimum cross-boundary degree.
     #[inline(always)]
-    pub const fn minimum_degree(self) -> usize {
-        self.as_usize()
-    }
+    pub const fn minimum_degree(self) -> usize { self.as_usize() }
 
     /// Returns the preferred cross-boundary degree for constrained styling.
     ///
@@ -89,30 +85,22 @@ impl ContinuityOrder {
 
     /// Returns the number of boundary-adjacent control rows in a full jet.
     #[inline(always)]
-    pub const fn constrained_rows(self) -> usize {
-        self.as_usize() + 1
-    }
+    pub const fn constrained_rows(self) -> usize { self.as_usize() + 1 }
 }
 
 impl TryFrom<usize> for ContinuityOrder {
     type Error = Error;
 
-    fn try_from(value: usize) -> Result<Self> {
-        Self::new(value)
-    }
+    fn try_from(value: usize) -> Result<Self> { Self::new(value) }
 }
 
 impl From<ContinuityOrder> for usize {
-    fn from(value: ContinuityOrder) -> Self {
-        value.as_usize()
-    }
+    fn from(value: ContinuityOrder) -> Self { value.as_usize() }
 }
 
 impl<'de> Deserialize<'de> for ContinuityOrder {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
+    where D: Deserializer<'de> {
         let order = u8::deserialize(deserializer)?;
         Self::new(order as usize).map_err(serde::de::Error::custom)
     }
@@ -257,39 +245,27 @@ impl SurfaceContinuityCapability {
 
     /// Returns the inspected surface boundary.
     #[inline(always)]
-    pub const fn boundary(self) -> SurfaceBoundary {
-        self.boundary
-    }
+    pub const fn boundary(self) -> SurfaceBoundary { self.boundary }
 
     /// Returns the requested continuity order.
     #[inline(always)]
-    pub const fn requested(self) -> ContinuityOrder {
-        self.requested
-    }
+    pub const fn requested(self) -> ContinuityOrder { self.requested }
 
     /// Returns the degree normal to the boundary in parameter space.
     #[inline(always)]
-    pub const fn cross_degree(self) -> usize {
-        self.cross_degree
-    }
+    pub const fn cross_degree(self) -> usize { self.cross_degree }
 
     /// Returns the number of control rows normal to the boundary.
     #[inline(always)]
-    pub const fn cross_control_rows(self) -> usize {
-        self.cross_control_rows
-    }
+    pub const fn cross_control_rows(self) -> usize { self.cross_control_rows }
 
     /// Returns the degree-based capability level.
     #[inline(always)]
-    pub const fn level(self) -> ContinuityCapabilityLevel {
-        self.level
-    }
+    pub const fn level(self) -> ContinuityCapabilityLevel { self.level }
 
     /// Returns the maturity of the requested solver target.
     #[inline(always)]
-    pub const fn maturity(self) -> ContinuityMaturity {
-        self.requested.maturity()
-    }
+    pub const fn maturity(self) -> ContinuityMaturity { self.requested.maturity() }
 
     /// Returns the control rows remaining beyond the constrained boundary jet.
     #[inline(always)]

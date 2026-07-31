@@ -20,9 +20,7 @@ pub struct CurveJet<V> {
 impl<V> CurveJet<V> {
     /// Evaluates a curve jet at `parameter`.
     pub fn from_curve<C>(curve: &C, order: ContinuityOrder, parameter: f64) -> Self
-    where
-        C: ParametricCurve<Vector = V>,
-    {
+    where C: ParametricCurve<Vector = V> {
         Self {
             order,
             derivatives: (0..=order.as_usize())
@@ -33,27 +31,19 @@ impl<V> CurveJet<V> {
 
     /// Returns the highest derivative order stored in the jet.
     #[inline(always)]
-    pub const fn order(&self) -> ContinuityOrder {
-        self.order
-    }
+    pub const fn order(&self) -> ContinuityOrder { self.order }
 
     /// Returns a derivative by order.
     #[inline(always)]
-    pub fn derivative(&self, order: usize) -> Option<&V> {
-        self.derivatives.get(order)
-    }
+    pub fn derivative(&self, order: usize) -> Option<&V> { self.derivatives.get(order) }
 
     /// Returns all derivatives in ascending order.
     #[inline(always)]
-    pub fn derivatives(&self) -> &[V] {
-        &self.derivatives
-    }
+    pub fn derivatives(&self) -> &[V] { &self.derivatives }
 
     /// Consumes the jet and returns its derivatives in ascending order.
     #[inline(always)]
-    pub fn into_derivatives(self) -> SmallVec<[V; INLINE_JET_TERMS]> {
-        self.derivatives
-    }
+    pub fn into_derivatives(self) -> SmallVec<[V; INLINE_JET_TERMS]> { self.derivatives }
 }
 
 type SurfaceJetRow<V> = SmallVec<[V; INLINE_JET_TERMS]>;
@@ -71,9 +61,7 @@ pub struct SurfaceJet<V> {
 impl<V> SurfaceJet<V> {
     /// Evaluates a surface jet at `(u, v)`.
     pub fn from_surface<S>(surface: &S, order: ContinuityOrder, u: f64, v: f64) -> Self
-    where
-        S: ParametricSurface<Vector = V>,
-    {
+    where S: ParametricSurface<Vector = V> {
         Self {
             order,
             derivatives: (0..=order.as_usize())
@@ -88,9 +76,7 @@ impl<V> SurfaceJet<V> {
 
     /// Returns the highest total derivative order stored in the jet.
     #[inline(always)]
-    pub const fn order(&self) -> ContinuityOrder {
-        self.order
-    }
+    pub const fn order(&self) -> ContinuityOrder { self.order }
 
     /// Returns the mixed derivative `(m, n)`.
     ///
@@ -108,15 +94,11 @@ impl<V> SurfaceJet<V> {
 
     /// Returns the number of derivatives stored in the triangular jet.
     #[inline(always)]
-    pub fn len(&self) -> usize {
-        self.derivatives.iter().map(SmallVec::len).sum()
-    }
+    pub fn len(&self) -> usize { self.derivatives.iter().map(SmallVec::len).sum() }
 
     /// Returns whether the jet stores no derivatives.
     #[inline(always)]
-    pub fn is_empty(&self) -> bool {
-        self.derivatives.is_empty()
-    }
+    pub fn is_empty(&self) -> bool { self.derivatives.is_empty() }
 }
 
 #[cfg(test)]

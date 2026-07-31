@@ -4,6 +4,7 @@ on:
   push:
     branches: [master]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -66,6 +67,26 @@ jobs:
       - uses: extractions/setup-just@v2
       - run: just test-cpu
 
+  continuity-validation:
+    name: continuity validation corpus
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The validation fixtures are repository-local, but workspace
+          # dependencies still expect the public resources submodule.
+          submodules: false
+      - run: git submodule update --init resources
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Emit mode checks all tolerances and immediate-rerun determinism without
+      # requiring host-sensitive digest equality with the Windows baseline.
+      - run: >-
+          cargo run -p monstertruck-geometry
+          --example continuity-validation --
+          --emit target/continuity-validation-ci.json
+
   meshing-features:
     name: monstertruck-meshing feature subsets
     runs-on: ubuntu-latest
@@ -83,7 +104,7 @@ jobs:
       - run: just meshing-features
 
   wasm-build:
-    name: cargo build (wasm32)
+    name: monstertruck-geometry tests (wasm32 compile)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -97,5 +118,6 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      - uses: extractions/setup-just@v2
-      - run: just wasm-build
+      - run: >-
+          cargo test -p monstertruck-geometry --lib
+          --target wasm32-unknown-unknown --no-run

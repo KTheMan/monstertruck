@@ -46,9 +46,7 @@ impl ContractId {
 
     /// Returns the identifier text.
     #[inline(always)]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
+    pub fn as_str(&self) -> &str { &self.0 }
 }
 
 impl Display for ContractId {
@@ -59,9 +57,7 @@ impl Display for ContractId {
 
 impl<'de> Deserialize<'de> for ContractId {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
+    where D: Deserializer<'de> {
         let value = String::deserialize(deserializer)?;
         Self::new(value).map_err(serde::de::Error::custom)
     }
@@ -105,15 +101,11 @@ impl SurfaceBoundaryRef {
 
     /// Returns the semantic face reference.
     #[inline(always)]
-    pub const fn topology(&self) -> &SemanticTopologyRef {
-        &self.topology
-    }
+    pub const fn topology(&self) -> &SemanticTopologyRef { &self.topology }
 
     /// Returns the selected parametric boundary.
     #[inline(always)]
-    pub const fn boundary(&self) -> SurfaceBoundary {
-        self.boundary
-    }
+    pub const fn boundary(&self) -> SurfaceBoundary { self.boundary }
 
     fn resolve(
         &self,
@@ -128,9 +120,7 @@ impl SurfaceBoundaryRef {
 
 impl<'de> Deserialize<'de> for SurfaceBoundaryRef {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
+    where D: Deserializer<'de> {
         #[derive(Deserialize)]
         struct SerializedSurfaceBoundaryRef {
             topology: SemanticTopologyRef,
@@ -183,39 +173,27 @@ impl ContinuityContract {
 
     /// Returns the serialized schema version.
     #[inline(always)]
-    pub const fn schema_version(&self) -> u16 {
-        self.schema_version
-    }
+    pub const fn schema_version(&self) -> u16 { self.schema_version }
 
     /// Returns the stable contract identifier.
     #[inline(always)]
-    pub const fn id(&self) -> &ContractId {
-        &self.id
-    }
+    pub const fn id(&self) -> &ContractId { &self.id }
 
     /// Returns the first persistent boundary reference.
     #[inline(always)]
-    pub const fn first(&self) -> &SurfaceBoundaryRef {
-        &self.first
-    }
+    pub const fn first(&self) -> &SurfaceBoundaryRef { &self.first }
 
     /// Returns the second persistent boundary reference.
     #[inline(always)]
-    pub const fn second(&self) -> &SurfaceBoundaryRef {
-        &self.second
-    }
+    pub const fn second(&self) -> &SurfaceBoundaryRef { &self.second }
 
     /// Returns the endpoint orientation relationship.
     #[inline(always)]
-    pub const fn alignment(&self) -> BoundaryAlignment {
-        self.alignment
-    }
+    pub const fn alignment(&self) -> BoundaryAlignment { self.alignment }
 
     /// Returns the requested geometric-continuity order.
     #[inline(always)]
-    pub const fn order(&self) -> ContinuityOrder {
-        self.order
-    }
+    pub const fn order(&self) -> ContinuityOrder { self.order }
 
     /// Resolves both semantic endpoints in the current tracking generation.
     ///
@@ -239,9 +217,7 @@ impl ContinuityContract {
 
 impl<'de> Deserialize<'de> for ContinuityContract {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
+    where D: Deserializer<'de> {
         #[derive(Deserialize)]
         struct SerializedContinuityContract {
             schema_version: u16,
@@ -280,15 +256,11 @@ pub struct ResolvedSurfaceBoundaryRef {
 impl ResolvedSurfaceBoundaryRef {
     /// Returns the current generation-specific topology identifier.
     #[inline(always)]
-    pub const fn tracking_id(&self) -> &TrackingId {
-        &self.tracking_id
-    }
+    pub const fn tracking_id(&self) -> &TrackingId { &self.tracking_id }
 
     /// Returns the selected parametric boundary.
     #[inline(always)]
-    pub const fn boundary(&self) -> SurfaceBoundary {
-        self.boundary
-    }
+    pub const fn boundary(&self) -> SurfaceBoundary { self.boundary }
 }
 
 /// Current-generation resolution of a [`ContinuityContract`].
@@ -307,33 +279,23 @@ pub struct ResolvedContinuityContract {
 impl ResolvedContinuityContract {
     /// Returns the stable contract identifier.
     #[inline(always)]
-    pub const fn id(&self) -> &ContractId {
-        &self.id
-    }
+    pub const fn id(&self) -> &ContractId { &self.id }
 
     /// Returns the first current-generation boundary.
     #[inline(always)]
-    pub const fn first(&self) -> &ResolvedSurfaceBoundaryRef {
-        &self.first
-    }
+    pub const fn first(&self) -> &ResolvedSurfaceBoundaryRef { &self.first }
 
     /// Returns the second current-generation boundary.
     #[inline(always)]
-    pub const fn second(&self) -> &ResolvedSurfaceBoundaryRef {
-        &self.second
-    }
+    pub const fn second(&self) -> &ResolvedSurfaceBoundaryRef { &self.second }
 
     /// Returns the endpoint orientation relationship.
     #[inline(always)]
-    pub const fn alignment(&self) -> BoundaryAlignment {
-        self.alignment
-    }
+    pub const fn alignment(&self) -> BoundaryAlignment { self.alignment }
 
     /// Returns the requested geometric-continuity order.
     #[inline(always)]
-    pub const fn order(&self) -> ContinuityOrder {
-        self.order
-    }
+    pub const fn order(&self) -> ContinuityOrder { self.order }
 }
 
 /// Failure to create, deserialize, or resolve a continuity contract.

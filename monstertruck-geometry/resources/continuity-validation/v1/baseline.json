@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "digest_version": "xxh3-64-public-transition-v4",
+  "cases": {
+    "invalid-degenerate-first-boundary": "39386d671d7edd28",
+    "invalid-insufficient-cross-degree": "4aca0543e130ff3f",
+    "invalid-samples-per-span": "9afab8c3d4161d68",
+    "invalid-zero-second-weight": "8e194fbc97264e94",
+    "iteration-bounded-large-offset": "626a8a7ca42d5368",
+    "polynomial-quintic-aligned-g3-scale-1": "53979a51b81eecbc",
+    "polynomial-quintic-aligned-g3-scale-large": "0784082ed3211079",
+    "polynomial-quintic-aligned-g3-scale-small": "73a7d2de8c92b29f",
+    "polynomial-quintic-aligned-g3-unequal-cross-domain": "82772107cadcd289",
+    "polynomial-quintic-curved-aligned-g2": "6a97003079fd68cd",
+    "polynomial-quintic-curved-offset-repair-g1": "7fe678e592e1db1c",
+    "polynomial-quintic-planar-aligned-g0": "d0ab6d94f030742e",
+    "polynomial-quintic-reversed-g3-scale-1": "4fbbb4fb0e27c668",
+    "polynomial-quintic-unequal-g1-scale-1": "2c3cf10f909da809",
+    "rational-quintic-aligned-g3-scale-1": "46afa620f199245a",
+    "rational-quintic-aligned-g3-scale-large": "f42cab3d454a7105",
+    "rational-quintic-aligned-g4-experimental": "9bfaaacf4c521b14",
+    "rational-quintic-unequal-reversed-g1-scale-1": "b7531fe2111e8f61"
+  }
+}

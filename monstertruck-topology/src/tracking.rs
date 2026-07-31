@@ -36,19 +36,13 @@ pub struct TrackingReport {
 
 impl TrackingReport {
     /// Returns every distinct topology ID in deterministic traversal order.
-    pub fn all_ids(&self) -> &[TrackingId] {
-        &self.all_ids
-    }
+    pub fn all_ids(&self) -> &[TrackingId] { &self.all_ids }
 
     /// Returns IDs preserved from an input topology.
-    pub fn preserved_ids(&self) -> &[TrackingId] {
-        &self.preserved_ids
-    }
+    pub fn preserved_ids(&self) -> &[TrackingId] { &self.preserved_ids }
 
     /// Returns semantic bindings allocated for generated topology.
-    pub fn generated(&self) -> &[SemanticBinding] {
-        &self.generated
-    }
+    pub fn generated(&self) -> &[SemanticBinding] { &self.generated }
 
     /// Returns generated IDs in deterministic traversal order.
     pub fn generated_ids(&self) -> impl Iterator<Item = &TrackingId> {
@@ -275,9 +269,7 @@ impl<P> TopologyTracking for Vertex<P> {
         })
     }
 
-    fn tracking_ids(&self) -> Vec<TrackingId> {
-        self.tracking_id().cloned().into_iter().collect()
-    }
+    fn tracking_ids(&self) -> Vec<TrackingId> { self.tracking_id().cloned().into_iter().collect() }
 
     fn into_untracked(mut self) -> Self {
         self.set_tracking_id(None);
@@ -720,15 +712,9 @@ mod tests {
         impl ParametricCurve for Segment {
             type Point = f64;
             type Vector = f64;
-            fn evaluate(&self, parameter: f64) -> f64 {
-                parameter
-            }
-            fn derivative(&self, _: f64) -> f64 {
-                1.0
-            }
-            fn derivative_2(&self, _: f64) -> f64 {
-                0.0
-            }
+            fn evaluate(&self, parameter: f64) -> f64 { parameter }
+            fn derivative(&self, _: f64) -> f64 { 1.0 }
+            fn derivative_2(&self, _: f64) -> f64 { 0.0 }
             fn derivative_n(&self, order: usize, parameter: f64) -> f64 {
                 match order {
                     0 => self.evaluate(parameter),
@@ -747,9 +733,7 @@ mod tests {
         impl BoundedCurve for Segment {}
 
         impl Cut for Segment {
-            fn cut(&mut self, _: f64) -> Self {
-                Self
-            }
+            fn cut(&mut self, _: f64) -> Self { Self }
         }
 
         let vertices = Vertex::from_points([0.0, 1.0]);
