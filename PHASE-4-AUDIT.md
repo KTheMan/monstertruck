@@ -71,7 +71,11 @@ ledger.
 - **Bounded estimate:** At `G3`, transition degree three, and 1,000 along-seam
   controls, the initial variable count is 18,027. The initial gradient payload
   alone is about 2.42 GiB before residual gradients and matrix copies.
-- **Disposition:** Open; Phase 4 repair required.
+- **Disposition:** Fixed in `bd29b3eb`. The default solver now has finite
+  limits for control points, spans, samples, variables, residuals, Jacobian
+  elements, augmented QR elements, and iterations. Checked arithmetic runs
+  before dense allocation; an explicit unbounded budget remains available to
+  trusted hosts that enforce an equivalent external policy.
 
 ### `P4-A002` -- Solver iteration count is caller-unbounded
 
@@ -79,7 +83,8 @@ ledger.
   when each individual problem fits the allocation budget.
 - **Evidence:** `max_iterations` is required to be positive but has no upper
   bound.
-- **Disposition:** Open; include iterations in the solver work budget.
+- **Disposition:** Fixed in `bd29b3eb`; solver construction rejects an
+  iteration ceiling above its resource budget.
 
 ### `P4-A003` -- Failed tracking operations can partially mutate state
 
@@ -89,8 +94,9 @@ ledger.
 - **Evidence:** tracking assignment allocates and binds incrementally.
   Modeling wrappers pass the caller's mutable session directly through a
   fallible topology operation.
-- **Disposition:** Open; stage mutable session/output state and commit on
-  success.
+- **Disposition:** Fixed in `99fb3835`. Initializers clone and stage topology
+  plus session state; tracked cuts and modeling wrappers stage the complete
+  session through lineage recording and commit only on success.
 
 ### `P4-A004` -- Tracked compressed topology can lose index correspondence
 
@@ -99,7 +105,9 @@ ledger.
 - **Evidence:** extraction rebuilds edge and vertex indices by first traversal
   encounter, then indexes the parallel tracking vectors with the rebuilt
   order instead of the serialized array indices.
-- **Disposition:** Open; preserve original compressed-array correspondence.
+- **Disposition:** Fixed in `06fedf9c`. Tracking IDs are applied to vertices
+  and edges while those arrays are reconstructed, before face traversal can
+  reorder their uses.
 
 ### `P4-A005` -- Tracked deserialization delegates unchecked indices
 
@@ -109,8 +117,9 @@ ledger.
   indices are accessed directly. The empty-face unwrap also exists on the
   legacy route, so the root sink predates Phase 2 even though the tracked
   wrapper reaches it.
-- **Disposition:** Open as robustness work; replace panics with typed
-  extraction errors without claiming a newly introduced vulnerability.
+- **Disposition:** Fixed in `06fedf9c` as robustness work. Compressed
+  references use checked lookup and return typed extraction errors; serialized
+  faces require exactly one extracted face.
 
 ### `P4-A006` -- Existing tracking IDs are not checked against semantic kind
 
@@ -120,8 +129,11 @@ ledger.
 - **Evidence:** initialization calls `validate_current`, which checks session,
   generation, and serial. It does not compare the existing binding with the
   visited vertex, edge, or face kind.
-- **Disposition:** Open; validate ID-to-binding kind and reference policy
-  before preserving an existing ID.
+- **Disposition:** Partially fixed in `48da2bd1`. Existing bound IDs must match
+  the visited topology kind, and failure remains transactional. Same-kind
+  semantic reference correspondence cannot be inferred from the current
+  topology wire format, so that narrower integrity claim remains not yet
+  substantiated.
 
 ### `P4-A007` -- Empty continuity capability inputs can panic
 
@@ -129,8 +141,8 @@ ledger.
   proving that it exists.
 - **Evidence:** both B-spline and NURBS capability constructors use
   `control_points()[0]`.
-- **Disposition:** Open; provide a fallible query or a non-panicking
-  unavailable capability result.
+- **Disposition:** Fixed in `552177b8`; empty control nets report
+  `Unsupported` without indexing a missing row.
 
 ### `P4-A008` -- Public degree-elevation targets have no practical bound
 
@@ -163,12 +175,13 @@ ledger.
 
 | Gate | Current observation | Ownership |
 | --- | --- | --- |
-| Geometry library tests | `cargo test -p monstertruck-geometry --lib`: 175 passed. | Phase 4. |
-| Focused tracking tests | Core, topology, and modeling tracking suites passed during independent review. | Phase 4. |
-| Workspace Clippy | `monstertruck-traits/src/algo/curve.rs:110` fails `clippy::nonminimal_bool`; the line predates the Phase 1 base. | Workspace maintenance; Phase 4 may repair in a separate commit. |
+| Geometry library tests | `cargo test -p monstertruck-geometry --lib`: 175 passed. New resource and capability integration suites add seven passing tests. | Phase 4. |
+| Focused tracking tests | Core tracking: 9 passed; topology tracking: 7 passed; modeling tracked wrappers: 5 passed. New transactional, compressed-index, and malformed-input suites add seven passing tests. | Phase 4. |
+| Targeted lint | Geometry, core, topology, and modeling pass package-scoped `cargo clippy --all-targets --no-deps -- -W warnings`. | Phase 4. |
+| Workspace Clippy | The pre-existing `clippy::nonminimal_bool` failure was fixed in `b003bb47`. The full lint run now reaches `monstertruck-step` and stops because the uninitialized `resources` submodule omits `resources/shape/cube.json` and `resources/step/occt-cylinder.step`. | Checkout/setup. |
 | Formatting | The repository uses nightly-only `rustfmt.toml` options. Nightly is not installed; stable proposes unrelated workspace-wide rewrites. | Toolchain/infrastructure. |
 | Workspace tests | Required `resources` submodule assets are absent, including `resources/obj/cube.obj` and `resources/texture/WoodFloor024_1K_Color.png`. | Checkout/setup. |
-| Wasm | A fresh Phase 4 target gate is required. Any failure will be recorded with dependency and target details. | Phase 4. |
+| Wasm | Fixed in `404b4e33`. `cargo test -p monstertruck-geometry --lib --target wasm32-unknown-unknown --no-run` now emits the geometry test Wasm module. The repair enables the `getrandom` 0.3 JavaScript backend used by `proptest`, disables unused fork/timeout features, and keeps native-only Criterion out of the Wasm dev graph. | Phase 4. |
 
 ## Delivery status
 
@@ -176,6 +189,6 @@ ledger.
 | --- | --- |
 | Phase 4 charter and claim register | Committed as `285e1550`; pull request `KTheMan/monstertruck#1`. |
 | Audit ledger | In progress on the stacked audit/repair branch. |
-| Focused repair commits | Pending. |
+| Focused repair commits | `bd29b3eb`, `552177b8`, `99fb3835`, `06fedf9c`, and `48da2bd1`. |
 | Corpus and independent certifier | Pending. |
 | Evidence records and final claim promotion | Pending. |
