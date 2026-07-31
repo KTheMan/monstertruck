@@ -219,20 +219,6 @@ pub struct TrackedCompressedSolid<P, C, S> {
     pub tracking: Vec<CompressedTopologyTracking>,
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(untagged)]
-enum ShellSerialization<P, C, S> {
-    Tracked(TrackedCompressedShell<P, C, S>),
-    Legacy(CompressedShell<P, C, S>),
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(untagged)]
-enum SolidSerialization<P, C, S> {
-    Tracked(TrackedCompressedSolid<P, C, S>),
-    Legacy(CompressedSolid<P, C, S>),
-}
-
 /// Serialized compressed solid with exact face-local trim storage.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CompressedTrimmedSolid<P, C, S, T> {
@@ -1208,11 +1194,7 @@ where
     where
         Serializer: serde::Serializer,
     {
-        if self.tracking_ids().is_empty() {
-            ShellSerialization::Legacy(self.compress()).serialize(serializer)
-        } else {
-            ShellSerialization::Tracked(self.compress_tracked()).serialize(serializer)
-        }
+        self.compress().serialize(serializer)
     }
 }
 
@@ -1225,14 +1207,8 @@ where
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where D: serde::Deserializer<'de> {
         use serde::de::Error;
-        match ShellSerialization::<P, C, S>::deserialize(deserializer)? {
-            ShellSerialization::Tracked(tracked) => {
-                Shell::extract_tracked(tracked).map_err(D::Error::custom)
-            }
-            ShellSerialization::Legacy(compressed) => {
-                Shell::extract(compressed).map_err(D::Error::custom)
-            }
-        }
+        let compressed = CompressedShell::<P, C, S>::deserialize(deserializer)?;
+        Shell::extract(compressed).map_err(D::Error::custom)
     }
 }
 
@@ -1249,11 +1225,7 @@ where
     where
         Serializer: serde::Serializer,
     {
-        if self.tracking_ids().is_empty() {
-            SolidSerialization::Legacy(self.compress()).serialize(serializer)
-        } else {
-            SolidSerialization::Tracked(self.compress_tracked()).serialize(serializer)
-        }
+        self.compress().serialize(serializer)
     }
 }
 
@@ -1266,14 +1238,8 @@ where
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where D: serde::Deserializer<'de> {
         use serde::de::Error;
-        match SolidSerialization::<P, C, S>::deserialize(deserializer)? {
-            SolidSerialization::Tracked(tracked) => {
-                Solid::extract_tracked(tracked).map_err(D::Error::custom)
-            }
-            SolidSerialization::Legacy(compressed) => {
-                Solid::extract(compressed).map_err(D::Error::custom)
-            }
-        }
+        let compressed = CompressedSolid::<P, C, S>::deserialize(deserializer)?;
+        Solid::extract(compressed).map_err(D::Error::custom)
     }
 }
 
