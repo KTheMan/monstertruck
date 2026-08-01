@@ -1,7 +1,7 @@
 //! Imported solve, topology replacement, meshing, and STEP round trip.
 
 use super::Args;
-use super::certify::certify_g1;
+use super::certify::{Certificate, CertificationConfig, certify};
 use super::classify::{ImportedShell, select_full_nurbs_seam, to_nurbs};
 use super::errors::ValidationError;
 use anyhow::{Context, Result, anyhow};
@@ -14,6 +14,7 @@ use monstertruck_meshing::prelude::RobustMeshableShape;
 use monstertruck_step::load::step_geometry::Surface;
 use monstertruck_step::load::{Table, step_geometry};
 use monstertruck_step::save::{CompleteStepDisplay, StepHeaderDescriptor, StepModel};
+use serde::Serialize;
 use std::fs;
 
 pub(super) fn execute(args: &Args) -> Result<()> {
@@ -48,14 +49,25 @@ pub(super) fn execute(args: &Args) -> Result<()> {
         .context("failed to construct continuity solver")?
         .solve(&first, &perturbed_second, request)
         .context("continuity solver rejected or failed the imported fixture")?;
-    let certificate = certify_g1(
+    let maximum_residual_by_order = [
+        args.position_tolerance,
+        args.first_derivative_tolerance,
+        args.second_derivative_tolerance,
+        args.third_derivative_tolerance,
+    ];
+    let certificate = certify(
         solution.first(),
         solution.second(),
         solution.transition(),
         selection,
-        args.certification_intervals,
-        args.position_tolerance,
-        args.tangent_tolerance,
+        order,
+        CertificationConfig {
+            intervals: args.certification_intervals,
+            normalized_step: args.certification_step,
+            stencil_radius: args.certification_stencil_radius,
+            maximum_residual_by_order: &maximum_residual_by_order,
+            maximum_normal_angle: args.tangent_tolerance,
+        },
     )?;
     solved_shell.faces[selection.second_face].surface =
         Surface::NurbsSurface(solution.second().clone());
@@ -68,10 +80,17 @@ pub(super) fn execute(args: &Args) -> Result<()> {
     fs::write(&args.output, &output_step)
         .with_context(|| format!("failed to write {}", args.output.display()))?;
     validate_reimport(&output_step, args.shell)?;
+    write_receipt(
+        args,
+        selection,
+        &certificate,
+        solution.report(),
+        triangle_count,
+    )?;
     println!(
         "status=validated input={} shell={} faces={}/{} boundaries={:?}/{:?} \
          alignment={:?} order=G{} classification_maximum={:.6e} \
-         certificate_samples={} position_maximum={:.6e} tangent_maximum={:.6e} \
+         certificate_samples={} normalized_residuals={:?} normal_angle={:.6e} \
          triangles={} output={}",
         args.input.display(),
         args.shell,
@@ -83,8 +102,8 @@ pub(super) fn execute(args: &Args) -> Result<()> {
         args.order,
         selection.classification_maximum,
         certificate.samples,
-        certificate.position_maximum,
-        certificate.tangent_maximum,
+        certificate.maximum_normalized_residual_by_order,
+        certificate.maximum_normal_angle,
         triangle_count,
         args.output.display(),
     );
@@ -96,13 +115,130 @@ fn validate_args(args: &Args) -> Result<(), ValidationError> {
         ("perturbation", args.perturbation),
         ("classification_tolerance", args.classification_tolerance),
         ("position_tolerance", args.position_tolerance),
+        (
+            "first_derivative_tolerance",
+            args.first_derivative_tolerance,
+        ),
+        (
+            "second_derivative_tolerance",
+            args.second_derivative_tolerance,
+        ),
+        (
+            "third_derivative_tolerance",
+            args.third_derivative_tolerance,
+        ),
         ("tangent_tolerance", args.tangent_tolerance),
+        ("certification_step", args.certification_step),
         ("mesh_tolerance", args.mesh_tolerance),
     ]
     .into_iter()
     .find(|(_, value)| !value.is_finite() || *value <= 0.0)
     .map_or(Ok(()), |(name, _)| {
         Err(ValidationError::InvalidTolerance { name })
+    })
+}
+
+#[derive(Serialize)]
+struct ValidationReceipt<'a> {
+    schema_version: u32,
+    evidence_class: &'static str,
+    input: String,
+    output: String,
+    order: u8,
+    perturbation: f64,
+    selection: SelectionReceipt,
+    certificate: &'a Certificate,
+    solver: SolverReceipt<'a>,
+    triangle_count: usize,
+    step_reimported: bool,
+}
+
+#[derive(Serialize)]
+struct SelectionReceipt {
+    first_face: usize,
+    second_face: usize,
+    first_boundary: SurfaceBoundary,
+    second_boundary: SurfaceBoundary,
+    alignment: monstertruck_geometry::nurbs::continuity::BoundaryAlignment,
+    classification_maximum: f64,
+}
+
+impl From<super::classify::SeamSelection> for SelectionReceipt {
+    fn from(selection: super::classify::SeamSelection) -> Self {
+        Self {
+            first_face: selection.first_face + 1,
+            second_face: selection.second_face + 1,
+            first_boundary: selection.first_boundary,
+            second_boundary: selection.second_boundary,
+            alignment: selection.alignment,
+            classification_maximum: selection.classification_maximum,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct SolverReceipt<'a> {
+    termination: monstertruck_geometry::nurbs::continuity_solver::ContinuityTermination,
+    iterations: usize,
+    accepted_steps: usize,
+    rejected_steps: usize,
+    initial_objective: f64,
+    final_objective: f64,
+    residuals: &'a [monstertruck_geometry::nurbs::continuity_solver::OrderResidual],
+    numerical_rank: usize,
+    variable_count: usize,
+    residual_count: usize,
+}
+
+impl<'a> From<&'a monstertruck_geometry::nurbs::continuity_solver::ContinuitySolveReport>
+    for SolverReceipt<'a>
+{
+    fn from(
+        report: &'a monstertruck_geometry::nurbs::continuity_solver::ContinuitySolveReport,
+    ) -> Self {
+        Self {
+            termination: report.termination(),
+            iterations: report.iterations(),
+            accepted_steps: report.accepted_steps(),
+            rejected_steps: report.rejected_steps(),
+            initial_objective: report.initial_objective(),
+            final_objective: report.final_objective(),
+            residuals: report.residuals(),
+            numerical_rank: report.numerical_rank(),
+            variable_count: report.variable_count(),
+            residual_count: report.residual_count(),
+        }
+    }
+}
+
+fn write_receipt(
+    args: &Args,
+    selection: super::classify::SeamSelection,
+    certificate: &Certificate,
+    solver_report: &monstertruck_geometry::nurbs::continuity_solver::ContinuitySolveReport,
+    triangle_count: usize,
+) -> Result<()> {
+    args.receipt.as_ref().map_or(Ok(()), |path| {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("failed to create {}", parent.display()))?;
+        }
+        let receipt = ValidationReceipt {
+            schema_version: 1,
+            evidence_class: "imported_workflow_independent_dense_certificate",
+            input: args.input.display().to_string(),
+            output: args.output.display().to_string(),
+            order: args.order,
+            perturbation: args.perturbation,
+            selection: selection.into(),
+            certificate,
+            solver: solver_report.into(),
+            triangle_count,
+            step_reimported: true,
+        };
+        let json = serde_json::to_string_pretty(&receipt).context("failed to serialize receipt")?;
+        fs::write(path, format!("{json}\n"))
+            .with_context(|| format!("failed to write {}", path.display()))
     })
 }
 

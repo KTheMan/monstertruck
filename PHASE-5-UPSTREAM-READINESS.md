@@ -43,13 +43,13 @@ tracking and contract replay are later, independently reviewable layers.
 | Area | Current state | Upstream gate |
 | --- | --- | --- |
 | G0--G3 formulas and jets | Analytically verified and procedurally validated. | Preserve exact/property coverage and add executable public examples. |
-| Nonzero repair | Procedurally validated through G1. | Add nonzero imported or independently exported G2 and G3 repair cases before any production-maturity claim. |
+| Nonzero repair | Independently certified through G3 on the committed imported fixtures. | Add repeated-knot and extreme-positive-weight cases before any production-maturity claim. |
 | G4 | Procedurally validated as experimental reachability. | Keep experimental and outside the upstream acceptance requirement. |
 | Failure safety and resource bounds | Implemented with focused transactional and checked-dimension coverage. | Preserve typed failures; measure accepted-boundary work separately from certification. |
 | Public API compatibility | Audited against the upstream surface; removed topology constructors/setters are restored and ordinary shell serialization remains compatible. | Resolve the recorded maintainer-choice items before proposing each upstream slice. |
 | Public API usability | Runnable rustdoc examples cover tracking, modeling, contracts, direct solving, and replay; the STEP example covers supported and unsupported imported boundaries. | Keep the examples warning-free as slices are separated. |
 | Module responsibility | Large tracking and solver modules are split into focused submodules near the repository guideline. | Preserve the split while extracting upstream slices. |
-| Imported workflow | Implemented and exercised for the committed polynomial G1, rational reversed G2, and quintic G3 fixtures; the full imported-validation state is not yet substantiated. | Add triangle nondegeneracy, topology/bounding-box comparisons, post-reimport seam certification, and independent G2/G3 residual certification. |
+| Imported workflow | Implemented and independently certified through the requested order for the committed polynomial G1, rational reversed G2, and quintic G3 fixtures; the full imported-validation state is not yet substantiated. | Add triangle nondegeneracy, topology/bounding-box comparisons, and post-reimport seam certification. |
 | Persistence | The repaired G1 trimmed shell exports, re-imports, and tessellates to 8,339 finite-position triangles. | Add exact topology invariants and scale-relative seam/bounding-box certification after re-import before treating persistence as a release gate. |
 | External interoperability | The four inputs and one repaired Monstertruck output are accepted as valid B-reps by pinned OCCT. | Retain the output receipt and repeat it when STEP serialization changes. |
 | Wasm compile | Geometry test compilation passes. | Preserve upstream's workspace Wasm job and keep the targeted geometry test as additive coverage. |
@@ -94,20 +94,33 @@ independent re-import, B-rep validity, topology counts, bounding boxes, and
 surface metadata for all four inputs.
 
 The public workflow is
-`monstertruck-step/examples/continuity-step-validation`. The G1 run certifies
-513 seam samples with a maximum positional residual of
-`5.721958e-16`, a maximum tangent-plane sine residual of
-`3.293372e-14`, and 8,339 finite output triangles. The G2 and G3 imported runs
-exercise reversed rational and quintic solver paths respectively, but their
-independent certificate currently establishes G1 only. They therefore do not
-substantiate a production G2/G3 claim.
+`monstertruck-step/examples/continuity-step-validation`. Its independent
+certificate uses public point evaluation, one-sided cross-boundary stencils,
+the solved public coordinate transition, and mixed finite differences. It does
+not reuse the solver objective or convergence decision. The certificate grid
+contains 513 uniform seam positions plus mapped knot boundaries, producing 514
+distinct samples for the committed fixtures.
+
+The polynomial G1 repair has maximum normalized residuals
+`[2.139619e-16, 1.309688e-11]`; the rational reversed G2 repair has
+`[1.310417e-16, 1.034364e-11, 6.780301e-9]`; and the quintic G3 repair has
+`[1.458563e-16, 8.987455e-12, 5.836967e-9, 4.147814e-6]`. Their respective
+per-order limits are `[1e-9, 1e-7]`, `[1e-9, 1e-7, 1e-5]`, and
+`[1e-9, 1e-7, 1e-5, 1e-3]`. Every case has maximum tangent-plane angle
+`2.580957e-8` radians against a `1e-7` limit. Versioned JSON receipts are
+committed beside the fixtures as `monstertruck-*-certificate.json`.
+
+This closes the independent imported G2/G3 residual gate for these fixtures.
+It does not establish production G2/G3 maturity because repeated knots,
+extreme weights, persistence invariants, and broader real-model evidence
+remain open.
 
 The example currently verifies a nonempty finite-position mesh and the
 re-imported presence of the solved spline pair. It does not yet reject
 zero-area triangles, compare complete topology and bounding-box signatures, or
 repeat seam certification on the serialized/re-imported surfaces. Those are
-explicit remaining gates, so this pass does not label the public workflow
-`Imported workflow validated`.
+explicit remaining gates, so this pass does not label the complete public
+workflow `Imported workflow validated`.
 
 ## Persistence and external receipt
 
@@ -195,6 +208,8 @@ The final local gates pass:
 - the complete 18-case continuity corpus, with every case repeated and matched
   to its committed digest;
 - the three imported positive STEP workflows and the arbitrary-trim negative;
+- independent dense common-coordinate certification through requested G1,
+  G2, and G3 orders for the three imported positive STEP workflows;
 - deterministic exported G1 bytes and pinned OCCT output validation.
 
 The following local commands are deliberately deferred:

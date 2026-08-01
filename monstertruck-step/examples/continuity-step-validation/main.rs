@@ -30,18 +30,36 @@ struct Args {
     /// Absolute tolerance for imported seam classification.
     #[arg(long, default_value_t = 1.0e-7)]
     classification_tolerance: f64,
-    /// Absolute tolerance for dense positional certification.
-    #[arg(long, default_value_t = 1.0e-7)]
+    /// Scale-normalized positional residual tolerance.
+    #[arg(long, default_value_t = 1.0e-9)]
     position_tolerance: f64,
-    /// Maximum sine of the angle between certified tangent planes.
-    #[arg(long, default_value_t = 1.0e-6)]
+    /// Scale-normalized first-derivative residual tolerance.
+    #[arg(long, default_value_t = 1.0e-7)]
+    first_derivative_tolerance: f64,
+    /// Scale-normalized second-derivative residual tolerance.
+    #[arg(long, default_value_t = 1.0e-5)]
+    second_derivative_tolerance: f64,
+    /// Scale-normalized third-derivative residual tolerance.
+    #[arg(long, default_value_t = 1.0e-3)]
+    third_derivative_tolerance: f64,
+    /// Maximum angle in radians between certified tangent planes.
+    #[arg(long, default_value_t = 1.0e-7)]
     tangent_tolerance: f64,
     /// Number of intervals in the independent dense certification grid.
     #[arg(long, default_value_t = 512)]
     certification_intervals: usize,
+    /// Normalized spacing for the independent finite-difference stencil.
+    #[arg(long, default_value_t = 5.0e-3)]
+    certification_step: f64,
+    /// One-sided finite-difference stencil radius.
+    #[arg(long, default_value_t = 4)]
+    certification_stencil_radius: usize,
     /// Tessellation tolerance.
     #[arg(long, default_value_t = 1.0e-3)]
     mesh_tolerance: f64,
+    /// Optional JSON evidence receipt.
+    #[arg(long)]
+    receipt: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {

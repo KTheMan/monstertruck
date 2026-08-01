@@ -39,19 +39,36 @@ pub(super) enum ValidationError {
     SparseCertification,
     #[error("validation tolerance `{name}` must be positive and finite")]
     InvalidTolerance { name: &'static str },
-    #[error("a non-finite or degenerate tangent frame occurred at dense sample {sample}")]
-    DegenerateTangentFrame { sample: usize },
+    #[error("invalid certification configuration: {reason}")]
+    InvalidCertificationConfig { reason: &'static str },
+    #[error("invalid certification geometry: {reason}")]
+    InvalidCertificationGeometry { reason: &'static str },
+    #[error("the finite-difference certification stencil is singular")]
+    SingularCertificationStencil,
+    #[error("the transition is non-finite at seam {seam:e}, cross coordinate {cross:e}")]
+    TransitionSamplingFailed { seam: f64, cross: f64 },
     #[error(
-        "independent G1 certification failed: position {position_maximum:e} \
-         (limit {position_tolerance:e}), tangent {tangent_maximum:e} \
-         (limit {tangent_tolerance:e})"
+        "certification sampled outside the normalized domain at seam {seam:e}, inward {inward:e}"
     )]
-    CertificationFailed {
-        position_maximum: f64,
-        position_tolerance: f64,
-        tangent_maximum: f64,
-        tangent_tolerance: f64,
+    BoundarySamplingOutsideDomain { seam: f64, inward: f64 },
+    #[error("certification produced a non-finite result at seam {seam:e}")]
+    NonFiniteCertificate { seam: f64 },
+    #[error("a degenerate tangent frame occurred at seam {seam:e}")]
+    DegenerateTangentFrame { seam: f64 },
+    #[error(
+        "independent order-{order} residual certification failed: normalized maximum \
+         {maximum:e} exceeds {tolerance:e}"
+    )]
+    CertificationResidualFailed {
+        order: usize,
+        maximum: f64,
+        tolerance: f64,
     },
+    #[error(
+        "independent tangent-plane certification failed: maximum angle {maximum:e} radians \
+         exceeds {tolerance:e}"
+    )]
+    CertificationNormalFailed { maximum: f64, tolerance: f64 },
     #[error("tessellation produced no finite triangles")]
     EmptyOrNonFiniteMesh,
     #[error("re-imported STEP contains no shell")]
