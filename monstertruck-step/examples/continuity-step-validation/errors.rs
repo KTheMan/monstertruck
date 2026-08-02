@@ -75,4 +75,15 @@ pub(super) enum ValidationError {
     EmptyReimport,
     #[error("re-imported STEP lost the solved spline face pair")]
     ReimportLostNurbsFaces,
+    #[error("the evaluated shell has no finite positive bounding box")]
+    InvalidBoundingBox,
+    #[error(
+        "STEP re-import changed the compressed topology signature: before={before}, after={after}"
+    )]
+    TopologyPersistenceMismatch { before: String, after: String },
+    #[error(
+        "STEP re-import changed the scale-normalized bounding box by {maximum:e}, \
+         exceeding {tolerance:e}"
+    )]
+    BoundingBoxPersistenceFailed { maximum: f64, tolerance: f64 },
 }

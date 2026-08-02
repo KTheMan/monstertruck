@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "evidence_class": "imported_workflow_independent_dense_certificate",
   "input": "validation/continuity/quintic-g3.step",
   "output": "target/continuity-certification/quintic-g3-solved.step",
@@ -13,7 +13,7 @@
     "alignment": "Aligned",
     "classification_maximum": 0.0
   },
-  "certificate": {
+  "certificate_before_export": {
     "samples": 514,
     "scale": 3.881249978123164,
     "normalized_step": 0.005,
@@ -113,5 +113,171 @@
     "residual_count": 387
   },
   "triangle_count": 10046,
-  "step_reimported": true
+  "reimport": {
+    "selection": {
+      "first_face": 1,
+      "second_face": 2,
+      "first_boundary": "UEnd",
+      "second_boundary": "UStart",
+      "alignment": "Aligned",
+      "classification_maximum": 2.2247786310271853e-16
+    },
+    "certificate": {
+      "samples": 514,
+      "scale": 3.881249978123164,
+      "normalized_step": 0.005,
+      "stencil_radius": 4,
+      "maximum_absolute_residual_by_order": [
+        5.661048867003676e-16,
+        3.4882557628479786e-11,
+        2.2654727802781083e-8,
+        0.000016098703685045208
+      ],
+      "maximum_normalized_residual_by_order": [
+        1.4585633233912852e-16,
+        8.987454512102249e-12,
+        5.836966938608812e-9,
+        4.1478141773362335e-6
+      ],
+      "maximum_normalized_residual_tolerance_by_order": [
+        1e-9,
+        1e-7,
+        0.00001,
+        0.001
+      ],
+      "maximum_normal_angle": 2.580956827951785e-8,
+      "maximum_normal_angle_tolerance": 1e-7,
+      "worst_seam_by_order": [
+        0.587890625,
+        0.96484375,
+        0.984375,
+        0.96484375
+      ],
+      "worst_mixed_derivative_by_order": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ]
+      ]
+    },
+    "persistence": {
+      "topology_before_export": {
+        "vertex_count": 6,
+        "edge_count": 7,
+        "face_count": 2,
+        "euler_characteristic": 1,
+        "vertex_valences": [
+          2,
+          2,
+          2,
+          2,
+          3,
+          3
+        ],
+        "edge_face_use_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          2
+        ],
+        "faces": [
+          {
+            "orientation": true,
+            "boundary_edge_counts": [
+              4
+            ]
+          },
+          {
+            "orientation": true,
+            "boundary_edge_counts": [
+              4
+            ]
+          }
+        ]
+      },
+      "topology_after_reimport": {
+        "vertex_count": 6,
+        "edge_count": 7,
+        "face_count": 2,
+        "euler_characteristic": 1,
+        "vertex_valences": [
+          2,
+          2,
+          2,
+          2,
+          3,
+          3
+        ],
+        "edge_face_use_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          2
+        ],
+        "faces": [
+          {
+            "orientation": true,
+            "boundary_edge_counts": [
+              4
+            ]
+          },
+          {
+            "orientation": true,
+            "boundary_edge_counts": [
+              4
+            ]
+          }
+        ]
+      },
+      "topology_equal": true,
+      "bounding_box_before_export": {
+        "minimum": [
+          -1.4000000000000001,
+          -0.000010835059721966944,
+          -1.07
+        ],
+        "maximum": [
+          1.5000000000000002,
+          1.0000113767689671,
+          1.3126451921280293
+        ],
+        "diagonal": 3.8842042345532706,
+        "samples": 2184
+      },
+      "bounding_box_after_reimport": {
+        "minimum": [
+          -1.4000000000000001,
+          -0.000010835059721728958,
+          -1.07
+        ],
+        "maximum": [
+          1.5000000000000002,
+          1.0000113767689671,
+          1.3126451921280293
+        ],
+        "diagonal": 3.8842042345532706,
+        "samples": 2184
+      },
+      "bounding_box_normalized_maximum_drift": 6.127014714501191e-17,
+      "bounding_box_normalized_tolerance": 1e-9
+    }
+  }
 }

@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "evidence_class": "imported_workflow_independent_dense_certificate",
   "input": "validation/continuity/polynomial-g1.step",
   "output": "target/continuity-certification/polynomial-g1-solved.step",
@@ -13,7 +13,7 @@
     "alignment": "Aligned",
     "classification_maximum": 0.0
   },
-  "certificate": {
+  "certificate_before_export": {
     "samples": 514,
     "scale": 2.674288471762782,
     "normalized_step": 0.005,
@@ -79,5 +79,155 @@
     "residual_count": 152
   },
   "triangle_count": 8339,
-  "step_reimported": true
+  "reimport": {
+    "selection": {
+      "first_face": 1,
+      "second_face": 2,
+      "first_boundary": "UEnd",
+      "second_boundary": "UStart",
+      "alignment": "Aligned",
+      "classification_maximum": 4.718958039861916e-16
+    },
+    "certificate": {
+      "samples": 514,
+      "scale": 2.674288471762782,
+      "normalized_step": 0.005,
+      "stencil_radius": 4,
+      "maximum_absolute_residual_by_order": [
+        5.721958498152797e-16,
+        3.5024834180604816e-11
+      ],
+      "maximum_normalized_residual_by_order": [
+        2.1396190271055968e-16,
+        1.3096879618793657e-11
+      ],
+      "maximum_normalized_residual_tolerance_by_order": [
+        1e-9,
+        1e-7
+      ],
+      "maximum_normal_angle": 2.580956827951785e-8,
+      "maximum_normal_angle_tolerance": 1e-7,
+      "worst_seam_by_order": [
+        0.984375,
+        0.9921875
+      ],
+      "worst_mixed_derivative_by_order": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ]
+    },
+    "persistence": {
+      "topology_before_export": {
+        "vertex_count": 6,
+        "edge_count": 7,
+        "face_count": 2,
+        "euler_characteristic": 1,
+        "vertex_valences": [
+          2,
+          2,
+          2,
+          2,
+          3,
+          3
+        ],
+        "edge_face_use_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          2
+        ],
+        "faces": [
+          {
+            "orientation": true,
+            "boundary_edge_counts": [
+              4
+            ]
+          },
+          {
+            "orientation": true,
+            "boundary_edge_counts": [
+              4
+            ]
+          }
+        ]
+      },
+      "topology_after_reimport": {
+        "vertex_count": 6,
+        "edge_count": 7,
+        "face_count": 2,
+        "euler_characteristic": 1,
+        "vertex_valences": [
+          2,
+          2,
+          2,
+          2,
+          3,
+          3
+        ],
+        "edge_face_use_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          2
+        ],
+        "faces": [
+          {
+            "orientation": true,
+            "boundary_edge_counts": [
+              4
+            ]
+          },
+          {
+            "orientation": true,
+            "boundary_edge_counts": [
+              4
+            ]
+          }
+        ]
+      },
+      "topology_equal": true,
+      "bounding_box_before_export": {
+        "minimum": [
+          -1.0,
+          -0.000011873974998303137,
+          -0.2
+        ],
+        "maximum": [
+          1.2500000000000002,
+          1.000012953427275,
+          0.8453798295637217
+        ],
+        "diagonal": 2.6749520824642117,
+        "samples": 2184
+      },
+      "bounding_box_after_reimport": {
+        "minimum": [
+          -1.0,
+          -0.000011873974998437184,
+          -0.2
+        ],
+        "maximum": [
+          1.2500000000000002,
+          1.000012953427275,
+          0.8453798295637217
+        ],
+        "diagonal": 2.6749520824642117,
+        "samples": 2184
+      },
+      "bounding_box_normalized_maximum_drift": 5.0111683462866464e-17,
+      "bounding_box_normalized_tolerance": 1e-9
+    }
+  }
 }

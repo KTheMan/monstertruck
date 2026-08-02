@@ -72,3 +72,10 @@ every mixed derivative through the requested order with finite differences. It
 uses the public solved transition but does not reuse solver residuals or the
 solver convergence decision. The default normalized per-order limits are
 `1e-9`, `1e-7`, `1e-5`, and `1e-3` through order three.
+
+Receipt schema two records the independent certificate both before export and
+after STEP re-import. It also records exact canonical combinatorial topology
+signatures, sampled bounding boxes, their scale-normalized maximum drift, and
+the tessellated triangle count. The workflow writes neither output nor receipt
+unless topology matches and the bounding-box drift is at most `1e-9`; override
+that limit with `--bounding-box-tolerance`.

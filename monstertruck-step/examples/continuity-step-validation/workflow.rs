@@ -4,10 +4,12 @@ use super::Args;
 use super::certify::{Certificate, CertificationConfig, certify};
 use super::classify::{ImportedShell, select_full_nurbs_seam, to_nurbs};
 use super::errors::ValidationError;
+use super::persistence::PersistenceEvidence;
 use anyhow::{Context, Result, anyhow};
 use monstertruck_geometry::nurbs::continuity::{ContinuityOrder, SurfaceBoundary};
 use monstertruck_geometry::nurbs::continuity_solver::{
-    BoundaryContinuityRequest, BoundaryContinuitySolver, ContinuitySolverConfig,
+    BoundaryContinuityRequest, BoundaryContinuitySolver, BoundaryTransition, ContinuitySolveReport,
+    ContinuitySolverConfig, ContinuityTermination, OrderResidual,
 };
 use monstertruck_geometry::prelude::{NurbsSurface, Vector4};
 use monstertruck_meshing::prelude::RobustMeshableShape;
@@ -49,12 +51,7 @@ pub(super) fn execute(args: &Args) -> Result<()> {
         .context("failed to construct continuity solver")?
         .solve(&first, &perturbed_second, request)
         .context("continuity solver rejected or failed the imported fixture")?;
-    let maximum_residual_by_order = [
-        args.position_tolerance,
-        args.first_derivative_tolerance,
-        args.second_derivative_tolerance,
-        args.third_derivative_tolerance,
-    ];
+    let maximum_residual_by_order = maximum_residual_by_order(args);
     let certificate = certify(
         solution.first(),
         solution.second(),
@@ -73,24 +70,33 @@ pub(super) fn execute(args: &Args) -> Result<()> {
         Surface::NurbsSurface(solution.second().clone());
     let triangle_count = validate_mesh(&solved_shell, args.mesh_tolerance)?;
     let output_step = export_step(&solved_shell);
+    let reimport = validate_reimport(
+        &output_step,
+        args,
+        order,
+        solution.transition(),
+        &solved_shell,
+        &maximum_residual_by_order,
+    )?;
     if let Some(parent) = args.output.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("failed to create {}", parent.display()))?;
     }
     fs::write(&args.output, &output_step)
         .with_context(|| format!("failed to write {}", args.output.display()))?;
-    validate_reimport(&output_step, args.shell)?;
     write_receipt(
         args,
         selection,
         &certificate,
         solution.report(),
         triangle_count,
+        &reimport,
     )?;
     println!(
         "status=validated input={} shell={} faces={}/{} boundaries={:?}/{:?} \
          alignment={:?} order=G{} classification_maximum={:.6e} \
          certificate_samples={} normalized_residuals={:?} normal_angle={:.6e} \
+         post_reimport_residuals={:?} bounding_box_drift={:.6e} \
          triangles={} output={}",
         args.input.display(),
         args.shell,
@@ -104,6 +110,8 @@ pub(super) fn execute(args: &Args) -> Result<()> {
         certificate.samples,
         certificate.maximum_normalized_residual_by_order,
         certificate.maximum_normal_angle,
+        reimport.certificate.maximum_normalized_residual_by_order,
+        reimport.persistence.bounding_box_normalized_maximum_drift(),
         triangle_count,
         args.output.display(),
     );
@@ -130,6 +138,7 @@ fn validate_args(args: &Args) -> Result<(), ValidationError> {
         ("tangent_tolerance", args.tangent_tolerance),
         ("certification_step", args.certification_step),
         ("mesh_tolerance", args.mesh_tolerance),
+        ("bounding_box_tolerance", args.bounding_box_tolerance),
     ]
     .into_iter()
     .find(|(_, value)| !value.is_finite() || *value <= 0.0)
@@ -147,10 +156,23 @@ struct ValidationReceipt<'a> {
     order: u8,
     perturbation: f64,
     selection: SelectionReceipt,
-    certificate: &'a Certificate,
+    certificate_before_export: &'a Certificate,
     solver: SolverReceipt<'a>,
     triangle_count: usize,
-    step_reimported: bool,
+    reimport: ReimportReceipt<'a>,
+}
+
+#[derive(Serialize)]
+struct ReimportReceipt<'a> {
+    selection: SelectionReceipt,
+    certificate: &'a Certificate,
+    persistence: &'a PersistenceEvidence,
+}
+
+struct ReimportEvidence {
+    selection: super::classify::SeamSelection,
+    certificate: Certificate,
+    persistence: PersistenceEvidence,
 }
 
 #[derive(Serialize)]
@@ -178,24 +200,20 @@ impl From<super::classify::SeamSelection> for SelectionReceipt {
 
 #[derive(Serialize)]
 struct SolverReceipt<'a> {
-    termination: monstertruck_geometry::nurbs::continuity_solver::ContinuityTermination,
+    termination: ContinuityTermination,
     iterations: usize,
     accepted_steps: usize,
     rejected_steps: usize,
     initial_objective: f64,
     final_objective: f64,
-    residuals: &'a [monstertruck_geometry::nurbs::continuity_solver::OrderResidual],
+    residuals: &'a [OrderResidual],
     numerical_rank: usize,
     variable_count: usize,
     residual_count: usize,
 }
 
-impl<'a> From<&'a monstertruck_geometry::nurbs::continuity_solver::ContinuitySolveReport>
-    for SolverReceipt<'a>
-{
-    fn from(
-        report: &'a monstertruck_geometry::nurbs::continuity_solver::ContinuitySolveReport,
-    ) -> Self {
+impl<'a> From<&'a ContinuitySolveReport> for SolverReceipt<'a> {
+    fn from(report: &'a ContinuitySolveReport) -> Self {
         Self {
             termination: report.termination(),
             iterations: report.iterations(),
@@ -215,8 +233,9 @@ fn write_receipt(
     args: &Args,
     selection: super::classify::SeamSelection,
     certificate: &Certificate,
-    solver_report: &monstertruck_geometry::nurbs::continuity_solver::ContinuitySolveReport,
+    solver_report: &ContinuitySolveReport,
     triangle_count: usize,
+    reimport: &ReimportEvidence,
 ) -> Result<()> {
     args.receipt.as_ref().map_or(Ok(()), |path| {
         if let Some(parent) = path.parent() {
@@ -224,17 +243,21 @@ fn write_receipt(
                 .with_context(|| format!("failed to create {}", parent.display()))?;
         }
         let receipt = ValidationReceipt {
-            schema_version: 1,
+            schema_version: 2,
             evidence_class: "imported_workflow_independent_dense_certificate",
             input: args.input.display().to_string(),
             output: args.output.display().to_string(),
             order: args.order,
             perturbation: args.perturbation,
             selection: selection.into(),
-            certificate,
+            certificate_before_export: certificate,
             solver: solver_report.into(),
             triangle_count,
-            step_reimported: true,
+            reimport: ReimportReceipt {
+                selection: reimport.selection.into(),
+                certificate: &reimport.certificate,
+                persistence: &reimport.persistence,
+            },
         };
         let json = serde_json::to_string_pretty(&receipt).context("failed to serialize receipt")?;
         fs::write(path, format!("{json}\n"))
@@ -269,6 +292,15 @@ fn continuity_order(order: u8) -> Result<ContinuityOrder, ValidationError> {
         3 => Ok(ContinuityOrder::G3),
         _ => Err(ValidationError::UnsupportedOrder(order)),
     }
+}
+
+fn maximum_residual_by_order(args: &Args) -> [f64; 4] {
+    [
+        args.position_tolerance,
+        args.first_derivative_tolerance,
+        args.second_derivative_tolerance,
+        args.third_derivative_tolerance,
+    ]
 }
 
 fn perturb_boundary_strip(
@@ -357,9 +389,16 @@ fn export_step(shell: &ImportedShell) -> String {
     .to_string()
 }
 
-fn validate_reimport(step: &str, shell_index: usize) -> Result<(), ValidationError> {
+fn validate_reimport(
+    step: &str,
+    args: &Args,
+    order: ContinuityOrder,
+    transition: &BoundaryTransition,
+    before_export: &ImportedShell,
+    maximum_residual_by_order: &[f64; 4],
+) -> Result<ReimportEvidence, ValidationError> {
     let table = Table::from_step(step).map_err(|_| ValidationError::EmptyReimport)?;
-    let shell = load_shell(&table, shell_index).map_err(|_| ValidationError::EmptyReimport)?;
+    let shell = load_shell(&table, args.shell).map_err(|_| ValidationError::EmptyReimport)?;
     let spline_count = shell
         .faces
         .iter()
@@ -373,6 +412,31 @@ fn validate_reimport(step: &str, shell_index: usize) -> Result<(), ValidationErr
     if spline_count < 2 {
         Err(ValidationError::ReimportLostNurbsFaces)
     } else {
-        Ok(())
+        let persistence =
+            PersistenceEvidence::compare(before_export, &shell, args.bounding_box_tolerance)?;
+        let selection = select_full_nurbs_seam(&shell, args.classification_tolerance)?;
+        let first = to_nurbs(&shell.faces[selection.first_face].surface)
+            .ok_or(ValidationError::InsufficientNurbsFaces(0))?;
+        let second = to_nurbs(&shell.faces[selection.second_face].surface)
+            .ok_or(ValidationError::InsufficientNurbsFaces(0))?;
+        let certificate = certify(
+            &first,
+            &second,
+            transition,
+            selection,
+            order,
+            CertificationConfig {
+                intervals: args.certification_intervals,
+                normalized_step: args.certification_step,
+                stencil_radius: args.certification_stencil_radius,
+                maximum_residual_by_order,
+                maximum_normal_angle: args.tangent_tolerance,
+            },
+        )?;
+        Ok(ReimportEvidence {
+            selection,
+            certificate,
+            persistence,
+        })
     }
 }

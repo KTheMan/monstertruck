@@ -49,8 +49,8 @@ tracking and contract replay are later, independently reviewable layers.
 | Public API compatibility | Audited against the upstream surface; removed topology constructors/setters are restored and ordinary shell serialization remains compatible. | Resolve the recorded maintainer-choice items before proposing each upstream slice. |
 | Public API usability | Runnable rustdoc examples cover tracking, modeling, contracts, direct solving, and replay; the STEP example covers supported and unsupported imported boundaries. | Keep the examples warning-free as slices are separated. |
 | Module responsibility | Large tracking and solver modules are split into focused submodules near the repository guideline. | Preserve the split while extracting upstream slices. |
-| Imported workflow | Implemented and independently certified through the requested order for the committed polynomial G1, rational reversed G2, and quintic G3 fixtures; the full imported-validation state is not yet substantiated. | Add triangle nondegeneracy, topology/bounding-box comparisons, and post-reimport seam certification. |
-| Persistence | The repaired G1 trimmed shell exports, re-imports, and tessellates to 8,339 finite-position triangles. | Add exact topology invariants and scale-relative seam/bounding-box certification after re-import before treating persistence as a release gate. |
+| Imported workflow | Implemented and independently certified before export and after re-import through the requested order for the committed polynomial G1, rational reversed G2, and quintic G3 fixtures. Canonical topology and sampled bounding boxes persist; complete triangle validity is not yet substantiated. | Reject nonfinite, degenerate, and inconsistently oriented triangles before labeling the complete workflow validated. |
+| Persistence | All three repaired shells preserve exact canonical combinatorial signatures after STEP re-import. Their scale-normalized bounding-box drifts are at most `6.127015e-17`, and their post-import seam certificates reproduce the pre-export residuals. | Retain the versioned receipts as regression gates and repeat external OCCT validation when STEP serialization changes. |
 | External interoperability | The four inputs and one repaired Monstertruck output are accepted as valid B-reps by pinned OCCT. | Retain the output receipt and repeat it when STEP serialization changes. |
 | Wasm compile | Geometry test compilation passes. | Preserve upstream's workspace Wasm job and keep the targeted geometry test as additive coverage. |
 | Determinism | Same-host/cross-process Windows evidence and Linux tolerance/outcome CI. | Keep cross-platform bitwise equality unclaimed. |
@@ -112,27 +112,43 @@ committed beside the fixtures as `monstertruck-*-certificate.json`.
 
 This closes the independent imported G2/G3 residual gate for these fixtures.
 It does not establish production G2/G3 maturity because repeated knots,
-extreme weights, persistence invariants, and broader real-model evidence
-remain open.
+extreme positive weights, complete triangle validity, and broader real-model
+evidence remain open.
 
-The example currently verifies a nonempty finite-position mesh and the
-re-imported presence of the solved spline pair. It does not yet reject
-zero-area triangles, compare complete topology and bounding-box signatures, or
-repeat seam certification on the serialized/re-imported surfaces. Those are
-explicit remaining gates, so this pass does not label the complete public
-workflow `Imported workflow validated`.
+Before committing an output or receipt, the example now re-imports the
+in-memory STEP text, matches vertices by scale-relative position, and requires
+the exact canonical edge set and oriented face-boundary cycles to match. It
+also compares a 33-by-33 sample bounding box for every NURBS face plus all
+shell vertices. The normalized maximum drifts are `5.011168e-17` for G1,
+`1.290067e-28` for G2, and `6.127015e-17` for G3 against the default `1e-9`
+limit.
+
+The re-imported seam is selected again and independently certified. Its
+maximum normalized residuals and tangent-plane angle reproduce the pre-export
+certificate in every committed case. Schema-two receipts record both
+certificates, both topology and bounding-box signatures, the comparison
+result, the tolerance, and the tessellated triangle count.
+
+The example currently verifies a nonempty finite-position mesh. It does not
+yet reject zero-area triangles or certify consistent triangle orientation.
+That remaining gate prevents labeling the complete public workflow `Imported
+workflow validated`.
 
 ## Persistence and external receipt
 
-At least one successful trimmed-shell case is exported through the public STEP
-writer and re-imported. The receipt records:
+Each successful trimmed-shell case is exported through the public STEP writer
+and re-imported before any caller-visible output is written. The current
+receipt records:
 
 - parse success;
 - face, edge, and shell counts;
-- shell condition after tessellation/welding;
-- finite/nondegenerate triangle counts;
-- bounding-box and, where meaningful, mass-property drift;
+- an exact canonical combinatorial topology signature;
+- the finite-position triangle count;
+- sampled bounding-box signatures and scale-normalized drift;
 - independently certified seam residuals after re-import.
+
+Nondegenerate and consistently oriented triangle counts remain the next local
+persistence gate. Mass-property drift is not claimed for these open shells.
 
 A pinned OCCT or FreeCAD command-line check then reads the exported STEP file,
 runs its shape checker, and records tool version, command, input hash, topology

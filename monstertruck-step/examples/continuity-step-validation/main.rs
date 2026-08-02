@@ -3,6 +3,7 @@
 mod certify;
 mod classify;
 mod errors;
+mod persistence;
 mod workflow;
 
 use anyhow::{Context, Result};
@@ -57,6 +58,9 @@ struct Args {
     /// Tessellation tolerance.
     #[arg(long, default_value_t = 1.0e-3)]
     mesh_tolerance: f64,
+    /// Scale-normalized bounding-box persistence tolerance.
+    #[arg(long, default_value_t = 1.0e-9)]
+    bounding_box_tolerance: f64,
     /// Optional JSON evidence receipt.
     #[arg(long)]
     receipt: Option<PathBuf>,
