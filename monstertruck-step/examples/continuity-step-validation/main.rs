@@ -3,6 +3,7 @@
 mod certify;
 mod classify;
 mod errors;
+mod mesh_validation;
 mod persistence;
 mod workflow;
 
@@ -58,6 +59,12 @@ struct Args {
     /// Tessellation tolerance.
     #[arg(long, default_value_t = 1.0e-3)]
     mesh_tolerance: f64,
+    /// Minimum scale-normalized doubled triangle area.
+    #[arg(long, default_value_t = 1.0e-14)]
+    triangle_area_tolerance: f64,
+    /// Minimum cosine between triangle and surface normals.
+    #[arg(long, default_value_t = 1.0e-6)]
+    minimum_triangle_normal_alignment: f64,
     /// Scale-normalized bounding-box persistence tolerance.
     #[arg(long, default_value_t = 1.0e-9)]
     bounding_box_tolerance: f64,

@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "evidence_class": "imported_workflow_independent_dense_certificate",
   "input": "validation/continuity/rational-reversed-g2.step",
   "output": "target/continuity-certification/rational-reversed-g2-solved.step",
@@ -95,7 +95,18 @@
     "variable_count": 79,
     "residual_count": 349
   },
-  "triangle_count": 9797,
+  "mesh_before_export": {
+    "face_count": 2,
+    "triangle_count": 9797,
+    "triangles_only": true,
+    "finite": true,
+    "nondegenerate": true,
+    "consistently_oriented": true,
+    "minimum_normalized_double_area": 0.000024313250285901107,
+    "normalized_double_area_tolerance": 1e-14,
+    "minimum_normal_alignment": 0.9927668317410572,
+    "normal_alignment_tolerance": 1e-6
+  },
   "reimport": {
     "selection": {
       "first_face": 1,
@@ -253,6 +264,18 @@
       },
       "bounding_box_normalized_maximum_drift": 1.29006715567933e-28,
       "bounding_box_normalized_tolerance": 1e-9
+    },
+    "mesh": {
+      "face_count": 2,
+      "triangle_count": 9777,
+      "triangles_only": true,
+      "finite": true,
+      "nondegenerate": true,
+      "consistently_oriented": true,
+      "minimum_normalized_double_area": 0.000024313235708102812,
+      "normalized_double_area_tolerance": 1e-14,
+      "minimum_normal_alignment": 0.9925987611188798,
+      "normal_alignment_tolerance": 1e-6
     }
   }
 }

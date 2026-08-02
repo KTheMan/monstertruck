@@ -4,15 +4,17 @@ use super::Args;
 use super::certify::{Certificate, CertificationConfig, certify};
 use super::classify::{ImportedShell, select_full_nurbs_seam, to_nurbs};
 use super::errors::ValidationError;
+use super::mesh_validation::{MeshEvidence, MeshValidationConfig, validate_mesh};
 use super::persistence::PersistenceEvidence;
 use anyhow::{Context, Result, anyhow};
-use monstertruck_geometry::nurbs::continuity::{ContinuityOrder, SurfaceBoundary};
+use monstertruck_geometry::nurbs::continuity::{
+    BoundaryAlignment, ContinuityOrder, SurfaceBoundary,
+};
 use monstertruck_geometry::nurbs::continuity_solver::{
     BoundaryContinuityRequest, BoundaryContinuitySolver, BoundaryTransition, ContinuitySolveReport,
     ContinuitySolverConfig, ContinuityTermination, OrderResidual,
 };
 use monstertruck_geometry::prelude::{NurbsSurface, Vector4};
-use monstertruck_meshing::prelude::RobustMeshableShape;
 use monstertruck_step::load::step_geometry::Surface;
 use monstertruck_step::load::{Table, step_geometry};
 use monstertruck_step::save::{CompleteStepDisplay, StepHeaderDescriptor, StepModel};
@@ -68,7 +70,7 @@ pub(super) fn execute(args: &Args) -> Result<()> {
     )?;
     solved_shell.faces[selection.second_face].surface =
         Surface::NurbsSurface(solution.second().clone());
-    let triangle_count = validate_mesh(&solved_shell, args.mesh_tolerance)?;
+    let mesh = validate_mesh(&solved_shell, mesh_validation_config(args))?;
     let output_step = export_step(&solved_shell);
     let reimport = validate_reimport(
         &output_step,
@@ -89,7 +91,7 @@ pub(super) fn execute(args: &Args) -> Result<()> {
         selection,
         &certificate,
         solution.report(),
-        triangle_count,
+        &mesh,
         &reimport,
     )?;
     println!(
@@ -97,7 +99,8 @@ pub(super) fn execute(args: &Args) -> Result<()> {
          alignment={:?} order=G{} classification_maximum={:.6e} \
          certificate_samples={} normalized_residuals={:?} normal_angle={:.6e} \
          post_reimport_residuals={:?} bounding_box_drift={:.6e} \
-         triangles={} output={}",
+         triangles={} minimum_normalized_double_area={:.6e} \
+         minimum_normal_alignment={:.6e} post_reimport_triangles={} output={}",
         args.input.display(),
         args.shell,
         selection.first_face + 1,
@@ -112,7 +115,10 @@ pub(super) fn execute(args: &Args) -> Result<()> {
         certificate.maximum_normal_angle,
         reimport.certificate.maximum_normalized_residual_by_order,
         reimport.persistence.bounding_box_normalized_maximum_drift(),
-        triangle_count,
+        mesh.triangle_count(),
+        mesh.minimum_normalized_double_area(),
+        mesh.minimum_normal_alignment(),
+        reimport.mesh.triangle_count(),
         args.output.display(),
     );
     Ok(())
@@ -138,13 +144,24 @@ fn validate_args(args: &Args) -> Result<(), ValidationError> {
         ("tangent_tolerance", args.tangent_tolerance),
         ("certification_step", args.certification_step),
         ("mesh_tolerance", args.mesh_tolerance),
+        ("triangle_area_tolerance", args.triangle_area_tolerance),
         ("bounding_box_tolerance", args.bounding_box_tolerance),
     ]
     .into_iter()
     .find(|(_, value)| !value.is_finite() || *value <= 0.0)
     .map_or(Ok(()), |(name, _)| {
         Err(ValidationError::InvalidTolerance { name })
-    })
+    })?;
+    if !args.minimum_triangle_normal_alignment.is_finite()
+        || !(0.0..=1.0).contains(&args.minimum_triangle_normal_alignment)
+        || args.minimum_triangle_normal_alignment == 0.0
+    {
+        Err(ValidationError::InvalidTolerance {
+            name: "minimum_triangle_normal_alignment",
+        })
+    } else {
+        Ok(())
+    }
 }
 
 #[derive(Serialize)]
@@ -158,7 +175,7 @@ struct ValidationReceipt<'a> {
     selection: SelectionReceipt,
     certificate_before_export: &'a Certificate,
     solver: SolverReceipt<'a>,
-    triangle_count: usize,
+    mesh_before_export: &'a MeshEvidence,
     reimport: ReimportReceipt<'a>,
 }
 
@@ -167,12 +184,14 @@ struct ReimportReceipt<'a> {
     selection: SelectionReceipt,
     certificate: &'a Certificate,
     persistence: &'a PersistenceEvidence,
+    mesh: &'a MeshEvidence,
 }
 
 struct ReimportEvidence {
     selection: super::classify::SeamSelection,
     certificate: Certificate,
     persistence: PersistenceEvidence,
+    mesh: MeshEvidence,
 }
 
 #[derive(Serialize)]
@@ -181,7 +200,7 @@ struct SelectionReceipt {
     second_face: usize,
     first_boundary: SurfaceBoundary,
     second_boundary: SurfaceBoundary,
-    alignment: monstertruck_geometry::nurbs::continuity::BoundaryAlignment,
+    alignment: BoundaryAlignment,
     classification_maximum: f64,
 }
 
@@ -234,7 +253,7 @@ fn write_receipt(
     selection: super::classify::SeamSelection,
     certificate: &Certificate,
     solver_report: &ContinuitySolveReport,
-    triangle_count: usize,
+    mesh: &MeshEvidence,
     reimport: &ReimportEvidence,
 ) -> Result<()> {
     args.receipt.as_ref().map_or(Ok(()), |path| {
@@ -243,7 +262,7 @@ fn write_receipt(
                 .with_context(|| format!("failed to create {}", parent.display()))?;
         }
         let receipt = ValidationReceipt {
-            schema_version: 2,
+            schema_version: 3,
             evidence_class: "imported_workflow_independent_dense_certificate",
             input: args.input.display().to_string(),
             output: args.output.display().to_string(),
@@ -252,11 +271,12 @@ fn write_receipt(
             selection: selection.into(),
             certificate_before_export: certificate,
             solver: solver_report.into(),
-            triangle_count,
+            mesh_before_export: mesh,
             reimport: ReimportReceipt {
                 selection: reimport.selection.into(),
                 certificate: &reimport.certificate,
                 persistence: &reimport.persistence,
+                mesh: &reimport.mesh,
             },
         };
         let json = serde_json::to_string_pretty(&receipt).context("failed to serialize receipt")?;
@@ -353,29 +373,6 @@ fn control_point_index(
     }
 }
 
-fn validate_mesh(shell: &ImportedShell, tolerance: f64) -> Result<usize, ValidationError> {
-    let meshed = shell.robust_triangulation(tolerance);
-    let meshes = meshed
-        .faces
-        .iter()
-        .filter_map(|face| face.surface.as_ref())
-        .collect::<Vec<_>>();
-    let triangle_count = meshes
-        .iter()
-        .map(|mesh| mesh.tri_faces().len())
-        .sum::<usize>();
-    let finite = meshes.iter().all(|mesh| {
-        mesh.positions()
-            .iter()
-            .all(|point| point.x.is_finite() && point.y.is_finite() && point.z.is_finite())
-    });
-    if triangle_count == 0 || !finite {
-        Err(ValidationError::EmptyOrNonFiniteMesh)
-    } else {
-        Ok(triangle_count)
-    }
-}
-
 fn export_step(shell: &ImportedShell) -> String {
     CompleteStepDisplay::new(
         StepModel::from(shell),
@@ -414,6 +411,7 @@ fn validate_reimport(
     } else {
         let persistence =
             PersistenceEvidence::compare(before_export, &shell, args.bounding_box_tolerance)?;
+        let mesh = validate_mesh(&shell, mesh_validation_config(args))?;
         let selection = select_full_nurbs_seam(&shell, args.classification_tolerance)?;
         let first = to_nurbs(&shell.faces[selection.first_face].surface)
             .ok_or(ValidationError::InsufficientNurbsFaces(0))?;
@@ -437,6 +435,15 @@ fn validate_reimport(
             selection,
             certificate,
             persistence,
+            mesh,
         })
+    }
+}
+
+fn mesh_validation_config(args: &Args) -> MeshValidationConfig {
+    MeshValidationConfig {
+        tessellation_tolerance: args.mesh_tolerance,
+        normalized_double_area_tolerance: args.triangle_area_tolerance,
+        minimum_normal_alignment: args.minimum_triangle_normal_alignment,
     }
 }

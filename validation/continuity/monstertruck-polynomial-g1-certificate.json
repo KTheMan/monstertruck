@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "evidence_class": "imported_workflow_independent_dense_certificate",
   "input": "validation/continuity/polynomial-g1.step",
   "output": "target/continuity-certification/polynomial-g1-solved.step",
@@ -78,7 +78,18 @@
     "variable_count": 71,
     "residual_count": 152
   },
-  "triangle_count": 8339,
+  "mesh_before_export": {
+    "face_count": 2,
+    "triangle_count": 8339,
+    "triangles_only": true,
+    "finite": true,
+    "nondegenerate": true,
+    "consistently_oriented": true,
+    "minimum_normalized_double_area": 0.00004756196956958259,
+    "normalized_double_area_tolerance": 1e-14,
+    "minimum_normal_alignment": 0.9954108598610755,
+    "normal_alignment_tolerance": 1e-6
+  },
   "reimport": {
     "selection": {
       "first_face": 1,
@@ -228,6 +239,18 @@
       },
       "bounding_box_normalized_maximum_drift": 5.0111683462866464e-17,
       "bounding_box_normalized_tolerance": 1e-9
+    },
+    "mesh": {
+      "face_count": 2,
+      "triangle_count": 8339,
+      "triangles_only": true,
+      "finite": true,
+      "nondegenerate": true,
+      "consistently_oriented": true,
+      "minimum_normalized_double_area": 0.000047561969569582594,
+      "normalized_double_area_tolerance": 1e-14,
+      "minimum_normal_alignment": 0.9954108598610755,
+      "normal_alignment_tolerance": 1e-6
     }
   }
 }

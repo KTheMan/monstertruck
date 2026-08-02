@@ -69,8 +69,41 @@ pub(super) enum ValidationError {
          exceeds {tolerance:e}"
     )]
     CertificationNormalFailed { maximum: f64, tolerance: f64 },
-    #[error("tessellation produced no finite triangles")]
-    EmptyOrNonFiniteMesh,
+    #[error("tessellation produced no triangles")]
+    EmptyMesh,
+    #[error("tessellation produced no mesh for face {face}")]
+    MissingFaceMesh { face: usize },
+    #[error("tessellation produced a non-triangular polygon for face {face}")]
+    NonTriangularFaceMesh { face: usize },
+    #[error("tessellation produced a non-finite position {position} for face {face}")]
+    NonFiniteMeshPosition { face: usize, position: usize },
+    #[error("tessellation produced no finite positive mesh scale")]
+    InvalidMeshScale,
+    #[error("face {face} triangle {triangle} contains an invalid position index")]
+    InvalidTriangleVertex { face: usize, triangle: usize },
+    #[error("face {face} triangle {triangle} has no complete surface-normal attribution")]
+    MissingTriangleNormal { face: usize, triangle: usize },
+    #[error("face {face} triangle {triangle} contains a non-finite or zero surface normal")]
+    NonFiniteTriangleNormal { face: usize, triangle: usize },
+    #[error(
+        "face {face} triangle {triangle} has scale-normalized doubled area {normalized_double_area:e}, \
+         not greater than {tolerance:e}"
+    )]
+    DegenerateTriangle {
+        face: usize,
+        triangle: usize,
+        normalized_double_area: f64,
+        tolerance: f64,
+    },
+    #[error(
+        "face {face} triangle {triangle} has normal alignment {alignment:e}, below {tolerance:e}"
+    )]
+    InconsistentTriangleOrientation {
+        face: usize,
+        triangle: usize,
+        alignment: f64,
+        tolerance: f64,
+    },
     #[error("re-imported STEP contains no shell")]
     EmptyReimport,
     #[error("re-imported STEP lost the solved spline face pair")]
