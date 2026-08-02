@@ -43,26 +43,34 @@ tracking and contract replay are later, independently reviewable layers.
 | Area | Current state | Upstream gate |
 | --- | --- | --- |
 | G0--G3 formulas and jets | Analytically verified and procedurally validated. | Preserve exact/property coverage and add executable public examples. |
-| Nonzero repair | Independently certified through G3 on the committed imported fixtures. | Add repeated-knot and extreme-positive-weight cases before any production-maturity claim. |
+| Nonzero repair | Independently certified through G3 on the committed imported fixtures, including a multiplicity-three internal knot and strictly positive rational weights spanning `1e-8` through `1`. | Treat the supported full-boundary G1--G3 scope as production mature; keep arbitrary subcurves and G4 outside this claim. |
 | G4 | Procedurally validated as experimental reachability. | Keep experimental and outside the upstream acceptance requirement. |
 | Failure safety and resource bounds | Implemented with focused transactional and checked-dimension coverage. | Preserve typed failures; measure accepted-boundary work separately from certification. |
 | Public API compatibility | Audited against the upstream surface; removed topology constructors/setters are restored and ordinary shell serialization remains compatible. | Resolve the recorded maintainer-choice items before proposing each upstream slice. |
 | Public API usability | Runnable rustdoc examples cover tracking, modeling, contracts, direct solving, and replay; the STEP example covers supported and unsupported imported boundaries. | Keep the examples warning-free as slices are separated. |
 | Module responsibility | Large tracking and solver modules are split into focused submodules near the repository guideline. | Preserve the split while extracting upstream slices. |
-| Imported workflow | Validated before export and after re-import through the requested order for the committed polynomial G1, rational reversed G2, and quintic G3 fixtures. Every face tessellates exclusively to finite, scale-qualified, consistently oriented triangles; canonical topology and sampled bounding boxes persist. | Add repeated-knot and extreme-positive-weight imported cases before any production-maturity claim. |
-| Persistence | All three repaired shells preserve exact canonical combinatorial signatures after STEP re-import. Their scale-normalized bounding-box drifts are at most `6.127015e-17`, and their post-import seam certificates reproduce the pre-export residuals. | Retain the versioned receipts as regression gates and repeat external OCCT validation when STEP serialization changes. |
-| External interoperability | The four inputs and one repaired Monstertruck output are accepted as valid B-reps by pinned OCCT. | Retain the output receipt and repeat it when STEP serialization changes. |
+| Imported workflow | Validated before export and after re-import through the requested order for five committed positive fixtures: polynomial G1, rational reversed G2, repeated-knot G2, extreme-positive-weight G2, and quintic G3. Every face tessellates exclusively to finite, scale-qualified, consistently oriented triangles; canonical topology and sampled bounding boxes persist. | Retain all five versioned receipts as release regressions. |
+| Persistence | All five repaired shells preserve exact canonical combinatorial signatures after STEP re-import. Their scale-normalized bounding-box drifts are at most `6.127015e-17`, and their post-import seam certificates reproduce the pre-export residuals. | Retain the versioned receipts as regression gates and repeat external OCCT validation when STEP serialization changes. |
+| External interoperability | All six inputs and the repaired Monstertruck G1 output are accepted as valid B-reps by pinned OCCT. OCCT independently confirms the repeated-knot multiplicity and `1e8` rational-weight ratio. | Retain the receipts and repeat them when fixture or STEP serialization changes. |
 | Wasm compile | Geometry test compilation passes. | Preserve upstream's workspace Wasm job and keep the targeted geometry test as additive coverage. |
 | Determinism | Same-host/cross-process Windows evidence and Linux tolerance/outcome CI. | Keep cross-platform bitwise equality unclaimed. |
 | Performance | Not yet substantiated. | Separate solver time, certification time, iterations, accepted steps, and bounded work dimensions. |
 
 ## Minimum imported corpus
 
-The pre-upstream corpus contains three provenance-clean adjacent-seam fixtures:
+The pre-upstream baseline contains three provenance-clean adjacent-seam
+fixtures:
 
 1. a polynomial multi-span `G1` repair;
 2. a positive nonuniform rational, unequal or reversed `G2` repair;
 3. a degree-three-or-higher, preferably quintic, `G3` repair.
+
+The production stress extension adds:
+
+4. a polynomial G2 pair with a degree-five seam direction and one internal
+   multiplicity-three knot, preserving exactly C2 continuity at that knot;
+5. a rational G2 pair with strictly positive weights from `1e-8` through `1`,
+   a `1e8` ratio.
 
 At least one fixture is a trimmed multi-face shell rather than two loose
 surfaces. Every fixture records source, license, generating application and
@@ -91,7 +99,8 @@ repository-owned definitions by `tools/phase5/generate_occt_fixtures.py` using
 OCP `7.8.1.1`/OCCT `7.8.1`. `manifest.json` records provenance, construction,
 degrees, parameter mapping, and SHA-256 digests. `occt-validation.json` records
 independent re-import, B-rep validity, topology counts, bounding boxes, and
-surface metadata for all four inputs.
+surface metadata, knot values and multiplicities, and rational-weight ranges
+for all six inputs.
 
 The public workflow is
 `monstertruck-step/examples/continuity-step-validation`. Its independent
@@ -111,8 +120,12 @@ per-order limits are `[1e-9, 1e-7]`, `[1e-9, 1e-7, 1e-5]`, and
 committed beside the fixtures as `monstertruck-*-certificate.json`.
 
 This closes the independent imported G2/G3 residual gate for these fixtures.
-It does not establish production G2/G3 maturity because repeated knots,
-extreme positive weights, and broader real-model evidence remain open.
+The repeated-knot G2 repair has maximum normalized residuals
+`[1.354938e-16, 1.076137e-11, 7.112911e-9]`; the extreme-positive-weight G2
+repair has `[1.750627e-16, 1.095664e-11, 7.007594e-9]`. Their post-import
+certificates reproduce those arrays exactly. Combined with the baseline G1,
+reversed-rational G2, and G3 cases, this substantiates production maturity for
+the explicitly supported full-boundary G1--G3 workflow.
 
 Before committing an output or receipt, the example now re-imports the
 in-memory STEP text, matches vertices by scale-relative position, and requires
@@ -135,9 +148,10 @@ must exceed `1e-14`, and every triangle normal must have cosine at least
 `1e-6` against each of its three surface normals. The minimum doubled areas
 across both passes are `4.756197e-5` for G1, `2.431324e-5` for G2, and
 `1.646745e-5` for G3. The corresponding minimum normal alignments are
-`0.995411`, `0.992599`, and `0.991544`. This closes the complete imported
-workflow gate for the committed baseline corpus without broadening it into a
-production-maturity claim.
+`0.995411`, `0.992599`, and `0.991544`. The repeated-knot and extreme-weight
+cases have minimum doubled areas `6.084457e-5` and `3.073434e-5`, with minimum
+normal alignments `0.999371` and `0.999435`. This closes the complete imported
+workflow gate for the committed production corpus.
 
 ## Persistence and external receipt
 
@@ -231,11 +245,11 @@ The final local gates pass:
 - workspace `cargo clippy --all-targets -- -W warnings`;
 - the complete 18-case continuity corpus, with every case repeated and matched
   to its committed digest;
-- the three imported positive STEP workflows and the arbitrary-trim negative;
+- the five imported positive STEP workflows and the arbitrary-trim negative;
 - independent dense common-coordinate certification through requested G1,
-  G2, and G3 orders for the three imported positive STEP workflows;
+  G2, and G3 orders for the five imported positive STEP workflows;
 - finite, nondegenerate, consistently oriented triangle certification before
-  export and after re-import for all three positive STEP workflows;
+  export and after re-import for all five positive STEP workflows;
 - deterministic exported G1 bytes and pinned OCCT output validation.
 
 The following local commands are deliberately deferred:
@@ -264,7 +278,9 @@ The following local commands are deliberately deferred:
   remains additive rather than replacing upstream coverage.
 - A repository-local, pinned OCCT fixture and validation route is used for
   external evidence. It is not a dependency of the normal Rust test suite.
-- Regenerating all four STEP fixtures preserves every recorded SHA-256.
+- The continuity CI job runs all five imported positive workflows and verifies
+  that the arbitrary-trim negative remains typed and transactional.
+- Regenerating all six STEP fixtures preserves every recorded SHA-256.
 - OCCT independently re-imports every fixture and the repaired G1 output as a
   valid two-face B-spline shell. The negative arbitrary-trim fixture exits with
   the typed unsupported-subcurve path and creates no output file.

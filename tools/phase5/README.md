@@ -27,6 +27,8 @@ target/phase5-python/Scripts/python.exe -E `
   validation/continuity/rational-reversed-g2.step `
   validation/continuity/quintic-g3.step `
   validation/continuity/arbitrary-trim-negative.step `
+  validation/continuity/repeated-knot-g2.step `
+  validation/continuity/extreme-positive-weights-g2.step `
   --output validation/continuity/occt-validation.json
 ```
 
@@ -65,6 +67,16 @@ cargo run -p monstertruck-step --example continuity-step-validation -- `
   validation/continuity/quintic-g3.step --order 3 `
   --output target/continuity-certification/quintic-g3-solved.step `
   --receipt validation/continuity/monstertruck-quintic-g3-certificate.json
+
+cargo run -p monstertruck-step --example continuity-step-validation -- `
+  validation/continuity/repeated-knot-g2.step --order 2 `
+  --output target/continuity-certification/repeated-knot-g2-solved.step `
+  --receipt validation/continuity/monstertruck-repeated-knot-g2-certificate.json
+
+cargo run -p monstertruck-step --example continuity-step-validation -- `
+  validation/continuity/extreme-positive-weights-g2.step --order 2 `
+  --output target/continuity-certification/extreme-positive-weights-g2-solved.step `
+  --receipt validation/continuity/monstertruck-extreme-positive-weights-g2-certificate.json
 ```
 
 The certificate samples points through public surface evaluation and estimates
@@ -82,3 +94,8 @@ matches, the bounding-box drift is at most `1e-9`, every normalized doubled
 triangle area exceeds `1e-14`, and every triangle/surface-normal cosine is at
 least `1e-6`. Override these limits with `--bounding-box-tolerance`,
 `--triangle-area-tolerance`, and `--minimum-triangle-normal-alignment`.
+
+The stress fixtures exercise a degree-five seam direction with an internal
+knot multiplicity of three and a rational G2 pair with positive weights from
+`1e-8` through `1`. The pinned OCCT receipt records those multiplicities and
+weights independently from the generator manifest.

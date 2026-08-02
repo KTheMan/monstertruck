@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "validator": "tools/phase5/validate_step_occt.py",
   "validator_command": "target/phase5-python/Scripts/python.exe -E tools/phase5/validate_step_occt.py <step-files>",
   "occt_version": "7.8.1",
@@ -52,8 +52,29 @@
           "v_poles": 5,
           "u_knots": 2,
           "v_knots": 3,
+          "u_knot_values": [
+            0.0,
+            1.0
+          ],
+          "v_knot_values": [
+            0.0,
+            0.37,
+            1.0
+          ],
+          "u_multiplicities": [
+            4,
+            4
+          ],
+          "v_multiplicities": [
+            4,
+            1,
+            4
+          ],
           "u_rational": false,
-          "v_rational": false
+          "v_rational": false,
+          "minimum_weight": 1.0,
+          "maximum_weight": 1.0,
+          "weight_ratio": 1.0
         },
         {
           "surface_type": "GeomAbs_BSplineSurface",
@@ -71,8 +92,29 @@
           "v_poles": 5,
           "u_knots": 2,
           "v_knots": 3,
+          "u_knot_values": [
+            0.0,
+            1.0
+          ],
+          "v_knot_values": [
+            0.0,
+            0.37,
+            1.0
+          ],
+          "u_multiplicities": [
+            4,
+            4
+          ],
+          "v_multiplicities": [
+            4,
+            1,
+            4
+          ],
           "u_rational": false,
-          "v_rational": false
+          "v_rational": false,
+          "minimum_weight": 1.0,
+          "maximum_weight": 1.0,
+          "weight_ratio": 1.0
         }
       ]
     },
@@ -123,8 +165,29 @@
           "v_poles": 5,
           "u_knots": 2,
           "v_knots": 3,
+          "u_knot_values": [
+            0.0,
+            1.0
+          ],
+          "v_knot_values": [
+            0.0,
+            0.74,
+            2.0
+          ],
+          "u_multiplicities": [
+            4,
+            4
+          ],
+          "v_multiplicities": [
+            4,
+            1,
+            4
+          ],
           "u_rational": true,
-          "v_rational": false
+          "v_rational": false,
+          "minimum_weight": 0.707106781187,
+          "maximum_weight": 1.35,
+          "weight_ratio": 1.9091883092024569
         },
         {
           "surface_type": "GeomAbs_BSplineSurface",
@@ -142,8 +205,29 @@
           "v_poles": 5,
           "u_knots": 2,
           "v_knots": 3,
+          "u_knot_values": [
+            0.0,
+            1.0
+          ],
+          "v_knot_values": [
+            10.0,
+            12.52,
+            14.0
+          ],
+          "u_multiplicities": [
+            4,
+            4
+          ],
+          "v_multiplicities": [
+            4,
+            1,
+            4
+          ],
           "u_rational": true,
-          "v_rational": false
+          "v_rational": false,
+          "minimum_weight": 0.707106781187,
+          "maximum_weight": 1.35,
+          "weight_ratio": 1.9091883092024569
         }
       ]
     },
@@ -194,8 +278,29 @@
           "v_poles": 5,
           "u_knots": 2,
           "v_knots": 3,
+          "u_knot_values": [
+            0.0,
+            1.0
+          ],
+          "v_knot_values": [
+            0.0,
+            0.41,
+            1.0
+          ],
+          "u_multiplicities": [
+            6,
+            6
+          ],
+          "v_multiplicities": [
+            4,
+            1,
+            4
+          ],
           "u_rational": false,
-          "v_rational": false
+          "v_rational": false,
+          "minimum_weight": 1.0,
+          "maximum_weight": 1.0,
+          "weight_ratio": 1.0
         },
         {
           "surface_type": "GeomAbs_BSplineSurface",
@@ -213,8 +318,29 @@
           "v_poles": 5,
           "u_knots": 2,
           "v_knots": 3,
+          "u_knot_values": [
+            0.0,
+            1.0
+          ],
+          "v_knot_values": [
+            0.0,
+            0.41,
+            1.0
+          ],
+          "u_multiplicities": [
+            6,
+            6
+          ],
+          "v_multiplicities": [
+            4,
+            1,
+            4
+          ],
           "u_rational": false,
-          "v_rational": false
+          "v_rational": false,
+          "minimum_weight": 1.0,
+          "maximum_weight": 1.0,
+          "weight_ratio": 1.0
         }
       ]
     },
@@ -265,8 +391,27 @@
           "v_poles": 2,
           "u_knots": 2,
           "v_knots": 2,
+          "u_knot_values": [
+            0.0,
+            1.0
+          ],
+          "v_knot_values": [
+            0.0,
+            1.0
+          ],
+          "u_multiplicities": [
+            2,
+            2
+          ],
+          "v_multiplicities": [
+            2,
+            2
+          ],
           "u_rational": false,
-          "v_rational": false
+          "v_rational": false,
+          "minimum_weight": 1.0,
+          "maximum_weight": 1.0,
+          "weight_ratio": 1.0
         },
         {
           "surface_type": "GeomAbs_BSplineSurface",
@@ -284,8 +429,253 @@
           "v_poles": 2,
           "u_knots": 2,
           "v_knots": 2,
+          "u_knot_values": [
+            0.0,
+            1.0
+          ],
+          "v_knot_values": [
+            0.0,
+            1.0
+          ],
+          "u_multiplicities": [
+            2,
+            2
+          ],
+          "v_multiplicities": [
+            2,
+            2
+          ],
           "u_rational": false,
-          "v_rational": false
+          "v_rational": false,
+          "minimum_weight": 1.0,
+          "maximum_weight": 1.0,
+          "weight_ratio": 1.0
+        }
+      ]
+    },
+    {
+      "file": "validation/continuity/repeated-knot-g2.step",
+      "sha256": "bf488b28c1f6eae4fe38cec6044d682042f67c50fc23d245490d568fac4826a3",
+      "bytes": 12557,
+      "occt_model_entities": 242,
+      "transferred_roots": 1,
+      "shape_type": "TopAbs_SHELL",
+      "valid_brep": true,
+      "unique_topology": {
+        "compounds": 0,
+        "compsolids": 0,
+        "solids": 0,
+        "shells": 1,
+        "faces": 2,
+        "wires": 2,
+        "edges": 7,
+        "vertices": 6
+      },
+      "bounding_box": {
+        "min": [
+          -1.3000001,
+          -1e-07,
+          -0.7400000999999999
+        ],
+        "max": [
+          1.3800001,
+          1.0000001,
+          0.8600000999999999
+        ]
+      },
+      "surfaces": [
+        {
+          "surface_type": "GeomAbs_BSplineSurface",
+          "u_domain": [
+            0.0,
+            1.0
+          ],
+          "v_domain": [
+            0.0,
+            1.0
+          ],
+          "u_degree": 3,
+          "v_degree": 5,
+          "u_poles": 4,
+          "v_poles": 9,
+          "u_knots": 2,
+          "v_knots": 3,
+          "u_knot_values": [
+            0.0,
+            1.0
+          ],
+          "v_knot_values": [
+            0.0,
+            0.47,
+            1.0
+          ],
+          "u_multiplicities": [
+            4,
+            4
+          ],
+          "v_multiplicities": [
+            6,
+            3,
+            6
+          ],
+          "u_rational": false,
+          "v_rational": false,
+          "minimum_weight": 1.0,
+          "maximum_weight": 1.0,
+          "weight_ratio": 1.0
+        },
+        {
+          "surface_type": "GeomAbs_BSplineSurface",
+          "u_domain": [
+            0.0,
+            1.0
+          ],
+          "v_domain": [
+            0.0,
+            1.0
+          ],
+          "u_degree": 3,
+          "v_degree": 5,
+          "u_poles": 4,
+          "v_poles": 9,
+          "u_knots": 2,
+          "v_knots": 3,
+          "u_knot_values": [
+            0.0,
+            1.0
+          ],
+          "v_knot_values": [
+            0.0,
+            0.47,
+            1.0
+          ],
+          "u_multiplicities": [
+            4,
+            4
+          ],
+          "v_multiplicities": [
+            6,
+            3,
+            6
+          ],
+          "u_rational": false,
+          "v_rational": false,
+          "minimum_weight": 1.0,
+          "maximum_weight": 1.0,
+          "weight_ratio": 1.0
+        }
+      ]
+    },
+    {
+      "file": "validation/continuity/extreme-positive-weights-g2.step",
+      "sha256": "51426938b6a6071855c8794c89d7139c9a5537c2c996c1419ab8c1da5126445f",
+      "bytes": 11767,
+      "occt_model_entities": 198,
+      "transferred_roots": 1,
+      "shape_type": "TopAbs_SHELL",
+      "valid_brep": true,
+      "unique_topology": {
+        "compounds": 0,
+        "compsolids": 0,
+        "solids": 0,
+        "shells": 1,
+        "faces": 2,
+        "wires": 2,
+        "edges": 7,
+        "vertices": 6
+      },
+      "bounding_box": {
+        "min": [
+          -1.2800001,
+          -1e-07,
+          -0.7100000999999999
+        ],
+        "max": [
+          1.3400001000000001,
+          1.0000001,
+          0.7700001
+        ]
+      },
+      "surfaces": [
+        {
+          "surface_type": "GeomAbs_BSplineSurface",
+          "u_domain": [
+            0.0,
+            1.0
+          ],
+          "v_domain": [
+            0.0,
+            1.0
+          ],
+          "u_degree": 3,
+          "v_degree": 3,
+          "u_poles": 4,
+          "v_poles": 5,
+          "u_knots": 2,
+          "v_knots": 3,
+          "u_knot_values": [
+            0.0,
+            1.0
+          ],
+          "v_knot_values": [
+            0.0,
+            0.43,
+            1.0
+          ],
+          "u_multiplicities": [
+            4,
+            4
+          ],
+          "v_multiplicities": [
+            4,
+            1,
+            4
+          ],
+          "u_rational": true,
+          "v_rational": false,
+          "minimum_weight": 1e-08,
+          "maximum_weight": 1.0,
+          "weight_ratio": 100000000.0
+        },
+        {
+          "surface_type": "GeomAbs_BSplineSurface",
+          "u_domain": [
+            0.0,
+            1.0
+          ],
+          "v_domain": [
+            0.0,
+            1.0
+          ],
+          "u_degree": 3,
+          "v_degree": 3,
+          "u_poles": 4,
+          "v_poles": 5,
+          "u_knots": 2,
+          "v_knots": 3,
+          "u_knot_values": [
+            0.0,
+            1.0
+          ],
+          "v_knot_values": [
+            0.0,
+            0.43,
+            1.0
+          ],
+          "u_multiplicities": [
+            4,
+            4
+          ],
+          "v_multiplicities": [
+            4,
+            1,
+            4
+          ],
+          "u_rational": true,
+          "v_rational": false,
+          "minimum_weight": 1e-08,
+          "maximum_weight": 1.0,
+          "weight_ratio": 100000000.0
         }
       ]
     }

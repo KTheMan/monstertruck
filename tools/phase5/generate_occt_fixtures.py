@@ -308,6 +308,149 @@ def _rational_reversed_g2() -> tuple[object, dict[str, object]]:
     )
 
 
+def _repeated_knot_g2() -> tuple[object, dict[str, object]]:
+    boundary = [(0.0, index / 8.0, 0.0) for index in range(9)]
+    first = [(1.05, 0.0, 0.18)] * 9
+    second = [(0.0, 0.0, -0.12)] * 9
+    zero = [(0.0, 0.0, 0.0)] * 9
+    left_near, right_near = _cross_layers(boundary, first, second, zero, 3)
+    left = [
+        [
+            (-1.30, point[1], point[2] - 0.58 - 0.02 * index)
+            for index, point in enumerate(boundary)
+        ],
+        left_near[2],
+        left_near[1],
+        left_near[0],
+    ]
+    right = [
+        right_near[0],
+        right_near[1],
+        right_near[2],
+        [
+            (1.38, point[1], point[2] + 0.66 + 0.025 * index)
+            for index, point in enumerate(boundary)
+        ],
+    ]
+    v_knots = [0.0, 0.47, 1.0]
+    v_multiplicities = [6, 3, 6]
+    left_surface = _surface(
+        left,
+        [0.0, 1.0],
+        [4, 4],
+        v_knots,
+        v_multiplicities,
+        3,
+        5,
+    )
+    right_surface = _surface(
+        right,
+        [0.0, 1.0],
+        [4, 4],
+        v_knots,
+        v_multiplicities,
+        3,
+        5,
+    )
+    _assert_continuity(left_surface, right_surface, 2, lambda value: value)
+    _assert_discontinuity(left_surface, right_surface, 3, lambda value: value)
+    return (
+        _sew([_full_face(left_surface), _full_face(right_surface)]),
+        {
+            "expected_continuity": "G2",
+            "construction": (
+                "Polynomial cubic-by-quintic pair with a multiplicity-three "
+                "internal seam-direction knot; C2 cross-seam derivatives match "
+                "and third derivatives intentionally differ."
+            ),
+            "full_rectangular_faces": True,
+            "rational": False,
+            "reversed_boundary_parameter": False,
+            "repeated_knot_axis": "v",
+            "v_knots": v_knots,
+            "v_multiplicities": v_multiplicities,
+            "internal_knot_continuity": "C2",
+            "u_degrees": [3, 3],
+            "v_degrees": [5, 5],
+        },
+    )
+
+
+def _extreme_positive_weights_g2() -> tuple[object, dict[str, object]]:
+    boundary = [
+        (0.0, 0.0, 0.0),
+        (0.0, 0.25, 0.0),
+        (0.0, 0.50, 0.0),
+        (0.0, 0.75, 0.0),
+        (0.0, 1.0, 0.0),
+    ]
+    first = [(1.0, 0.0, 0.16)] * 5
+    second = [(0.0, 0.0, -0.10)] * 5
+    zero = [(0.0, 0.0, 0.0)] * 5
+    left_near, right_near = _cross_layers(boundary, first, second, zero, 3)
+    left = [
+        [
+            (-1.28, point[1], point[2] - 0.61 - 0.025 * index)
+            for index, point in enumerate(boundary)
+        ],
+        left_near[2],
+        left_near[1],
+        left_near[0],
+    ]
+    right = [
+        right_near[0],
+        right_near[1],
+        right_near[2],
+        [
+            (1.34, point[1], point[2] + 0.69 + 0.02 * index)
+            for index, point in enumerate(boundary)
+        ],
+    ]
+    boundary_weights = [1.0, 1.0, 1.0e-8, 1.0, 1.0]
+    weights = [boundary_weights.copy() for _ in range(4)]
+    left_surface = _surface(
+        left,
+        [0.0, 1.0],
+        [4, 4],
+        [0.0, 0.43, 1.0],
+        [4, 1, 4],
+        3,
+        3,
+        weights,
+    )
+    right_surface = _surface(
+        right,
+        [0.0, 1.0],
+        [4, 4],
+        [0.0, 0.43, 1.0],
+        [4, 1, 4],
+        3,
+        3,
+        weights,
+    )
+    _assert_continuity(left_surface, right_surface, 2, lambda value: value)
+    _assert_discontinuity(left_surface, right_surface, 3, lambda value: value)
+    return (
+        _sew([_full_face(left_surface), _full_face(right_surface)]),
+        {
+            "expected_continuity": "G2",
+            "construction": (
+                "Rational bicubic/multi-span pair with strictly positive weights "
+                "spanning eight orders of magnitude; C2 cross-seam derivatives "
+                "match and third derivatives intentionally differ."
+            ),
+            "full_rectangular_faces": True,
+            "rational": True,
+            "reversed_boundary_parameter": False,
+            "minimum_weight": min(boundary_weights),
+            "maximum_weight": max(boundary_weights),
+            "weight_ratio": max(boundary_weights) / min(boundary_weights),
+            "u_degrees": [3, 3],
+            "v_degrees": [3, 3],
+        },
+    )
+
+
 def _quintic_g3() -> tuple[object, dict[str, object]]:
     boundary = [
         (0.0, 0.0, 0.02),
@@ -515,6 +658,8 @@ def main() -> None:
         "rational-reversed-g2.step": _rational_reversed_g2,
         "quintic-g3.step": _quintic_g3,
         "arbitrary-trim-negative.step": _trimmed_negative,
+        "repeated-knot-g2.step": _repeated_knot_g2,
+        "extreme-positive-weights-g2.step": _extreme_positive_weights_g2,
     }
     entries = []
     for filename, factory in fixtures.items():
@@ -530,7 +675,7 @@ def main() -> None:
             }
         )
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "license": "Apache-2.0",
         "provenance": "Generated entirely by tools/phase5/generate_occt_fixtures.py; no third-party CAD model content.",
         "generator_command": "target/phase5-python/Scripts/python.exe -E tools/phase5/generate_occt_fixtures.py",

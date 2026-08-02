@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "license": "Apache-2.0",
   "provenance": "Generated entirely by tools/phase5/generate_occt_fixtures.py; no third-party CAD model content.",
   "generator_command": "target/phase5-python/Scripts/python.exe -E tools/phase5/generate_occt_fixtures.py",
@@ -87,6 +87,57 @@
       "v_degrees": [
         1,
         1
+      ]
+    },
+    {
+      "file": "repeated-knot-g2.step",
+      "sha256": "bf488b28c1f6eae4fe38cec6044d682042f67c50fc23d245490d568fac4826a3",
+      "bytes": 12557,
+      "expected_continuity": "G2",
+      "construction": "Polynomial cubic-by-quintic pair with a multiplicity-three internal seam-direction knot; C2 cross-seam derivatives match and third derivatives intentionally differ.",
+      "full_rectangular_faces": true,
+      "rational": false,
+      "reversed_boundary_parameter": false,
+      "repeated_knot_axis": "v",
+      "v_knots": [
+        0.0,
+        0.47,
+        1.0
+      ],
+      "v_multiplicities": [
+        6,
+        3,
+        6
+      ],
+      "internal_knot_continuity": "C2",
+      "u_degrees": [
+        3,
+        3
+      ],
+      "v_degrees": [
+        5,
+        5
+      ]
+    },
+    {
+      "file": "extreme-positive-weights-g2.step",
+      "sha256": "51426938b6a6071855c8794c89d7139c9a5537c2c996c1419ab8c1da5126445f",
+      "bytes": 11767,
+      "expected_continuity": "G2",
+      "construction": "Rational bicubic/multi-span pair with strictly positive weights spanning eight orders of magnitude; C2 cross-seam derivatives match and third derivatives intentionally differ.",
+      "full_rectangular_faces": true,
+      "rational": true,
+      "reversed_boundary_parameter": false,
+      "minimum_weight": 1e-08,
+      "maximum_weight": 1.0,
+      "weight_ratio": 100000000.0,
+      "u_degrees": [
+        3,
+        3
+      ],
+      "v_degrees": [
+        3,
+        3
       ]
     }
   ]

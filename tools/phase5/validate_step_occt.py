@@ -59,6 +59,13 @@ def _surface_records(shape: object) -> list[dict[str, object]]:
         }
         if surface_type == GeomAbs_BSplineSurface:
             surface = adaptor.BSpline()
+            weights = [
+                surface.Weight(u_index, v_index)
+                for u_index in range(1, surface.NbUPoles() + 1)
+                for v_index in range(1, surface.NbVPoles() + 1)
+            ]
+            minimum_weight = min(weights)
+            maximum_weight = max(weights)
             record.update(
                 {
                     "u_degree": surface.UDegree(),
@@ -67,8 +74,31 @@ def _surface_records(shape: object) -> list[dict[str, object]]:
                     "v_poles": surface.NbVPoles(),
                     "u_knots": surface.NbUKnots(),
                     "v_knots": surface.NbVKnots(),
+                    "u_knot_values": [
+                        surface.UKnot(index)
+                        for index in range(1, surface.NbUKnots() + 1)
+                    ],
+                    "v_knot_values": [
+                        surface.VKnot(index)
+                        for index in range(1, surface.NbVKnots() + 1)
+                    ],
+                    "u_multiplicities": [
+                        surface.UMultiplicity(index)
+                        for index in range(1, surface.NbUKnots() + 1)
+                    ],
+                    "v_multiplicities": [
+                        surface.VMultiplicity(index)
+                        for index in range(1, surface.NbVKnots() + 1)
+                    ],
                     "u_rational": surface.IsURational(),
                     "v_rational": surface.IsVRational(),
+                    "minimum_weight": minimum_weight,
+                    "maximum_weight": maximum_weight,
+                    "weight_ratio": (
+                        maximum_weight / minimum_weight
+                        if minimum_weight > 0.0
+                        else None
+                    ),
                 }
             )
         records.append(record)
@@ -146,7 +176,7 @@ def main(arguments: Sequence[str] | None = None) -> None:
             "Run the pinned interpreter with `-E`."
         )
     report = {
-        "schema_version": 1,
+        "schema_version": 2,
         "validator": "tools/phase5/validate_step_occt.py",
         "validator_command": "target/phase5-python/Scripts/python.exe -E tools/phase5/validate_step_occt.py <step-files>",
         "occt_version": "7.8.1",
