@@ -11,7 +11,11 @@ pub use monstertruck_geometry::prelude::{algo, inv_or_zero};
 pub use monstertruck_geometry::{decorators::*, nurbs::*, specifieds::*, t_spline::*};
 pub use monstertruck_mesh::PolylineCurve;
 use monstertruck_topology::compress::{CompressedTrimmedShell, CompressedTrimmedSolid};
-use monstertruck_topology::trimmed::{TrimmedFace, TrimmedShell, TrimmedSolid};
+use monstertruck_topology::trimmed::{TrimmedShell, TrimmedSolid};
+// Only the rayon-parallel (native) `to_trimmed_with_parameter_curves` builds
+// faces directly; the wasm32 arm goes through `to_trimmed_with_face_trims`.
+#[cfg(not(target_arch = "wasm32"))]
+use monstertruck_topology::trimmed::TrimmedFace;
 use monstertruck_traits::SnapCurveEndpoints;
 #[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
@@ -19,8 +23,10 @@ use rustc_hash::FxHashMap as HashMap;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::hash::Hasher;
-use std::time::Instant;
 use std::{env, iter};
+// `web_time::Instant` is `std::time::Instant` on native and falls back to the
+// browser performance clock on wasm32, where `std::time::Instant::now()` panics.
+use web_time::Instant;
 
 type ModelSurfaceCurve = SurfaceCurve<
     Box<Curve>,

@@ -30,6 +30,9 @@ monstertruck-fillet = { workspace = true, optional = true }
 monstertruck-topology = { workspace = true }
 rayon = { workspace = true }
 ttf-parser = { workspace = true, optional = true }
+# `web_time::Instant` is `std::time::Instant` on native and falls back to the
+# browser performance clock on wasm32, where `std::time::Instant::now()` panics.
+web-time = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

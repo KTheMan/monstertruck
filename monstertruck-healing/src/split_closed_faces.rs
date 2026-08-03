@@ -70,7 +70,7 @@ where
         .iter()
         .enumerate()
         .map(|(index, edge)| {
-            let started = std::time::Instant::now();
+            let started = Instant::now();
             let poly = to_poly(edge);
             if debug_trace && started.elapsed().as_secs_f64() * 1000.0 >= 10.0 {
                 eprintln!(
@@ -83,7 +83,7 @@ where
         .collect();
     let len = shell.faces.len();
     (0..len).for_each(|i| {
-        let started = std::time::Instant::now();
+        let started = Instant::now();
         changed |= split_face_with_non_closed_boundary(
             i,
             shell,
@@ -101,7 +101,7 @@ where
     });
     let len = shell.faces.len();
     let closure = |i| {
-        let started = std::time::Instant::now();
+        let started = Instant::now();
         let result = split_face_with_non_simple_wire(
             i,
             shell,
@@ -123,7 +123,7 @@ where
     shell.faces.extend(new_faces);
     let len = shell.faces.len();
     let closure = |i| {
-        let started = std::time::Instant::now();
+        let started = Instant::now();
         let result = split_face_with_concave_wire(
             i,
             shell,

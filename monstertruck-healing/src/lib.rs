@@ -31,6 +31,9 @@ use monstertruck_topology::trimmed::{TrimmedShell, TrimmedSolid};
 use monstertruck_traits::SnapCurveEndpoints;
 use rustc_hash::FxHashMap as HashMap;
 use std::env;
+// `web_time::Instant` is `std::time::Instant` on native and falls back to the
+// browser performance clock on wasm32, where `std::time::Instant::now()` panics.
+use web_time::Instant;
 
 type Edge<C> = CompressedEdge<C>;
 type EdgeIndex = CompressedEdgeIndex;
@@ -782,7 +785,7 @@ where
             env::var("MT_BOOL_FORCE_SINGLE_FACE_PASS_THROUGH").is_ok();
         let skip_single_face_pass_through =
             self.faces.len() <= 1 && !force_single_face_pass_through;
-        let started = std::time::Instant::now();
+        let started = Instant::now();
         fn sp<S>(surface: &S, point: Point3, hint: Option<(f64, f64)>) -> Option<(f64, f64)>
         where S: SearchParameter<SurfaceParameter, Point = Point3>
                 + SearchNearestParameter<SurfaceParameter, Point = Point3> {
@@ -880,7 +883,7 @@ where
             env::var("MT_BOOL_FORCE_SINGLE_FACE_PASS_THROUGH").is_ok();
         let skip_single_face_pass_through =
             self.faces.len() <= 1 && !force_single_face_pass_through;
-        let started = std::time::Instant::now();
+        let started = Instant::now();
         fn sp<S>(surface: &S, point: Point3, hint: Option<(f64, f64)>) -> Option<(f64, f64)>
         where S: SearchParameter<SurfaceParameter, Point = Point3>
                 + SearchNearestParameter<SurfaceParameter, Point = Point3> {
