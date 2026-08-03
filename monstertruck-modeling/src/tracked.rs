@@ -3,6 +3,35 @@
 //! Raw mapping and sweep traits remain useful for geometry construction. The
 //! wrappers in this module add the operation context needed to validate
 //! preserved identities or initialize fresh generated identities.
+//!
+//! The following tracked extrusion preserves the source face identities,
+//! assigns fresh identities to generated topology, and records lineage in the
+//! [`TrackingSession`].
+//!
+//! ```
+//! use monstertruck_core::{Point3, TrackingSession, TrackingSessionId, Vector3};
+//! use monstertruck_modeling::{builder, tracked, Edge, Face, Solid};
+//! use monstertruck_topology::{FeatureId, TopologyTracking};
+//!
+//! fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let vertex = builder::vertex(Point3::new(0.0, 0.0, 0.0));
+//!     let edge: Edge = builder::extrude(&vertex, Vector3::unit_x());
+//!     let mut face: Face = builder::extrude(&edge, Vector3::unit_y());
+//!     let mut session = TrackingSession::new(TrackingSessionId::new("modeling-session")?);
+//!     face.initialize_tracking(&mut session, FeatureId::new("profile")?)?;
+//!
+//!     let solid: Solid = tracked::extrude(
+//!         &face,
+//!         Vector3::unit_z(),
+//!         &mut session,
+//!         FeatureId::new("pad")?,
+//!     )?;
+//!
+//!     assert!(!solid.tracking_ids().is_empty());
+//!     assert_eq!(session.lineage().len(), face.tracking_ids().len());
+//!     Ok(())
+//! }
+//! ```
 
 use crate::builder::{self, SweepAngle};
 use crate::geom_impls::{ArcConnector, ExtrudeConnector, LineConnector, RevoluteConnector};

@@ -35,7 +35,7 @@ The published review stack, observed on 2026-07-30, is:
 | --- | --- | --- | --- | --- |
 | [`KTheMan/monstertruck#1`](https://github.com/KTheMan/monstertruck/pull/1) | `agent/phase-3-variational-continuity` | `agent/phase-4-validation-audit` | Charter and acceptance program at `285e1550`. | Merged as `02b69d7a` on 2026-07-30. |
 | [`KTheMan/monstertruck#2`](https://github.com/KTheMan/monstertruck/pull/2) | `agent/phase-3-variational-continuity` | `agent/phase-4-audit-repairs` | Audit ledger and focused repairs through `33eff4da`. | Merged as `25e13e6e` on 2026-07-30. |
-| [`KTheMan/monstertruck#3`](https://github.com/KTheMan/monstertruck/pull/3) | `agent/phase-3-variational-continuity` | `agent/phase-4-real-world-validation` | Solved-transition API, edit replay, corpus, certifier, receipt, and claim promotion. | Open. The fork workflow is active; the final review push runs the hosted gates before the pull request leaves draft status. |
+| [`KTheMan/monstertruck#3`](https://github.com/KTheMan/monstertruck/pull/3) | `agent/phase-3-variational-continuity` | `agent/phase-4-real-world-validation` | Solved-transition API, edit replay, corpus, certifier, receipt, and claim promotion. | Ready for review. All six hosted checks passed at `993c438f`; GitHub reports the pull request clean and mergeable. |
 
 These pull requests were intentionally stacked. Merging pull requests 1 and 2
 retargeted pull request 3 to the Phase 3 branch while preserving its five
@@ -74,20 +74,20 @@ robustness issues. No security claim is inferred from this ledger.
 
 | Area | State | Evidence | Required promotion |
 | --- | --- | --- | --- |
-| `G0`--`G3` exact continuity path | Realistically validated | The 18-case CAD-like procedural corpus exercises explicit `G0`, `G1`, `G2`, and `G3` layouts. The public certifier checks every mixed derivative through the requested order at endpoints, mapped knot boundaries from both surfaces, and span-interior samples. | Imported production geometry remains a separate evidence class. |
-| Nonzero-offset repair | Realistically validated through `G1` | The curved-seam quintic offset case converges in two accepted steps and passes external `G0`/`G1` certification. | Add independently certified nonzero-offset `G2` and `G3` repairs. |
-| Rational derivative and reparameterization formulas | Analytically verified | Independent formula review traced homogeneous jets, quotient conversion, and transition-field composition through order four. The external corpus supplies supporting residual evidence for positive nonuniform rational weights. | Imported rational production surfaces remain pending. |
-| Multi-span quintic polynomial and rational path | Realistically validated | Exact polynomial and nonuniform rational cases contain multiple cross and seam spans. G3 residuals pass the independent public-evaluation certifier. | Add repeated-knot and extreme-positive-weight cases. |
-| Unequal and reversed parameterization | Realistically validated for the recorded cases | The corpus covers nonlinear unequal `G1`, rational unequal/reversed `G1`, reversed `G3`, and unequal cross-domain `G3`; mapped boundaries from both surfaces are explicit certification samples. | Curved unequal-domain nonzero-offset `G2`/`G3` repair remains pending. |
+| `G0`--`G3` exact continuity path | Procedurally validated | The 18-case CAD-like procedural corpus exercises explicit `G0`, `G1`, `G2`, and `G3` layouts. The public certifier checks every mixed derivative through the requested order at endpoints, mapped knot boundaries from both surfaces, and span-interior samples. | Imported production geometry remains a separate evidence class. |
+| Nonzero-offset repair | Procedurally validated through `G1` | The curved-seam quintic offset case converges in two accepted steps and passes independent `G0`/`G1` certification. | Add independently certified nonzero-offset `G2` and `G3` repairs. |
+| Rational derivative and reparameterization formulas | Analytically verified | Independent formula review traced homogeneous jets, quotient conversion, and transition-field composition through order four. The procedural corpus supplies supporting residual evidence for positive nonuniform rational weights. | Imported rational production surfaces remain pending. |
+| Multi-span quintic polynomial and rational path | Procedurally validated | Exact polynomial and nonuniform rational cases contain multiple cross and seam spans. G3 residuals pass the independent public-evaluation certifier. | Add repeated-knot and extreme-positive-weight cases. |
+| Unequal and reversed parameterization | Procedurally validated for the recorded cases | The corpus covers nonlinear unequal `G1`, rational unequal/reversed `G1`, reversed `G3`, and unequal cross-domain `G3`; mapped boundaries from both surfaces are explicit certification samples. | Curved unequal-domain nonzero-offset `G2`/`G3` repair remains pending. |
 | Tracking initialization and compressed restoration | Implemented | Focused regressions cover failed initializer rollback, fallible edge-map identity, kind mismatch rollback, serialized index correspondence, checked indices, and empty-face rejection. | Oversized payload limits and same-kind semantic-reference correspondence. |
 | Tracked cuts and modeling-session atomicity | Implemented | The implementations stage session state through lineage commit; existing success-path cut and modeling tests pass. | Failure injected after partial staged work for every cut and modeling wrapper, with complete pre/post comparison. |
-| Continuity replay after edits and late failure | Realistically validated for the synthetic chain | `5e22e3a3` advances and rebinds a tracking generation, replays a meaningful upstream repair, rejects stale IDs, orders lexically conflicting contracts by dependency, preserves each solved local transition, and proves unchanged caller input after a downstream failure. | Imported modeling-session edit histories and coupled systems remain pending. |
+| Continuity replay after edits and late failure | Procedurally validated for the synthetic chain | `5e22e3a3` advances and rebinds a tracking generation, replays a meaningful upstream repair, rejects stale IDs, orders lexically conflicting contracts by dependency, preserves each solved local transition, and proves unchanged caller input after a downstream failure. | Imported modeling-session edit histories and coupled systems remain pending. |
 | Solver allocation bounds | Implemented | `bd29b3eb` adds checked budgets and seven focused resource/capability tests cover representative dimensions and typed limit failures. | Corpus measurements at accepted boundaries and host-level deserialization budgets. |
 | Serialized topology robustness | Implemented | `06fedf9c` checks referenced topology indices, face cardinality, tracking dimensions, and index-to-ID correspondence. | Malformed trimmed-route coverage and allocation limits before `Vec` deserialization. |
-| Deterministic output | Realistically validated on Windows/MSVC | Each case matches an immediate rerun and a separate-process v4 baseline verification. The raw reviewed receipt preserves geometry/report/dense/error evidence and work counters. | Cross-platform digest equivalence is not claimed. |
+| Deterministic output | Procedurally validated on Windows/MSVC | Each case matches an immediate rerun and a separate-process v4 baseline verification. The raw reviewed receipt preserves geometry/report/dense/error evidence and work counters. | Cross-platform digest equivalence is not claimed. |
 | Wasm compilation | Implemented | The committed receipt for `404b4e33` records successful geometry-library test-module compilation for `wasm32-unknown-unknown`. | Keep the compile gate in CI. |
 | Wasm runtime usability | Not yet substantiated | No browser or Wasm runtime execution receipt is committed. | Execute representative solve, replay, and bounded-failure cases in a supported Wasm host. |
-| Experimental `G4` reachability | Realistically validated as experimental | A curved-seam, multi-span, nonuniform rational quintic case certifies through order four with maximum normalized order-four residual `3.874577898e-3` using domain-valid one-sided cross stencils. | This does not promote production `G4`; nonzero-offset and imported evidence remain pending. |
+| Experimental `G4` reachability | Procedurally validated as experimental | A curved-seam, multi-span, nonuniform rational quintic case certifies through order four with maximum normalized order-four residual `3.874577898e-3` using domain-valid one-sided cross stencils. | This does not promote production `G4`; nonzero-offset and imported evidence remain pending. |
 
 ## Findings
 
@@ -108,7 +108,7 @@ robustness issues. No security claim is inferred from this ledger.
   limits for control points, spans, samples, variables, residuals, Jacobian
   elements, augmented QR elements, and iterations. Checked arithmetic runs
   before dense allocation; an explicit unbounded budget remains available to
-  trusted hosts that enforce an equivalent external policy. Realistic
+  trusted hosts that enforce an equivalent external policy. Procedural
   accepted-boundary measurements remain pending.
 
 ### `P4-A002` -- Solver iteration count is caller-unbounded
@@ -273,7 +273,7 @@ robustness issues. No security claim is inferred from this ledger.
 - Inject semantic-label collisions into tracked cuts and each modeling wrapper
   after staged work has begun, then compare the full caller-visible session.
 
-### Determinism and realistic corpus
+### Determinism and procedural corpus
 
 - The committed receipt establishes same-host Windows/MSVC determinism for
   procedural CAD-like fixtures. Cross-platform digest equality remains

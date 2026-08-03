@@ -20,6 +20,15 @@ impl<P> Vertex<P> {
         }
     }
 
+    /// Creates a vertex with an explicit [`StableId`].
+    ///
+    /// The vertex remains untracked until it is initialized through
+    /// [`TopologyTracking::initialize_tracking`].
+    #[inline(always)]
+    pub fn new_with_id(point: P, stable_id: StableId) -> Vertex<P> {
+        Self::new_with_ids(point, stable_id, None)
+    }
+
     #[inline(always)]
     pub(crate) fn new_with_ids(
         point: P,
@@ -37,9 +46,11 @@ impl<P> Vertex<P> {
     #[inline(always)]
     pub fn stable_id(&self) -> StableId { self.stable_id }
 
-    /// Sets the stable persistent identifier of this vertex internally.
+    /// Sets the stable persistent identifier of this vertex.
+    ///
+    /// This does not change its session-scoped [`TrackingId`].
     #[inline(always)]
-    pub(crate) fn set_stable_id(&mut self, id: StableId) { self.stable_id = id; }
+    pub fn set_stable_id(&mut self, id: StableId) { self.stable_id = id; }
 
     /// Returns the immutable session-scoped tracking identifier, when assigned.
     #[inline(always)]

@@ -47,9 +47,11 @@ impl<P, C> Edge<P, C> {
     #[inline(always)]
     pub fn stable_id(&self) -> StableId { self.stable_id }
 
-    /// Sets the stable persistent identifier of this edge internally.
+    /// Sets the stable persistent identifier of this edge.
+    ///
+    /// This does not change its session-scoped [`TrackingId`].
     #[inline(always)]
-    pub(crate) fn set_stable_id(&mut self, id: StableId) { self.stable_id = id; }
+    pub fn set_stable_id(&mut self, id: StableId) { self.stable_id = id; }
 
     /// Returns the immutable session-scoped tracking identifier, when assigned.
     #[inline(always)]

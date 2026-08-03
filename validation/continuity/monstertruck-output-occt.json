@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "validator": "tools/phase5/validate_step_occt.py",
+  "validator_command": "target/phase5-python/Scripts/python.exe -E tools/phase5/validate_step_occt.py <step-files>",
+  "occt_version": "7.8.1",
+  "ocp_wrapper_version": "7.8.1.1",
+  "files": [
+    {
+      "file": "validation/continuity/monstertruck-polynomial-g1-solved.step",
+      "sha256": "41bf105b12840ce25a1a28ae77183b574fa790a36b02fbe07402bc8a4ebb06a1",
+      "bytes": 35969,
+      "occt_model_entities": 592,
+      "transferred_roots": 1,
+      "shape_type": "TopAbs_SHELL",
+      "valid_brep": true,
+      "unique_topology": {
+        "compounds": 0,
+        "compsolids": 0,
+        "solids": 0,
+        "shells": 1,
+        "faces": 2,
+        "wires": 2,
+        "edges": 7,
+        "vertices": 6
+      },
+      "bounding_box": {
+        "min": [
+          -1.0000001,
+          -2.6835821669e-05,
+          -0.2700001
+        ],
+        "max": [
+          1.2500001,
+          1.0000292663509205,
+          0.9300001
+        ]
+      },
+      "surfaces": [
+        {
+          "surface_type": "GeomAbs_BSplineSurface",
+          "u_domain": [
+            0.0,
+            1.0
+          ],
+          "v_domain": [
+            0.0,
+            1.0
+          ],
+          "u_degree": 3,
+          "v_degree": 3,
+          "u_poles": 4,
+          "v_poles": 5,
+          "u_knots": 2,
+          "v_knots": 3,
+          "u_rational": false,
+          "v_rational": false
+        },
+        {
+          "surface_type": "GeomAbs_BSplineSurface",
+          "u_domain": [
+            0.0,
+            1.0
+          ],
+          "v_domain": [
+            0.0,
+            1.0
+          ],
+          "u_degree": 3,
+          "v_degree": 3,
+          "u_poles": 4,
+          "v_poles": 5,
+          "u_knots": 2,
+          "v_knots": 3,
+          "u_rational": false,
+          "v_rational": false
+        }
+      ]
+    }
+  ]
+}

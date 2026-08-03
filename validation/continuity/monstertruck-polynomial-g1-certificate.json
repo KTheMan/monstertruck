@@ -1,0 +1,256 @@
+{
+  "schema_version": 3,
+  "evidence_class": "imported_workflow_independent_dense_certificate",
+  "input": "validation/continuity/polynomial-g1.step",
+  "output": "target/continuity-certification/polynomial-g1-solved.step",
+  "order": 1,
+  "perturbation": 0.001,
+  "selection": {
+    "first_face": 1,
+    "second_face": 2,
+    "first_boundary": "UEnd",
+    "second_boundary": "UStart",
+    "alignment": "Aligned",
+    "classification_maximum": 0.0
+  },
+  "certificate_before_export": {
+    "samples": 514,
+    "scale": 2.674288471762782,
+    "normalized_step": 0.005,
+    "stencil_radius": 4,
+    "maximum_absolute_residual_by_order": [
+      5.721958498152797e-16,
+      3.5024834180604816e-11
+    ],
+    "maximum_normalized_residual_by_order": [
+      2.1396190271055968e-16,
+      1.3096879618793657e-11
+    ],
+    "maximum_normalized_residual_tolerance_by_order": [
+      1e-9,
+      1e-7
+    ],
+    "maximum_normal_angle": 2.580956827951785e-8,
+    "maximum_normal_angle_tolerance": 1e-7,
+    "worst_seam_by_order": [
+      0.984375,
+      0.9921875
+    ],
+    "worst_mixed_derivative_by_order": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ]
+  },
+  "solver": {
+    "termination": "Converged",
+    "iterations": 2,
+    "accepted_steps": 2,
+    "rejected_steps": 0,
+    "initial_objective": 5372308817807.744,
+    "final_objective": 5.28294082977734e-11,
+    "residuals": [
+      {
+        "order": 0,
+        "rms": 2.7391411523488535e-16,
+        "maximum": 4.91663999040321e-16,
+        "worst_sample": 31,
+        "validation_sample": true,
+        "cross_derivative": 0,
+        "seam_derivative": 0
+      },
+      {
+        "order": 1,
+        "rms": 2.4473836240438357e-14,
+        "maximum": 3.738879685713165e-14,
+        "worst_sample": 26,
+        "validation_sample": true,
+        "cross_derivative": 1,
+        "seam_derivative": 0
+      }
+    ],
+    "numerical_rank": 71,
+    "variable_count": 71,
+    "residual_count": 152
+  },
+  "mesh_before_export": {
+    "face_count": 2,
+    "triangle_count": 8339,
+    "triangles_only": true,
+    "finite": true,
+    "nondegenerate": true,
+    "consistently_oriented": true,
+    "minimum_normalized_double_area": 0.00004756196956958259,
+    "normalized_double_area_tolerance": 1e-14,
+    "minimum_normal_alignment": 0.9954108598610755,
+    "normal_alignment_tolerance": 1e-6
+  },
+  "reimport": {
+    "selection": {
+      "first_face": 1,
+      "second_face": 2,
+      "first_boundary": "UEnd",
+      "second_boundary": "UStart",
+      "alignment": "Aligned",
+      "classification_maximum": 4.718958039861916e-16
+    },
+    "certificate": {
+      "samples": 514,
+      "scale": 2.674288471762782,
+      "normalized_step": 0.005,
+      "stencil_radius": 4,
+      "maximum_absolute_residual_by_order": [
+        5.721958498152797e-16,
+        3.5024834180604816e-11
+      ],
+      "maximum_normalized_residual_by_order": [
+        2.1396190271055968e-16,
+        1.3096879618793657e-11
+      ],
+      "maximum_normalized_residual_tolerance_by_order": [
+        1e-9,
+        1e-7
+      ],
+      "maximum_normal_angle": 2.580956827951785e-8,
+      "maximum_normal_angle_tolerance": 1e-7,
+      "worst_seam_by_order": [
+        0.984375,
+        0.9921875
+      ],
+      "worst_mixed_derivative_by_order": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ]
+    },
+    "persistence": {
+      "topology_before_export": {
+        "vertex_count": 6,
+        "edge_count": 7,
+        "face_count": 2,
+        "euler_characteristic": 1,
+        "vertex_valences": [
+          2,
+          2,
+          2,
+          2,
+          3,
+          3
+        ],
+        "edge_face_use_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          2
+        ],
+        "faces": [
+          {
+            "orientation": true,
+            "boundary_edge_counts": [
+              4
+            ]
+          },
+          {
+            "orientation": true,
+            "boundary_edge_counts": [
+              4
+            ]
+          }
+        ]
+      },
+      "topology_after_reimport": {
+        "vertex_count": 6,
+        "edge_count": 7,
+        "face_count": 2,
+        "euler_characteristic": 1,
+        "vertex_valences": [
+          2,
+          2,
+          2,
+          2,
+          3,
+          3
+        ],
+        "edge_face_use_counts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          2
+        ],
+        "faces": [
+          {
+            "orientation": true,
+            "boundary_edge_counts": [
+              4
+            ]
+          },
+          {
+            "orientation": true,
+            "boundary_edge_counts": [
+              4
+            ]
+          }
+        ]
+      },
+      "topology_equal": true,
+      "bounding_box_before_export": {
+        "minimum": [
+          -1.0,
+          -0.000011873974998303137,
+          -0.2
+        ],
+        "maximum": [
+          1.2500000000000002,
+          1.000012953427275,
+          0.8453798295637217
+        ],
+        "diagonal": 2.6749520824642117,
+        "samples": 2184
+      },
+      "bounding_box_after_reimport": {
+        "minimum": [
+          -1.0,
+          -0.000011873974998437184,
+          -0.2
+        ],
+        "maximum": [
+          1.2500000000000002,
+          1.000012953427275,
+          0.8453798295637217
+        ],
+        "diagonal": 2.6749520824642117,
+        "samples": 2184
+      },
+      "bounding_box_normalized_maximum_drift": 5.0111683462866464e-17,
+      "bounding_box_normalized_tolerance": 1e-9
+    },
+    "mesh": {
+      "face_count": 2,
+      "triangle_count": 8339,
+      "triangles_only": true,
+      "finite": true,
+      "nondegenerate": true,
+      "consistently_oriented": true,
+      "minimum_normalized_double_area": 0.000047561969569582594,
+      "normalized_double_area_tolerance": 1e-14,
+      "minimum_normal_alignment": 0.9954108598610755,
+      "normal_alignment_tolerance": 1e-6
+    }
+  }
+}

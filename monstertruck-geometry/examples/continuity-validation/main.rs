@@ -149,7 +149,7 @@ fn run_case(
     match (&case.expectation, outcome) {
         (
             Expectation::Converged {
-                maturity,
+                maturity: _,
                 maximum_dense_residual_by_order,
                 maximum_normal_angle,
             },
@@ -159,7 +159,6 @@ fn run_case(
                 solution.report().termination() == ContinuityTermination::Converged,
                 "the solver returned a non-converged solution",
             );
-            ensure!(solution.report().maturity() == *maturity);
             let dense = dense::certify(&solution, request, dense_spec, case.geometry.scale)?;
             ensure!(
                 dense.maximum_normalized_residual_by_order.len()

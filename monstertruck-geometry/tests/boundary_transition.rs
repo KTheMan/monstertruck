@@ -108,7 +108,7 @@ fn consuming_solution_parts_can_retain_the_transition() {
 
     let (solved_first, solved_second, transition, report) = solution.into_parts_with_transition();
 
-    assert_eq!(solved_first, first);
+    assert_eq!(solved_first, &first);
     assert_eq!(solved_second, second);
     assert_eq!(transition.order(), ContinuityOrder::G3);
     assert_eq!(report.iterations(), 0);

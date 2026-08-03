@@ -17,7 +17,9 @@ Every material claim uses one of these states:
 | --- | --- |
 | Implemented | The code path exists and has focused automated coverage for the stated behavior. This does not imply realistic validation or release readiness. |
 | Analytically verified | Independent mathematical checks support the result; the solver's own objective or collocation set is not the sole verifier. |
-| Realistically validated | Reproducible tests exercise imported or CAD-like models, representative edits, scale variation, and failure cases. |
+| Procedurally validated | Reproducible generated fixtures exercise the public implementation with known construction, representative edits, scale variation, and failure cases. |
+| Imported workflow validated | Provenance-clean CAD assets reach the feature through public import, topology, solve, certification, tessellation, and persistence APIs. |
+| Externally validated | A pinned independent CAD implementation accepts and checks the exported result. |
 | Not yet substantiated | The implementation or evidence is insufficient for the claim. |
 
 Passing a unit test is evidence of implementation, not by itself evidence of
@@ -65,18 +67,18 @@ named artifact and command are committed and reproducible.
 
 | Claim | Current state | Required Phase 4 evidence |
 | --- | --- | --- |
-| The kernel exposes `G0`--`G3` continuity primitives and a variational repair path. | Realistically validated for the recorded CAD-like cases | Exact `G0`--`G3`, one nonzero-offset `G1` repair, dense public-evaluation certification, and typed failures are committed. Nonzero-offset `G2`/`G3` remains pending. |
-| Nonuniform rational multi-span boundaries are supported. | Realistically validated for exact G3 | Curved-seam quintic rational cases with positive nonuniform weights pass independent certification. |
-| Multi-span boundaries are supported. | Realistically validated for the recorded knot layouts | Polynomial and rational cases contain multiple cross and seam spans; repeated-knot variants remain pending. |
-| Unequal parameterizations and reversed alignment are supported. | Realistically validated for the recorded cases | Nonlinear unequal/reversed `G1`, reversed `G3`, and unequal cross-domain `G3` pass mapped-boundary and interior certification. |
+| The kernel exposes `G0`--`G3` continuity primitives and a variational repair path. | Procedurally validated for the recorded CAD-like cases | Exact `G0`--`G3`, one nonzero-offset `G1` repair, dense public-evaluation certification, and typed failures are committed. Nonzero-offset `G2`/`G3` remains pending. |
+| Nonuniform rational multi-span boundaries are supported. | Procedurally validated for exact G3 | Curved-seam quintic rational cases with positive nonuniform weights pass independent certification. |
+| Multi-span boundaries are supported. | Procedurally validated for the recorded knot layouts | Polynomial and rational cases contain multiple cross and seam spans; repeated-knot variants remain pending. |
+| Unequal parameterizations and reversed alignment are supported. | Procedurally validated for the recorded cases | Nonlinear unequal/reversed `G1`, reversed `G3`, and unequal cross-domain `G3` pass mapped-boundary and interior certification. |
 | Failed solves and replay do not partially mutate tracked geometry or tracking sessions. | Implemented with focused replay validation | Initializer and topology regressions plus a multi-contract late replay failure preserve caller-visible inputs. Equivalent injected failure for every modeling wrapper remains pending. |
-| Replay after upstream edits is dependency ordered. | Realistically validated for the synthetic chain | Changed-generation geometry, stale-ID rejection, lexically conflicting contract IDs, dependency ordering, and downstream failure are covered. |
+| Replay after upstream edits is dependency ordered. | Procedurally validated for the synthetic chain | Changed-generation geometry, stale-ID rejection, lexically conflicting contract IDs, dependency ordering, and downstream failure are covered. |
 | Solver inputs have practical allocation and iteration bounds. | Implemented | Checked budgets cover control points, spans, samples, variables, residuals, Jacobian/QR elements, and iterations. Host deserialization limits remain separate. |
 | Serialized tracking topology rejects the audited malformed indices and kind mismatch. | Implemented | Focused regressions cover index correspondence, checked references, face cardinality, tracking dimensions, and kind mismatch. Oversized deserializer allocation remains pending. |
-| Results are deterministic on the recorded Windows/MSVC host. | Realistically validated | Immediate reruns and a separate-process full verify reproduce all 18 v4 digests. Cross-platform equality is not claimed. |
+| Results are deterministic on the recorded Windows/MSVC host. | Procedurally validated | Immediate reruns and a separate-process full verify reproduce all 18 v4 digests. Cross-platform equality is not claimed. |
 | The geometry continuity test target compiles to Wasm. | Implemented | Preserve the committed compile receipt and run it in CI. |
 | The continuity path is usable on Wasm. | Not yet substantiated | Runtime execution in a supported Wasm host, including deterministic replay and bounded failure cases. |
-| Experimental `G4` is reachable. | Realistically validated as experimental | The rational quintic G4 case certifies with maximum normalized order-four residual `3.874577898e-3` using domain-valid one-sided cross stencils; production G4 remains not substantiated. |
+| Experimental `G4` is reachable. | Procedurally validated as experimental | The rational quintic G4 case certifies with maximum normalized order-four residual `3.874577898e-3` using domain-valid one-sided cross stencils; production G4 remains not substantiated. |
 | The implementation provides production `G4`. | Not yet substantiated | Not required. Keep `G4` experimental pending nonzero-offset and imported evidence. |
 | The implementation provides "Class-A" surfacing. | Not yet substantiated | No Phase 4 claim is planned; this requires broader fairness and visual-quality criteria. |
 
