@@ -15,10 +15,24 @@ impl Plane {
     pub const fn origin(&self) -> Point3 { self.o }
     /// Returns the u-axis
     #[inline(always)]
-    pub fn u_axis(&self) -> Vector3 { self.p - self.o }
+    pub fn axis_u(&self) -> Vector3 { self.p - self.o }
     /// Returns the v-axis
     #[inline(always)]
-    pub fn v_axis(&self) -> Vector3 { self.q - self.o }
+    pub fn axis_v(&self) -> Vector3 { self.q - self.o }
+    /// Deprecated alias for [`axis_u`](Plane::axis_u).
+    ///
+    /// Renamed for `<property>_<direction>` consistency with `derivative_u`,
+    /// `knot_vector_u` and `cut_u`, which is the convention across this crate.
+    #[deprecated(since = "0.3.4", note = "renamed to `axis_u`")]
+    #[inline(always)]
+    pub fn u_axis(&self) -> Vector3 { self.axis_u() }
+    /// Deprecated alias for [`axis_v`](Plane::axis_v).
+    ///
+    /// Renamed for `<property>_<direction>` consistency with `derivative_v`,
+    /// `knot_vector_v` and `cut_v`, which is the convention across this crate.
+    #[deprecated(since = "0.3.4", note = "renamed to `axis_v`")]
+    #[inline(always)]
+    pub fn v_axis(&self) -> Vector3 { self.axis_v() }
     /// Returns the normal
     /// # Examples
     /// ```
@@ -31,7 +45,7 @@ impl Plane {
     /// assert_near!(plane.normal(), Vector3::unit_z());
     /// ```
     #[inline(always)]
-    pub fn normal(&self) -> Vector3 { self.u_axis().cross(self.v_axis()).normalize() }
+    pub fn normal(&self) -> Vector3 { self.axis_u().cross(self.axis_v()).normalize() }
     /// Gets the parameter of `pt` in plane's matrix.
     /// # Examples
     /// ```
@@ -45,15 +59,15 @@ impl Plane {
     /// let pt = Point3::new(2.1, -6.5, 4.7);
     /// let prm = plane.parameter(pt);
     /// let rev = plane.origin()
-    ///     + prm[0] * plane.u_axis()
-    ///     + prm[1] * plane.v_axis()
+    ///     + prm[0] * plane.axis_u()
+    ///     + prm[1] * plane.axis_v()
     ///     + prm[2] * plane.normal();
     /// assert_near!(pt, rev);
     /// ```
     #[inline(always)]
     pub fn parameter(&self, pt: Point3) -> Vector3 {
-        let a = self.u_axis();
-        let b = self.v_axis();
+        let a = self.axis_u();
+        let b = self.axis_v();
         let c = self.normal();
         // SAFETY: `u_axis`, `v_axis`, and `normal` are linearly independent by
         // the `Plane` construction invariant.

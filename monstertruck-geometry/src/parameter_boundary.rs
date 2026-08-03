@@ -447,7 +447,7 @@ where
     I: IntoIterator<Item = f64>,
 {
     let mut parameters = parameters.into_iter();
-    let periods = (surface.u_period(), surface.v_period());
+    let periods = (surface.period_u(), surface.period_v());
     let samples: SmallVec<[(Point3, Point2); 5]> =
         parameters.try_fold(SmallVec::new(), |mut samples, parameter| {
             let point = curve.subs(parameter);

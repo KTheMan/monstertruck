@@ -180,9 +180,9 @@ where
         (self.curve0.parameter_range(), self.curve1.parameter_range())
     }
     #[inline(always)]
-    fn u_period(&self) -> Option<f64> { self.curve0.period() }
+    fn period_u(&self) -> Option<f64> { self.curve0.period() }
     #[inline(always)]
-    fn v_period(&self) -> Option<f64> { self.curve1.period() }
+    fn period_v(&self) -> Option<f64> { self.curve1.period() }
 }
 
 impl<C0, C1> ParametricSurface3D for SubSurface<C0, C1>

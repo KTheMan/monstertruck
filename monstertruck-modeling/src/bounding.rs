@@ -402,7 +402,7 @@ fn surface_patch_box(
                 (high.x, low.y),
                 (high.x, high.y),
             ] {
-                points.push(plane.origin() + plane.u_axis() * u + plane.v_axis() * v);
+                points.push(plane.origin() + plane.axis_u() * u + plane.axis_v() * v);
             }
             hull_box(&points)
         }
