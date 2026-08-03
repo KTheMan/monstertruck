@@ -27,7 +27,7 @@ fn pmul<P: EuclideanSpace>((b, p): (&P::Scalar, &P)) -> P::Diff { p.to_vec() * *
 fn tmul<S: Copy, T: Copy + Mul<S>>((b, v): (&S, &T)) -> <T as Mul<S>>::Output { *v * *b }
 
 type SurfaceTriple<'a, S> = (S, &'a Vec<Point2>, &'a Vec<Vector2>);
-fn u_control_points<S: ParametricSurface3D>(
+fn control_points_u<S: ParametricSurface3D>(
     basis: &[f64],
     dbasis: &[f64],
     (surface, side_control_points, tangent_vecs): SurfaceTriple<'_, S>,
@@ -72,7 +72,7 @@ const fn bezier_3rd_basis(n: usize, u: f64) -> [f64; 4] {
 
 mod subders {
     use super::*;
-    fn v_axis_ders(p_ders: &CurveDerivatives<Vector3>) -> CurveDerivatives<Vector3> {
+    fn axis_v_ders(p_ders: &CurveDerivatives<Vector3>) -> CurveDerivatives<Vector3> {
         let p_derders = p_ders.derivative();
         let homog_ders =
             p_derders.element_wise_derivatives(&p_derders.absolute_derivatives(), Vector3::extend);
@@ -96,11 +96,11 @@ mod subders {
         n_ders: &CurveDerivatives<Vector3>,
     ) -> CurveDerivatives<Vector3> {
         use std::ops::Add;
-        let v_axis_ders = v_axis_ders(p_ders);
-        let u_axis_ders = v_axis_ders.combinatorial_derivatives(n_ders, Vector3::cross);
+        let axis_v_ders = axis_v_ders(p_ders);
+        let u_axis_ders = axis_v_ders.combinatorial_derivatives(n_ders, Vector3::cross);
         let wp_ders = w_ders.combinatorial_derivatives(p_ders, |w, p| w * p);
         let aders = b_ders.combinatorial_derivatives(&u_axis_ders, |v, p| v[0] * p) / 3.0;
-        let bders = b_ders.combinatorial_derivatives(&v_axis_ders, |v, p| v[1] * p) / 3.0;
+        let bders = b_ders.combinatorial_derivatives(&axis_v_ders, |v, p| v[1] * p) / 3.0;
         wp_ders
             .element_wise_derivatives(&aders, Add::add)
             .element_wise_derivatives(&bders, Add::add)
@@ -193,8 +193,8 @@ where
         let weight: f64 = basis.iter().zip(weights).map(|(&b, &w)| b * w).sum();
         let striple0 = (surface0, side_control_points0, tangent_vecs0);
         let striple1 = (surface1, side_control_points1, tangent_vecs1);
-        let (pt0, pt1) = u_control_points(&basis, &dbasis, striple0, weight);
-        let (pt3, pt2) = u_control_points(&basis, &dbasis, striple1, weight);
+        let (pt0, pt1) = control_points_u(&basis, &dbasis, striple0, weight);
+        let (pt3, pt2) = control_points_u(&basis, &dbasis, striple1, weight);
         let b = bezier_3rd_basis(0, u);
         Point3::from_homogeneous(b[0] * pt0 + b[1] * pt1 + b[2] * pt2 + b[3] * pt3)
     }

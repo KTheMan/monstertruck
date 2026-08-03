@@ -96,9 +96,9 @@ impl ParametricSurface for Torus {
         (RANGE, RANGE)
     }
     #[inline(always)]
-    fn u_period(&self) -> Option<f64> { Some(2.0 * PI) }
+    fn period_u(&self) -> Option<f64> { Some(2.0 * PI) }
     #[inline(always)]
-    fn v_period(&self) -> Option<f64> { Some(2.0 * PI) }
+    fn period_v(&self) -> Option<f64> { Some(2.0 * PI) }
 }
 
 impl ParametricSurface3D for Torus {
@@ -153,9 +153,9 @@ impl v2::ParametricSurface for Torus {
         ParametricSurface::derivative_vv(self, u, v)
     }
     #[inline(always)]
-    fn period_u(&self) -> Option<f64> { ParametricSurface::u_period(self) }
+    fn period_u(&self) -> Option<f64> { ParametricSurface::period_u(self) }
     #[inline(always)]
-    fn period_v(&self) -> Option<f64> { ParametricSurface::v_period(self) }
+    fn period_v(&self) -> Option<f64> { ParametricSurface::period_v(self) }
 }
 
 impl v2::BoundedSurface for Torus {

@@ -56,7 +56,7 @@ where
         )
     }
     #[inline(always)]
-    fn u_period(&self) -> Option<f64> { self.curve.period() }
+    fn period_u(&self) -> Option<f64> { self.curve.period() }
 }
 
 impl<C: ParametricCurve3D> ParametricSurface3D for ExtrusionSurface<C, Vector3> {
@@ -110,9 +110,9 @@ where
         ParametricSurface::derivative_vv(self, u, v)
     }
     #[inline(always)]
-    fn period_u(&self) -> Option<f64> { ParametricSurface::u_period(self) }
+    fn period_u(&self) -> Option<f64> { ParametricSurface::period_u(self) }
     #[inline(always)]
-    fn period_v(&self) -> Option<f64> { ParametricSurface::v_period(self) }
+    fn period_v(&self) -> Option<f64> { ParametricSurface::period_v(self) }
 }
 
 impl<C: ParametricCurve3D + ParametricCurveTrait> v2::ParametricSurface3D

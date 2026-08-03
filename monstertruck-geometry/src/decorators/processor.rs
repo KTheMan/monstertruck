@@ -264,17 +264,17 @@ where
         }
     }
     #[inline(always)]
-    fn u_period(&self) -> Option<f64> {
+    fn period_u(&self) -> Option<f64> {
         match self.orientation {
-            true => self.entity.u_period(),
-            false => self.entity.v_period(),
+            true => self.entity.period_u(),
+            false => self.entity.period_v(),
         }
     }
     #[inline(always)]
-    fn v_period(&self) -> Option<f64> {
+    fn period_v(&self) -> Option<f64> {
         match self.orientation {
-            true => self.entity.v_period(),
-            false => self.entity.u_period(),
+            true => self.entity.period_v(),
+            false => self.entity.period_u(),
         }
     }
 }
@@ -341,9 +341,9 @@ where
         ParametricSurface::derivative_vv(self, u, v)
     }
     #[inline(always)]
-    fn period_u(&self) -> Option<f64> { ParametricSurface::u_period(self) }
+    fn period_u(&self) -> Option<f64> { ParametricSurface::period_u(self) }
     #[inline(always)]
-    fn period_v(&self) -> Option<f64> { ParametricSurface::v_period(self) }
+    fn period_v(&self) -> Option<f64> { ParametricSurface::period_v(self) }
 }
 
 impl<S, T> v2::BoundedSurface for Processor<S, T>

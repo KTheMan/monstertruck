@@ -83,7 +83,7 @@ where
         cc_ders.vder_info(&rders)
     }
 
-    pub(super) fn u_parameter_division(
+    pub(super) fn parameter_division_u(
         &self,
         ((u0, u1), (v0, v1)): ((f64, f64), (f64, f64)),
         tol: f64,
@@ -484,7 +484,7 @@ proptest! {
     }
 }
 
-pub(super) fn v_parameter_division_for_fillet<S>(
+pub(super) fn parameter_division_v_for_fillet<S>(
     surface: &S,
     udiv: &[f64],
     vdiv: &mut Vec<f64>,
@@ -535,7 +535,7 @@ pub(super) fn v_parameter_division_for_fillet<S>(
 
     if vdiv.len() != new_vdiv.len() {
         *vdiv = new_vdiv;
-        v_parameter_division_for_fillet(surface, udiv, vdiv, tol);
+        parameter_division_v_for_fillet(surface, udiv, vdiv, tol);
     }
 }
 

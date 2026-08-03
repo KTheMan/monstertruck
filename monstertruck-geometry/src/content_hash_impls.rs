@@ -60,8 +60,8 @@ impl DeterministicContentHash for Plane {
     fn content_hash<H: Hasher>(&self, state: &mut H) {
         self.origin().content_hash(state);
         // Hash u_axis and v_axis -- derived from the stored p,q fields.
-        self.u_axis().content_hash(state);
-        self.v_axis().content_hash(state);
+        self.axis_u().content_hash(state);
+        self.axis_v().content_hash(state);
     }
 }
 

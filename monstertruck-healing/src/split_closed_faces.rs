@@ -529,7 +529,7 @@ where
     };
     let create_pre_divisor = move |(wire, poly_wire): ZippedWire<'_>| {
         let (urange, vrange) = surface.try_range_tuple();
-        let (up, vp) = (surface.u_period(), surface.v_period());
+        let (up, vp) = (surface.period_u(), surface.period_v());
         let p = poly_wire[0][0];
         let q = *poly_wire.last()?.last()?;
         let vertices: Vec<(usize, f64)> = if p.x.near(&q.x) {
@@ -674,7 +674,7 @@ where
         .find_map(closure_find_vertex_parameter(v0, edges))?;
     let q = zip_boundaries(boundaries, &param_boundaries)
         .find_map(closure_find_vertex_parameter(v1, edges))?;
-    let periods = (surface.u_period(), surface.v_period());
+    let periods = (surface.period_u(), surface.period_v());
     let q =
         periodic_iterator(q, periods).min_by(|q, r| p.distance2(*q).total_cmp(&p.distance2(*r)))?;
     let pcurve = ParameterCurve::new(Line(p, q), surface.clone());
@@ -940,12 +940,12 @@ fn nearest_periodic_parameter(
     reference: Point2,
     periods: (Option<f64>, Option<f64>),
 ) -> Point2 {
-    let (u_period, v_period) = periods;
-    let us = match u_period {
+    let (period_u, period_v) = periods;
+    let us = match period_u {
         Some(period) => vec![-2.0 * period, -period, 0.0, period, 2.0 * period],
         None => vec![0.0],
     };
-    let vs = match v_period {
+    let vs = match period_v {
         Some(period) => vec![-2.0 * period, -period, 0.0, period, 2.0 * period],
         None => vec![0.0],
     };
@@ -974,7 +974,7 @@ where
     C: ParameterBoundary2D<S>,
     S: ParametricSurface3D,
 {
-    let periods = (surface.u_period(), surface.v_period());
+    let periods = (surface.period_u(), surface.period_v());
     let mut previous = None;
     boundaries
         .iter()
@@ -1101,7 +1101,7 @@ fn poly_project_to_uv<'a, S: ParametricSurface3D>(
     surface: &'a S,
     sp: impl SP<S> + 'a,
 ) -> impl FnMut(Point3) -> Option<Point2> + 'a {
-    let (up, vp) = (surface.u_period(), surface.v_period());
+    let (up, vp) = (surface.period_u(), surface.period_v());
     let mut previous = None;
     move |pt| {
         let (mut u, mut v) = sp(surface, pt, previous)?;
@@ -1126,7 +1126,7 @@ fn get_mindiff(u: f64, u0: f64, up: f64) -> f64 {
 }
 
 fn boundary_into_domain<S: ParametricSurface3D>(vec: &mut Vec<Point2>, surface: &S) {
-    let (up, vp) = (surface.u_period(), surface.v_period());
+    let (up, vp) = (surface.period_u(), surface.period_v());
     let (urange, vrange) = surface.try_range_tuple();
     let grav = vec.iter().fold(Point2::origin(), |g, p| g + p.to_vec()) / vec.len() as f64;
     if let (Some(up), Some((u0, _))) = (up, urange) {
@@ -1176,7 +1176,7 @@ fn enumerate_vertices_on_divisor<S: ParametricSurface>(
 ) -> Option<Vec<(f64, (usize, Point2))>> {
     let (v0, v1) = divisor;
     let (p, q) = (*param_vertices.get(&v0)?, *param_vertices.get(&v1)?);
-    let periods = (surface.u_period(), surface.v_period());
+    let periods = (surface.period_u(), surface.period_v());
     let q =
         periodic_iterator(q, periods).min_by(|q, r| p.distance2(*q).total_cmp(&p.distance2(*r)))?;
     let line = Line(p, q);

@@ -621,7 +621,7 @@ impl StepFormat for Plane {
 {location}{z_axis}{x_axis}",
             location = StepDisplay::new(self.origin(), location_idx),
             z_axis = StepDisplay::new(VectorAsDirection(self.normal()), z_axis_idx),
-            x_axis = StepDisplay::new(VectorAsDirection(self.u_axis().normalize()), x_axis_idx)
+            x_axis = StepDisplay::new(VectorAsDirection(self.axis_u().normalize()), x_axis_idx)
         ))
     }
 }
