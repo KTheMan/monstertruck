@@ -1,5 +1,5 @@
+use monstertruck_fillet::{FilletIntersectionCurve, ParameterCurveLinear};
 use monstertruck_geometry::prelude::*;
-use monstertruck_solid::{FilletIntersectionCurve, ParameterCurveLinear};
 
 use crate::{Curve, Curve2D, Surface};
 
@@ -10,6 +10,13 @@ impl TryFrom<Surface> for NurbsSurface<Vector4> {
             Surface::Plane(plane) => Ok(NurbsSurface::from(BsplineSurface::from(plane))),
             Surface::BsplineSurface(bsp) => Ok(NurbsSurface::from(bsp)),
             Surface::NurbsSurface(ns) => Ok(ns),
+            // The exact rational net -- the SAME one these faces WERE before
+            // spec 012 U1.2 moved them onto the analytic variants, so the
+            // fillet path sees no change.
+            Surface::SphericalSurface(_) | Surface::ToroidalSurface(_) => surface
+                .try_into_homogeneous_bspline_surface()
+                .map(NurbsSurface::new)
+                .ok_or(()),
             Surface::RevolutionSurface(_) | Surface::TsplineSurface(_) => Err(()),
         }
     }

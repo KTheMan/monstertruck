@@ -967,7 +967,9 @@ fn exec_spherical_surface(
         StepDisplay::new(VectorAsDirection(ref_dir.normalize()), 5),
     );
     let step_sphere = step_to_entity::<ElementarySurfaceAnyHolder>(&step_str);
-    let sphere: step_geometry::ElementarySurface = (&step_sphere).into();
+    let sphere: step_geometry::ElementarySurface = (&step_sphere)
+        .try_into()
+        .expect("a spherical surface must convert");
     let mat = Matrix4::from_cols(
         x.extend(0.0),
         y.extend(0.0),
@@ -1026,12 +1028,16 @@ fn exec_cylindrical_surface(
         StepDisplay::new(VectorAsDirection(ref_dir.normalize()), 5),
     );
     let step_cylinder0 = step_to_entity::<ElementarySurfaceAnyHolder>(&step_str0);
-    let cylinder0: step_geometry::ElementarySurface = (&step_cylinder0).into();
+    let cylinder0: step_geometry::ElementarySurface = (&step_cylinder0)
+        .try_into()
+        .expect("a cylindrical surface must convert");
 
     // It has its own output, so test it accordingly.
     let step_str1 = format!("DATA;\n{}ENDSEC;", StepDisplay::new(&cylinder0, 1));
     let step_cylinder1 = step_to_entity::<ElementarySurfaceAnyHolder>(&step_str1);
-    let cylinder1: step_geometry::ElementarySurface = (&step_cylinder1).into();
+    let cylinder1: step_geometry::ElementarySurface = (&step_cylinder1)
+        .try_into()
+        .expect("a cylindrical surface must convert");
 
     let mat = Matrix4::from_cols(
         x.extend(0.0),
@@ -1092,7 +1098,9 @@ fn exec_toroidal_surface(
         StepDisplay::new(VectorAsDirection(ref_dir.normalize()), 5),
     );
     let step_toroidal = step_to_entity::<ElementarySurfaceAnyHolder>(&step_str);
-    let toroidal: step_geometry::ElementarySurface = (&step_toroidal).into();
+    let toroidal: step_geometry::ElementarySurface = (&step_toroidal)
+        .try_into()
+        .expect("a ring torus must convert");
     let mat = Matrix4::from_cols(
         x.extend(0.0),
         y.extend(0.0),
@@ -1152,12 +1160,16 @@ fn exec_conical_surface(
         StepDisplay::new(VectorAsDirection(ref_dir.normalize()), 5),
     );
     let step_conical = step_to_entity::<ElementarySurfaceAnyHolder>(&step_str);
-    let conical: step_geometry::ElementarySurface = (&step_conical).into();
+    let conical: step_geometry::ElementarySurface = (&step_conical)
+        .try_into()
+        .expect("a conical surface must convert");
 
     // It has its own output, so test it accordingly.
     let step_str1 = format!("DATA;\n{}ENDSEC;", StepDisplay::new(conical, 1));
     let step_cylinder1 = step_to_entity::<ElementarySurfaceAnyHolder>(&step_str1);
-    let conical1: step_geometry::ElementarySurface = (&step_cylinder1).into();
+    let conical1: step_geometry::ElementarySurface = (&step_cylinder1)
+        .try_into()
+        .expect("a conical surface must convert");
 
     let mat = Matrix4::from_cols(
         x.extend(0.0),

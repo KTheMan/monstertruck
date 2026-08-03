@@ -328,14 +328,14 @@ Why:
 
 - This is a parallel redesign of upstream's old fillet path.
 - Our code has already moved to `rolling_ball_fillet` and `approximate_fillet_surface` names/structure.
-- Merging would likely regress architecture and make the Yang/boolean work harder to reason about.
+- Merging would likely regress architecture and make the boolean work harder to reason about.
 
 Use upstream only as reference:
 
 - Mine tests and edge cases.
 - Mine specific numerical fixes if they apply to our current fillet implementation.
 - Do not resurrect `rbf_surface` module structure.
-- Do not block Boolean/Yang work on this.
+- Do not block boolean work on this.
 
 ## `truck-drafting`/potential `monstertruck-sketch` assessment
 

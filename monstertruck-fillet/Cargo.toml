@@ -1,0 +1,31 @@
+[package]
+name = "monstertruck-fillet"
+version = "0.3.3"
+authors = ["Moritz Moeller <virtualritz@protonmail.com>"]
+edition = "2024"
+description = "Rolling-ball fillet operations for solid shell edges"
+homepage = "https://github.com/virtualritz/monstertruck"
+repository = "https://github.com/virtualritz/monstertruck"
+license = "Apache-2.0"
+
+[features]
+default = []
+
+[dependencies]
+ahash = { workspace = true }
+derive_more = { workspace = true }
+itertools = { workspace = true }
+smallvec = { workspace = true }
+thiserror = { workspace = true }
+monstertruck-core = { workspace = true }
+monstertruck-geometry = { workspace = true }
+monstertruck-traits = { workspace = true }
+monstertruck-meshing = { workspace = true }
+monstertruck-topology = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+monstertruck-step = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+getrandom = { workspace = true }

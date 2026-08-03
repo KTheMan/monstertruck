@@ -1,4 +1,29 @@
-use crate::HashSet;
+//! Shape healing for solids imported from other CAD systems.
+//!
+//! The compressed-shell repair passes that turn a loaded B-rep into something a
+//! boolean kernel can work with: closed-edge and closed-face splitting, seam
+//! stripping, pass-through-edge dedup and shell orientation normalization.
+//!
+//! These passes are POST-CSG and kernel-independent -- nothing here references a
+//! boolean backend, which is why the crate sits below both the published
+//! `monstertruck-solid` marching kernel and any external SSI boolean backend
+//! rather than inside either.
+
+#![cfg_attr(not(debug_assertions), deny(warnings))]
+#![deny(clippy::all, rust_2018_idioms)]
+#![warn(
+    missing_docs,
+    missing_debug_implementations,
+    trivial_casts,
+    trivial_numeric_casts,
+    unsafe_code,
+    unstable_features,
+    unused_import_braces,
+    unused_qualifications
+)]
+
+pub(crate) use ahash::AHashSet as HashSet;
+
 use monstertruck_geometry::prelude::*;
 use monstertruck_meshing::rexport_polymesh::*;
 use monstertruck_topology::compress::*;
@@ -24,8 +49,8 @@ use split_pass_through_edges::{
     dedup_coincident_pass_through_edges, remap_trimmed_edge_uses_for_dedup,
     split_pass_through_edges, split_pass_through_edges_trimmed,
 };
-// Promoted (doc-hidden) so an external SSI boolean-backend upgrade crate
-// can reuse these compressed-shell repair passes; unused inside this crate
+// Promoted (doc-hidden) so an external SSI boolean backend can reuse these
+// compressed-shell repair passes; unused inside this crate
 // outside `#[cfg(test)]`.
 #[doc(hidden)]
 pub use split_pass_through_edges::{
@@ -34,6 +59,9 @@ pub use split_pass_through_edges::{
 
 mod split_closed_faces;
 use split_closed_faces::split_closed_faces;
+
+mod split_seam_faces;
+use split_seam_faces::split_seam_faces_trimmed;
 
 fn same_surface<S: ParametricSurface3D>(lhs: &S, rhs: &S) -> bool {
     let sample_params = |surface: &S| {
@@ -936,22 +964,33 @@ where
                 started.elapsed().as_secs_f64() * 1000.0,
             );
         }
-        if !first_faces_changed {
-            return;
-        }
-        let original = self.clone();
-        if enable_pass_through && !skip_single_face_pass_through {
-            split_closed_edges(&mut plain);
-            split_pass_through_edges(&mut plain, tol);
-            let second_faces_changed = split_closed_faces(&mut plain, tol, sp);
-            if debug_trace || debug_heal_split {
-                eprintln!(
-                    "trace bool robust_split_trimmed after_faces_propagate elapsed_ms={:.3} changed={second_faces_changed}",
-                    started.elapsed().as_secs_f64() * 1000.0,
-                );
+        if first_faces_changed {
+            let original = self.clone();
+            if enable_pass_through && !skip_single_face_pass_through {
+                split_closed_edges(&mut plain);
+                split_pass_through_edges(&mut plain, tol);
+                let second_faces_changed = split_closed_faces(&mut plain, tol, sp);
+                if debug_trace || debug_heal_split {
+                    eprintln!(
+                        "trace bool robust_split_trimmed after_faces_propagate elapsed_ms={:.3} changed={second_faces_changed}",
+                        started.elapsed().as_secs_f64() * 1000.0,
+                    );
+                }
             }
+            *self = reattach_preserved_face_trims(&original, plain, tol);
         }
-        *self = reattach_preserved_face_trims(&original, plain, tol);
+        // Resolve any residual periodic-surface seam face that `split_closed_faces`
+        // could not divide into simple sub-faces (inward-normal / hole cylinders
+        // whose param-space loops carry no positive outer, or seam-crossing halves
+        // that wrap the u-period) into its two vertex-disjoint cap loops, so the
+        // trimmed solid extracts instead of refusing `NotSimpleWire` at solidify.
+        let seam_splits = split_seam_faces_trimmed(self);
+        if debug_trace || debug_heal_split {
+            eprintln!(
+                "trace bool robust_split_trimmed after_seam elapsed_ms={:.3} seam_splits={seam_splits}",
+                started.elapsed().as_secs_f64() * 1000.0,
+            );
+        }
     }
 }
 
@@ -1052,6 +1091,29 @@ where
 
 /// Convenience function: heal a compressed trimmed solid and extract it while
 /// preserving exact face-local trim curves when the edge curves can supply them.
+///
+/// # Refuses a PARTIAL input instead of returning one (ledger class C11)
+///
+/// A `CompressedTrimmedSolid` can arrive short of faces: the STEP loader
+/// converts a shell face by face, so a typed surface refusal -- spec 011 T1's
+/// degenerate-torus refusal, for instance -- drops that face and the shell is
+/// still returned as `Ok`. Healing cannot repair that; the shell it is handed
+/// simply has a hole.
+///
+/// This function therefore ends in
+/// [`TrimmedSolid::try_new`](monstertruck_topology::trimmed::TrimmedSolid::try_new)
+/// and refuses such an input with the same typed error the plain path has
+/// always used -- `NotClosedShell`, `NotConnected`, `NotManifold`,
+/// `EmptyShell`. Measured over every in-repo fixture (15 files, 185 solids,
+/// spec 011 C11 work): zero change, all 185 already satisfied the invariant.
+/// Measured over `ROTOR-201NAL-Z7.STEP`: 3 of 33 solids move from `Ok`-and-
+/// abort-downstream to a typed refusal here.
+///
+/// **What the error does NOT tell you** is WHY the shell is short -- that
+/// knowledge belongs to the loader, which is a layer above this crate. A
+/// caller who needs the reason should convert through the STEP loader's
+/// `*_reported` conversions (spec 011 T7) and read the `ShellLoadReport`
+/// alongside this refusal.
 pub fn extract_healed_trimmed_solid<C, S, T>(
     mut csolid: CompressedTrimmedSolid<Point3, C, S, T>,
     tol: f64,
@@ -1087,13 +1149,18 @@ where
     };
     // Real-world STEP files routinely ship shells whose faces disagree on
     // edge direction (shell condition `Regular`); heal them to `Closed`.
-    Ok(TrimmedSolid::new(
+    //
+    // `try_new` and not `new`: orientation healing is the LAST repair this
+    // function has, so whatever is still wrong after it is not repairable
+    // here and must leave as a typed refusal rather than as an `Ok` that
+    // violates `Solid`'s precondition. See the C11 note on the item docs.
+    TrimmedSolid::try_new(
         solid
             .into_boundaries()
             .into_iter()
             .map(|shell| normalize_trimmed_shell_orientation(shell).0)
             .collect(),
-    ))
+    )
 }
 
 /// Outcome of [`normalize_shell_orientation`].

@@ -1080,7 +1080,7 @@ impl TryFrom<&SurfaceAny> for Surface {
     fn try_from(x: &SurfaceAny) -> Result<Self, Self::Error> {
         use SurfaceAny::*;
         Ok(match x {
-            ElementarySurface(x) => Self::ElementarySurface(x.as_ref().into()),
+            ElementarySurface(x) => Self::ElementarySurface(x.as_ref().try_into()?),
             BsplineSurface(x) => x.as_ref().try_into()?,
             SweptSurface(x) => Self::SweepSurface(x.as_ref().try_into()?),
         })
@@ -1100,21 +1100,33 @@ pub enum ElementarySurfaceAny {
     CylindricalSurface(Box<CylindricalSurface>),
     #[holder(use_place_holder)]
     ToroidalSurface(Box<ToroidalSurface>),
+    /// The self-intersecting torus subtype. Present so the record deserializes
+    /// into a NAMED class instead of `Table::dummy`; its geometry is refused with
+    /// the class named (see [`refuse_degenerate_torus`]).
+    #[holder(use_place_holder)]
+    DegenerateToroidalSurface(Box<DegenerateToroidalSurface>),
     #[holder(use_place_holder)]
     ConicalSurface(Box<ConicalSurface>),
 }
 
-impl From<&ElementarySurfaceAny> for ElementarySurface {
+/// Fallible since spec 011 T1: two of the five elementary surfaces carry radii a
+/// STEP file can put outside the representable domain, and the torus arm used to
+/// hand them to a constructor that PANICS (`Torus::new`, on
+/// `major_radius <= 0.0`). 207 corpus faces reached that panic and took 11 solids
+/// -- 15,191 faces -- down with them. The refusal now happens here, typed.
+impl TryFrom<&ElementarySurfaceAny> for ElementarySurface {
+    type Error = StepConvertingError;
     #[inline(always)]
-    fn from(value: &ElementarySurfaceAny) -> Self {
+    fn try_from(value: &ElementarySurfaceAny) -> Result<Self, Self::Error> {
         use ElementarySurfaceAny::*;
-        match value {
+        Ok(match value {
             Plane(x) => Self::Plane(x.as_ref().into()),
             SphericalSurface(x) => Self::Sphere(x.as_ref().into()),
             CylindricalSurface(x) => Self::CylindricalSurface(x.as_ref().into()),
-            ToroidalSurface(x) => Self::ToroidalSurface(x.as_ref().into()),
+            ToroidalSurface(x) => Self::ToroidalSurface(x.as_ref().try_into()?),
+            DegenerateToroidalSurface(x) => Self::ToroidalSurface(x.as_ref().try_into()?),
             ConicalSurface(x) => Self::ConicalSurface(x.as_ref().into()),
-        }
+        })
     }
 }
 
@@ -1201,19 +1213,181 @@ pub struct ToroidalSurface {
     minor_radius: f64,
 }
 
-impl From<&ToroidalSurface> for step_geometry::ToroidalSurface {
+/// The DEGENERATE (self-intersecting) toroidal regime, refused with the class
+/// named -- for BOTH spellings real exporters use for it.
+///
+/// # The regime, and why it is one regime with two spellings
+///
+/// A torus whose `minor_radius` exceeds its `major_radius` self-intersects: the
+/// tube circle crosses the axis of revolution, so the swept surface passes
+/// through itself and closes into an apex (the "spindle" or "lemon" torus).
+/// ISO 10303-42 splits `degenerate_toroidal_surface` out of `toroidal_surface`
+/// precisely for it (`WHERE major_radius < minor_radius`, plus `select_outer` to
+/// pick a sheet). Measured over the 8-file corpus (spec 011 T1), it arrives
+/// THREE ways:
+///
+/// | spelling | records | files |
+/// |---|---|---|
+/// | `DEGENERATE_TOROIDAL_SURFACE` | 253 | Rocky_House 156, Cruise_Assembly 63, Ai-14R 34 |
+/// | `TOROIDAL_SURFACE` with NEGATIVE `major_radius` | 207 | NissanGT-R 201, ROTOR 6 |
+/// | `TOROIDAL_SURFACE` with `0 < major_radius < minor_radius` | 136 | NissanGT-R 126, UMC-500 10 |
+///
+/// A negative major radius is out-of-schema (`positive_length_measure`), and it
+/// is the same surface: `(-R, r)` at `(u, v)` equals `(R, r)` at
+/// `(u + pi, pi - v)`. That reparameterisation is NOT a placement change, so it
+/// cannot be normalised away without invalidating the face's trims (C2).
+/// In every one of the 207 measured records `|major| < minor`, i.e. all three
+/// spellings are the SAME degenerate regime.
+///
+/// # Why refuse rather than represent (measured, not assumed)
+///
+/// The rational-NURBS control net IS exact here -- with the builder's spindle
+/// guard bypassed, the emitted net matches the analytic torus to a relative
+/// 8e-16..9e-16 over the whole domain, with the control hull a superset of the
+/// analytic bbox (the 7y standard, at the witness radii `0.633974596215563/1.0`
+/// and at both negative-major samples). Exactness is not what fails.
+///
+/// What fails is everything that has to invert the parameterisation. On a
+/// spindle, `Torus::search_parameter` returns `None` for 168 of 576 on-surface
+/// grid points (29%; 144/576 = 25% at the NissanGT-R radii), and
+/// `search_nearest_parameter` answers those same points with parameters that
+/// evaluate to a DIFFERENT point -- silently, because the implicit form
+/// `(sqrt(x^2+y^2) - R)^2 + z^2 = r^2` does not describe the sheet swept through
+/// the axis. The ring control scores 576/576 on both. Converting would therefore
+/// trade a typed refusal for a face whose trims can be placed wrongly on a
+/// quarter of its domain -- worse than no fix, by the correct-or-typed standard.
+/// `monstertruck_geometry`'s builder already encodes the same verdict by
+/// returning `None` (`bspline_conversion.rs`, `torus_spindle_is_rejected`).
+///
+/// # What is NOT refused
+///
+/// HORN tori (`major_radius == minor_radius`, and the fp-near-horn fillets where
+/// the two differ by a few ulps) are representable and stay so: the inner
+/// equator pinches to a point on the axis, nothing self-intersects, and
+/// parameter recovery measures 576/576. The rule below is deliberately the same
+/// predicate the geometry builder uses, so the STEP layer refuses exactly what
+/// the geometry layer cannot build -- no wider. `Ai-14R.stp` writes an exact
+/// horn torus (`3., 3.`) as a `DEGENERATE_TOROIDAL_SURFACE`, so the spelling
+/// cannot be trusted to imply the regime; the RADII decide.
+fn refuse_degenerate_torus(
+    entity: &str,
+    major_radius: f64,
+    minor_radius: f64,
+) -> Result<(), StepConvertingError> {
+    if !major_radius.is_finite() || !minor_radius.is_finite() {
+        return Err(format!(
+            "{entity} refused: non-finite radii (major_radius {major_radius}, \
+             minor_radius {minor_radius})."
+        )
+        .into());
+    }
+    if minor_radius <= 0.0 {
+        return Err(format!(
+            "{entity} refused: non-positive minor_radius {minor_radius} \
+             (major_radius {major_radius}); ISO 10303-42 declares it a \
+             positive_length_measure."
+        )
+        .into());
+    }
+    if major_radius <= 0.0 {
+        return Err(format!(
+            "{entity} refused: non-positive major_radius {major_radius} with minor_radius \
+             {minor_radius} -- ISO 10303-42 declares major_radius a positive_length_measure. \
+             Negating it names the SAME surface as ({}, {minor_radius}) under a \
+             (u + pi, pi - v) reparameterisation that no placement can absorb, and that \
+             surface is the degenerate self-intersecting (spindle/lemon) torus monstertruck \
+             cannot represent.",
+            -major_radius
+        )
+        .into());
+    }
+    // Exactly the geometry builder's predicate (`TryIntoHomogeneousBsplineSurface
+    // for Torus`): horn and fp-near-horn stay representable, true spindles do not.
+    if minor_radius - major_radius > TOLERANCE * (major_radius + minor_radius) {
+        return Err(format!(
+            "{entity} refused: degenerate self-intersecting torus -- major_radius \
+             {major_radius} < minor_radius {minor_radius} (the spindle/lemon regime \
+             ISO 10303-42 splits degenerate_toroidal_surface out for). monstertruck has no \
+             representation for it: the rational-NURBS builder rejects it, and analytic \
+             parameter recovery is silently wrong on ~29% of its domain."
+        )
+        .into());
+    }
+    Ok(())
+}
+
+impl TryFrom<&ToroidalSurface> for step_geometry::ToroidalSurface {
+    type Error = StepConvertingError;
     #[inline(always)]
-    fn from(
+    fn try_from(
         ToroidalSurface {
             position,
             major_radius,
             minor_radius,
             ..
         }: &ToroidalSurface,
-    ) -> Self {
+    ) -> Result<Self, Self::Error> {
+        refuse_degenerate_torus("TOROIDAL_SURFACE", *major_radius, *minor_radius)?;
         let mat = Matrix4::from(position);
         let torus = Torus::new(Point3::origin(), *major_radius, *minor_radius);
-        Processor::new(torus).transformed(mat)
+        Ok(Processor::new(torus).transformed(mat))
+    }
+}
+
+/// `degenerate_toroidal_surface`
+///
+/// ISO 10303-42 subtype of `toroidal_surface`:
+/// `(name, position, major_radius, minor_radius, select_outer)`. The fifth
+/// attribute is a BOOLEAN -- which SHEET of the self-intersecting torus the face
+/// lies on -- and is nothing like `toroidal_surface`'s attribute list, which
+/// simply stops at `minor_radius`. The subtype's WHERE rule is
+/// `major_radius < minor_radius`.
+///
+/// The entity exists in the schema, so it deserializes here rather than falling
+/// into `Table::dummy`: a record that lands in `dummy` can only ever be refused
+/// as a lookup miss (`Lookup failed for #145`), which names neither the class nor
+/// the reason. See [`refuse_degenerate_torus`] for the fate of the geometry.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Holder)]
+#[holder(table = Table)]
+#[holder(field = degenerate_toroidal_surface)]
+#[holder(generate_deserialize)]
+pub struct DegenerateToroidalSurface {
+    label: String,
+    #[holder(use_place_holder)]
+    position: Axis2Placement3d,
+    major_radius: f64,
+    minor_radius: f64,
+    select_outer: bool,
+}
+
+impl TryFrom<&DegenerateToroidalSurface> for step_geometry::ToroidalSurface {
+    type Error = StepConvertingError;
+    fn try_from(
+        DegenerateToroidalSurface {
+            position,
+            major_radius,
+            minor_radius,
+            select_outer,
+            ..
+        }: &DegenerateToroidalSurface,
+    ) -> Result<Self, Self::Error> {
+        refuse_degenerate_torus("DEGENERATE_TOROIDAL_SURFACE", *major_radius, *minor_radius)?;
+        // Past the radii check the surface is a horn torus (or a ring one, if an
+        // exporter mis-spells one as degenerate): `select_outer = .T.` is then the
+        // whole surface and converts, while `.F.` selects the sheet that has
+        // pinched to a single point on the axis -- which is not a surface.
+        if !select_outer {
+            return Err(format!(
+                "DEGENERATE_TOROIDAL_SURFACE refused: select_outer = .F. selects the inner \
+                 (apex) sheet, which at major_radius {major_radius} / minor_radius \
+                 {minor_radius} has collapsed onto the axis of revolution and is not a \
+                 representable surface."
+            )
+            .into());
+        }
+        let mat = Matrix4::from(position);
+        let torus = Torus::new(Point3::origin(), *major_radius, *minor_radius);
+        Ok(Processor::new(torus).transformed(mat))
     }
 }
 
@@ -2020,6 +2194,34 @@ pub struct EdgeLoop {
     pub edge_list: Vec<EdgeAny>,
 }
 
+/// `vertex_loop`
+///
+/// A `loop` whose entire extent is ONE vertex -- the degenerate boundary
+/// exporters emit at a parameterisation singularity: a cone apex, a sphere pole,
+/// or a stand-in for the (boundary-less) closed torus.
+///
+/// It has an arm here purely so the record is ATTRIBUTABLE. Before spec 011 T7
+/// it fell into [`Table::dummy`](crate::load::Table::dummy), so
+/// `FaceBoundHolder::bound_holder` looked the id up in `Table::edge_loop`, got
+/// `None`, and the wire was discarded by a `filter_map` **with no error and no
+/// message anywhere** -- the only truly silent drop the spec 011 Phase 0 census
+/// found. It bit four in-repo fixtures, `boxy-with-surfacetex.step` losing 10 of
+/// its 160 wires.
+///
+/// It is still not REPRESENTED in a `CompressedShell`: a compressed wire is a
+/// sequence of edge uses and a point boundary has none, so the loop is reported
+/// as [`LossReason::DegenerateVertexLoop`](crate::load::report::LossReason::DegenerateVertexLoop)
+/// and dropped. Read that variant's docs for the measurement behind the choice.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Holder)]
+#[holder(table = Table)]
+#[holder(field = vertex_loop)]
+#[holder(generate_deserialize)]
+pub struct VertexLoop {
+    pub label: String,
+    #[holder(use_place_holder)]
+    pub loop_vertex: VertexPoint,
+}
+
 /// `face_bound`
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Holder)]
 #[holder(table = Table)]
@@ -2034,11 +2236,46 @@ pub struct FaceBound {
     pub orientation: bool,
 }
 
+/// What a `FACE_BOUND`'s `bound` reference turns out to point at.
+///
+/// The declared type of `FaceBound::bound` is `EdgeLoop`, but STEP's `loop` has
+/// three subtypes and the reference is untyped until it is resolved. Naming the
+/// three outcomes is what lets the loader distinguish a LEGITIMATE degeneracy
+/// (a vertex loop) from a genuine loss (a bound that is simply not there).
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum BoundResolution {
+    /// An `EDGE_LOOP`, inline or resolved from the table.
+    EdgeLoop(EdgeLoopHolder),
+    /// A `VERTEX_LOOP`, with its entity id.
+    VertexLoop(u64),
+    /// Neither: no record with that id, or a `loop` subtype with no arm. Carries
+    /// the id when the reference had one.
+    Unresolved(Option<u64>),
+}
+
 impl FaceBoundHolder {
-    pub(crate) fn bound_holder(&self, table: &Table) -> Option<EdgeLoopHolder> {
+    pub(crate) fn resolve_bound(&self, table: &Table) -> BoundResolution {
         match &self.bound {
-            PlaceHolder::Owned(holder) => Some(holder.clone()),
-            PlaceHolder::Ref(Name::Entity(idx)) => table.edge_loop.get(idx).cloned(),
+            PlaceHolder::Owned(holder) => BoundResolution::EdgeLoop(holder.clone()),
+            PlaceHolder::Ref(Name::Entity(idx)) => table
+                .edge_loop
+                .get(idx)
+                .cloned()
+                .map(BoundResolution::EdgeLoop)
+                .unwrap_or_else(|| {
+                    if table.vertex_loop.contains_key(idx) {
+                        BoundResolution::VertexLoop(*idx)
+                    } else {
+                        BoundResolution::Unresolved(Some(*idx))
+                    }
+                }),
+            _ => BoundResolution::Unresolved(None),
+        }
+    }
+
+    pub(crate) fn bound_holder(&self, table: &Table) -> Option<EdgeLoopHolder> {
+        match self.resolve_bound(table) {
+            BoundResolution::EdgeLoop(holder) => Some(holder),
             _ => None,
         }
     }
@@ -2072,13 +2309,23 @@ pub struct FaceSurface {
 }
 
 impl FaceSurfaceHolder {
-    pub(crate) fn bounds_holder<'a>(&'a self, table: &'a Table) -> Vec<Option<FaceBoundHolder>> {
+    /// Every bound the face LISTS, paired with the entity id the face referenced.
+    ///
+    /// The id is carried alongside so a bound that fails to resolve can still be
+    /// reported by name -- without it, a lost wire is anonymous and a human has
+    /// nothing to go and look at.
+    pub(crate) fn bounds_holder<'a>(
+        &'a self,
+        table: &'a Table,
+    ) -> Vec<(Option<u64>, Option<FaceBoundHolder>)> {
         self.bounds
             .iter()
             .map(|bound| match bound {
-                PlaceHolder::Owned(bound) => Some(bound.clone()),
-                PlaceHolder::Ref(Name::Entity(idx)) => table.face_bound.get(idx).cloned(),
-                _ => None,
+                PlaceHolder::Owned(bound) => (None, Some(bound.clone())),
+                PlaceHolder::Ref(Name::Entity(idx)) => {
+                    (Some(*idx), table.face_bound.get(idx).cloned())
+                }
+                _ => (None, None),
             })
             .collect()
     }
@@ -2221,7 +2468,12 @@ pub struct ProductContext {
 pub struct Product {
     pub id: String,
     pub name: String,
-    pub description: String,
+    /// `OPTIONAL text` in ISO 10303-41 `product`, so `$` is CONFORMANT here.
+    /// Measured: 115 of 225 `PRODUCT` records in `Scania-8x4.stp` and 27 of 180
+    /// in `Scania-Engine-V8-XT-Turbo.step` write `$`; while this was `String`
+    /// every one of them was refused and dropped, taking the product out of
+    /// `Table::product` and the part out of the assembly graph.
+    pub description: Option<String>,
     #[holder(use_place_holder)]
     pub frame_of_reference: Vec<ProductContext>,
 }
@@ -2232,7 +2484,11 @@ pub struct Product {
 #[holder(generate_deserialize)]
 pub struct ProductDefinitionFormation {
     pub id: String,
-    pub description: String,
+    /// `OPTIONAL text` in ISO 10303-41 `product_definition_formation`, so `$` is
+    /// CONFORMANT. Measured: **100%** of the 225 + 180 records in the two Scania
+    /// files write `$` here, which is why `Table::product_definition_formation`
+    /// was completely empty for both and `Table::step_assy` had nothing to walk.
+    pub description: Option<String>,
     #[holder(use_place_holder)]
     pub of_product: Product,
 }
@@ -2276,8 +2532,20 @@ pub enum CharacterizedDefinition {
 #[holder(field = product_definition_shape)]
 #[holder(generate_deserialize)]
 pub struct ProductDefinitionShape {
-    pub name: String,
-    pub description: String,
+    /// `label`, and NOT optional in ISO 10303-41 `property_definition` -- so a
+    /// `$` here is the EXPORTER being non-conformant, not the schema allowing it.
+    /// Accepted anyway, and the reason is measured: 470 of 695 records in
+    /// `Scania-8x4.stp` and 726 of 906 in `Scania-Engine-V8-XT-Turbo.step` are
+    /// spelled `PRODUCT_DEFINITION_SHAPE($,$,#..)`. Refusing them is refusing the
+    /// file's entire assembly over two display strings, which is the same trade
+    /// [`Table::from_step_bytes`](crate::load::Table::from_step_bytes) already
+    /// declines to make for its encoding fallback. `Option` rather than an empty
+    /// `String` so the distinction between "unset" and "set to empty" survives --
+    /// 225 records in the same file really do write `''`.
+    pub name: Option<String>,
+    /// `OPTIONAL text` in ISO 10303-41 `property_definition`: `$` is CONFORMANT.
+    /// Measured at 100% of both files' records.
+    pub description: Option<String>,
     #[holder(use_place_holder)]
     pub definition: CharacterizedDefinition,
 }
@@ -2321,8 +2589,13 @@ pub struct ShapeDefinitionRepresentation {
 #[holder(field = shape_representation_relationship)]
 #[holder(generate_deserialize)]
 pub struct ShapeRepresentationRelationship {
-    pub name: String,
-    pub description: String,
+    /// `label`, mandatory in ISO 10303-43 `representation_relationship`; accepted
+    /// as unset for the same measured reason as
+    /// [`ProductDefinitionShape::name`].
+    pub name: Option<String>,
+    /// `OPTIONAL text` in ISO 10303-43 `representation_relationship`: `$` is
+    /// CONFORMANT.
+    pub description: Option<String>,
     #[holder(use_place_holder)]
     pub rep_1: ShapeRepresentation,
     #[holder(use_place_holder)]
@@ -2334,8 +2607,15 @@ pub struct ShapeRepresentationRelationship {
 #[holder(field = shape_representation_relationship_with_transformation)]
 #[holder(generate_deserialize)]
 pub struct ShapeRepresentationRelationshipWithTransformation {
-    pub name: String,
-    pub description: String,
+    /// `label`, mandatory in ISO 10303-43; accepted as unset. Measured: **100%**
+    /// of the 470 + 726 `REPRESENTATION_RELATIONSHIP` sub-records of the complex
+    /// `SHAPE_REPRESENTATION_RELATIONSHIP` instances in the two Scania files are
+    /// spelled `REPRESENTATION_RELATIONSHIP($,$,#..,#..)`. These are the records
+    /// that ATTACH the placement matrices to the parts, so all 1,086 solids lost
+    /// their position to this one refusal.
+    pub name: Option<String>,
+    /// `OPTIONAL text` in ISO 10303-43: `$` is CONFORMANT.
+    pub description: Option<String>,
     #[holder(use_place_holder)]
     pub rep_1: ShapeRepresentation,
     #[holder(use_place_holder)]
@@ -2364,8 +2644,13 @@ pub struct NextAssemblyUsageOccurrence {
 #[holder(field = item_defined_transformation)]
 #[holder(generate_deserialize)]
 pub struct ItemDefinedTransformation {
-    name: String,
-    description: String,
+    /// `label`, mandatory in ISO 10303-43 `item_defined_transformation`; accepted
+    /// as unset. Measured: **100%** of the 470 + 726 records in the two Scania
+    /// files are spelled `ITEM_DEFINED_TRANSFORMATION($,$,#..,#..)`. This entity
+    /// carries the assembly's placement matrices.
+    name: Option<String>,
+    /// `OPTIONAL text` in ISO 10303-43: `$` is CONFORMANT.
+    description: Option<String>,
     #[holder(use_place_holder)]
     transform_item_1: Axis2Placement,
     #[holder(use_place_holder)]

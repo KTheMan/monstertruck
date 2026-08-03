@@ -122,7 +122,9 @@ where
             vec
         }));
         shell.push(face_cursor);
-        Solid::debug_new(vec![shell])
+        // Spec 012 U4, same as `sweep.rs`: infallible trait output, so the
+        // construction is stated rather than profile-switched.
+        Solid::new_unchecked(vec![shell])
     }
 }
 

@@ -3,7 +3,7 @@ name = "monstertruck-solid"
 version = "0.3.3"
 authors = ["Moritz Moeller <virtualritz@protonmail.com>"]
 edition = "2024"
-description = "Boolean operations, fillets, and shape healing for solids"
+description = "Boolean operations for solids"
 homepage = "https://github.com/virtualritz/monstertruck"
 repository = "https://github.com/virtualritz/monstertruck"
 license = "Apache-2.0"
@@ -12,7 +12,8 @@ license = "Apache-2.0"
 default = ["marching-ssi"]
 # Truck-derived polyline-marching SSI: the self-contained boolean backend the
 # published crate ships by default. Under `--no-default-features` no backend is
-# compiled and the boolean entry points return a typed `NoBackend` error.
+# compiled and the boolean entry points return a typed `NoBackend` error; an
+# external SSI boolean backend can be plugged in over the public solid types.
 marching-ssi = []
 step-test = []
 

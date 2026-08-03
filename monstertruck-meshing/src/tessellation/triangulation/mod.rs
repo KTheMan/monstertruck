@@ -15,9 +15,13 @@ use std::{collections::hash_map::Entry, env, iter};
 use web_time::Instant;
 
 mod boundary;
+mod diagnostics;
 mod mesh;
 
 use boundary::{PolyBoundary, PolyBoundaryPiece};
+pub(crate) use diagnostics::classify_face_drop;
+use diagnostics::observe_face_drop;
+pub use diagnostics::{FaceDropReason, face_drop_count, reset_face_drop_count};
 use mesh::{trimming_tessellation, untrimmed_tessellation};
 
 type SPoint2 = spade::Point2<f64>;
@@ -499,7 +503,10 @@ where
             let v1 = vmap.get(&edge.absolute_back().id()).unwrap();
             let curve = edge.curve();
             let poly = PolylineCurve::from_curve(&curve, curve.range_tuple(), tolerance);
-            (id, Edge::debug_new(v0, v1, poly))
+            // Spec 012 U4: `Edge::debug_new` is fallible now and this
+            // `par_iter().map()` has no channel; `new_unchecked` is what the
+            // release arm of `debug_new` already did.
+            (id, Edge::new_unchecked(v0, v1, poly))
         })
         .collect();
     let create_edge = |edge: &Edge<Point3, C>| -> Edge<_, _> {
@@ -512,7 +519,7 @@ where
     };
     let create_boundary =
         |wire: &Wire<Point3, C>| -> Wire<_, _> { wire.edge_iter().map(create_edge).collect() };
-    let create_face = move |face: &Face<Point3, C, S>| -> Face<_, _, _> {
+    let create_face = move |(face_idx, face): (usize, &Face<Point3, C, S>)| -> Face<_, _, _> {
         let wires: Vec<_> = face
             .absolute_boundaries()
             .iter()
@@ -525,9 +532,10 @@ where
             tolerance,
             &sp,
             primitive_config,
+            Some(face_idx),
         )
     };
-    shell.face_par_iter().map(create_face).collect()
+    shell.face_par_iter().enumerate().map(create_face).collect()
 }
 
 /// Tessellates faces.
@@ -557,7 +565,8 @@ where
             let v1 = vmap.entry_or_insert(vb).clone();
             let curve = edge.curve();
             let poly = PolylineCurve::from_curve(&curve, curve.range_tuple(), tolerance);
-            Edge::debug_new(&v0, &v1, poly)
+            // Spec 012 U4, as the parallel sibling above.
+            Edge::new_unchecked(&v0, &v1, poly)
         },
     );
     let mut create_edge = move |edge: &'a Edge<Point3, C>| -> Edge<_, _> {
@@ -570,7 +579,7 @@ where
     let mut create_boundary = move |wire: &'a Wire<Point3, C>| -> Wire<_, _> {
         wire.edge_iter().map(&mut create_edge).collect()
     };
-    let create_face = move |face: &'a Face<Point3, C, S>| -> Face<_, _, _> {
+    let create_face = move |(face_idx, face): (usize, &'a Face<Point3, C, S>)| -> Face<_, _, _> {
         let wires: Vec<_> = face
             .absolute_boundaries()
             .iter()
@@ -583,9 +592,10 @@ where
             tolerance,
             &sp,
             primitive_config,
+            Some(face_idx),
         )
     };
-    shell.face_iter().map(create_face).collect()
+    shell.face_iter().enumerate().map(create_face).collect()
 }
 
 /// Tessellates faces.
@@ -623,6 +633,14 @@ where
             let polygon =
                 untrimmed_tessellation(surface, (urange, vrange), tolerance, primitive_config.mode);
             log_mesh_trace(face_idx, "untrimmed", "ok", face_start);
+            observe_face_drop(
+                surface,
+                Some(face_idx),
+                Some(&polygon),
+                true,
+                boundaries.len(),
+                0,
+            );
             return CompressedFace {
                 boundaries,
                 orientation: face.orientation,
@@ -707,7 +725,7 @@ where
                 .or_else(|| {
                     let wire_iter =
                         oriented_edge_indices(wire, face_orientation).filter_map(create_edge);
-                    PolyBoundaryPiece::try_new(surface, wire_iter, &sp)
+                    PolyBoundaryPiece::try_new(surface, wire_iter, &sp, tolerance)
                 })
         };
         let boundary_start = Instant::now();
@@ -759,6 +777,14 @@ where
             "face",
             format!("surface={}", polygon.is_some()),
             face_start,
+        );
+        observe_face_drop(
+            surface,
+            Some(face_idx),
+            polygon.as_ref(),
+            is_untrimmed,
+            boundaries.len(),
+            boundaries.iter().map(|wire| wire.len()).sum(),
         );
         CompressedFace {
             boundaries,
@@ -919,6 +945,14 @@ where
                 .map(|options| untrimmed_isoparametric_curves(surface, (urange, vrange), options))
                 .unwrap_or_default();
             log_mesh_trace(face_idx, "untrimmed", "ok", face_start);
+            observe_face_drop(
+                surface,
+                Some(face_idx),
+                Some(&polygon),
+                true,
+                boundaries.len(),
+                0,
+            );
             return (
                 CompressedFace {
                     boundaries,
@@ -1010,7 +1044,7 @@ where
                                             )
                                         })
                                     });
-                                PolyBoundaryPiece::try_new(surface, wire_iter, &sp)
+                                PolyBoundaryPiece::try_new(surface, wire_iter, &sp, tolerance)
                             })
                         })
                 }
@@ -1103,6 +1137,14 @@ where
             format!("surface={}", polygon.is_some()),
             face_start,
         );
+        observe_face_drop(
+            surface,
+            Some(face_idx),
+            polygon.as_ref(),
+            is_untrimmed,
+            boundaries.len(),
+            boundaries.iter().map(|wire| wire.len()).sum(),
+        );
         (
             CompressedFace {
                 boundaries,
@@ -1147,6 +1189,7 @@ fn shell_create_polygon<S: PreMeshableSurface>(
     tolerance: f64,
     sp: impl SP<S>,
     primitive_config: TessellationPrimitiveOptions,
+    face_idx: Option<usize>,
 ) -> Face<Point3, PolylineCurve, Option<PolygonMesh>> {
     // Fast path: untrimmed face with bounded surface domain.
     let is_untrimmed = wires.iter().all(|w| w.is_empty());
@@ -1162,11 +1205,12 @@ fn shell_create_polygon<S: PreMeshableSurface>(
             None
         }
     } else {
+        boundary::projection_debug_set_face(face_idx);
         let preboundary = wires
             .iter()
             .map(|wire: &Wire<_, _>| {
                 let wire_iter = wire.iter().map(Edge::oriented_curve);
-                PolyBoundaryPiece::try_new(surface, wire_iter, &sp)
+                PolyBoundaryPiece::try_new(surface, wire_iter, &sp, tolerance)
             })
             .collect::<Option<Vec<_>>>();
         preboundary.map(|preboundary| {
@@ -1174,6 +1218,16 @@ fn shell_create_polygon<S: PreMeshableSurface>(
             trimming_tessellation(surface, &boundary, tolerance, primitive_config, usize::MAX)
         })
     };
+    let loops = wires.len();
+    let edges = wires.iter().map(|wire| wire.len()).sum();
+    observe_face_drop(
+        surface,
+        face_idx,
+        polygon.as_ref(),
+        is_untrimmed,
+        loops,
+        edges,
+    );
     let mut new_face = Face::new_unchecked(wires, polygon);
     if !orientation {
         new_face.invert();
@@ -2049,5 +2103,68 @@ mod tests {
             reversed_mesh.tri_faces().len()
         );
         assert!(!forward_mesh.tri_faces().is_empty());
+    }
+
+    // --- spec 007 D1: loud tessellation face-drop diagnostic ---------------
+
+    #[test]
+    fn classify_face_drop_maps_each_silent_drop() {
+        use super::diagnostics::classify_face_drop;
+
+        // `None` mesh on an untrimmed face -> the surface had no bounded domain.
+        assert_eq!(
+            classify_face_drop(None, true),
+            Some(FaceDropReason::UnboundedDomain),
+        );
+        // `None` mesh on a trimmed face -> a boundary loop would not project
+        // (the revolve-pole / periodic-seam / degenerate-trim family).
+        assert_eq!(
+            classify_face_drop(None, false),
+            Some(FaceDropReason::BoundaryProjectionFailed),
+        );
+        // `Some` but empty -> a silently empty tessellation, on either path.
+        let empty = PolygonMesh::default();
+        assert_eq!(
+            classify_face_drop(Some(&empty), false),
+            Some(FaceDropReason::EmptyTessellation),
+        );
+        assert_eq!(
+            classify_face_drop(Some(&empty), true),
+            Some(FaceDropReason::EmptyTessellation),
+        );
+
+        // A real, non-empty tessellation is not a drop.
+        let profile = Line(Point3::new(1.0, 0.0, 0.0), Point3::new(1.0, 0.0, 10.0));
+        let surface =
+            RevolutionSurface::by_revolution(profile, Point3::origin(), Vector3::unit_z());
+        let boundary = PolyBoundary::new(vec![cylinder_patch_piece(&surface)], &surface, 0.01);
+        let mesh = trimming_tessellation(
+            &surface,
+            &boundary,
+            0.01,
+            TessellationPrimitiveOptions::default(),
+            usize::MAX,
+        );
+        assert!(!mesh.faces().is_empty());
+        assert_eq!(classify_face_drop(Some(&mesh), false), None);
+    }
+
+    #[test]
+    fn observe_face_drop_advances_the_loud_metric() {
+        use super::diagnostics::observe_face_drop;
+
+        let profile = Line(Point3::new(1.0, 0.0, 0.0), Point3::new(1.0, 0.0, 10.0));
+        let surface =
+            RevolutionSurface::by_revolution(profile, Point3::origin(), Vector3::unit_z());
+
+        // The metric is process-global and monotonic within a run, so a strict
+        // increase across our own dropping call proves the signal fired even if
+        // other parallel tests advance it too.
+        let before = face_drop_count();
+        observe_face_drop(&surface, Some(7), None, false, 1, 4);
+        assert!(
+            face_drop_count() > before,
+            "a boundary-projection drop must advance the face-drop metric",
+        );
     }
 }

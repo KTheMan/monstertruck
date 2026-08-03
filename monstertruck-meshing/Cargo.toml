@@ -28,6 +28,10 @@ web-time = { workspace = true }
 array-macro = { workspace = true }
 derive_more = { workspace = true }
 itertools = { workspace = true }
+# Structured, digest-safe face-drop diagnostics (tessellation). `log` is a
+# zero-cost facade when no logger is installed, so it never changes output or
+# behavior in tests; logger-equipped consumers see dropped-face warnings.
+log = { workspace = true }
 rustc-hash = { workspace = true }
 spade = { workspace = true, optional = true }
 monstertruck-core = { workspace = true }

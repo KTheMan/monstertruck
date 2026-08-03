@@ -1,4 +1,9 @@
-#![cfg(feature = "derive")]
+// Gated on BOTH features, not just `derive`. The body reaches
+// `monstertruck_traits::polynomial` (via the glob import below), and that module
+// is `#[cfg(feature = "polynomial")]` -- so `--features derive` alone failed to
+// compile the whole test target. Found 2026-07-30 when a spec-012 gate that
+// names this package could not build on master.
+#![cfg(all(feature = "derive", feature = "polynomial"))]
 #![allow(dead_code)]
 
 use monstertruck_core::{cgmath64::*, hash::HashGen};

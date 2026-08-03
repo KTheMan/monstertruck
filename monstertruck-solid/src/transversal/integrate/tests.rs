@@ -1,7 +1,7 @@
 //! Classic-backend boolean tests: the default `and`/`or`/`difference` entry
-//! points route through `transversal::classic`. Upgrade-backend-only pins (named
-//! selections, the regression matrix cells, determinism, and the `try_build_solid`
-//! healing diagnostics) live in an external SSI boolean-backend crate.
+//! points route through `transversal::classic`. Pins specific to an external
+//! SSI backend (named selections, the regression matrix cells, determinism, and
+//! the `try_build_solid` healing diagnostics) live with that backend.
 
 use monstertruck_meshing::prelude::*;
 use monstertruck_modeling::*;

@@ -185,3 +185,59 @@ fn search_nearest_parameter_near_north_pole_is_finite() {
         .expect("near-pole point should map to a valid (u, v).");
     assert!(u.is_finite() && v.is_finite());
 }
+
+/// **A coarse chord on a small sphere must not panic** -- spec 012 U1.2.
+///
+/// `Sphere::parameter_division` carried `assert!(tol < self.radius)`. While
+/// STEP spheres reached the tessellator as rational nets, nothing dispatched
+/// here and the assert was unreachable; U1.2 routes them onto this closed form
+/// so that they stop costing 2,876,754 adaptive refinement cells over ROTOR's
+/// ten sphere faces, and the assert became reachable from the DISPLAY path.
+///
+/// The reaching input is ordinary: a viewer picks its chord from the assembly's
+/// bbox diagonal, so a 2 mm fillet ball inside a 5 m assembly is asked for a
+/// chord several times its own radius. `ParameterDivision2D` returns
+/// `(Vec<f64>, Vec<f64>)` and has no refusal channel, and its ~20 impls are
+/// consumed by viewers, area/volume and mesh export, none of which has anywhere
+/// to put one -- so a panic there is ledger C11, not a diagnostic.
+///
+/// Two claims, and the second is what makes the first safe:
+///  1. a chord at or beyond the radius yields a usable division, and
+///  2. every chord that already worked (`tol < radius`) is UNCHANGED.
+#[test]
+fn a_chord_coarser_than_the_radius_divides_instead_of_panicking() {
+    let sphere = Sphere::new(Point3::new(1.0, -2.0, 3.0), 0.002);
+    let range = ((0.0, PI), (0.0, 2.0 * PI));
+
+    for tol in [0.002, 0.005, 5.0, 5000.0] {
+        let (udiv, vdiv) = sphere.parameter_division(range, tol);
+        assert!(
+            udiv.len() >= 2 && vdiv.len() >= 2,
+            "tol {tol} must still yield a division, got {}x{}",
+            udiv.len(),
+            vdiv.len(),
+        );
+        assert_eq!((udiv[0], *udiv.last().unwrap()), range.0);
+        assert_eq!((vdiv[0], *vdiv.last().unwrap()), range.1);
+        assert!(
+            udiv.iter().chain(vdiv.iter()).all(|t| t.is_finite()),
+            "tol {tol} produced a non-finite parameter",
+        );
+    }
+
+    // The clamp is at ratio 1.0, so nothing that worked before moves. Verified
+    // against the pre-clamp formula spelled out here rather than against a
+    // frozen array, so this stays honest if the sphere's radius changes.
+    let big = Sphere::new(Point3::origin(), 53.0);
+    for tol in [1.0e-3, 1.0e-2, 1.0e-1, 1.0, 10.0] {
+        let delta = 2.0 * f64::acos(1.0 - tol / big.radius());
+        let expected_u = 1 + ((range.0.1 - range.0.0) / delta).floor() as usize;
+        let expected_v = 1 + ((range.1.1 - range.1.0) / delta).floor() as usize;
+        let (udiv, vdiv) = big.parameter_division(range, tol);
+        assert_eq!(
+            (udiv.len(), vdiv.len()),
+            (expected_u + 1, expected_v + 1),
+            "tol {tol} is below the clamp and must be byte-identical",
+        );
+    }
+}

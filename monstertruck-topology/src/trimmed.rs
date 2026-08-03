@@ -105,6 +105,21 @@ impl<P, C, S, T> TrimmedShell<P, C, S, T> {
             .map(TrimmedFace::erase_trims)
             .collect()
     }
+
+    /// A plain [`Shell`] view of the faces, trims dropped, without consuming
+    /// `self`. Face clones are handle clones; no geometry is copied.
+    fn to_plain_shell(&self) -> Shell<P, C, S> {
+        self.face_list
+            .iter()
+            .map(|trimmed_face| trimmed_face.face.clone())
+            .collect()
+    }
+
+    /// The precondition this shell must satisfy to be a boundary of a
+    /// [`TrimmedSolid`]; see [`Shell::check_solid_boundary`].
+    pub fn check_solid_boundary(&self) -> Result<()> {
+        self.to_plain_shell().check_solid_boundary()
+    }
 }
 
 impl<P, C, S, T> From<Shell<P, C, S>> for TrimmedShell<P, C, S, T> {
@@ -116,9 +131,43 @@ impl<P, C, S, T> From<TrimmedShell<P, C, S, T>> for Shell<P, C, S> {
 }
 
 impl<P, C, S, T> TrimmedSolid<P, C, S, T> {
-    /// Creates a trimmed solid from its boundary shells.
+    /// Creates a trimmed solid from its boundary shells, WITHOUT validating
+    /// them.
+    ///
+    /// # This is `Solid::new_unchecked`, not `Solid::new`
+    ///
+    /// Despite the shared name, this constructor is the trimmed counterpart of
+    /// [`Solid::new_unchecked`] and not of [`Solid::new`]: it checks nothing.
+    /// Spec 011's ledger entry for class C11, and the corpus row that pinned
+    /// it, both recorded this call as "the infallible `Solid::new`" -- it is
+    /// not, it never validated at all, and the abort they were chasing came
+    /// from a `Solid::debug_new` two hops downstream in
+    /// [`Solid::try_mapped`]. That confusion is the reason this doc comment is
+    /// this long.
+    ///
+    /// Use [`Self::try_new`] whenever the boundaries come from data rather
+    /// than from a construction that already established the invariant.
     #[inline(always)]
     pub const fn new(boundaries: Vec<TrimmedShell<P, C, S, T>>) -> Self { Self { boundaries } }
+
+    /// Creates a trimmed solid whose boundaries must be non-empty, connected,
+    /// and closed manifold -- the SAME precondition as [`Solid::try_new`],
+    /// via the single definition in [`Shell::check_solid_boundary`].
+    ///
+    /// The plain path has enforced this since forever
+    /// (`Solid::extract` ends in `Solid::try_new(shells?)?`); the trimmed path
+    /// did not, so a `CompressedTrimmedSolid` that was short a face -- the
+    /// shape a typed surface refusal upstream produces -- extracted to `Ok`
+    /// and only failed later, in a `debug_assertions`-only construction that
+    /// panicked in debug and silently returned an invalid solid in release.
+    /// Ledger class C11.
+    #[inline(always)]
+    pub fn try_new(boundaries: Vec<TrimmedShell<P, C, S, T>>) -> Result<Self> {
+        for shell in &boundaries {
+            shell.check_solid_boundary()?;
+        }
+        Ok(Self { boundaries })
+    }
 
     /// Returns the boundary shells.
     #[inline(always)]
@@ -386,5 +435,93 @@ impl<P, C, S, T> TryFrom<CompressedTrimmedSolid<P, C, S, T>> for TrimmedSolid<P,
                 .map(TrimmedShell::try_from)
                 .collect::<Result<Vec<_>>>()?,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Minimal closed manifold shell: a tetrahedron with consistently oriented
+    /// faces. Purely topological -- `()` for point, curve and surface.
+    fn tetrahedron() -> Shell<(), (), ()> {
+        let vertex: Vec<Vertex<()>> = (0..4).map(|_| Vertex::new(())).collect();
+        let edge = |a: usize, b: usize| Edge::new(&vertex[a], &vertex[b], ());
+        let e01 = edge(0, 1);
+        let e02 = edge(0, 2);
+        let e03 = edge(0, 3);
+        let e12 = edge(1, 2);
+        let e13 = edge(1, 3);
+        let e23 = edge(2, 3);
+        let wire = |edges: [Edge<(), ()>; 3]| -> Wire<(), ()> { edges.to_vec().into() };
+        [
+            Face::new(vec![wire([e01.clone(), e12.clone(), e02.inverse()])], ()),
+            Face::new(vec![wire([e02.clone(), e23.clone(), e03.inverse()])], ()),
+            Face::new(vec![wire([e03, e13.inverse(), e01.inverse()])], ()),
+            Face::new(vec![wire([e13, e23.inverse(), e12.inverse()])], ()),
+        ]
+        .into_iter()
+        .collect()
+    }
+
+    fn trimmed(shell: Shell<(), (), ()>) -> TrimmedShell<(), (), (), ()> {
+        TrimmedShell::from(shell)
+    }
+
+    /// `TrimmedSolid::try_new` must accept exactly what `Solid::try_new`
+    /// accepts. Both are checked on the same shell so the two cannot drift
+    /// apart silently -- they share one definition
+    /// (`Shell::check_solid_boundary`) precisely so that this assertion holds.
+    #[test]
+    fn try_new_accepts_a_closed_manifold_boundary_just_as_solid_try_new_does() {
+        let shell = tetrahedron();
+        assert!(Solid::try_new(vec![shell.clone()]).is_ok());
+        assert!(TrimmedSolid::try_new(vec![trimmed(shell)]).is_ok());
+    }
+
+    /// The C11 shape: a boundary shell one face short -- what a typed surface
+    /// refusal upstream leaves behind. `TrimmedSolid::try_new` must refuse it
+    /// with the SAME typed error `Solid::try_new` gives, and the unchecked
+    /// `TrimmedSolid::new` must still build it, because that is what `new`
+    /// has always done and callers depend on it.
+    #[test]
+    fn try_new_refuses_a_boundary_shell_that_lost_a_face() {
+        let mut shell = tetrahedron();
+        shell.pop().expect("the tetrahedron has four faces");
+        assert_eq!(shell.len(), 3);
+
+        assert_eq!(
+            Solid::try_new(vec![shell.clone()]).err(),
+            Some(Error::NotClosedShell),
+        );
+        assert_eq!(
+            TrimmedSolid::try_new(vec![trimmed(shell.clone())]).err(),
+            Some(Error::NotClosedShell),
+            "the trimmed path must refuse what the plain path refuses",
+        );
+        assert_eq!(
+            TrimmedSolid::new(vec![trimmed(shell)]).boundaries().len(),
+            1,
+            "`new` is the unchecked constructor and must stay unchecked",
+        );
+    }
+
+    /// Two disjoint tetrahedra presented as ONE boundary shell: connected-ness
+    /// and closedness are different failures and must stay distinguishable, so
+    /// a caller can tell "a face went missing" from "this is two solids".
+    #[test]
+    fn try_new_distinguishes_a_disconnected_boundary_from_an_open_one() {
+        let mut shell = tetrahedron();
+        for face in tetrahedron() {
+            shell.push(face);
+        }
+        assert_eq!(
+            TrimmedSolid::try_new(vec![trimmed(shell)]).err(),
+            Some(Error::NotConnected),
+        );
+        assert_eq!(
+            TrimmedSolid::try_new(vec![TrimmedShell::<(), (), (), ()>::from(Shell::new())]).err(),
+            Some(Error::EmptyShell),
+        );
     }
 }

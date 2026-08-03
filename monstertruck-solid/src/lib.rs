@@ -1,4 +1,9 @@
-//! Crate for operation shapes. Provides boolean operations to Solid, and shape healing for importing shapes from other CAD systems.
+//! Crate for operation shapes. Provides boolean operations to Solid.
+//!
+//! Shape healing and fillets are POST-CSG and kernel-independent, so they live
+//! in their own crates: `monstertruck-healing` and `monstertruck-fillet`. This
+//! crate is the classic polyline-marching boolean kernel and nothing else, which
+//! is what lets an external SSI boolean backend stand in for it wholesale.
 
 #![cfg_attr(not(debug_assertions), deny(warnings))]
 #![deny(clippy::all, rust_2018_idioms)]
@@ -18,18 +23,6 @@
     unused_qualifications
 )]
 
-pub(crate) use ahash::AHashSet as HashSet;
-
-mod healing;
-pub use healing::{
-    OrientationNormalization, RobustSplitClosedEdgesAndFaces, SplitClosedEdgesAndFaces,
-    extract_healed, extract_healed_trimmed, extract_healed_trimmed_solid,
-    normalize_shell_orientation, normalize_trimmed_shell_orientation,
-};
-// Doc-hidden compressed-shell repair passes reused by an external SSI
-// boolean-backend upgrade crate's boolean-output healing.
-#[doc(hidden)]
-pub use healing::{split_non_simple_compressed_wires, split_pinched_compressed_faces};
 mod transversal;
 pub use transversal::{
     PlaneCut, ShapeOpsCurve, ShapeOpsError, ShapeOpsSurface, ShellOrientationHints,
@@ -37,9 +30,3 @@ pub use transversal::{
     plane_cut, symmetric_difference,
 };
 mod alternative;
-pub mod fillet;
-pub use fillet::{
-    FilletError, FilletIntersectionCurve, FilletOptions, FilletProfile, FilletableCurve,
-    FilletableSurface, ParameterCurveLinear, RadiusSpec, fillet, fillet_along_wire, fillet_edges,
-    fillet_edges_generic, fillet_with_side,
-};

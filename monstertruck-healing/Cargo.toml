@@ -1,0 +1,26 @@
+[package]
+name = "monstertruck-healing"
+version = "0.3.3"
+authors = ["Moritz Moeller <virtualritz@protonmail.com>"]
+edition = "2024"
+description = "Shape healing for solids imported from other CAD systems"
+homepage = "https://github.com/virtualritz/monstertruck"
+repository = "https://github.com/virtualritz/monstertruck"
+license = "Apache-2.0"
+
+[features]
+default = []
+step-test = []
+
+[dependencies]
+ahash = { workspace = true }
+itertools = { workspace = true }
+rustc-hash = { workspace = true }
+monstertruck-geometry = { workspace = true }
+monstertruck-traits = { workspace = true }
+monstertruck-meshing = { workspace = true }
+monstertruck-topology = { workspace = true }
+
+[dev-dependencies]
+monstertruck-modeling = { workspace = true }
+monstertruck-step = { workspace = true }

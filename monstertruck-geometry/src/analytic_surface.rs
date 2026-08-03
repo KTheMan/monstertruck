@@ -283,6 +283,28 @@ impl TryIntoAnalyticSurfaceKind for Tmesh<Point3> {
     fn try_into_analytic_surface_kind(&self) -> Option<AnalyticSurfaceKind> { None }
 }
 
+/// `None`, deliberately -- see [`TryIntoAnalyticSurfaceKind for Torus`].
+///
+/// A sphere IS a [`SphericalRevolutionSurface`], and answering so here would
+/// hand the symbolic SSI an exact sphere identity it does not get today. But
+/// spec 012 U1.2 moved spheres from the rational-net variant to the analytic
+/// one for their TESSELLATION, and while they were nets this call answered
+/// `None` (`NurbsSurface::try_into_analytic_surface_kind` recognises only a
+/// plane or a homogeneous extrusion, and a sphere net is neither). Returning
+/// `Some` here would therefore be a boolean-engine change riding along on a
+/// display-path fix. Recorded as follow-on work, not landed.
+impl TryIntoAnalyticSurfaceKind for Sphere {
+    #[inline]
+    fn try_into_analytic_surface_kind(&self) -> Option<AnalyticSurfaceKind> { None }
+}
+
+/// `None`: no [`AnalyticSurfaceKind`] variant describes a torus, and its net
+/// answered `None` too.
+impl TryIntoAnalyticSurfaceKind for Torus {
+    #[inline]
+    fn try_into_analytic_surface_kind(&self) -> Option<AnalyticSurfaceKind> { None }
+}
+
 impl<C> TryIntoAnalyticSurfaceKind for RevolutionSurface<C>
 where C: ParametricCurve3D + TryIntoHomogeneousBsplineCurve
 {

@@ -241,7 +241,15 @@ where
             connect_curves,
         ));
         shell.push(seiling);
-        Solid::debug_new(vec![shell])
+        // Spec 012 U4: `Solid::debug_new` is fallible now, and this trait
+        // method's return type is a bare `Solid`, so there is nowhere to put a
+        // refusal. The construction is stated as `new_unchecked` rather than
+        // left behind `debug_new`'s profile switch, which chose between an
+        // abort (debug) and exactly this call (release). The check it drops is
+        // MEASURED DEAD in-gate -- it validates the sweep's own output, and a
+        // firing would have aborted a debug test run. Giving it a channel means
+        // a fallible `Sweep` output type; owner call, not this track's.
+        Solid::new_unchecked(vec![shell])
     }
 }
 

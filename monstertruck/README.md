@@ -21,7 +21,8 @@ for the full runnable version with STEP export.
 
 ```rust
 use monstertruck_modeling::*;
-use monstertruck_solid::{difference, fillet_edges, or, FilletOptions};
+use monstertruck_fillet::{fillet_edges, FilletOptions};
+use monstertruck_solid::{difference, or};
 use std::f64::consts::PI;
 
 fn sphere(center: Point3, radius: f64) -> Solid {

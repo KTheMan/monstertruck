@@ -8,7 +8,224 @@ use super::*;
 /// ill-conditioned offset or a singular evaluation -- so a tessellation
 /// caller falls back to the partial division it has so far instead of
 /// looping forever.
+///
+/// **This bounds DEPTH, not WORK, and the two are not the same quantity here.**
+/// [`sub_parameter_division`] refines a TENSOR-PRODUCT grid: one stubborn cell
+/// sets the flag for its whole `u` row and `v` column, so a level can double
+/// both axes and the examined cell count is `O(4^depth)`. At depth 100 the
+/// implied cell count is `4^100`; the machine grinds long before the counter
+/// runs out (ledger M10 -- a guard that does not cover what is claimed for it).
+/// [`MAX_PARAMETER_DIVISION_CELLS`] is the bound that actually binds.
 const MAX_PARAMETER_DIVISION_RECURSION: usize = 100;
+
+/// Maximum number of grid CELLS [`parameter_division`] may examine, summed over
+/// every refinement level of one top-level call.
+///
+/// This is the quantity that bounds the work: each examined cell costs five
+/// surface evaluations plus one hash, and the per-level cell count is
+/// `(udiv.len() - 1) * (vdiv.len() - 1)`, which can quadruple from one level to
+/// the next. A depth cap does not bound it (see
+/// [`MAX_PARAMETER_DIVISION_RECURSION`]).
+///
+/// A level is admitted only if it fits ENTIRELY inside the remaining budget, so
+/// the division returned is always a level-complete grid and never a half-refined
+/// one -- the result stays a deterministic function of the surface, the range and
+/// the tolerance, independent of machine, thread count and load.
+///
+/// **The headroom this value is set from (spec 012 U1.1, measured 2026-07-31 at
+/// `tol = 1e-3`, the chord the certified-empty guard and every fixture boolean
+/// row use).** Cells spent by the largest SINGLE division, measured by
+/// `user_fixture_boolean_tests::division_budget_sweep_over_the_in_repo_fixtures`
+/// and `corpus_boolean_rows.rs::u1_divergent_face_probe`:
+///
+/// | geometry | worst single division | converges? | of this cap |
+/// |---|---|---|---|
+/// | boxy `#26`, 80 faces | 0 | -- (all analytic) | 0% |
+/// | io1 `#10`, 22 faces | 0 | -- (all analytic) | 0% |
+/// | ap224 `#1727`, 48 faces | 5,621 | yes | 0.07% |
+/// | **coffy `#219` face 24** | **5,193,917** (852x2715 grid) | **yes** | **61.9%** |
+/// | ROTOR `#25387` face 4 | 1,847,121 | yes | 22.0% |
+/// | ROTOR `#19264` face 4 | >4,194,304 | **NO** | clipped |
+///
+/// The cap sits above every division measured that CONVERGES -- coffy face 24 is
+/// the binding one, and an earlier `1 << 22` clipped it, which is why the value
+/// is not that -- and below the point where a non-converging division has stopped
+/// making progress. ROTOR #19264 face 4 is the non-converging case: its spend
+/// moves only 7% between `tol = 1e-2` and `tol = 1e-3` because it is not
+/// approaching the tolerance at all, so no affordable cap would let it finish and
+/// bounding it is the whole point.
+///
+/// Do NOT raise this without re-running that sweep. `parameter_division_with_budget`
+/// exists so the sweep needs no environment variable and no configuration knob on
+/// the production path.
+///
+/// **What a caller who cannot handle a refusal sees.** [`parameter_division`] and
+/// the `ParameterDivision2D` trait method keep their signatures and return the
+/// level-complete, coarser-than-`tol` division -- the same shape of result the
+/// depth cap already produced, except that it is now reachable in bounded time
+/// and readable afterwards through [`division_work`] and [`division_totals`].
+/// That is deliberate: this trait is implemented by roughly twenty geometry types
+/// and consumed by viewers, area and volume estimates and mesh export, none of
+/// which has a refusal to return, and a panic there would be a worse failure than
+/// a coarse mesh. A caller whose SOUNDNESS depends on the chord bound must use
+/// [`try_parameter_division`] and get the typed refusal instead.
+pub const MAX_PARAMETER_DIVISION_CELLS: u64 = 1 << 23;
+
+/// What one [`parameter_division`] call cost, and whether it was cut short.
+///
+/// `cells` is the load-independent work unit: cells examined, five surface
+/// evaluations each. `truncated` is set when the call hit
+/// [`MAX_PARAMETER_DIVISION_CELLS`] and returned a COARSER division than the
+/// requested tolerance asks for.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DivisionWork {
+    /// Grid cells examined, summed over every refinement level.
+    pub cells: u64,
+    /// Whether the cell budget was exhausted, so the returned division is
+    /// coarser than `tol` requires.
+    pub truncated: bool,
+}
+
+std::thread_local! {
+    /// Work charged on this thread since the last [`take_division_work`].
+    ///
+    /// Accumulating (rather than resetting per call) is what makes nested
+    /// divisions -- `Processor` delegating to its entity, a `Shell` triangulation
+    /// walking many faces -- add up instead of overwriting each other. Each cell
+    /// pays one thread-local read/write against five surface evaluations, so the
+    /// meter is not measurable on the hot path.
+    static DIVISION_WORK: std::cell::Cell<DivisionWork> =
+        const { std::cell::Cell::new(DivisionWork { cells: 0, truncated: false }) };
+}
+
+/// Reads the work charged on this thread since the last [`take_division_work`],
+/// without clearing it.
+#[must_use]
+pub fn division_work() -> DivisionWork { DIVISION_WORK.with(std::cell::Cell::get) }
+
+/// Reads and clears the work charged on this thread.
+///
+/// Call it immediately BEFORE a division to zero the meter and immediately
+/// AFTER to read that division's cost, including any nested ones.
+pub fn take_division_work() -> DivisionWork { DIVISION_WORK.replace(DivisionWork::default()) }
+
+/// Process-wide cells examined, across every thread.
+///
+/// The thread-local [`division_work`] cannot see a division that ran on a rayon
+/// worker, which is where shell tessellation actually does its work; this
+/// counter can. It is charged once per REFINEMENT LEVEL (~20 relaxed adds per
+/// top-level division at the very most), not once per cell, so it is free on the
+/// hot path.
+static DIVISION_CELLS_TOTAL: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Process-wide count of divisions cut short by [`MAX_PARAMETER_DIVISION_CELLS`].
+static DIVISION_TRUNCATIONS_TOTAL: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
+
+/// Process-wide HIGH-WATER MARK of cells spent by a SINGLE top-level division.
+///
+/// This is the quantity a headroom table needs: the cap applies per call, so the
+/// question "does this cap clip anything that terminates today" is answered by
+/// the largest single call, never by a total.
+static DIVISION_CELLS_MAX: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Reads the process-wide `(cells, truncations)` counters.
+#[must_use]
+pub fn division_totals() -> (u64, u64) {
+    use std::sync::atomic::Ordering::Relaxed;
+    (
+        DIVISION_CELLS_TOTAL.load(Relaxed),
+        DIVISION_TRUNCATIONS_TOTAL.load(Relaxed),
+    )
+}
+
+/// Zeroes the process-wide counters and returns what they held.
+pub fn take_division_totals() -> (u64, u64) {
+    use std::sync::atomic::Ordering::Relaxed;
+    (
+        DIVISION_CELLS_TOTAL.swap(0, Relaxed),
+        DIVISION_TRUNCATIONS_TOTAL.swap(0, Relaxed),
+    )
+}
+
+/// Process-wide PRESEARCH GRID NODES scanned, across every thread -- spec 014
+/// W3's second candidate work unit.
+///
+/// A `search_nearest_parameter` with no hint spends nearly all of its time in
+/// [`presearch`], scanning a `(division + 1)^2` grid of surface evaluations
+/// before Newton ever starts. A COUNT OF CALLS therefore hides a factor of ~4:
+/// tensor-product surfaces presearch at `PRESEARCH_DIVISION` (51x51 = 2,601
+/// nodes) while the revolution processor presearches at 100 (101x101 = 10,201).
+/// This counter charges the nodes instead, so two calls over different surface
+/// families are not counted as equal work.
+///
+/// Charged ONCE PER PRESEARCH -- one relaxed add per thousands of evaluations --
+/// never inside the grid loop, which is the loop being measured.
+static PRESEARCH_NODES_TOTAL: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Charges `nodes` presearch grid nodes. Public because the hand-rolled
+/// separable presearches (`NurbsSurface::presearch_separable`, the revolution
+/// processor's) bypass [`presearch`] and must charge the same unit, or the
+/// counter would read differently depending on which fast path a surface takes.
+#[inline]
+pub fn charge_presearch_nodes(nodes: u64) {
+    PRESEARCH_NODES_TOTAL.fetch_add(nodes, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Grid nodes for a `(division + 1) x (division + 1)` presearch scan.
+#[inline]
+#[must_use]
+pub fn presearch_nodes(division: usize) -> u64 {
+    let side = division as u64 + 1;
+    side.saturating_mul(side)
+}
+
+/// Reads the process-wide presearch-node counter.
+#[must_use]
+pub fn presearch_nodes_total() -> u64 {
+    PRESEARCH_NODES_TOTAL.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Reads the process-wide high-water mark of cells spent by one division.
+#[must_use]
+pub fn division_max_cells() -> u64 { DIVISION_CELLS_MAX.load(std::sync::atomic::Ordering::Relaxed) }
+
+/// Zeroes the high-water mark and returns what it held.
+pub fn take_division_max_cells() -> u64 {
+    DIVISION_CELLS_MAX.swap(0, std::sync::atomic::Ordering::Relaxed)
+}
+
+/// A [`parameter_division`] that ran out of cell budget before it met `tol`.
+///
+/// Carries the division actually produced, so a caller that can use a coarser
+/// grid may still take it -- deliberately, and knowing that it is coarser --
+/// rather than being handed one silently.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DivisionTruncated {
+    /// The level-complete but too-coarse division reached before the budget ran
+    /// out.
+    pub division: (Vec<f64>, Vec<f64>),
+    /// Cells examined before the budget ran out.
+    pub cells: u64,
+    /// The budget that was exhausted.
+    pub budget: u64,
+}
+
+impl std::fmt::Display for DivisionTruncated {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "surface parameter division exhausted its cell budget: {} of {} cells examined, \
+             division stopped at {}x{} and is coarser than the requested tolerance",
+            self.cells,
+            self.budget,
+            self.division.0.len(),
+            self.division.1.len(),
+        )
+    }
+}
+
+impl std::error::Error for DivisionTruncated {}
 
 /// Divides the domain into equal parts, examines all the values, and returns `(u, v)` such that
 /// `surface.evaluate(u, v)` is closest to `point`.
@@ -23,6 +240,9 @@ where
     S: ParametricSurface,
     S::Point: MetricSpace<Metric = f64> + Copy,
 {
+    // Spec 014 W3: charged once, before the scan, so the unit is a deterministic
+    // function of the grid rather than of how far the scan got.
+    charge_presearch_nodes(presearch_nodes(division));
     let mut res = (0.0, 0.0);
     let mut min = f64::INFINITY;
     let ((u0, u1), (v0, v1)) = (urange, vrange);
@@ -243,15 +463,108 @@ where
     S: ParametricSurface,
     S::Point: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64> + HashGen<f64>,
 {
+    parameter_division_with_budget(surface, (urange, vrange), tol, MAX_PARAMETER_DIVISION_CELLS)
+        .division
+}
+
+/// The remaining cell budget of one top-level division, and whether it ran out.
+struct CellBudget {
+    remaining: u64,
+    exhausted: bool,
+}
+
+/// One division and what it cost, as returned by [`parameter_division_with_budget`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct BudgetedDivision {
+    /// The `(udiv, vdiv)` division. Level-complete either way, and coarser than
+    /// `tol` asks for exactly when `truncated`.
+    pub division: (Vec<f64>, Vec<f64>),
+    /// Cells examined, summed over every refinement level.
+    pub cells: u64,
+    /// Whether the budget ran out before the tolerance was met.
+    pub truncated: bool,
+}
+
+/// [`parameter_division`] against an explicit cell budget.
+///
+/// The two production entry points fix the budget at
+/// [`MAX_PARAMETER_DIVISION_CELLS`]; this one is what a HEADROOM STUDY calls, so
+/// the ceiling can be swept without an environment variable or any other hidden
+/// configuration knob on the production path.
+///
+/// # Panics
+///
+/// `tol` must be more than `TOLERANCE`.
+pub fn parameter_division_with_budget<S>(
+    surface: &S,
+    (urange, vrange): SurfaceParameterRange,
+    tol: f64,
+    cell_budget: u64,
+) -> BudgetedDivision
+where
+    S: ParametricSurface,
+    S::Point: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64> + HashGen<f64>,
+{
     nonpositive_tolerance!(tol);
     let (mut udiv, mut vdiv) = (vec![urange.0, urange.1], vec![vrange.0, vrange.1]);
+    let mut budget = CellBudget {
+        remaining: cell_budget,
+        exhausted: false,
+    };
     sub_parameter_division(
         surface,
         (&mut udiv, &mut vdiv),
         tol,
         MAX_PARAMETER_DIVISION_RECURSION,
+        &mut budget,
     );
-    (udiv, vdiv)
+    let cells = cell_budget - budget.remaining;
+    DIVISION_CELLS_MAX.fetch_max(cells, std::sync::atomic::Ordering::Relaxed);
+    BudgetedDivision {
+        division: (udiv, vdiv),
+        cells,
+        truncated: budget.exhausted,
+    }
+}
+
+/// [`parameter_division`], but a division that could not be refined to `tol`
+/// within [`MAX_PARAMETER_DIVISION_CELLS`] is an `Err` naming the stage instead
+/// of a silently-coarse `Ok`.
+///
+/// Use this wherever a coarse division would be UNSOUND rather than merely ugly
+/// -- a certified-empty guard sampling a curved operand, say, whose soundness
+/// argument rests on the mesh staying within the chord of the true surface. The
+/// infallible [`parameter_division`] keeps its signature and its behaviour for
+/// the many callers -- viewers, area and volume estimates -- that have no
+/// refusal to return and are better served by a coarse grid than by a panic; it
+/// leaves the truncation readable through [`division_work`].
+///
+/// # Panics
+///
+/// `tol` must be more than `TOLERANCE`.
+pub fn try_parameter_division<S>(
+    surface: &S,
+    (urange, vrange): SurfaceParameterRange,
+    tol: f64,
+) -> Result<(Vec<f64>, Vec<f64>), DivisionTruncated>
+where
+    S: ParametricSurface,
+    S::Point: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64> + HashGen<f64>,
+{
+    let budgeted = parameter_division_with_budget(
+        surface,
+        (urange, vrange),
+        tol,
+        MAX_PARAMETER_DIVISION_CELLS,
+    );
+    match budgeted.truncated {
+        false => Ok(budgeted.division),
+        true => Err(DivisionTruncated {
+            division: budgeted.division,
+            cells: budgeted.cells,
+            budget: MAX_PARAMETER_DIVISION_CELLS,
+        }),
+    }
 }
 
 fn sub_parameter_division<S>(
@@ -259,13 +572,49 @@ fn sub_parameter_division<S>(
     (udiv, vdiv): (&mut Vec<f64>, &mut Vec<f64>),
     tol: f64,
     remaining_trials: usize,
+    budget: &mut CellBudget,
 ) where
     S: ParametricSurface,
     S::Point: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64> + HashGen<f64>,
 {
     if remaining_trials == 0 {
+        // Reaching the DEPTH cap is a truncation too: the caller is handed a
+        // division coarser than `tol` asks for. It used to return silently, so a
+        // caller could not tell an accurate division from an abandoned one. It is
+        // hard to reach now -- the cell budget binds first for any grid that
+        // grows -- but a grid that adds a single interval per level walks all the
+        // way here on very little work, and that case has to be honest as well.
+        budget.exhausted = true;
+        DIVISION_WORK.with(|work| {
+            let mut current = work.get();
+            current.truncated = true;
+            work.set(current);
+        });
+        DIVISION_TRUNCATIONS_TOTAL.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         return;
     }
+    // Admit a refinement level only if it fits ENTIRELY in the remaining budget.
+    // All-or-nothing per level keeps the returned grid level-complete, so the
+    // result is a deterministic function of surface, range and tolerance rather
+    // than of where a mid-level abort happened to land.
+    let level_cells = (udiv.len() - 1) as u64 * (vdiv.len() - 1) as u64;
+    if level_cells > budget.remaining {
+        budget.exhausted = true;
+        DIVISION_WORK.with(|work| {
+            let mut current = work.get();
+            current.truncated = true;
+            work.set(current);
+        });
+        DIVISION_TRUNCATIONS_TOTAL.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        return;
+    }
+    budget.remaining -= level_cells;
+    DIVISION_WORK.with(|work| {
+        let mut current = work.get();
+        current.cells += level_cells;
+        work.set(current);
+    });
+    DIVISION_CELLS_TOTAL.fetch_add(level_cells, std::sync::atomic::Ordering::Relaxed);
     let mut divide_flag0 = vec![false; udiv.len() - 1];
     let mut divide_flag1 = vec![false; vdiv.len() - 1];
 
@@ -327,6 +676,149 @@ fn sub_parameter_division<S>(
     if udiv.len() != new_udiv.len() || vdiv.len() != new_vdiv.len() {
         *udiv = new_udiv;
         *vdiv = new_vdiv;
-        sub_parameter_division(surface, (udiv, vdiv), tol, remaining_trials - 1);
+        sub_parameter_division(surface, (udiv, vdiv), tol, remaining_trials - 1, budget);
+    }
+}
+
+#[cfg(test)]
+mod division_budget_tests {
+    use super::*;
+
+    /// A surface whose evaluation carries a high-frequency term that a bilinear
+    /// interpolant can never match, so the deviation test fails at EVERY level:
+    /// the stand-in for the real non-converging case (a rational B-spline asked
+    /// to flatten a parameter box outside its knot vector, spec 012 U1.0).
+    #[derive(Clone, Copy, Debug)]
+    struct NonConvergingSurface;
+
+    impl ParametricSurface for NonConvergingSurface {
+        type Point = Point3;
+        type Vector = Vector3;
+        fn evaluate(&self, u: f64, v: f64) -> Point3 {
+            // 1e9 cycles across the unit domain: no level of halving resolves it.
+            Point3::new(u, v, f64::sin(1.0e9 * u) * f64::cos(1.0e9 * v))
+        }
+        fn derivative_u(&self, _: f64, _: f64) -> Vector3 { Vector3::unit_x() }
+        fn derivative_v(&self, _: f64, _: f64) -> Vector3 { Vector3::unit_y() }
+        fn derivative_uu(&self, _: f64, _: f64) -> Vector3 { Vector3::zero() }
+        fn derivative_uv(&self, _: f64, _: f64) -> Vector3 { Vector3::zero() }
+        fn derivative_vv(&self, _: f64, _: f64) -> Vector3 { Vector3::zero() }
+        fn derivative_mn(&self, m: usize, n: usize, u: f64, v: f64) -> Vector3 {
+            match (m, n) {
+                (0, 0) => self.evaluate(u, v).to_vec(),
+                (1, 0) => self.derivative_u(u, v),
+                (0, 1) => self.derivative_v(u, v),
+                _ => Vector3::zero(),
+            }
+        }
+    }
+
+    /// A plane: the control. Bilinear interpolation is EXACT on it, so the very
+    /// first deviation test passes and the division is the two endpoints.
+    #[derive(Clone, Copy, Debug)]
+    struct FlatSurface;
+
+    impl ParametricSurface for FlatSurface {
+        type Point = Point3;
+        type Vector = Vector3;
+        fn evaluate(&self, u: f64, v: f64) -> Point3 { Point3::new(u, v, 0.0) }
+        fn derivative_u(&self, _: f64, _: f64) -> Vector3 { Vector3::unit_x() }
+        fn derivative_v(&self, _: f64, _: f64) -> Vector3 { Vector3::unit_y() }
+        fn derivative_uu(&self, _: f64, _: f64) -> Vector3 { Vector3::zero() }
+        fn derivative_uv(&self, _: f64, _: f64) -> Vector3 { Vector3::zero() }
+        fn derivative_vv(&self, _: f64, _: f64) -> Vector3 { Vector3::zero() }
+        fn derivative_mn(&self, m: usize, n: usize, u: f64, v: f64) -> Vector3 {
+            match (m, n) {
+                (0, 0) => self.evaluate(u, v).to_vec(),
+                (1, 0) => self.derivative_u(u, v),
+                (0, 1) => self.derivative_v(u, v),
+                _ => Vector3::zero(),
+            }
+        }
+    }
+
+    #[test]
+    fn a_non_converging_surface_terminates_instead_of_grinding() {
+        // Before the cell budget this ran to `MAX_PARAMETER_DIVISION_RECURSION`
+        // = 100 levels of a TENSOR-PRODUCT grid -- `4^100` implied cells, which
+        // is not a bound (ledger M10). The depth cap is still there; this asserts
+        // the one that binds.
+        let budgeted = parameter_division_with_budget(
+            &NonConvergingSurface,
+            ((0.0, 1.0), (0.0, 1.0)),
+            0.01,
+            4096,
+        );
+        assert!(
+            budgeted.truncated,
+            "a surface that cannot converge must trip the budget"
+        );
+        assert!(
+            budgeted.cells <= 4096,
+            "spend {} must not exceed the budget",
+            budgeted.cells,
+        );
+        // The returned grid is still a real, level-complete division of the range.
+        let (udiv, vdiv) = &budgeted.division;
+        assert_eq!(udiv.first(), Some(&0.0));
+        assert_eq!(udiv.last(), Some(&1.0));
+        assert_eq!(vdiv.first(), Some(&0.0));
+        assert_eq!(vdiv.last(), Some(&1.0));
+        assert!(udiv.windows(2).all(|window| window[0] < window[1]));
+        assert!(vdiv.windows(2).all(|window| window[0] < window[1]));
+    }
+
+    #[test]
+    fn the_infallible_entry_returns_a_coarse_division_and_the_fallible_one_refuses() {
+        // The contract for a caller with no refusal channel (a viewer, a volume
+        // estimate) versus one whose SOUNDNESS rests on the chord bound.
+        let coarse = parameter_division(&NonConvergingSurface, ((0.0, 1.0), (0.0, 1.0)), 0.01);
+        assert!(coarse.0.len() >= 2 && coarse.1.len() >= 2);
+        let refused = try_parameter_division(&NonConvergingSurface, ((0.0, 1.0), (0.0, 1.0)), 0.01);
+        let error = refused.expect_err("a truncated division must not be reported as Ok");
+        assert_eq!(error.budget, MAX_PARAMETER_DIVISION_CELLS);
+        assert!(error.cells <= MAX_PARAMETER_DIVISION_CELLS);
+        assert!(
+            error.to_string().contains("cell budget"),
+            "the refusal must name the stage: {error}",
+        );
+        // Same grid either way -- the fallible entry adds a verdict, not a
+        // different division.
+        assert_eq!(error.division, coarse);
+    }
+
+    #[test]
+    fn a_converging_surface_is_untouched_by_the_budget() {
+        // The headroom assertion in miniature: a division that terminates must
+        // spend the same cells and return the same grid at ANY budget above its
+        // spend, including the production one.
+        let range = ((0.0, 1.0), (0.0, 1.0));
+        let tiny = parameter_division_with_budget(&FlatSurface, range, 0.01, 8);
+        let production =
+            parameter_division_with_budget(&FlatSurface, range, 0.01, MAX_PARAMETER_DIVISION_CELLS);
+        assert!(!tiny.truncated);
+        assert!(!production.truncated);
+        assert_eq!(tiny.cells, production.cells);
+        assert_eq!(tiny.division, production.division);
+        assert_eq!(tiny.division, (vec![0.0, 1.0], vec![0.0, 1.0]));
+        assert_eq!(tiny.cells, 1, "one level, one cell, no refinement");
+    }
+
+    #[test]
+    fn the_work_meter_charges_what_the_division_spends() {
+        let _ = take_division_work();
+        let _ = take_division_totals();
+        let budgeted = parameter_division_with_budget(
+            &NonConvergingSurface,
+            ((0.0, 1.0), (0.0, 1.0)),
+            0.01,
+            1024,
+        );
+        let work = take_division_work();
+        assert_eq!(work.cells, budgeted.cells);
+        assert!(work.truncated);
+        let (total, truncations) = take_division_totals();
+        assert_eq!(total, budgeted.cells);
+        assert_eq!(truncations, 1);
     }
 }

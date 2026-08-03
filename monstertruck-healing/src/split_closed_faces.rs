@@ -276,8 +276,10 @@ where
         boundaries[0]
             .iter()
             .zip(&param_boundaries[0])
-            .map(|(edge_index, param_edge)| (take_front(*edge_index), param_edge[0]))
-            .collect()
+            .map(|(edge_index, param_edge)| {
+                param_edge.first().map(|p| (take_front(*edge_index), *p))
+            })
+            .collect::<Option<_>>()?
     };
     let divisor = concave_wire_divisor(&ordered_vertices)?;
     split_face_by_divisor(
@@ -920,7 +922,7 @@ where
             tol,
         },
     )?;
-    let param_vertices = create_param_vertices(boundaries, &param_boundaries, edges);
+    let param_vertices = create_param_vertices(boundaries, &param_boundaries, edges)?;
     let mut duplicated_edges = duplicated_edges(boundaries.iter().flatten().map(|ei| ei.index));
     let vertices_on_divisor = enumerate_vertices_on_divisor(divisor, &param_vertices, surface)?;
     let new_edges = create_new_edges(&vertices_on_divisor, poly_edges, surface, tol)?;
@@ -1151,10 +1153,10 @@ fn create_param_vertices<C>(
     boundaries: &[Wire],
     param_boundaries: &[Vec<PolylineCurve<Point2>>],
     edges: &[Edge<C>],
-) -> HashMap<usize, Point2> {
+) -> Option<HashMap<usize, Point2>> {
     let take_front = closure_take_front(edges);
     zip_boundaries(boundaries, param_boundaries)
-        .map(|(edge_index, param_edge)| (take_front(*edge_index), param_edge[0]))
+        .map(|(edge_index, param_edge)| param_edge.first().map(|p| (take_front(*edge_index), *p)))
         .collect()
 }
 
@@ -1502,7 +1504,10 @@ enum BoundaryType {
 }
 
 fn boundary_type(poly: &PolylineCurve<Point2>) -> BoundaryType {
-    if poly[0].distance2(poly[poly.len() - 1]) < 1.0e-3 {
+    let (Some(first), Some(last)) = (poly.first(), poly.last()) else {
+        return BoundaryType::NotClosed;
+    };
+    if first.distance2(*last) < 1.0e-3 {
         match poly.area() > 0.0 {
             true => BoundaryType::Positive,
             false => BoundaryType::Negative,

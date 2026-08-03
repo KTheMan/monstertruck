@@ -3,8 +3,8 @@
 //! Ported verbatim from the published 0.3.2 crate's
 //! `transversal::faces_classification`. Kept private to the classic subtree so
 //! it binds to the classic [`ShapesOpStatus`] (the crate-level
-//! `faces_classification` binds to the upgrade-backend loops-store status of
-//! the same name, a distinct type).
+//! `faces_classification` binds to the loops-store status of the same
+//! name, a distinct type).
 
 use super::loops_store::ShapesOpStatus;
 use monstertruck_topology::*;

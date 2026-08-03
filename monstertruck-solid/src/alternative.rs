@@ -1,6 +1,7 @@
 use monstertruck_geometry::prelude::{
-    AnalyticSurfaceKind, BsplineCurve, BsplineSurface, ParametricSurface3D, Point2,
-    SearchNearestParameter, SearchParameter, SupportsExactPatchDomains, TryIntoAnalyticSurfaceKind,
+    AnalyticSurfaceKind, BsplineCurve, BsplineSurface, HomogeneousSurfaceConversion,
+    ParametricSurface3D, Point2, SearchNearestParameter, SearchParameter,
+    SupportsExactPatchDomains, SurfaceParameterRectangle, TryIntoAnalyticSurfaceKind,
     TryIntoBsplineSurface, TryIntoHomogeneousBsplineCurve, TryIntoHomogeneousBsplineSurface,
 };
 use monstertruck_meshing::prelude::*;
@@ -189,6 +190,20 @@ where
         match self {
             Self::FirstType(entity) => entity.try_into_homogeneous_bspline_surface(),
             Self::SecondType(entity) => entity.try_into_homogeneous_bspline_surface(),
+        }
+    }
+
+    fn try_into_homogeneous_bspline_surface_over(
+        &self,
+        parameter_range: Option<SurfaceParameterRectangle>,
+    ) -> Option<HomogeneousSurfaceConversion> {
+        match self {
+            Self::FirstType(entity) => {
+                entity.try_into_homogeneous_bspline_surface_over(parameter_range)
+            }
+            Self::SecondType(entity) => {
+                entity.try_into_homogeneous_bspline_surface_over(parameter_range)
+            }
         }
     }
 }
