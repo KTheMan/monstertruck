@@ -186,11 +186,17 @@ impl<P: Copy, C: Clone> Loops<P, C> {
             .for_each(|edge| {
                 let mut new_edge = if edge.absolute_front() == old_vertex {
                     emap.entry(edge.id()).or_insert_with(|| {
-                        Edge::new(new_vertex, edge.absolute_back(), edge.curve())
+                        let mut replacement =
+                            Edge::new(new_vertex, edge.absolute_back(), edge.curve());
+                        replacement.inherit_tracking_from(edge);
+                        replacement
                     })
                 } else if edge.absolute_back() == old_vertex {
                     emap.entry(edge.id()).or_insert_with(|| {
-                        Edge::new(edge.absolute_front(), new_vertex, edge.curve())
+                        let mut replacement =
+                            Edge::new(edge.absolute_front(), new_vertex, edge.curve());
+                        replacement.inherit_tracking_from(edge);
+                        replacement
                     })
                 } else {
                     return;
@@ -331,7 +337,9 @@ impl<P: Copy + Tolerance, C: Clone> LoopsStore<P, C> {
             ParameterKind::Inner(t) => {
                 let edge = self[loops_index][wire_index][edge_index].absolute_clone();
                 let edge_id = edge.id();
-                let (edge0, edge1) = edge.cut_with_parameter(v, t)?;
+                let (mut edge0, mut edge1) = edge.cut_with_parameter(v, t)?;
+                edge0.inherit_tracking_from(&edge);
+                edge1.inherit_tracking_from(&edge);
                 let new_wire: Wire<_, _> = vec![edge0, edge1].into();
                 self.swap_edge_into_wire(edge_id, &new_wire);
             }
@@ -376,7 +384,9 @@ impl<C> LoopsStore<Point3, C> {
                 v.set_point(pt);
                 let edge = self[loops_index][wire_index][edge_index].absolute_clone();
                 let edge_id = edge.id();
-                let (edge0, edge1) = edge.cut_with_parameter(v, t)?;
+                let (mut edge0, mut edge1) = edge.cut_with_parameter(v, t)?;
+                edge0.inherit_tracking_from(&edge);
+                edge1.inherit_tracking_from(&edge);
                 let new_wire: Wire<_, _> = vec![edge0, edge1].into();
                 self.swap_edge_into_wire(edge_id, &new_wire);
             }

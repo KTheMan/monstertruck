@@ -867,8 +867,12 @@ where
         let t = (t0 + t1) * 0.5;
         let v1 = Vertex::new(curve.subs(t));
         let curve1 = curve.cut(t);
-        wire.push_back(Edge::debug_new(&v0, &v1, curve));
-        wire.push_back(Edge::debug_new(&v1, &v2, curve1));
+        let mut first = Edge::debug_new(&v0, &v1, curve);
+        let mut second = Edge::debug_new(&v1, &v2, curve1);
+        first.inherit_tracking_from(&edge);
+        second.inherit_tracking_from(&edge);
+        wire.push_back(first);
+        wire.push_back(second);
     }
 
     let mut shell = revolve(&wire, origin, axis, sweep, division);

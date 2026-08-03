@@ -367,6 +367,22 @@ pub enum OperationKind {
     Cut,
     /// A topology split.
     Split,
+    /// A topology clone.
+    Clone,
+    /// A translation.
+    Translate,
+    /// A non-uniform scale.
+    Scale,
+    /// A Boolean intersection.
+    BooleanIntersection,
+    /// A Boolean union.
+    BooleanUnion,
+    /// A Boolean difference.
+    BooleanDifference,
+    /// A Boolean symmetric difference.
+    BooleanSymmetricDifference,
+    /// An edge fillet.
+    Fillet,
 }
 
 /// Relationship between a lineage parent and its children.
@@ -379,6 +395,8 @@ pub enum LineageRelation {
     Generated,
     /// The operation split the parent into multiple children.
     Split,
+    /// The operation removed the parent without a surviving descendant.
+    Deleted,
 }
 
 impl DeterministicContentHash for OperationKind {

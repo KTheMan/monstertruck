@@ -171,8 +171,9 @@ impl TrackingSession {
     ///
     /// # Errors
     ///
-    /// Returns a typed [`TrackingError`] when an identifier is not current,
-    /// there are no children, or a child occurs more than once.
+    /// Returns a typed [`TrackingError`] when an identifier is not current, a
+    /// non-deleted event has no children, a deleted event has children, or a
+    /// child occurs more than once.
     pub fn record_lineage(
         &mut self,
         operation: OperationKind,
@@ -182,8 +183,10 @@ impl TrackingSession {
     ) -> TrackingResult<&LineageEvent> {
         self.validate_current(&parent)?;
         let children: Vec<_> = children.into_iter().collect();
-        if children.is_empty() {
+        if children.is_empty() && relation != LineageRelation::Deleted {
             return Err(TrackingError::EmptyLineage);
+        } else if !children.is_empty() && relation == LineageRelation::Deleted {
+            return Err(TrackingError::DeletedLineageHasChildren);
         }
         children
             .iter()
@@ -195,6 +198,50 @@ impl TrackingSession {
         self.lineage
             .push(LineageEvent::new(operation, relation, parent, children));
         Ok(&self.lineage[self.lineage.len() - 1])
+    }
+
+    /// Resolves the current terminal descendants of a tracked selection.
+    ///
+    /// Events are applied in recording order, so preserved identities can
+    /// continue through later operations while split identities expand into
+    /// every surviving child. A deleted selection resolves to an empty set.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same session, generation, and allocation errors as
+    /// [`Self::validate_current`].
+    pub fn descendants(&self, tracking_id: &TrackingId) -> TrackingResult<Vec<TrackingId>> {
+        self.validate_current(tracking_id)?;
+        Ok(self
+            .lineage
+            .iter()
+            .fold(vec![tracking_id.clone()], |mut descendants, event| {
+                if let Some(index) = descendants
+                    .iter()
+                    .position(|candidate| candidate == event.parent())
+                {
+                    if event.relation() == LineageRelation::Generated {
+                        descendants.splice(index + 1..index + 1, event.children().iter().cloned());
+                    } else {
+                        descendants.splice(index..=index, event.children().iter().cloned());
+                    }
+                }
+                descendants
+            }))
+    }
+
+    /// Resolves a semantic selection to its current terminal descendants.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TrackingError::UnknownSemanticReference`] when the selection
+    /// is unknown, or the same session, generation, and allocation errors as
+    /// [`Self::descendants`].
+    pub fn resolve_descendants(
+        &self,
+        reference: &SemanticTopologyRef,
+    ) -> TrackingResult<Vec<TrackingId>> {
+        self.descendants(self.resolve(reference)?)
     }
 
     /// Advances replay generation and clears generation-local state.
@@ -244,8 +291,10 @@ impl TrackingSession {
         }
         self.lineage.iter().try_for_each(|event| {
             self.validate_current(&event.parent)?;
-            if event.children.is_empty() {
+            if event.children.is_empty() && event.relation() != LineageRelation::Deleted {
                 return Err(TrackingError::EmptyLineage);
+            } else if !event.children.is_empty() && event.relation() == LineageRelation::Deleted {
+                return Err(TrackingError::DeletedLineageHasChildren);
             }
             event
                 .children
@@ -365,6 +414,8 @@ pub enum TrackingError {
     EmptyLineage,
     /// A lineage event repeats a child.
     DuplicateLineageChild,
+    /// A deleted lineage event contains a child.
+    DeletedLineageHasChildren,
     /// The replay-generation counter is exhausted.
     GenerationOverflow,
     /// The generation-local serial counter is exhausted.
@@ -433,6 +484,9 @@ impl Display for TrackingError {
             Self::EmptyLineage => formatter.write_str("a lineage event must have a child"),
             Self::DuplicateLineageChild => {
                 formatter.write_str("a lineage event contains a duplicate child")
+            }
+            Self::DeletedLineageHasChildren => {
+                formatter.write_str("a deleted lineage event cannot contain a child")
             }
             Self::GenerationOverflow => {
                 formatter.write_str("the tracking generation counter is exhausted")

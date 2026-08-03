@@ -2,7 +2,7 @@ use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
 use crate::*;
 
-use super::interface::{TrackingReport, TrackingResult};
+use super::interface::{TrackingReplacement, TrackingReport, TrackingResult};
 
 pub(super) struct TrackingState<'a> {
     session: &'a mut TrackingSession,
@@ -14,6 +14,7 @@ pub(super) struct TrackingState<'a> {
     all_ids: Vec<TrackingId>,
     preserved_ids: Vec<TrackingId>,
     generated: Vec<SemanticBinding>,
+    replacements: Vec<TrackingReplacement>,
 }
 
 impl<'a> TrackingState<'a> {
@@ -28,6 +29,7 @@ impl<'a> TrackingState<'a> {
             all_ids: Vec::new(),
             preserved_ids: Vec::new(),
             generated: Vec::new(),
+            replacements: Vec::new(),
         }
     }
 
@@ -78,6 +80,12 @@ impl<'a> TrackingState<'a> {
         self.used.insert(tracking_id.clone());
         self.all_ids.push(tracking_id.clone());
         self.generated.push(binding);
+        if let Some(original) = existing {
+            self.replacements.push(TrackingReplacement {
+                original: original.clone(),
+                replacement: tracking_id.clone(),
+            });
+        }
         Ok(tracking_id)
     }
 
@@ -86,6 +94,7 @@ impl<'a> TrackingState<'a> {
             all_ids: self.all_ids,
             preserved_ids: self.preserved_ids,
             generated: self.generated,
+            replacements: self.replacements,
         }
     }
 }

@@ -80,6 +80,16 @@ impl<P, C, S> Face<P, C, S> {
     #[inline(always)]
     pub fn tracking_id(&self) -> Option<&TrackingId> { self.tracking_id.as_ref() }
 
+    /// Copies the tracking origin from a face replaced by an operation.
+    ///
+    /// Operation implementations use this before
+    /// [`TopologyTracking::initialize_tracking`] assigns independently
+    /// addressable identities to duplicate descendants.
+    #[doc(hidden)]
+    pub fn inherit_tracking_from(&mut self, source: &Self) {
+        self.tracking_id.clone_from(&source.tracking_id);
+    }
+
     #[inline(always)]
     pub(crate) fn set_tracking_id(&mut self, id: Option<TrackingId>) { self.tracking_id = id; }
 

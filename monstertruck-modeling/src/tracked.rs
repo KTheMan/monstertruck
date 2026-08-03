@@ -33,15 +33,26 @@
 //! }
 //! ```
 
-use crate::builder::{self, SweepAngle};
-use crate::geom_impls::{ArcConnector, ExtrudeConnector, LineConnector, RevoluteConnector};
-use crate::topo_traits::{ClosedSweep, Mapped, Sweep};
+#[cfg(feature = "solid")]
+use std::collections::BTreeSet;
+
 use monstertruck_core::{Matrix4, Point3, Rad, Vector3};
+#[cfg(feature = "solid")]
+use monstertruck_topology::TrackingReport;
 use monstertruck_topology::{
     FeatureId, LineageRelation, OperationKind, TopologyTracking, TrackingError, TrackingId,
     TrackingSession,
 };
 use thiserror::Error;
+
+#[cfg(feature = "fillet")]
+use crate::Edge;
+use crate::builder::{self, SweepAngle};
+use crate::geom_impls::{ArcConnector, ExtrudeConnector, LineConnector, RevoluteConnector};
+use crate::topo_traits::{ClosedSweep, Mapped, Sweep};
+#[cfg(feature = "solid")]
+use crate::{Curve, Solid, Surface};
+use crate::{Shell, Wire};
 
 /// Result type for tracked modeling operations.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -58,6 +69,18 @@ pub enum Error {
     /// A topology-preserving map changed the ordered tracking identity set.
     #[error("the mapped topology did not preserve its ordered tracking identity set")]
     IdentityMismatch,
+    /// A Boolean shape operation failed.
+    #[cfg(feature = "solid")]
+    #[error("Boolean shape operation failed: {0}")]
+    ShapeOperation(String),
+    /// An edge-fillet operation failed.
+    #[cfg(feature = "fillet")]
+    #[error("edge-fillet operation failed: {0}")]
+    Fillet(String),
+    /// Plane-cut section faces could not be matched to the tracked solid.
+    #[cfg(feature = "solid")]
+    #[error("plane-cut section topology did not match the tracked result solid")]
+    SectionTrackingMismatch,
 }
 
 fn current_ids<T: TopologyTracking>(
@@ -117,6 +140,48 @@ fn record_generated(
     Ok(())
 }
 
+#[cfg(feature = "solid")]
+fn record_finalized(
+    source: &[TrackingId],
+    report: &TrackingReport,
+    session: &mut TrackingSession,
+    operation: OperationKind,
+) -> Result<()> {
+    source.iter().try_for_each(|tracking_id| {
+        let preserved = report
+            .all_ids()
+            .contains(tracking_id)
+            .then(|| tracking_id.clone());
+        let replacements = report
+            .replacements()
+            .iter()
+            .filter(|replacement| replacement.original() == tracking_id)
+            .map(|replacement| replacement.replacement().clone());
+        let children: Vec<_> = preserved.into_iter().chain(replacements).collect();
+        let relation = match children.len() {
+            0 => LineageRelation::Deleted,
+            1 => LineageRelation::Preserved,
+            _ => LineageRelation::Split,
+        };
+        session
+            .record_lineage(operation, relation, tracking_id.clone(), children)
+            .map(|_| ())
+    })?;
+    Ok(())
+}
+
+#[cfg(feature = "solid")]
+fn finalize_output<T: TopologyTracking>(
+    output: &mut T,
+    source: &[TrackingId],
+    session: &mut TrackingSession,
+    feature: FeatureId,
+    operation: OperationKind,
+) -> Result<()> {
+    let report = output.initialize_tracking(session, feature)?;
+    record_finalized(source, &report, session, operation)
+}
+
 fn commit_session<T>(
     session: &mut TrackingSession,
     operation: impl FnOnce(&mut TrackingSession) -> Result<T>,
@@ -146,6 +211,38 @@ where T: Mapped<Matrix4> + TopologyTracking {
     Ok(output)
 }
 
+/// Clones topology while preserving its current tracking identities.
+///
+/// # Errors
+///
+/// Returns [`enum@Error`] when the source is untracked, an identity is not
+/// current, cloning changes topology identity, or lineage recording fails.
+pub fn cloned<T>(topology: &T, session: &mut TrackingSession) -> Result<T>
+where T: Mapped<()> + TopologyTracking {
+    let source = current_ids(topology, session)?;
+    let output = builder::clone(topology);
+    commit_session(session, |session| {
+        record_preserved(&source, &output, session, OperationKind::Clone)
+    })?;
+    Ok(output)
+}
+
+/// Translates topology while preserving its current tracking identities.
+///
+/// # Errors
+///
+/// Returns [`enum@Error`] when the source is untracked, an identity is not
+/// current, translation changes topology identity, or lineage recording fails.
+pub fn translated<T>(topology: &T, vector: Vector3, session: &mut TrackingSession) -> Result<T>
+where T: Mapped<Matrix4> + TopologyTracking {
+    let source = current_ids(topology, session)?;
+    let output = builder::translated(topology, vector);
+    commit_session(session, |session| {
+        record_preserved(&source, &output, session, OperationKind::Translate)
+    })?;
+    Ok(output)
+}
+
 /// Rotates topology while preserving its current tracking identities.
 ///
 /// # Errors
@@ -166,6 +263,29 @@ where
     let output = builder::rotated(topology, origin, axis, angle);
     commit_session(session, |session| {
         record_preserved(&source, &output, session, OperationKind::Rotate)
+    })?;
+    Ok(output)
+}
+
+/// Scales topology while preserving its current tracking identities.
+///
+/// # Errors
+///
+/// Returns [`enum@Error`] when the source is untracked, an identity is not
+/// current, scaling changes topology identity, or lineage recording fails.
+pub fn scaled<T>(
+    topology: &T,
+    origin: Point3,
+    scalars: Vector3,
+    session: &mut TrackingSession,
+) -> Result<T>
+where
+    T: Mapped<Matrix4> + TopologyTracking,
+{
+    let source = current_ids(topology, session)?;
+    let output = builder::scaled(topology, origin, scalars);
+    commit_session(session, |session| {
+        record_preserved(&source, &output, session, OperationKind::Scale)
     })?;
     Ok(output)
 }
@@ -260,6 +380,314 @@ where
         record_generated(&source, &generated, session, OperationKind::Revolve)
     })?;
     Ok(output)
+}
+
+/// Revolves a wire while collapsing degenerate on-axis edges and tracking all
+/// generated topology.
+///
+/// # Errors
+///
+/// Returns [`enum@Error`] when the source is untracked, an identity is not
+/// current, result initialization fails, or lineage recording fails.
+pub fn revolve_wire(
+    wire: &Wire,
+    origin: Point3,
+    axis: Vector3,
+    sweep: SweepAngle,
+    division: usize,
+    session: &mut TrackingSession,
+    feature: FeatureId,
+) -> Result<Shell> {
+    let source = current_ids(wire, session)?;
+    let mut output = builder::revolve_wire(wire, origin, axis, sweep, division);
+    commit_session(session, |session| {
+        let report = output.initialize_tracking(session, feature)?;
+        let generated: Vec<_> = report.generated_ids().cloned().collect();
+        record_generated(&source, &generated, session, OperationKind::Revolve)
+    })?;
+    Ok(output)
+}
+
+/// Revolves a wire around an axis through its first vertex and tracks all
+/// generated topology.
+///
+/// # Errors
+///
+/// Returns [`enum@Error`] when the source is untracked, an identity is not
+/// current, result initialization fails, or lineage recording fails.
+#[deprecated(note = "Use `revolve_wire` instead, which takes an explicit origin parameter.")]
+pub fn cone(
+    wire: &Wire,
+    axis: Vector3,
+    sweep: SweepAngle,
+    division: usize,
+    session: &mut TrackingSession,
+    feature: FeatureId,
+) -> Result<Shell> {
+    let origin = wire
+        .front_vertex()
+        .map_or(Point3::new(0.0, 0.0, 0.0), |vertex| vertex.point());
+    revolve_wire(wire, origin, axis, sweep, division, session, feature)
+}
+
+#[cfg(feature = "solid")]
+fn boolean_operation(
+    first: &Solid,
+    second: &Solid,
+    session: &mut TrackingSession,
+    feature: FeatureId,
+    operation: OperationKind,
+    boolean: impl FnOnce(
+        &Solid,
+        &Solid,
+    ) -> std::result::Result<Solid, monstertruck_solid::ShapeOpsError>,
+) -> Result<Solid> {
+    let source: Vec<_> = current_ids(first, session)?
+        .into_iter()
+        .chain(current_ids(second, session)?)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let mut output =
+        boolean(first, second).map_err(|error| Error::ShapeOperation(error.to_string()))?;
+    commit_session(session, |session| {
+        finalize_output(&mut output, &source, session, feature, operation)
+    })?;
+    Ok(output)
+}
+
+/// Intersects two solids and records preserved, split, and deleted topology.
+///
+/// # Errors
+///
+/// Returns [`enum@Error`] when either source is untracked, the Boolean
+/// operation fails, result tracking fails, or lineage recording fails.
+#[cfg(feature = "solid")]
+pub fn and(
+    first: &Solid,
+    second: &Solid,
+    tolerance: f64,
+    session: &mut TrackingSession,
+    feature: FeatureId,
+) -> Result<Solid> {
+    boolean_operation(
+        first,
+        second,
+        session,
+        feature,
+        OperationKind::BooleanIntersection,
+        |first, second| monstertruck_solid::and(first, second, tolerance),
+    )
+}
+
+/// Intersects two solids using known shell-orientation hints.
+///
+/// # Errors
+///
+/// Returns [`enum@Error`] when either source is untracked, the Boolean
+/// operation fails, result tracking fails, or lineage recording fails.
+#[cfg(feature = "solid")]
+pub fn and_with_orientation_hints(
+    first: &Solid,
+    second: &Solid,
+    orientation_hints: monstertruck_solid::ShellOrientationHints,
+    tolerance: f64,
+    session: &mut TrackingSession,
+    feature: FeatureId,
+) -> Result<Solid> {
+    boolean_operation(
+        first,
+        second,
+        session,
+        feature,
+        OperationKind::BooleanIntersection,
+        |first, second| {
+            monstertruck_solid::and_with_orientation_hints(
+                first,
+                second,
+                orientation_hints,
+                tolerance,
+            )
+        },
+    )
+}
+
+/// Unites two solids and records preserved, split, and deleted topology.
+///
+/// # Errors
+///
+/// Returns [`enum@Error`] when either source is untracked, the Boolean
+/// operation fails, result tracking fails, or lineage recording fails.
+#[cfg(feature = "solid")]
+pub fn or(
+    first: &Solid,
+    second: &Solid,
+    tolerance: f64,
+    session: &mut TrackingSession,
+    feature: FeatureId,
+) -> Result<Solid> {
+    boolean_operation(
+        first,
+        second,
+        session,
+        feature,
+        OperationKind::BooleanUnion,
+        |first, second| monstertruck_solid::or(first, second, tolerance),
+    )
+}
+
+/// Subtracts `second` from `first` and records topology lineage.
+///
+/// # Errors
+///
+/// Returns [`enum@Error`] when either source is untracked, the Boolean
+/// operation fails, result tracking fails, or lineage recording fails.
+#[cfg(feature = "solid")]
+pub fn difference(
+    first: &Solid,
+    second: &Solid,
+    tolerance: f64,
+    session: &mut TrackingSession,
+    feature: FeatureId,
+) -> Result<Solid> {
+    boolean_operation(
+        first,
+        second,
+        session,
+        feature,
+        OperationKind::BooleanDifference,
+        |first, second| monstertruck_solid::difference(first, second, tolerance),
+    )
+}
+
+/// Computes the symmetric difference and records topology lineage.
+///
+/// # Errors
+///
+/// Returns [`enum@Error`] when either source is untracked, the Boolean
+/// operation fails, result tracking fails, or lineage recording fails.
+#[cfg(feature = "solid")]
+pub fn symmetric_difference(
+    first: &Solid,
+    second: &Solid,
+    tolerance: f64,
+    session: &mut TrackingSession,
+    feature: FeatureId,
+) -> Result<Solid> {
+    boolean_operation(
+        first,
+        second,
+        session,
+        feature,
+        OperationKind::BooleanSymmetricDifference,
+        |first, second| monstertruck_solid::symmetric_difference(first, second, tolerance),
+    )
+}
+
+/// Clips a solid against a canonical clip-space half-space.
+///
+/// # Errors
+///
+/// Returns [`enum@Error`] when the source is untracked, clipping fails,
+/// result tracking fails, or lineage recording fails.
+#[cfg(feature = "solid")]
+pub fn clip_half_space_z(
+    solid: &Solid,
+    world_to_clip: Matrix4,
+    keep_positive_z: bool,
+    tolerance: f64,
+    session: &mut TrackingSession,
+    feature: FeatureId,
+) -> Result<Solid> {
+    let source = current_ids(solid, session)?;
+    let mut output =
+        monstertruck_solid::clip_half_space_z(solid, world_to_clip, keep_positive_z, tolerance)
+            .map_err(|error| Error::ShapeOperation(error.to_string()))?;
+    commit_session(session, |session| {
+        finalize_output(&mut output, &source, session, feature, OperationKind::Cut)
+    })?;
+    Ok(output)
+}
+
+/// Cuts a solid by a plane and tracks both the solid and section faces.
+///
+/// # Errors
+///
+/// Returns [`enum@Error`] when the source is untracked, cutting fails, result
+/// tracking fails, or lineage recording fails.
+#[cfg(feature = "solid")]
+pub fn plane_cut(
+    solid: &Solid,
+    world_to_clip: Matrix4,
+    keep_positive_z: bool,
+    tolerance: f64,
+    session: &mut TrackingSession,
+    feature: FeatureId,
+) -> Result<monstertruck_solid::PlaneCut<Curve, Surface>> {
+    let source = current_ids(solid, session)?;
+    let mut output =
+        monstertruck_solid::plane_cut(solid, world_to_clip, keep_positive_z, tolerance)
+            .map_err(|error| Error::ShapeOperation(error.to_string()))?;
+    let section = commit_session(session, |session| {
+        finalize_output(
+            &mut output.solid,
+            &source,
+            session,
+            feature,
+            OperationKind::Cut,
+        )?;
+        output
+            .section
+            .iter()
+            .map(|section_face| {
+                output
+                    .solid
+                    .face_iter()
+                    .find(|solid_face| solid_face.is_same(section_face))
+                    .cloned()
+                    .ok_or(Error::SectionTrackingMismatch)
+            })
+            .collect::<Result<Vec<_>>>()
+    })?;
+    output.section = section;
+    Ok(output)
+}
+
+/// Fillets selected shell edges and records replacement topology.
+///
+/// The mutation is transactional: both the shell and tracking session remain
+/// unchanged when filleting or tracking fails.
+///
+/// # Errors
+///
+/// Returns [`enum@Error`] when the shell or selected edges are untracked,
+/// filleting fails, result tracking fails, or lineage recording fails.
+#[cfg(feature = "fillet")]
+pub fn fillet_edges(
+    shell: &mut Shell,
+    edges: &[Edge],
+    options: Option<&monstertruck_solid::FilletOptions>,
+    session: &mut TrackingSession,
+    feature: FeatureId,
+) -> Result<()> {
+    let source = current_ids(shell, session)?;
+    edges
+        .iter()
+        .try_for_each(|edge| current_ids(edge, session).map(|_| ()))?;
+    let mut output = shell.clone();
+    monstertruck_solid::fillet_edges_generic(&mut output, edges, options)
+        .map_err(|error| Error::Fillet(error.to_string()))?;
+    commit_session(session, |session| {
+        finalize_output(
+            &mut output,
+            &source,
+            session,
+            feature,
+            OperationKind::Fillet,
+        )
+    })?;
+    *shell = output;
+    Ok(())
 }
 
 #[cfg(test)]
