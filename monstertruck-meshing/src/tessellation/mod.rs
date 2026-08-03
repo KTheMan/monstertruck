@@ -87,6 +87,12 @@ mod parallelizable {
 
 pub use parallelizable::*;
 
+mod provenance;
+pub use provenance::{
+    EdgeLocator, EdgeProvenance, FaceProvenance, MeshableShapeWithProvenance,
+    RobustMeshableShapeWithProvenance, TessellationWithProvenance,
+};
+
 /// Gathered the traits used in tessellation.
 pub trait PolylineableCurve:
     ParametricCurve3D + BoundedCurve + ParameterDivision1D<Point = Point3> + Parallelizable {
