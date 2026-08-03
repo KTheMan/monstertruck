@@ -112,6 +112,7 @@ where
                 .map(|chunk| chunk.wire.deref().clone())
                 .collect();
             let mut new_face = Face::debug_new(wires, surface).ok()?;
+            new_face.inherit_tracking_from(face);
             if !face.orientation() {
                 new_face.invert();
             }

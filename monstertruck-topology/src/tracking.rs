@@ -67,7 +67,7 @@ mod implementations;
 mod initialization;
 mod interface;
 
-pub use interface::{TopologyTracking, TrackingReport, TrackingResult};
+pub use interface::{TopologyTracking, TrackingReplacement, TrackingReport, TrackingResult};
 
 #[cfg(test)]
 mod tests {

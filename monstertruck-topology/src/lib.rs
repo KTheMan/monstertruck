@@ -415,7 +415,7 @@ pub mod face;
 pub mod shell;
 mod solid;
 mod tracking;
-pub use tracking::{TopologyTracking, TrackingReport, TrackingResult};
+pub use tracking::{TopologyTracking, TrackingReplacement, TrackingReport, TrackingResult};
 /// Runtime topology with face-local trim storage.
 pub mod trimmed;
 mod vertex;

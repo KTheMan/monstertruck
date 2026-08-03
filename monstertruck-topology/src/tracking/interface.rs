@@ -11,6 +11,25 @@ pub struct TrackingReport {
     pub(super) all_ids: Vec<TrackingId>,
     pub(super) preserved_ids: Vec<TrackingId>,
     pub(super) generated: Vec<SemanticBinding>,
+    pub(super) replacements: Vec<TrackingReplacement>,
+}
+
+/// A fresh identity assigned to a duplicated source identity.
+///
+/// Replacements preserve the origin needed to follow topology that an
+/// operation split into multiple independently addressable elements.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TrackingReplacement {
+    pub(super) original: TrackingId,
+    pub(super) replacement: TrackingId,
+}
+
+impl TrackingReplacement {
+    /// Returns the source identity copied by the operation.
+    pub const fn original(&self) -> &TrackingId { &self.original }
+
+    /// Returns the fresh identity assigned to the duplicate.
+    pub const fn replacement(&self) -> &TrackingId { &self.replacement }
 }
 
 impl TrackingReport {
@@ -27,6 +46,9 @@ impl TrackingReport {
     pub fn generated_ids(&self) -> impl Iterator<Item = &TrackingId> {
         self.generated.iter().map(SemanticBinding::tracking_id)
     }
+
+    /// Returns fresh identities whose source identity was duplicated.
+    pub fn replacements(&self) -> &[TrackingReplacement] { &self.replacements }
 }
 
 /// A topology value that can be finalized by a tracking session.
