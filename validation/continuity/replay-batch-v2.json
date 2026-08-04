@@ -1,0 +1,201 @@
+{
+  "schema_version": 2,
+  "base_revision": "4054cc8122b4a69776664caf7eb948aedfaaa906",
+  "harness_sha256": "ff48a623bc8991c35cee0440cf3fcc329a4a5b2398b8b53eedea157246a0f896",
+  "toolchain": "rustc 1.94.0 (4a4ef493e 2026-03-02); binary: rustc; commit-hash: 4a4ef493e3a1488c6e321570238084b38948f6db; commit-date: 2026-03-02; host: x86_64-pc-windows-msvc; release: 1.94.0; LLVM version: 21.1.8",
+  "target": "x86_64-windows",
+  "solver_configurations": {
+    "bounded_nonconvergence": "ContinuitySolverConfig::default().with_max_iterations(1)",
+    "default": "ContinuitySolverConfig::default()"
+  },
+  "generated_input": "deterministic bilinear and quintic tensor-product patches",
+  "bounded_batch_basis": "generated from resources/continuity-validation/v1/corpus.json fixture_version multispan_quintic_curved_seam_v2 with a 0.05 upstream G0 seam offset and a one-iteration batch budget",
+  "solver_tripwire": {
+    "kind": "non_positive_weight",
+    "endpoint": "First",
+    "row": 0,
+    "column": 0,
+    "weight": 0.0
+  },
+  "cases": {
+    "bounded_nonconvergence": {
+      "story": "MT-304",
+      "error": {
+        "kind": "did_not_converge",
+        "contract_id": "a-bounded-downstream",
+        "termination": "MaximumIterations",
+        "iterations": 1,
+        "accepted_steps": 1,
+        "rejected_steps": 0
+      },
+      "repeated_error_equal": true,
+      "geometry_unchanged": true,
+      "tracking_unchanged": true,
+      "contracts_unchanged": true,
+      "execution": {
+        "kind": "bounded_solve_failure",
+        "returned_solution": false,
+        "individual_contracts_succeeded": [
+          true,
+          true
+        ],
+        "input_contract_order": [
+          "a-bounded-downstream",
+          "z-bounded-upstream"
+        ],
+        "expected_dependency_order": [
+          "z-bounded-upstream",
+          "a-bounded-downstream"
+        ],
+        "prefix_repeated_equal": true,
+        "staged_prefix": {
+          "contract_id": "z-bounded-upstream",
+          "solve_count": 1,
+          "geometry_changed": true,
+          "surfaces_equal_across_reruns": true,
+          "transitions_equal_across_reruns": true,
+          "reports_equal_across_reruns": true,
+          "transition_order": 0,
+          "mapped_coordinates": [
+            0.25,
+            0.0
+          ],
+          "termination": "Converged",
+          "iterations": 1,
+          "accepted_steps": 1,
+          "rejected_steps": 0
+        }
+      }
+    },
+    "coupled_optimized_surface": {
+      "story": "MT-302",
+      "error": {
+        "kind": "coupled_optimized_surface",
+        "tracking_id": "replay-validation@0:2",
+        "first_contract": "a-coupled",
+        "second_contract": "z-coupled"
+      },
+      "repeated_error_equal": true,
+      "geometry_unchanged": true,
+      "tracking_unchanged": true,
+      "contracts_unchanged": true,
+      "execution": {
+        "kind": "rejected_before_solve"
+      }
+    },
+    "dependency_cycle_three": {
+      "story": "MT-303",
+      "error": {
+        "kind": "dependency_cycle",
+        "contracts": [
+          "a-cycle-three",
+          "m-cycle-three",
+          "z-cycle-three"
+        ]
+      },
+      "repeated_error_equal": true,
+      "geometry_unchanged": true,
+      "tracking_unchanged": true,
+      "contracts_unchanged": true,
+      "execution": {
+        "kind": "rejected_before_solve"
+      }
+    },
+    "dependency_cycle_two": {
+      "story": "MT-303",
+      "error": {
+        "kind": "dependency_cycle",
+        "contracts": [
+          "a-cycle-two",
+          "z-cycle-two"
+        ]
+      },
+      "repeated_error_equal": true,
+      "geometry_unchanged": true,
+      "tracking_unchanged": true,
+      "contracts_unchanged": true,
+      "execution": {
+        "kind": "rejected_before_solve"
+      }
+    },
+    "duplicate_contract_id": {
+      "story": "MT-304",
+      "error": {
+        "kind": "duplicate_contract_id",
+        "contract_id": "duplicate-contract"
+      },
+      "repeated_error_equal": true,
+      "geometry_unchanged": true,
+      "tracking_unchanged": true,
+      "contracts_unchanged": true,
+      "execution": {
+        "kind": "preparation_contradiction",
+        "reversed_order_error_equal": true,
+        "individual_contracts_succeeded": [
+          true,
+          true
+        ]
+      }
+    },
+    "late_dependency_failure": {
+      "story": "MT-305",
+      "error": {
+        "kind": "non_positive_weight",
+        "contract_id": "a-middle-to-dependent",
+        "endpoint": "Second",
+        "row": 0,
+        "column": 0,
+        "weight": 0.0
+      },
+      "repeated_error_equal": true,
+      "geometry_unchanged": true,
+      "tracking_unchanged": true,
+      "contracts_unchanged": true,
+      "execution": {
+        "kind": "late_solve_failure",
+        "returned_solution": false,
+        "prefix_repeated_equal": true,
+        "input_contract_order": [
+          "a-middle-to-dependent",
+          "z-master-to-middle"
+        ],
+        "expected_dependency_order": [
+          "z-master-to-middle",
+          "a-middle-to-dependent"
+        ],
+        "staged_prefix": {
+          "contract_id": "z-master-to-middle",
+          "solve_count": 1,
+          "geometry_changed": true,
+          "surfaces_equal_across_reruns": true,
+          "transitions_equal_across_reruns": true,
+          "reports_equal_across_reruns": true,
+          "transition_order": 0,
+          "mapped_coordinates": [
+            0.25,
+            0.0
+          ],
+          "termination": "Converged",
+          "iterations": 1,
+          "accepted_steps": 1,
+          "rejected_steps": 0
+        }
+      }
+    },
+    "same_surface_contract": {
+      "story": "MT-301",
+      "error": {
+        "kind": "same_surface_contract",
+        "contract_id": "same-surface",
+        "tracking_id": "replay-validation@0:1"
+      },
+      "repeated_error_equal": true,
+      "geometry_unchanged": true,
+      "tracking_unchanged": true,
+      "contracts_unchanged": true,
+      "execution": {
+        "kind": "rejected_before_solve"
+      }
+    }
+  }
+}

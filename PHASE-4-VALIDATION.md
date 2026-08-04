@@ -67,11 +67,11 @@ named artifact and command are committed and reproducible.
 
 | Claim | Current state | Required Phase 4 evidence |
 | --- | --- | --- |
-| The kernel exposes `G0`--`G3` continuity primitives and a variational repair path. | Procedurally validated for the recorded CAD-like cases | Exact `G0`--`G3`, one nonzero-offset `G1` repair, dense public-evaluation certification, and typed failures are committed. Nonzero-offset `G2`/`G3` remains pending. |
-| Nonuniform rational multi-span boundaries are supported. | Procedurally validated for exact G3 | Curved-seam quintic rational cases with positive nonuniform weights pass independent certification. |
-| Multi-span boundaries are supported. | Procedurally validated for the recorded knot layouts | Polynomial and rational cases contain multiple cross and seam spans; repeated-knot variants remain pending. |
-| Unequal parameterizations and reversed alignment are supported. | Procedurally validated for the recorded cases | Nonlinear unequal/reversed `G1`, reversed `G3`, and unequal cross-domain `G3` pass mapped-boundary and interior certification. |
-| Failed solves and replay do not partially mutate tracked geometry or tracking sessions. | Implemented with focused replay validation | Initializer and topology regressions plus a multi-contract late replay failure preserve caller-visible inputs. Equivalent injected failure for every modeling wrapper remains pending. |
+| The kernel exposes `G0`--`G3` continuity primitives and a variational repair path. | Imported workflow validated for the five recorded full-boundary fixtures | Nonzero-offset G1--G3 repairs pass independent requested-order certification before export and after re-import. Unequal-parameter nonzero-offset `G3` remains pending. |
+| Nonuniform rational multi-span boundaries are supported. | Imported workflow validated for the recorded `G2` fixtures; procedurally validated for exact rational `G3` | Reversed-rational and extreme-positive-weight `G2` fixtures pass imported-workflow certification with strictly positive nonuniform weights. The polynomial quintic `G3` fixture is not evidence for rational weights; exact rational `G3` remains covered by the procedural corpus. |
+| Multi-span boundaries are supported. | Imported workflow validated for the recorded knot layouts | Polynomial and rational fixtures include multiple spans and a multiplicity-three internal knot; requested-order certification passes before export and after re-import. |
+| Unequal parameterizations and reversed alignment are supported. | Imported workflow validated for nonzero-offset `G2`; procedurally validated for the recorded exact `G3` cases | The reversed-rational `G2` fixture and nonlinear unequal/reversed procedural cases pass mapped-boundary and interior certification. Unequal-parameter nonzero-offset `G3` remains pending. |
+| Failed solves and replay do not partially mutate tracked geometry or tracking sessions. | Implemented; procedurally validated for the committed synthetic replay chains | Initializer and topology regressions plus a multi-contract downstream failure preserve caller-visible inputs. Commit `95e6b9ee` additionally versions schema-two replay evidence for preparation contradiction, graph rejection, bounded sequential nonconvergence, and late failure with complete geometry/session/contract snapshots and staged-prefix transition/report evidence. The MT-401 matrix inventories all 18 public tracked-modeling wrappers without adding rollback evidence. The bounded replay case does not establish global mathematical infeasibility. Equivalent injection for every modeling wrapper remains pending. |
 | Replay after upstream edits is dependency ordered. | Procedurally validated for the synthetic chain | Changed-generation geometry, stale-ID rejection, lexically conflicting contract IDs, dependency ordering, and downstream failure are covered. |
 | Solver inputs have practical allocation and iteration bounds. | Implemented | Checked budgets cover control points, spans, samples, variables, residuals, Jacobian/QR elements, and iterations. Host deserialization limits remain separate. |
 | Serialized tracking topology rejects the audited malformed indices and kind mismatch. | Implemented | Focused regressions cover index correspondence, checked references, face cardinality, tracking dimensions, and kind mismatch. Oversized deserializer allocation remains pending. |
@@ -107,7 +107,7 @@ The minimum corpus covers:
 | Rational behavior | Non-unit, nonuniform weights and safe rejection of invalid weights. |
 | Scale | Geometrically equivalent cases at small, unit, and large scales. |
 | Edit/replay | Upstream surface edits followed by dependency-ordered contract replay. |
-| Failure | Degenerate boundaries, insufficient degree, malformed values, bounded-count violations, and deterministic iteration-bounded nonconvergence. Contradictory multi-contract evidence remains deferred. |
+| Failure | Degenerate boundaries, insufficient degree, malformed values, bounded-count violations, deterministic iteration-bounded nonconvergence, and local preparation-contradiction plus bounded sequential-batch evidence. |
 | Determinism | Identical case results across repeated fresh-process runs. |
 
 Imported assets may demonstrate loader and model integration, but an imported
@@ -166,8 +166,9 @@ precisely documented with ownership and a reproduction command:
   accepted;
 - the committed corpus passes `G0`--`G3` independent certification;
 - invalid and deliberately iteration-bounded nonconvergence cases preserve
-  input state and return typed errors; contradictory multi-contract evidence
-  is explicitly deferred;
+  input state and return typed errors; the committed schema-two replay receipt also
+  covers preparation contradiction, bounded sequential nonconvergence, and
+  late-failure batches without claiming global mathematical infeasibility;
 - repeated runs produce the same canonical result digest;
 - relevant package tests pass;
 - `cargo clippy --all-targets -- -W warnings` passes, or pre-existing unrelated
