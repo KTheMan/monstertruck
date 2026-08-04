@@ -14,7 +14,12 @@ pub(super) fn connect_vertices<P: Clone, C: Clone, CP: Fn(&P, &P) -> C>(
     v1: &Vertex<P>,
     connect_points: CP,
 ) -> Edge<P, C> {
-    Edge::debug_new(v0, v1, create_edge(v0, v1, connect_points))
+    // Spec 012 U4: infallible signature, no channel for a refusal. `v0` and
+    // `v1` are the two ends of a sweep's connecting edge -- one from the source
+    // wire, one from its `mapped` image, and `Vertex::mapped` allocates a fresh
+    // `Arc` whose pointer identity IS `Vertex` equality -- so `v0 == v1` cannot
+    // hold and the check `debug_new` would run is vacuous here.
+    Edge::new_unchecked(v0, v1, create_edge(v0, v1, connect_points))
 }
 
 pub(super) fn create_surface<P: Clone, C: Clone, S: Clone, CC: Fn(&C, &C) -> S>(

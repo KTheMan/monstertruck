@@ -538,6 +538,11 @@ where V::Point: MetricSpace<Metric = f64> + Copy
         if knot_u[0] == knot_u[knot_u.len() - 1] || knot_v[0] == knot_v[knot_v.len() - 1] {
             return algo::surface::presearch(self, point, (urange, vrange), division);
         }
+        // Spec 014 W3: the separable fast path scans the SAME grid as
+        // `algo::surface::presearch`, so it charges the same nodes -- otherwise
+        // the unit would read lower purely because a surface took the fast path.
+        // (The degenerate early return above delegates and is charged there.)
+        algo::surface::charge_presearch_nodes(algo::surface::presearch_nodes(division));
         let ((u0, u1), (v0, v1)) = (urange, vrange);
         // Every grid column's v-basis window, computed once.
         let vbasis: Vec<BasisWindow> = (0..=division)

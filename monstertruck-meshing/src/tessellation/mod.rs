@@ -160,6 +160,117 @@ pub trait MeshedShape {
 }
 
 pub use triangulation::ExactTrimBoundary2D;
+pub use triangulation::{FaceDropReason, face_drop_count, reset_face_drop_count};
+
+/// A typed tessellation refusal, produced ONLY by the opt-in strict meshing path
+/// ([`shell_to_polygon_strict`]).
+///
+/// The default `triangulation` / [`MeshedShape::to_polygon`] path never yields
+/// this: it drops a face that fails to tessellate *silently* (emitting no mesh
+/// for it) so that rendering stays lenient -- a cosmetic gap in a viewer beats a
+/// hard failure. That silent drop is dangerous only for a caller that then
+/// *trusts* the mesh for a quantity the missing face changes -- above all the
+/// boolean kernel, whose volume-conservation guard reads a divergence-theorem
+/// volume off the mesh (spec 006 corner-100: a revolve-pole cap dropped to
+/// `None`, the volume read flat, and a wrong boolean result was accepted). Such
+/// callers opt in to the strict path and get this refusal instead of a
+/// quietly-wrong number -- the tessellator-side analogue of the kernel's
+/// typed-refusal doctrine.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TessellationError {
+    /// A boundary face produced no usable mesh (the `None` class: an unbounded
+    /// domain or, overwhelmingly, a boundary-projection failure -- the
+    /// revolve-pole / periodic-seam family) and would be silently dropped,
+    /// understating the meshed volume and breaking closure. Carries the face
+    /// index within its shell, the surface class ([`std::any::type_name`] of the
+    /// face's surface type), and the [`FaceDropReason`].
+    FaceDropped {
+        /// Index of the dropped face within its shell (`-1` if unknown).
+        face: i64,
+        /// The dropped face's surface class (its surface type's `type_name`).
+        surface: &'static str,
+        /// Why the face produced no usable mesh.
+        reason: FaceDropReason,
+    },
+}
+
+impl std::fmt::Display for TessellationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::FaceDropped {
+                face,
+                surface,
+                reason,
+            } => write!(
+                f,
+                "tessellation dropped face {face} ({reason}): surface={surface} -- the meshed \
+                 shell is missing this face and its volume is understated",
+            ),
+        }
+    }
+}
+
+impl std::error::Error for TessellationError {}
+
+/// Meshes `shell` at `tolerance` and merges every face into one [`PolygonMesh`],
+/// but REFUSES with a typed [`TessellationError::FaceDropped`] on the first face
+/// that would silently drop -- the opt-in, correctness-critical counterpart to
+/// `shell.triangulation(tolerance).to_polygon()`.
+///
+/// It is deliberately equivalent to `triangulation(tolerance).to_polygon()` on
+/// any shell whose faces all mesh: the same faces are visited in the same order
+/// and merged with the same orientation handling, so the returned polygon (and
+/// therefore its volume) is byte-identical -- a caller can swap it in and see an
+/// identical result on a clean shell, and a typed refusal *only* when a face
+/// would have vanished. The single behavioural difference is a face whose mesh
+/// is `None`.
+///
+/// Escalation is scoped to the `None` class (`UnboundedDomain` /
+/// `BoundaryProjectionFailed` -- a *real* face was lost, the spec-006 corruption
+/// shape). An [`FaceDropReason::EmptyTessellation`] face (a mesh with zero
+/// triangles -- a degenerate / zero-area face, the census-benign class) is
+/// merged as the no-op it is: an empty mesh contributes nothing to the
+/// divergence-theorem volume, so omitting it cannot understate a trusted volume,
+/// and escalating it would risk false refusals on degenerate result faces. The
+/// always-on D1 warn floor still flags every drop of every class.
+pub fn shell_to_polygon_strict<C: PolylineableCurve, S: MeshableSurface>(
+    shell: &Shell<Point3, C, S>,
+    tolerance: f64,
+) -> std::result::Result<PolygonMesh, TessellationError> {
+    let surface = std::any::type_name::<S>();
+    let meshed = shell.triangulation(tolerance);
+    let mut polygon = PolygonMesh::default();
+    for (index, face) in meshed.face_iter().enumerate() {
+        match face.surface() {
+            // `None` == a real face was lost. Reclassify with the shared
+            // source-of-truth (untrimmed => unbounded domain, trimmed =>
+            // boundary-projection failure) and refuse typed rather than trust a
+            // volume mesh with a hole in it.
+            None => {
+                let is_untrimmed = face
+                    .absolute_boundaries()
+                    .iter()
+                    .all(|wire| wire.is_empty());
+                let reason = triangulation::classify_face_drop(None, is_untrimmed)
+                    .expect("a `None` face is always a drop");
+                return Err(TessellationError::FaceDropped {
+                    face: index as i64,
+                    surface,
+                    reason,
+                });
+            }
+            // A produced mesh (possibly empty). Merge exactly as `to_polygon`
+            // does -- an empty mesh merges as a no-op, contributing no volume.
+            Some(mut poly) => {
+                if !face.orientation() {
+                    poly.invert();
+                }
+                polygon.merge(poly);
+            }
+        }
+    }
+    Ok(polygon)
+}
 
 impl MeshedShape for Shell<Point3, PolylineCurve, PolygonMesh> {
     fn to_polygon(&self) -> PolygonMesh {

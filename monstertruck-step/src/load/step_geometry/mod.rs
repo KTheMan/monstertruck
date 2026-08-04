@@ -477,5 +477,12 @@ mod from_pcurve {
 
 /// implementation for trait `monstertruck_modeling::builder`.
 mod geom_impls;
+pub use geom_impls::ROUTE_ANALYTIC_SPHERE;
 /// implementation for output STEP format.
 mod stepout_impls;
+/// Provenance of a surface's reported parameter range, and the
+/// `MT_STEP_DEBUG_UV_CLAMP` lens over `normalize_uv`'s two writing arms.
+mod uv_clamp;
+/// Spec 012 U2 measurement harness for [`uv_clamp`]. Test-only.
+#[cfg(test)]
+mod uv_clamp_probe;

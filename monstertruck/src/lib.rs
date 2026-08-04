@@ -67,7 +67,12 @@
 //!   etc.).
 //! - [`solid`] -- shape operators
 //!   ([`and`](solid::and), [`or`](solid::or)) for boolean combinations of
-//!   solids, plus edge filleting.
+//!   solids. This is the boolean KERNEL only, so an external SSI backend
+//!   exporting the same surface can stand in for it with no consumer code
+//!   change.
+//! - [`fillet`] -- rolling-ball edge fillets, a post-CSG pass.
+//! - [`healing`] -- shape healing for solids imported from other CAD
+//!   systems, also post-CSG.
 //! - [`assembly`] -- DAG-structured assemblies (`Node`/`Edge`) that group
 //!   parts and the rigid transforms between them.
 //!
@@ -167,8 +172,21 @@ pub use monstertruck_modeling as modeling;
 #[cfg(feature = "meshing")]
 pub use monstertruck_meshing as meshing;
 
+// `solid` is the BOOLEAN KERNEL and nothing else, so a drop-in external SSI
+// backend exporting the same surface can replace the whole module and consumers
+// need no code change. This is only possible because the post-CSG,
+// kernel-independent passes (`fillet`, `healing`) are their own crates: while
+// they lived inside `monstertruck-solid`, two kernels differed by more than
+// their `ShapeOpsError`, and a glob facade would have exported two same-named
+// error types.
 #[cfg(feature = "solid")]
 pub use monstertruck_solid as solid;
+
+#[cfg(feature = "solid")]
+pub use monstertruck_fillet as fillet;
+
+#[cfg(feature = "solid")]
+pub use monstertruck_healing as healing;
 
 #[cfg(feature = "assembly")]
 pub use monstertruck_assembly as assembly;

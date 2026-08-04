@@ -561,7 +561,9 @@ where
         let vb = edge.absolute_back();
         let vertex1 = vertex_map.entry_or_insert(vb).clone()?;
         let curve = curve_mapping(&*edge.curve.lock())?;
-        let mut mapped = Edge::debug_new(&vertex0, &vertex1, curve);
+        // `.ok()?` reports a degenerate mapped edge through this closure's
+        // existing `Option` channel.
+        let mut mapped = Edge::debug_new(&vertex0, &vertex1, curve).ok()?;
         mapped.stable_id = edge.stable_id;
         mapped.tracking_id.clone_from(&edge.tracking_id);
         Some(mapped)
@@ -582,7 +584,9 @@ where
         let vb = edge.absolute_back();
         let vertex1 = vertex_map.entry_or_insert(vb).clone();
         let curve = curve_mapping(&*edge.curve.lock());
-        let mut mapped = Edge::debug_new(&vertex0, &vertex1, curve);
+        // This infallible closure has no refusal channel. A degenerate result
+        // can only preserve a degenerate source-edge invariant.
+        let mut mapped = Edge::new_unchecked(&vertex0, &vertex1, curve);
         mapped.stable_id = edge.stable_id;
         mapped.tracking_id.clone_from(&edge.tracking_id);
         mapped

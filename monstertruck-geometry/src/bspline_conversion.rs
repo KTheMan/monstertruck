@@ -2,6 +2,66 @@
 
 use crate::prelude::*;
 
+/// A closed `(u, v)` rectangle in a surface's own parameter frame, as
+/// `((u_min, u_max), (v_min, v_max))`.
+pub type SurfaceParameterRectangle = ((f64, f64), (f64, f64));
+
+/// Which parameter axes of a converted control net carry the surface's OWN
+/// parameter as their knot span, rather than the renormalized `[0, 1]` knot
+/// frame the untrimmed conversions emit. `(u, v)`.
+pub type SurfaceFrameAxes = (bool, bool);
+
+/// A trim-aware homogeneous conversion: the control net, plus which of its
+/// parameter axes are already expressed in the surface's own parameter frame.
+///
+/// A consumer that re-labels patch domains from the knot frame onto the
+/// surface's parameter frame must SKIP the axes flagged here -- they are already
+/// there, and re-labelling them would squash a trim-spanning net back onto the
+/// profile curve's incidental range, reintroducing exactly the inconsistency
+/// this conversion exists to remove.
+#[derive(Clone, Debug)]
+pub struct HomogeneousSurfaceConversion {
+    /// The homogeneous control net.
+    pub surface: BsplineSurface<Vector4>,
+    /// Axes whose knot span IS the surface's own parameter.
+    pub surface_frame_axes: SurfaceFrameAxes,
+}
+
+impl From<BsplineSurface<Vector4>> for HomogeneousSurfaceConversion {
+    #[inline]
+    fn from(surface: BsplineSurface<Vector4>) -> Self {
+        Self {
+            surface,
+            surface_frame_axes: (false, false),
+        }
+    }
+}
+
+/// Whether `requested` reaches outside `own` by more than the padding a trim
+/// range carries by construction.
+///
+/// The consumer pads every reported trim axis by
+/// `max(TOLERANCE, span * 1e-9)` (`expand_param_axis_range`) before anyone can
+/// read it, so a request that differs from the profile's own range by no more
+/// than that pad IS the profile's own range, and re-spanning on it would perturb
+/// exact geometry for nothing. The scale-relative `span * 1e-9` term is what
+/// makes this survive a large model; the `TOLERANCE` floor is not a threshold of
+/// this function's own choosing, it is the upstream pad reproduced.
+fn parameter_range_reaches_outside(requested: (f64, f64), own: (f64, f64)) -> bool {
+    let (requested_min, requested_max) =
+        (requested.0.min(requested.1), requested.0.max(requested.1));
+    let (own_min, own_max) = (own.0.min(own.1), own.0.max(own.1));
+    if !(requested_min.is_finite()
+        && requested_max.is_finite()
+        && own_min.is_finite()
+        && own_max.is_finite())
+    {
+        return false;
+    }
+    let pad = TOLERANCE.max((requested_max - requested_min).abs() * 1.0e-9);
+    requested_min < own_min - pad || requested_max > own_max + pad
+}
+
 /// Attempts to produce an exact homogeneous B-spline curve representation.
 ///
 /// The returned control net is in homogeneous coordinates, so true rational
@@ -9,6 +69,27 @@ use crate::prelude::*;
 pub trait TryIntoHomogeneousBsplineCurve {
     /// Converts this curve into a homogeneous B-spline curve, if possible.
     fn try_into_homogeneous_bspline_curve(&self) -> Option<BsplineCurve<Vector4>>;
+
+    /// Converts this curve into a homogeneous B-spline curve spanning the given
+    /// parameter interval, which may lie wholly OUTSIDE the curve's own bounded
+    /// range.
+    ///
+    /// Only curves that carry an exact analytic continuation beyond their own
+    /// range -- in practice, straight [`Line`]s -- can answer this; every other
+    /// curve returns [`None`] and the caller falls back to
+    /// [`Self::try_into_homogeneous_bspline_curve`]. Extrapolating a B-spline
+    /// or a trimmed conic past its knot span would NOT be the same curve, so the
+    /// default is a refusal rather than a guess.
+    ///
+    /// The returned curve's knot vector spans `range` itself, i.e. the emitted
+    /// parameter IS the curve's own parameter, not a renormalized copy.
+    #[inline]
+    fn try_into_homogeneous_bspline_curve_over(
+        &self,
+        _range: (f64, f64),
+    ) -> Option<BsplineCurve<Vector4>> {
+        None
+    }
 }
 
 /// Attempts to produce an exact homogeneous B-spline surface representation.
@@ -18,6 +99,30 @@ pub trait TryIntoHomogeneousBsplineCurve {
 pub trait TryIntoHomogeneousBsplineSurface {
     /// Converts this surface into a homogeneous B-spline surface, if possible.
     fn try_into_homogeneous_bspline_surface(&self) -> Option<BsplineSurface<Vector4>>;
+
+    /// Converts this surface into a homogeneous B-spline surface whose control
+    /// net covers the given trim rectangle in this surface's OWN parameter
+    /// frame.
+    ///
+    /// Swept analytic surfaces (`RevolutionSurface`, and the extrusions that
+    /// share its shape) are built from a profile curve whose bounded parameter
+    /// range is incidental: a STEP `CYLINDRICAL_SURFACE` arrives as a
+    /// revolution of a UNIT-LENGTH line, so the naive conversion emits a
+    /// one-unit slab of a surface the analytic form treats as unbounded, and any
+    /// consumer that reads the emitted control hull is told the face does not
+    /// reach where it plainly does. Passing the face's real trim rectangle here
+    /// makes the emitted net span the extent the CONSUMER needs instead.
+    ///
+    /// `None` -- and every implementation that does not override this -- is
+    /// exactly [`Self::try_into_homogeneous_bspline_surface`], reported as
+    /// carrying no surface-frame axis.
+    #[inline]
+    fn try_into_homogeneous_bspline_surface_over(
+        &self,
+        _parameter_range: Option<SurfaceParameterRectangle>,
+    ) -> Option<HomogeneousSurfaceConversion> {
+        self.try_into_homogeneous_bspline_surface().map(Into::into)
+    }
 }
 
 /// Reports whether exact knot-span patch domains should be preferred over
@@ -34,6 +139,27 @@ impl TryIntoHomogeneousBsplineCurve for Line<Point3> {
         Some(BsplineCurve::lift_up(BsplineCurve::new(
             KnotVector::bezier_knot(1),
             vec![self.0, self.1],
+        )))
+    }
+
+    /// A line is defined for every real parameter, so its restriction to any
+    /// interval is the SAME line, exactly. The emitted degree-1 Bezier carries
+    /// the requested interval as its knot vector, so `subs(t)` still equals
+    /// `Line::subs(t)` for every `t` in it -- the parameterization is preserved,
+    /// not renormalized.
+    #[inline]
+    fn try_into_homogeneous_bspline_curve_over(
+        &self,
+        range: (f64, f64),
+    ) -> Option<BsplineCurve<Vector4>> {
+        let (start, end) = (range.0.min(range.1), range.0.max(range.1));
+        if !start.is_finite() || !end.is_finite() || end <= start {
+            return None;
+        }
+        let direction = self.1 - self.0;
+        Some(BsplineCurve::lift_up(BsplineCurve::new(
+            KnotVector::from(vec![start, start, end, end]),
+            vec![self.0 + direction * start, self.0 + direction * end],
         )))
     }
 }
@@ -200,11 +326,41 @@ fn circle_orbit_transform(center: Point3, radial: Vector3, axis: Vector3) -> Mat
     )
 }
 
-impl<C> TryIntoHomogeneousBsplineSurface for RevolutionSurface<C>
+impl<C> RevolutionSurface<C>
 where C: TryIntoHomogeneousBsplineCurve
 {
-    fn try_into_homogeneous_bspline_surface(&self) -> Option<BsplineSurface<Vector4>> {
-        let profile = self.entity_curve().try_into_homogeneous_bspline_curve()?;
+    /// The profile curve to sweep, given the face's trim rectangle in this
+    /// surface's own parameter frame (`u` = profile parameter, `v` = revolution
+    /// angle), and whether it was re-spanned onto the requested range.
+    ///
+    /// Re-spanning happens only when the request REACHES OUTSIDE the profile
+    /// curve's own knot span -- a face that lives entirely inside it is already
+    /// covered and is left byte-identical, which is what keeps the unit-height
+    /// fillet faces and every frozen fixture unmoved. When it does happen the
+    /// emitted knot span is the requested range itself, so the swept surface's
+    /// profile parameter IS the surface's own profile parameter and the consumer
+    /// is told so via [`SurfaceFrameAxes`].
+    fn profile_curve_over(
+        &self,
+        parameter_range: Option<SurfaceParameterRectangle>,
+    ) -> Option<(BsplineCurve<Vector4>, bool)> {
+        let own = self.entity_curve().try_into_homogeneous_bspline_curve()?;
+        let knots = own.knot_vector();
+        let own_span = (*knots.first()?, *knots.last()?);
+        let widened = parameter_range
+            .map(|range| range.0)
+            .filter(|profile_range| parameter_range_reaches_outside(*profile_range, own_span))
+            .and_then(|profile_range| {
+                self.entity_curve()
+                    .try_into_homogeneous_bspline_curve_over(profile_range)
+            });
+        Some(match widened {
+            Some(curve) => (curve, true),
+            None => (own, false),
+        })
+    }
+
+    fn revolve_profile(&self, profile: &BsplineCurve<Vector4>) -> Option<BsplineSurface<Vector4>> {
         let axis = self.axis().normalize();
         let origin = self.origin();
         let circle = full_unit_circle_curve();
@@ -242,6 +398,28 @@ where C: TryIntoHomogeneousBsplineCurve
             })
             .collect::<Option<Vec<Vec<_>>>>()?;
         Some(BsplineSurface::new_unchecked(knot_vecs, control_points))
+    }
+}
+
+impl<C> TryIntoHomogeneousBsplineSurface for RevolutionSurface<C>
+where C: TryIntoHomogeneousBsplineCurve
+{
+    fn try_into_homogeneous_bspline_surface(&self) -> Option<BsplineSurface<Vector4>> {
+        let profile = self.entity_curve().try_into_homogeneous_bspline_curve()?;
+        self.revolve_profile(&profile)
+    }
+
+    fn try_into_homogeneous_bspline_surface_over(
+        &self,
+        parameter_range: Option<SurfaceParameterRectangle>,
+    ) -> Option<HomogeneousSurfaceConversion> {
+        let (profile, respanned) = self.profile_curve_over(parameter_range)?;
+        // `u` is the profile axis of a `RevolutionSurface`; `v` (the revolution
+        // angle) stays in the normalized circle knot frame either way.
+        Some(HomogeneousSurfaceConversion {
+            surface: self.revolve_profile(&profile)?,
+            surface_frame_axes: (respanned, false),
+        })
     }
 }
 
@@ -425,14 +603,35 @@ where C: TryIntoHomogeneousBsplineCurve
         let curve = self.entity_curve().try_into_homogeneous_bspline_curve()?;
         let dir = self.extruding_vector();
         let knot_vecs = (curve.knot_vector().clone(), KnotVector::bezier_knot(1));
-        // Row at v=0: original curve control points.
-        // Row at v=1: each (x,y,z,w) -> (x+dx*w, y+dy*w, z+dz*w, w).
-        let row0 = curve.control_points().clone();
-        let row1: Vec<Vector4> = row0
+        // `BsplineSurface` indexes `control_points[u][v]`, and `try_new` checks
+        // `knot_vecs.0` against the OUTER length and `knot_vecs.1` against the
+        // inner one. The knot vectors above are (profile, sweep), so the outer
+        // index must be the profile and the inner one the two sweep rows -- one
+        // 2-entry row per profile control point, NOT two rows of profile control
+        // points.
+        //
+        // Emitting it the other way round is not a cosmetic transposition: it
+        // pairs the profile's knot vector with a 2-long axis and the sweep's
+        // 4-knot Bezier vector with the profile's control points, so any profile
+        // with 4 or more control points fails `try_new`'s knot rule and
+        // `BsplineSurface::new` PANICS, while shorter profiles silently produce a
+        // surface with `u` and `v` exchanged. Measured 2026-07-30 on `Ai-14R.stp`:
+        // all 3,341 `SURFACE_OF_LINEAR_EXTRUSION` faces panicked here.
+        //
+        // At v=0 the control point is the profile's own; at v=1 it is translated
+        // by the extrusion vector, in homogeneous form
+        // (x,y,z,w) -> (x+dx*w, y+dy*w, z+dz*w, w).
+        let control_points: Vec<Vec<Vector4>> = curve
+            .control_points()
             .iter()
-            .map(|p| Vector4::new(p.x + dir.x * p.w, p.y + dir.y * p.w, p.z + dir.z * p.w, p.w))
+            .map(|p| {
+                vec![
+                    *p,
+                    Vector4::new(p.x + dir.x * p.w, p.y + dir.y * p.w, p.z + dir.z * p.w, p.w),
+                ]
+            })
             .collect();
-        Some(BsplineSurface::new(knot_vecs, vec![row0, row1]))
+        Some(BsplineSurface::new(knot_vecs, control_points))
     }
 }
 
@@ -477,6 +676,41 @@ where T: TryIntoHomogeneousBsplineSurface
             surface.invert();
         }
         Some(surface)
+    }
+
+    /// An inverted processor SWAPS the `(u, v)` axes (see the `ParametricSurface`
+    /// impl), so the trim rectangle has to be swapped back into the entity's own
+    /// frame before it is forwarded -- otherwise a STEP cylinder, which is
+    /// exactly such an inverted processor, would be handed its angular range as
+    /// the profile range.
+    fn try_into_homogeneous_bspline_surface_over(
+        &self,
+        parameter_range: Option<SurfaceParameterRectangle>,
+    ) -> Option<HomogeneousSurfaceConversion> {
+        let entity_range = parameter_range.map(|(u_range, v_range)| match self.orientation() {
+            true => (u_range, v_range),
+            false => (v_range, u_range),
+        });
+        let HomogeneousSurfaceConversion {
+            mut surface,
+            surface_frame_axes,
+        } = self
+            .entity()
+            .try_into_homogeneous_bspline_surface_over(entity_range)?;
+        surface
+            .control_points_mut()
+            .for_each(|point| *point = *self.transform() * *point);
+        let surface_frame_axes = match self.orientation() {
+            true => surface_frame_axes,
+            false => {
+                surface.invert();
+                (surface_frame_axes.1, surface_frame_axes.0)
+            }
+        };
+        Some(HomogeneousSurfaceConversion {
+            surface,
+            surface_frame_axes,
+        })
     }
 }
 
@@ -777,6 +1011,256 @@ mod tests {
                 .try_into_bspline_surface()
                 .is_none()
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // Trim-driven span of the swept analytic surfaces (stage P-CONV).
+    //
+    // A STEP `CYLINDRICAL_SURFACE` loads as
+    // `Processor<RevolutionSurface<Line<Point3>>, Matrix4>` with a UNIT-LENGTH
+    // profile line and `orientation = false`, so the untrimmed conversion emits
+    // one axial unit of a surface the analytic form treats as unbounded. Nothing
+    // in the workspace pinned that before, which is why it survived.
+    // -----------------------------------------------------------------------
+
+    /// The STEP loader's own construction (`step_types.rs`, `CylindricalSurface`
+    /// -> `step_geometry::CylindricalSurface`): a unit-length profile line at
+    /// `center + x * radius`, revolved about `axis`, wrapped in an INVERTED
+    /// processor (which swaps the `(u, v)` axes, so `v` is the profile axis).
+    fn step_cylinder(
+        center: Point3,
+        axis: Vector3,
+        radius: f64,
+    ) -> Processor<RevolutionSurface<Line<Point3>>, Matrix4> {
+        let radial = Vector3::unit_x();
+        let start = center + radial * radius;
+        let mut cylinder = Processor::new(RevolutionSurface::by_revolution(
+            Line(start, start + axis),
+            center,
+            axis,
+        ));
+        cylinder.invert();
+        cylinder
+    }
+
+    fn control_net_bbox(surface: &BsplineSurface<Vector4>) -> (Point3, Point3) {
+        surface
+            .control_points()
+            .iter()
+            .flat_map(|row| row.iter())
+            .map(|point| point.to_point())
+            .fold(
+                (
+                    Point3::new(f64::MAX, f64::MAX, f64::MAX),
+                    Point3::new(f64::MIN, f64::MIN, f64::MIN),
+                ),
+                |(min, max), point| {
+                    (
+                        Point3::new(min.x.min(point.x), min.y.min(point.y), min.z.min(point.z)),
+                        Point3::new(max.x.max(point.x), max.y.max(point.y), max.z.max(point.z)),
+                    )
+                },
+            )
+    }
+
+    /// THE REGRESSION PIN. A cylinder whose face is trimmed to `v` in `[0, 80]`
+    /// must convert to a control net that spans all 80 units, not the profile
+    /// line's incidental 1.
+    #[test]
+    fn trimmed_cylinder_control_net_spans_the_face_not_the_profile() {
+        let cylinder = step_cylinder(Point3::origin(), Vector3::unit_z(), 8.0);
+
+        // Untrimmed: the one-unit stub, unchanged.
+        let stub = cylinder
+            .try_into_homogeneous_bspline_surface()
+            .expect("cylinder converts");
+        let (stub_min, stub_max) = control_net_bbox(&stub);
+        assert!(
+            (stub_max.z - stub_min.z - 1.0).abs() < 1.0e-12,
+            "{stub_min:?} {stub_max:?}"
+        );
+
+        // `v` is the profile axis (the processor is inverted), so the face's
+        // trim rectangle is (angle, height).
+        let converted = cylinder
+            .try_into_homogeneous_bspline_surface_over(Some(((0.0, 1.0), (0.0, 80.0))))
+            .expect("trimmed cylinder converts");
+        assert_eq!(
+            converted.surface_frame_axes,
+            (false, true),
+            "the re-spanned axis must be reported to the consumer"
+        );
+        let trimmed = converted.surface;
+        let (min, max) = control_net_bbox(&trimmed);
+        assert!(
+            min.z <= 0.0 + 1.0e-12 && max.z >= 80.0 - 1.0e-12,
+            "converted control net must cover the whole 80-unit face, got z in [{}, {}]",
+            min.z,
+            max.z
+        );
+        // Radially it is still exactly the r = 8 cylinder's control polygon: the
+        // rational-quadratic circle's control points project onto the square
+        // circumscribing radius 8, so the net's x/y extent is exactly +-8.
+        assert!((max.x - 8.0).abs() < 1.0e-9 && (min.x + 8.0).abs() < 1.0e-9);
+        assert!((max.y - 8.0).abs() < 1.0e-9 && (min.y + 8.0).abs() < 1.0e-9);
+
+        // Knot span: the emitted `v` parameter IS the surface's own profile
+        // parameter over the requested interval, not a renormalized copy.
+        let (_, v_knots) = trimmed.knot_vectors();
+        assert!((v_knots[0] - 0.0).abs() < 1.0e-12);
+        assert!((v_knots[v_knots.len() - 1] - 80.0).abs() < 1.0e-12);
+
+        // And it is still EXACTLY the same cylinder: every evaluated point sits
+        // on radius 8, and `subs` agrees with the analytic surface.
+        let conv = as_nurbs(trimmed);
+        for s in grid_params() {
+            for t in grid_params() {
+                let v = 80.0 * t;
+                let got = conv.subs(s, v);
+                let want = ParametricSurface::evaluate(&cylinder, s * 2.0 * PI, v);
+                let radius = (got.x * got.x + got.y * got.y).sqrt();
+                assert!(
+                    (radius - 8.0).abs() <= 1.0e-9 * 80.0,
+                    "off-cylinder at ({s},{v}): r={radius}"
+                );
+                assert!(
+                    (got.z - v).abs() <= 1.0e-9 * 80.0,
+                    "height mismatch at ({s},{v}): {got:?}"
+                );
+                // The angular map is the exact rational-circle map, so compare
+                // against the analytic surface at the SAME evaluated angle.
+                let angle = full_circle_angle(s);
+                let want_at_angle = ParametricSurface::evaluate(&cylinder, angle, v);
+                assert!(
+                    got.distance(want_at_angle) <= 1.0e-9 * 80.0,
+                    "subs mismatch at ({s},{v}): got {got:?} want {want_at_angle:?} \
+                     (untrimmed reference {want:?})"
+                );
+            }
+        }
+    }
+
+    /// The widening is DISJOINTNESS-gated: a trim that merely overlaps the
+    /// profile's own range leaves the conversion byte-identical, which is what
+    /// keeps the unit-height fillet faces (and every frozen fixture) unmoved.
+    #[test]
+    fn overlapping_trim_leaves_the_cylinder_conversion_byte_identical() {
+        let cylinder = step_cylinder(Point3::new(1.0, -2.0, 3.0), Vector3::unit_z(), 2.5);
+        let plain = cylinder
+            .try_into_homogeneous_bspline_surface()
+            .expect("cylinder converts");
+        for trim in [
+            // Exactly the profile's own range.
+            ((0.0, 1.0), (0.0, 1.0)),
+            // The upstream trim pad (`expand_param_axis_range`, at least
+            // TOLERANCE) -- the same range, reported padded.
+            ((0.0, 1.0), (-1.0e-6, 1.0 + 1.0e-6)),
+            // Strictly inside: already covered, nothing to re-span.
+            ((0.0, 1.0), (0.25, 0.75)),
+        ] {
+            let over = cylinder
+                .try_into_homogeneous_bspline_surface_over(Some(trim))
+                .expect("cylinder converts");
+            assert_eq!(over.surface_frame_axes, (false, false));
+            let over = over.surface;
+            assert_eq!(
+                over.control_points(),
+                plain.control_points(),
+                "overlapping trim {trim:?} must not move the control net"
+            );
+            assert_eq!(over.knot_vectors(), plain.knot_vectors());
+        }
+        // ...but a trim that genuinely reaches BELOW the profile start does
+        // re-span: the face really is somewhere the naive sweep does not go.
+        let below = cylinder
+            .try_into_homogeneous_bspline_surface_over(Some(((0.0, 1.0), (-0.6, 1.0))))
+            .expect("cylinder converts");
+        assert_eq!(below.surface_frame_axes, (false, true));
+        let (_, v_knots) = below.surface.knot_vectors();
+        assert!((v_knots[0] + 0.6).abs() < 1.0e-12);
+    }
+
+    /// `None` -- and every non-swept surface -- is exactly the plain conversion.
+    #[test]
+    fn untrimmed_and_non_swept_conversions_are_unchanged() {
+        let cylinder = step_cylinder(Point3::origin(), Vector3::unit_z(), 3.0);
+        assert_eq!(
+            cylinder
+                .try_into_homogeneous_bspline_surface_over(None)
+                .unwrap()
+                .surface
+                .control_points(),
+            cylinder
+                .try_into_homogeneous_bspline_surface()
+                .unwrap()
+                .control_points()
+        );
+        let trim = Some(((0.0, 1.0), (-500.0, -400.0)));
+        for (over, plain) in [
+            (
+                Sphere::new(Point3::new(1.0, 2.0, 3.0), 4.0)
+                    .try_into_homogeneous_bspline_surface_over(trim),
+                Sphere::new(Point3::new(1.0, 2.0, 3.0), 4.0).try_into_homogeneous_bspline_surface(),
+            ),
+            (
+                Torus::new(Point3::origin(), 3.0, 1.0)
+                    .try_into_homogeneous_bspline_surface_over(trim),
+                Torus::new(Point3::origin(), 3.0, 1.0).try_into_homogeneous_bspline_surface(),
+            ),
+            (
+                Plane::new(
+                    Point3::origin(),
+                    Point3::new(1.0, 0.0, 0.0),
+                    Point3::new(0.0, 1.0, 0.0),
+                )
+                .try_into_homogeneous_bspline_surface_over(trim),
+                Plane::new(
+                    Point3::origin(),
+                    Point3::new(1.0, 0.0, 0.0),
+                    Point3::new(0.0, 1.0, 0.0),
+                )
+                .try_into_homogeneous_bspline_surface(),
+            ),
+        ] {
+            assert_eq!(
+                over.map(|converted| converted.surface.control_points().clone()),
+                plain.map(|surface| surface.control_points().clone())
+            );
+        }
+    }
+
+    /// A cone is the same `RevolutionSurface<Line>` with a slanted profile, so
+    /// the widened sweep must stay the exact cone -- the radius has to keep
+    /// growing linearly along the axis, not freeze at the stub's.
+    #[test]
+    fn trimmed_cone_stays_an_exact_cone() {
+        // Half-angle 45 degrees: profile from (1, 0, 0) towards (2, 0, 1).
+        let start = Point3::new(1.0, 0.0, 0.0);
+        let mut cone = Processor::new(RevolutionSurface::by_revolution(
+            Line(start, start + Vector3::new(1.0, 0.0, 1.0)),
+            Point3::origin(),
+            Vector3::unit_z(),
+        ));
+        cone.invert();
+        let conv = as_nurbs(
+            cone.try_into_homogeneous_bspline_surface_over(Some(((0.0, 1.0), (10.0, 40.0))))
+                .expect("cone converts")
+                .surface,
+        );
+        for s in grid_params() {
+            for t in grid_params() {
+                let v = 10.0 + 30.0 * t;
+                let point = conv.subs(s, v);
+                let radius = (point.x * point.x + point.y * point.y).sqrt();
+                // On this cone radius == 1 + height and height == v.
+                assert!((point.z - v).abs() <= 1.0e-9 * 40.0, "height at ({s},{v})");
+                assert!(
+                    (radius - (1.0 + v)).abs() <= 1.0e-9 * 40.0,
+                    "off-cone at ({s},{v}): r={radius} expected {}",
+                    1.0 + v
+                );
+            }
+        }
     }
 
     #[test]

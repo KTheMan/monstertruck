@@ -64,8 +64,10 @@ jobs:
       - run: git submodule update --init resources
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@nextest
       - uses: extractions/setup-just@v2
       - run: just test-cpu
+      - run: just test-doc
 
   continuity-validation:
     name: continuity validation corpus

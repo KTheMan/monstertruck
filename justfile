@@ -1,7 +1,7 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 # Crates exercised by `test-cpu` (anything that doesn't need a GPU).
-cpu_crates := "-p monstertruck-core -p monstertruck-traits -p monstertruck-geometry -p monstertruck-topology -p monstertruck-mesh -p monstertruck-meshing -p monstertruck-modeling -p monstertruck-solid -p monstertruck-step"
+cpu_crates := "-p monstertruck-core -p monstertruck-traits -p monstertruck-geometry -p monstertruck-topology -p monstertruck-mesh -p monstertruck-meshing -p monstertruck-modeling -p monstertruck-solid -p monstertruck-healing -p monstertruck-fillet -p monstertruck-step"
 
 # Crates exercised by `test-gpu`.
 gpu_crates := "-p monstertruck-gpu -p monstertruck-render"
@@ -14,7 +14,7 @@ default:
     @just --list
 
 # Aggregate: what CI runs.
-ci: fmt-check lint-check test-cpu meshing-features
+ci: fmt-check lint-check test-cpu test-doc meshing-features
 
 # Format code.
 fmt:
@@ -33,16 +33,28 @@ lint-check:
     cargo clippy --all-targets -- -D warnings
 
 # Run CPU-only tests on the stable toolchain.
+#
+# `cargo nextest run`, not `cargo test`: nextest gives each test its own PROCESS.
+# Some tests here read process-global measurement counters (the
+# `parameter_division` work meter in `monstertruck-traits`), and under `cargo
+# test`'s threads-in-one-process model a concurrently running test charges the
+# same counter, so the assertion can never hold. Nextest does NOT run doctests --
+# `test-doc` covers those separately, and `ci` runs both.
 test-cpu:
-    cargo test {{ cpu_crates }} --features derive --features polynomial -- --nocapture
+    cargo nextest run {{ cpu_crates }} --features derive --features polynomial
+
+# Doctests. Nextest cannot run these, so they are their own step.
+test-doc:
+    cargo test --doc {{ cpu_crates }} --features derive --features polynomial
 
 # Run CPU-only tests on the nightly toolchain.
 test-cpu-nightly:
-    rustup run nightly cargo test {{ cpu_crates }} --features derive --features polynomial -- --nocapture
+    rustup run nightly cargo nextest run {{ cpu_crates }} --features derive --features polynomial
 
-# Run GPU tests (requires a working GPU).
+# Run GPU tests (requires a working GPU). Serialized: these create real wgpu
+# devices, which do not tolerate concurrent construction.
 test-gpu:
-    cargo test {{ gpu_crates }} -- --nocapture --test-threads=1
+    cargo nextest run {{ gpu_crates }} -j1 --no-capture
 
 # Feature subset build checks for `monstertruck-meshing`.
 meshing-features:

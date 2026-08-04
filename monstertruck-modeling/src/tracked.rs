@@ -666,7 +666,7 @@ pub fn plane_cut(
 pub fn fillet_edges(
     shell: &mut Shell,
     edges: &[Edge],
-    options: Option<&monstertruck_solid::FilletOptions>,
+    options: Option<&monstertruck_fillet::FilletOptions>,
     session: &mut TrackingSession,
     feature: FeatureId,
 ) -> Result<()> {
@@ -675,7 +675,7 @@ pub fn fillet_edges(
         .iter()
         .try_for_each(|edge| current_ids(edge, session).map(|_| ()))?;
     let mut output = shell.clone();
-    monstertruck_solid::fillet_edges_generic(&mut output, edges, options)
+    monstertruck_fillet::fillet_edges_generic(&mut output, edges, options)
         .map_err(|error| Error::Fillet(error.to_string()))?;
     commit_session(session, |session| {
         finalize_output(

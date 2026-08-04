@@ -1,7 +1,7 @@
 use super::*;
 use monstertruck_geometry::prelude::{
-    SupportsExactPatchDomains, TryIntoBsplineSurface, TryIntoHomogeneousBsplineCurve,
-    TryIntoHomogeneousBsplineSurface,
+    HomogeneousSurfaceConversion, SupportsExactPatchDomains, SurfaceParameterRectangle,
+    TryIntoBsplineSurface, TryIntoHomogeneousBsplineCurve, TryIntoHomogeneousBsplineSurface,
 };
 use monstertruck_modeling::{
     Conic2D as ModelingConic2D, Curve as ModelingCurve, Curve2D as ModelingCurve2D,
@@ -33,11 +33,18 @@ where
         move |lhs: &f64, rhs: &f64| distance(lhs).partial_cmp(&distance(rhs)).unwrap()
     }
 
+    /// `surface` and `axis` are carried for the `MT_STEP_DEBUG_UV_CLAMP` lens
+    /// only (`uv_clamp.rs`); with the variable unset every `record_axis` call is
+    /// a `OnceLock` read and a return, and no value the lens computes is read
+    /// back here.
     fn normalize_axis(
         value: f64,
         previous: Option<f64>,
         period: Option<f64>,
         range: Option<(f64, f64)>,
+        surface: &Surface,
+        axis: uv_clamp::Axis,
+        real_range: bool,
     ) -> Option<f64> {
         if !value.is_finite() {
             None
@@ -47,14 +54,35 @@ where
                     .map(|index| value + index as f64 * period)
                     .min_by(abs_diff(previous))
             } else if let Some(range) = range {
-                Some(clamp_near_range(value, range))
+                let clamped = clamp_near_range(value, range);
+                uv_clamp::record_axis(
+                    surface,
+                    axis,
+                    real_range,
+                    uv_clamp::Event::Clamp {
+                        moved: clamped - value,
+                        to_max: clamped == range.1,
+                    },
+                );
+                Some(clamped)
             } else {
+                uv_clamp::record_axis(surface, axis, real_range, uv_clamp::Event::Unranged);
                 Some(value)
             }
         } else if let Some((min, max)) = range {
             if let Some(period) = period {
                 let span = max - min;
                 if span.so_small() {
+                    uv_clamp::record_axis(
+                        surface,
+                        axis,
+                        real_range,
+                        uv_clamp::Event::Periodic {
+                            wrapped: min != value,
+                            clamped: 0.0,
+                            degenerate: true,
+                        },
+                    );
                     Some(min)
                 } else {
                     let mut normalized = value - f64::floor((value - min) / period) * period;
@@ -64,12 +92,34 @@ where
                     if normalized > max {
                         normalized -= period;
                     }
-                    Some(normalized.clamp(min, max))
+                    let clamped = normalized.clamp(min, max);
+                    uv_clamp::record_axis(
+                        surface,
+                        axis,
+                        real_range,
+                        uv_clamp::Event::Periodic {
+                            wrapped: normalized != value,
+                            clamped: clamped - normalized,
+                            degenerate: false,
+                        },
+                    );
+                    Some(clamped)
                 }
             } else {
-                Some(clamp_near_range(value, (min, max)))
+                let clamped = clamp_near_range(value, (min, max));
+                uv_clamp::record_axis(
+                    surface,
+                    axis,
+                    real_range,
+                    uv_clamp::Event::Clamp {
+                        moved: clamped - value,
+                        to_max: clamped == max,
+                    },
+                );
+                Some(clamped)
             }
         } else {
+            uv_clamp::record_axis(surface, axis, real_range, uv_clamp::Event::Unranged);
             Some(value)
         }
     }
@@ -84,11 +134,118 @@ where
         }
     }
 
+    // THE CLAMP IS NOT ASKED ABOUT AN AXIS THAT REPORTS A PLACEHOLDER.
+    //
+    // `clamp_near_range` snaps a value that overshoots the reported range by
+    // less than `TOLERANCE` onto the boundary. On a knot-bounded axis that is
+    // exactly right and it is doing real work: the net carries no data past the
+    // knot vector, so an unbounded Newton that walked one ULP-cloud past the end
+    // must come back. On a PLACEHOLDER axis there is no boundary to come back
+    // to -- a plane's `[0, 1]^2` and a loaded cylinder's or cone's axial `[0, 1]`
+    // are the values `parameter_range` returns so `range_tuple()` has something
+    // to return, over an unbounded direction whose parameter is a world-scale
+    // distance. Clamping there writes a number the solver did not produce, onto
+    // a line in parameter space that means nothing (see
+    // `uv_clamp::reported_range_bounds_the_surface`, and the 40-line doc on
+    // `monstertruck-geometry/src/specifieds/plane.rs::parameter_range` that
+    // forbids treating the square as a domain). Same repair as spec 011's
+    // `a4604cef` on the modeling twin, and the same reason: do not ask a
+    // placeholder a question it cannot answer.
+    //
+    // MEASURED before the change with `MT_STEP_DEBUG_UV_CLAMP=1` (the lens in
+    // `uv_clamp.rs`, driven by `uv_clamp_probe.rs`), over two populations: the
+    // 15 in-repo fixtures at full depth (58,244 chains, 939,416 points) and 7 of
+    // the 8 big-assembly corpus files sampled by lowest solid id (81 solids,
+    // 35,447 chains, 862,318 points; Scania-Engine not sampled -- its parse
+    // alone exceeds nextest's 20-minute kill). **The clamp is LIVE**, and the
+    // split is what decides the shape of the fix:
+    //
+    // | axis                     | calls   | MOVED  | -> min | -> max | max |move| |
+    // |--------------------------|--------:|-------:|-------:|-------:|-----------:|
+    // | IN-REPO                  |         |        |        |        |            |
+    // | plane u (placeholder)    | 490,007 |  1,324 |  1,302 |     22 |    7.43e-7 |
+    // | plane v (placeholder)    | 490,007 |  1,582 |  1,524 |     58 |   2.78e-10 |
+    // | cylinder v (placeholder) |  67,472 |  3,655 |  3,569 |     86 |   5.63e-11 |
+    // | cone v (placeholder)     |   3,926 |    704 |    704 |      0 |   9.61e-11 |
+    // | bspline u+v (knots)      | 128,664 | 24,144 | 12,105 | 12,039 |    8.60e-7 |
+    // | nurbs u+v (knots)        | 624,366 | 64,708 | 36,896 | 27,812 |    9.30e-7 |
+    // | CORPUS                   |         |        |        |        |            |
+    // | plane u (placeholder)    | 291,687 |    842 |    828 |     14 |    7.06e-7 |
+    // | plane v (placeholder)    | 291,687 |    768 |    748 |     20 |    9.58e-7 |
+    // | cylinder v (placeholder) | 311,100 | 17,492 | 14,717 |  2,775 |    2.50e-7 |
+    // | cone v (placeholder)     | 103,061 | 26,338 | 23,057 |  3,281 |   1.21e-13 |
+    // | bspline u+v (knots)      |  86,630 |  5,670 |  3,335 |  2,335 |    9.99e-7 |
+    // | nurbs u+v (knots)        |  84,588 |  7,050 |  4,170 |  2,880 |    9.99e-7 |
+    //
+    // In-repo, 92.4% of all movement (88,852 of 96,117) is against a REAL knot
+    // vector and is untouched by this change. **On the corpus the ratio
+    // INVERTS**: 45,440 of 58,160 moves -- 78% -- are against a placeholder.
+    // The in-repo fixtures are B-spline-heavy scan data; real assemblies are
+    // analytic-heavy, so anyone measuring only in-repo would have concluded this
+    // was a 7% edge case.
+    //
+    // The `-> min` column is why the placeholder half looked harmless: most
+    // moves snap onto `min = 0`, which is the surface's own parameter ORIGIN --
+    // a plane's placement point, a revolution profile's start -- so the write is
+    // ~1e-10 and reads as de-noising. It is NOT principled de-noising: the same
+    // face's sample at u = 5.0 gets none, and the noise floor is only small
+    // because the placement happens to sit on the trim. The other **6,090
+    // corpus moves snap onto `max = 1`**, one arbitrary unit along an unbounded
+    // direction, which is the same write with none of the excuse.
+    //
+    // AND THE SQUARE IS NOT A DOMAIN, MEASURED AS SUCH: of the raw solver
+    // answers on a placeholder axis, the fraction sitting OUTSIDE the reported
+    // range by more than `TOLERANCE` -- where `clamp_near_range` does nothing at
+    // all -- is 437,258 of 490,007 planar u in-repo (89.2%) and 274,196 of
+    // 291,687 on the corpus (94.0%), reaching `u = 5.0e5` outside `[0, 1]`. A
+    // range that four out of five samples violate by five orders of magnitude
+    // is not a bound, and clamping the one-in-a-thousand that lands within
+    // 1e-6 of it is an accident of where the placement was written.
+    //
+    // Only NON-PERIODIC axes are dropped. No placeholder axis carries a period
+    // today (a revolution's turn and a sphere's/torus's angles are all real
+    // bounds, and a `Line` profile has no period), so the guard is inert --
+    // it is written this way so that the periodic wrap arm below, which is
+    // selected by `range.is_some()`, provably cannot lose its range. Pinned by
+    // `no_placeholder_axis_carries_a_period`.
+    //
+    // WHAT THIS CHANGE COSTS, measured by per-chain BIT digests of the produced
+    // parameter loops, before and after, over both populations: 3,147 of 58,268
+    // in-repo chains change (5.4%). NOT ONE changes its point count, and not one
+    // flips between `Some` and `None` -- the chains that refused still refuse
+    // and the chains that answered still answer, with the same number of
+    // samples. The largest movement of any chain's u/v extent is 7.43e-7, and
+    // only 19 chains move by more than 1e-9; the mode is ~1e-16, the ULP cloud
+    // around the placement origin that used to be snapped flat to `0.0`.
+    // Placeholder moves go 7,265 -> 0 and knot moves hold at exactly 88,852.
+    let (u_real, v_real) = uv_clamp::reported_range_bounds_the_surface(surface);
     let normalize_uv = |uv: Point2, previous: Option<(f64, f64)>| {
+        let (u_period, v_period) = (surface.u_period(), surface.v_period());
         let (urange, vrange) = surface.try_range_tuple();
+        uv_clamp::record_point();
+        uv_clamp::record_reported_excess(surface, uv_clamp::Axis::U, u_real, uv.x, urange);
+        uv_clamp::record_reported_excess(surface, uv_clamp::Axis::V, v_real, uv.y, vrange);
+        let urange = urange.filter(|_| u_real || u_period.is_some());
+        let vrange = vrange.filter(|_| v_real || v_period.is_some());
         Some(Point2::new(
-            normalize_axis(uv.x, previous.map(|(u, _)| u), surface.u_period(), urange)?,
-            normalize_axis(uv.y, previous.map(|(_, v)| v), surface.v_period(), vrange)?,
+            normalize_axis(
+                uv.x,
+                previous.map(|(u, _)| u),
+                u_period,
+                urange,
+                surface,
+                uv_clamp::Axis::U,
+                u_real,
+            )?,
+            normalize_axis(
+                uv.y,
+                previous.map(|(_, v)| v),
+                v_period,
+                vrange,
+                surface,
+                uv_clamp::Axis::V,
+                v_real,
+            )?,
         ))
     };
     let points = curve
@@ -102,7 +259,49 @@ where
             .or_else(|| surface.search_nearest_parameter(point, None, 100))
             .map(|(u, v)| Point2::new(u, v))
     };
-    points
+    // ONE PASS, NO RETRY -- and the absence is measured, not an oversight.
+    //
+    // This chain used to end in `.or_else(|| <the identical hinted scan>)`.
+    // `project` and `normalize_uv` are deterministic functions of
+    // `(point, hint)`, neither solver keeps state across calls, and the retry
+    // re-seeded the hint from the same `None` over the same `points` -- so it
+    // recomputed the same sequence and returned the same `None`. Every time.
+    //
+    // The twin in `monstertruck-modeling/src/geometry.rs`
+    // (`sampled_parameter_boundary`) retries differently: it re-projects every
+    // point UNHINTED, abandoning the chain. That IS a different computation, and
+    // copying it here was the other candidate. Both were measured before either
+    // was chosen (spec 011 open item 6), over the 15 in-repo fixtures at full
+    // depth plus 7 of the 8 corpus files sampled by solid:
+    //
+    // | population                       | chains | reach the retry | same-hinted rescues | UNHINTED rescues |
+    // |----------------------------------|-------:|----------------:|--------------------:|-----------------:|
+    // | 15 in-repo fixtures, all solids  | 58,244 |              14 |                   0 |                0 |
+    // | ROTOR-201NAL-Z7, all 33 solids   | 11,810 |               2 |                   0 |                0 |
+    // | Rocky_House, 12 of 156           |  8,938 |              11 |                   0 |                0 |
+    // | Cruise_Assembly, 12              |    995 |               0 |                   0 |                0 |
+    // | UMC-500, 12 of 217               |  3,094 |              52 |                   0 |                0 |
+    // | Ai-14R, 4                        |  1,978 |               0 |                   0 |                0 |
+    // | NissanGT-R, 4                    |  6,108 |              16 |                   0 |                0 |
+    // | Scania-8x4, 4 of 832             |  3,256 |              32 |                   0 |                0 |
+    // | **total**                        | 94,423 |         **127** |               **0** |            **0** |
+    //
+    // So the site was LIVE (127 chains, 0.13%, reached it) and the retry rescued
+    // none of them -- as the determinism argument requires. The finding that
+    // decided the shape of the fix is the last column: the modeling twin's
+    // unhinted retry would have rescued **none of the same 127 either**. The
+    // asymmetry between the twins was real, but "the other one is different, so
+    // copy it" is not the conclusion -- it would have replaced a retry that
+    // cannot rescue with one that measurably does not. Both are dead here; only
+    // one of them looks alive.
+    //
+    // The 127 are not a loss the retry was hiding: the chain refuses typed, and
+    // its caller (`monstertruck-solid`'s `reattach_preserved_face_trims`) falls
+    // through to its own `sampled_trim_segment`. If a rescue is ever wanted at
+    // THIS level, the measurement says it must be a genuinely different solve --
+    // not a different hint into the same one.
+    uv_clamp::begin_chain();
+    let boundary = points
         .iter()
         .copied()
         .scan(None, |hint, point| {
@@ -110,17 +309,9 @@ where
             *hint = uv.map(|uv| (uv.x, uv.y));
             Some(uv)
         })
-        .collect::<Option<Vec<_>>>()
-        .or_else(|| {
-            points
-                .into_iter()
-                .scan(None, |hint, point| {
-                    let uv = project(point, *hint).and_then(|uv| normalize_uv(uv, *hint));
-                    *hint = uv.map(|uv| (uv.x, uv.y));
-                    Some(uv)
-                })
-                .collect()
-        })
+        .collect();
+    uv_clamp::end_chain();
+    boundary
 }
 
 fn exact_parameter_curve_on(curve: &Curve3D, surface: &Surface) -> Option<StepParameterCurve> {
@@ -615,6 +806,14 @@ impl TryIntoHomogeneousBsplineSurface for Sphere {
     fn try_into_homogeneous_bspline_surface(&self) -> Option<BsplineSurface<Vector4>> {
         self.0.try_into_homogeneous_bspline_surface()
     }
+
+    fn try_into_homogeneous_bspline_surface_over(
+        &self,
+        parameter_range: Option<SurfaceParameterRectangle>,
+    ) -> Option<HomogeneousSurfaceConversion> {
+        self.0
+            .try_into_homogeneous_bspline_surface_over(parameter_range)
+    }
 }
 
 impl TryIntoBsplineSurface for Sphere {
@@ -637,6 +836,18 @@ impl TryIntoHomogeneousBsplineCurve for Curve3D {
                 curve.leader().try_into_homogeneous_bspline_curve()
             }
             Curve3D::NurbsCurve(curve) => curve.try_into_homogeneous_bspline_curve(),
+        }
+    }
+
+    fn try_into_homogeneous_bspline_curve_over(
+        &self,
+        range: (f64, f64),
+    ) -> Option<BsplineCurve<Vector4>> {
+        match self {
+            // Only a line has an exact analytic continuation past its own range;
+            // every other variant keeps the trait's refusing default.
+            Curve3D::Line(line) => line.try_into_homogeneous_bspline_curve_over(range),
+            _ => None,
         }
     }
 }
@@ -804,6 +1015,41 @@ impl TryIntoHomogeneousBsplineSurface for Surface {
             Surface::NurbsSurface(surface) => surface.try_into_homogeneous_bspline_surface(),
         }
     }
+
+    fn try_into_homogeneous_bspline_surface_over(
+        &self,
+        parameter_range: Option<SurfaceParameterRectangle>,
+    ) -> Option<HomogeneousSurfaceConversion> {
+        match self {
+            Surface::ElementarySurface(ElementarySurface::Plane(surface)) => {
+                surface.try_into_homogeneous_bspline_surface_over(parameter_range)
+            }
+            Surface::ElementarySurface(ElementarySurface::Sphere(surface)) => {
+                surface.try_into_homogeneous_bspline_surface_over(parameter_range)
+            }
+            Surface::ElementarySurface(ElementarySurface::CylindricalSurface(surface)) => {
+                surface.try_into_homogeneous_bspline_surface_over(parameter_range)
+            }
+            Surface::ElementarySurface(ElementarySurface::ToroidalSurface(surface)) => {
+                surface.try_into_homogeneous_bspline_surface_over(parameter_range)
+            }
+            Surface::ElementarySurface(ElementarySurface::ConicalSurface(surface)) => {
+                surface.try_into_homogeneous_bspline_surface_over(parameter_range)
+            }
+            Surface::SweepSurface(SweepSurface::ExtrusionSurface(surface)) => {
+                surface.try_into_homogeneous_bspline_surface_over(parameter_range)
+            }
+            Surface::SweepSurface(SweepSurface::RevolutionSurface(surface)) => {
+                surface.try_into_homogeneous_bspline_surface_over(parameter_range)
+            }
+            Surface::BsplineSurface(surface) => {
+                surface.try_into_homogeneous_bspline_surface_over(parameter_range)
+            }
+            Surface::NurbsSurface(surface) => {
+                surface.try_into_homogeneous_bspline_surface_over(parameter_range)
+            }
+        }
+    }
 }
 
 impl SupportsExactPatchDomains for Surface {
@@ -918,11 +1164,305 @@ impl<'a> TryFrom<CurveTrimRef<'a>> for StepParameterCurve {
     }
 }
 
+/// Whether the analytic sphere route is admissible, restating the guard in
+/// `TryIntoHomogeneousBsplineSurface for Sphere` (`bspline_conversion.rs`).
+///
+/// The predicate has to be the BUILDER's and no wider: a sphere that fails it
+/// must reach the generic arm, where the builder returns `None` and the
+/// conversion refuses -- which is what it does today.
+/// Whether STEP spheres route onto the analytic [`ModelingSurface::SphericalSurface`].
+///
+/// **`false` -- STILL HELD, but NOT for the reason the previous revision gave.**
+/// Ledger class C14.
+///
+/// # The previous diagnosis, and its falsification
+///
+/// This arm was reverted on 2026-07-31 with the finding "it changed the
+/// GEOMETRY, not merely its tessellation cost", bisected on
+/// `rotor_sphere_pin_a_union_refuses_ambiguous_topology_sign`, which reads ROTOR
+/// #19264's extracted mesh volume against a pinned `551.5116` and sees
+/// `338.6367` once the arm is on.
+///
+/// **That reading was FALSIFIED by measurement on 2026-07-31.** The geometry did
+/// change -- and it changed toward being CORRECT. `551.5116` is not the solid's
+/// volume and is not a converged quantity.
+///
+/// # What the solids actually are, and their closed forms
+///
+/// Both sphere pins are the same shape, read off their own loaded boundary
+/// geometry rather than assumed: a sphere of radius `R = 12.5` centred at the
+/// origin, cut by planes at `x = +-h`, with a bore of radius `r` along the
+/// x-axis (#19264: `h = 8`, `r = 7.5`; #25387: `h = 9`, `r = 6`). Two
+/// half-sphere faces split at `z = 0`, two half-bore faces, two end annuli.
+/// The trim circles land at `sqrt(R^2 - h^2)` = `9.604686` / `8.674676`, which
+/// is what the loaded edges report to 15 digits.
+///
+/// By Archimedes' hat-box theorem ONE half-sphere face's contribution to the
+/// divergence-theorem x-flux is exactly `pi * 2 h^3 / 3` -- `1072.3303` and
+/// `1526.8140` -- and its area is exactly `2 pi R h` = `628.3185` / `706.8583`.
+/// Neither depends on the mesh. Measured per face:
+///
+/// | route | face | x-flux | vs closed form | area |
+/// |---|---|---|---|---|
+/// | net (`false`) | #19264 z<0 | 1075.6349 | +0.31% | 627.7081 |
+/// | net (`false`) | #19264 z>0 | 1272.1296 | **+18.63%** | **265.9786** |
+/// | analytic (`true`) | #19264 both | 1067.4449 | -0.46% | 627.4176 |
+/// | net (`false`) | #25387 z<0 | 1528.8421 | +0.13% | -- |
+/// | net (`false`) | #25387 z>0 | 2000.9617 | **+31.06%** | -- |
+/// | analytic (`true`) | #25387 both | 1519.4105 | -0.49% | 705.6795 |
+///
+/// Refining the ANALYTIC arm walks each face monotonically up to its closed form
+/// from below, as an inscribed mesh must (#19264: `1067.4449 -> 1069.6015 ->
+/// 1070.5880` against `1072.3303`; areas `627.4176 -> 627.9058 -> 628.0886`
+/// against `628.3185`). Refining the NET arm does not converge at all: its bad
+/// face goes `1272.1296 -> 1018.5026`, from 18.6% above the closed form to 5.0%
+/// below it, and the whole-shell sum goes `551.5116 -> 281.4251`.
+///
+/// # The mechanism: TRIM INTERPRETATION, on the rational net
+///
+/// Under the net route one of the two half-sphere faces -- the one straddling
+/// the net's periodic seam -- is triangulated over the wrong sub-region of
+/// parameter space and covers **42% of its own area** (`265.98` of `628.32`),
+/// which refinement lifts only to 45%. Face ORIENTATION is not the mechanism
+/// (both routes give the same sign on both faces), and nothing is dropped or
+/// duplicated (`face_drop_count() == 0`, six faces, closed shell, on both
+/// routes). The analytic route does not have the defect because it never leaves
+/// the closed form.
+///
+/// # The arm is no longer held -- it was re-landed at `d212e597`
+///
+/// It had been held only because switching it on moved `551.5116` and
+/// `1323.4471`, `CorpusSolid::volume` IDENTITY pins in `corpus_boolean_rows.rs`,
+/// and re-pinning them was an owner decision rather than a code fix. That
+/// decision was taken; the constant below is `true`. This section is kept
+/// because the reasoning is what the re-landing rested on.
+///
+/// # Two further, INDEPENDENT defects this work uncovered (not C14)
+///
+/// The instrument both sides of C14 were argued with -- a divergence-theorem sum
+/// over the whole shell -- was not a volume on these solids. `occt-sphere.step`
+/// measured `-523.58` on a `+523.5988` ball and `occt-cube.step` `-1000` on a
+/// 1000-volume cube, while `primitive::cuboid` measured `+24` exactly on a
+/// 2x3x4 box and `occt-cylinder` / `occt-cone` / `occt-torus` were all correct
+/// and positive. Bit-identical with this switch on and off, so it predated and
+/// survived the routing question.
+///
+/// **Spec 013 V1 found TWO mechanisms behind that, not one, and the assumption
+/// that the cube and the sphere shared a defect was wrong.**
+///
+/// 1. **C15 proper, the cube and ROTOR #19264's annuli/bore faces.** A STEP
+///    `ADVANCED_FACE`'s loops are oriented about the FACE normal, but
+///    `CompressedFace` stores boundaries in the SURFACE sense; the loader passed
+///    them through, so every `same_sense = .F.` face was traversed backwards and
+///    the shell loaded `Regular`. Fixed in `Table::absolute_bound_orientation`
+///    (`load/convert.rs`), with the symmetric `FACE_BOUND` flag on the save side.
+/// 2. **A meshing defect, the sphere.** `occt-sphere` is a ONE-face shell, so it
+///    cannot have an inconsistent orientation and never did. Its winding was
+///    wrong because `ensure_winding_matches_normals` normalizes each face
+///    normal, a sphere's pole strip is degenerate, and one `0/0 = NaN` term made
+///    `vote < 0.0` false. Fixed in `monstertruck-meshing`.
+///
+/// The oracle for both is `occt_sphere_extracts_to_the_analytic_ball` (now the
+/// SIGNED closed form) plus `monstertruck-healing/tests/step_shell_orientation.rs`.
+///
+/// # The oracle, and the proof it discriminates
+///
+/// `rotor_sphere_faces_carry_their_closed_form_x_flux` (`corpus_boolean_rows.rs`)
+/// asserts each half-sphere face against `pi * 2 h^3 / 3` in a 1% band.
+/// Measured both ways: it FAILS on the net route (+18.632% / +31.055%) and
+/// PASSES on the analytic route (-0.456% / -0.485%). While this arm is held the
+/// row additionally admits the ONE named net-route value per solid, so the tree
+/// stays green; `MT_C14_FORCE_ANALYTIC_BAND=1` drops that escape and reproduces
+/// the failure on demand.
+///
+/// The TORUS sibling below stays ON for the same kind of reason it always did:
+/// it carries an analytic oracle
+/// (`occt_torus_intersection_with_an_enclosing_box_is_the_torus`, volume
+/// 789.5072 against the closed form `2*PI^2*R*r^2 = 789.5684`) and passes it.
+///
+/// TO RE-LAND: re-pin `ROTOR_SPHERE_PIN_A::volume` and `ROTOR_SPHERE_PIN_B::volume`
+/// to the analytic arm's measurements, flip this constant, and confirm the
+/// closed-form row above. The display win is real (ROTOR #19264 UNBOUNDED at
+/// chord 1e-3 -> 5.1 s).
+///
+/// Public so a test in another crate can assert WHICH surface a loaded sphere
+/// face reached the kernel as, in BOTH states of this switch -- an oracle that
+/// does not know which route it measured cannot certify either one.
+pub const ROUTE_ANALYTIC_SPHERE: bool = true;
+
+fn analytic_sphere_is_representable(sphere: &monstertruck_geometry::prelude::Sphere) -> bool {
+    let radius = sphere.radius();
+    radius.is_finite() && radius > TOLERANCE
+}
+
+/// Whether the analytic torus route is admissible.
+///
+/// Restates `TryIntoHomogeneousBsplineSurface for Torus`
+/// (`bspline_conversion.rs`) verbatim, INCLUDING its spindle rejection. Spec
+/// 011 T1: on a spindle torus (`small - large` above the relative tolerance)
+/// the surface passes through itself and `search_parameter` is silently wrong
+/// on roughly a third of the domain, so the class refuses typed. Horn tori
+/// (`large == small`, including the near-horn fillets real STEP files carry a
+/// few ulps below) ARE representable and must keep converting.
+fn analytic_torus_is_representable(torus: &Torus) -> bool {
+    let (large_radius, small_radius) = (torus.large_radius(), torus.small_radius());
+    large_radius.is_finite()
+        && small_radius.is_finite()
+        && small_radius > TOLERANCE
+        && large_radius > TOLERANCE
+        && small_radius - large_radius <= TOLERANCE * (large_radius + small_radius)
+}
+
+/// STEP surface -> modeling surface.
+///
+/// Cylinders and cones map onto the ANALYTIC
+/// [`ModelingSurface::RevolutionSurface`] variant rather than being flattened.
+/// The flattening path is lossy in a way nothing downstream can undo: a STEP
+/// `CYLINDRICAL_SURFACE` is a revolution of a UNIT-LENGTH profile line, so the
+/// untrimmed homogeneous conversion emits a control net spanning ONE AXIAL UNIT
+/// of an unbounded surface, and no consumer can widen a 4x2 rational net back
+/// out to the extent the face actually occupies. The kernel then reports a
+/// CONFIDENT empty for face pairs that demonstrably intersect -- 92 of boxy's
+/// 126 pairs before this mapping (spec 010, T22).
+///
+/// Measured on the boxy union: `OK curves=0` falls 100 -> 59 over the 126-pair
+/// census with **no pair regressing** (all 26 already-tracing pairs
+/// byte-identical), and six pairs move from a silent `Ok(vec![])` to an honest
+/// `SsiFailed`. The alternative of keeping the NURBS representation and
+/// re-spanning it over each face's trims was measured and REJECTED: it emits
+/// one surface carrying two parameter conventions -- the angular axis
+/// renormalized to `[0, 1]` while the axial axis keeps model-space knots -- so
+/// the angular origin is unrecoverable, and it regressed six pairs from two
+/// traced curves to zero. See `FIX_PLAN_010_PRODUCER_TRACK.md` sections 7m/7n.
+///
+/// Flipping to the analytic variant moves `supports_exact_patch_domains` to
+/// `false` and `parameter_range` to `((0, 1), (0, 2pi))` for these surfaces,
+/// which is what lets the broad phase see their true extent. The save side
+/// already round-trips this variant back to a STEP `CYLINDRICAL_SURFACE`
+/// (`save/geometry.rs`), so it improves save fidelity rather than costing it.
+///
+/// # Spheres and tori (spec 012 U1.2), same shape, different axis
+///
+/// T22 above was about the emitted net's EXTENT. Spheres and tori never had
+/// that defect -- their dedicated rational builders are machine-exact over the
+/// whole domain (ledger C1, "not this class", 7y) -- but routing them through
+/// [`TryIntoHomogeneousBsplineSurface`] threw away something else the analytic
+/// form carries: their CLOSED-FORM [`ParameterDivision2D`]
+/// (`specifieds/sphere.rs`, `specifieds/torus.rs`). The generic net divider
+/// then has to discover a sphere's curvature by adaptive bisection.
+///
+/// Measured over ROTOR's five T4 solids, 169 faces, at the guard's `1e-3`:
+/// **35,053 refinement cells on the STEP side against 8,469,082 on the modeling
+/// side, and 8,434,029 of that gap -- 99.6% -- is these two classes**, which
+/// spend ZERO on the STEP side. A six-face solid (#19264: two spheres, two
+/// cylinders, two planes) took 116.3 s to mesh for DISPLAY.
+///
+/// So they map onto analytic variants too. What that costs, enumerated:
+/// `try_into_homogeneous_bspline_surface` on the new variants is the SAME call
+/// on the SAME `Processor<_, Matrix4>` this arm used to make eagerly, so the
+/// net the boolean prepares is byte-identical and only its construction moved
+/// from load time to use time. `supports_exact_patch_domains` flips `true` ->
+/// `false`, exactly as T22's flip did. `search_parameter` becomes the analytic
+/// inverse instead of a Newton descent on a net. Nothing in the boolean engine,
+/// the topology crate or the mesher matches on `Surface`'s variants, so the
+/// dispatch cost is confined to `monstertruck-modeling`'s own `geometry.rs`,
+/// this crate's save side, and `fillet_impl.rs`.
+///
+/// # The degenerate torus stays refused (spec 011 T1)
+///
+/// The refusal for `|large| < small` lives in the BUILDER
+/// (`bspline_conversion.rs`), so a routing change that stops calling the
+/// builder would silently reopen it -- and it must not: on a spindle the
+/// FORWARD map is exact to 8e-16 while `search_parameter` is wrong on ~29% of
+/// the domain, which is what places trims. [`analytic_torus_is_representable`]
+/// therefore restates the builder's predicate verbatim, and a torus that fails
+/// it falls through to the generic arm, where the builder returns `None` and
+/// the conversion refuses exactly as it does today. Pinned by
+/// `spindle_torus_parameter_recovery_is_unsound_while_ring_and_horn_are_exact`
+/// (`monstertruck-geometry/tests/torus.rs`) and by
+/// `a_spindle_torus_is_still_refused_by_the_analytic_route` below.
 impl TryFrom<&Surface> for ModelingSurface {
     type Error = StepConvertingError;
     fn try_from(value: &Surface) -> std::result::Result<Self, Self::Error> {
         match value {
             Surface::ElementarySurface(ElementarySurface::Plane(surface)) => Ok((*surface).into()),
+            // Both arrive as `Processor<RevolutionSurface<Line<Point3>>, Matrix4>`,
+            // so one or-pattern binds them. `map_ref` carries the `Matrix4` and
+            // the processor's orientation across untouched; only the profile is
+            // lifted into the modeling curve enum.
+            Surface::ElementarySurface(
+                ElementarySurface::CylindricalSurface(surface)
+                | ElementarySurface::ConicalSurface(surface),
+            ) => Ok(ModelingSurface::RevolutionSurface(surface.map_ref(
+                |revolution| {
+                    RevolutionSurface::by_revolution(
+                        ModelingCurve::Line(*revolution.entity_curve()),
+                        revolution.origin(),
+                        revolution.axis(),
+                    )
+                },
+            ))),
+            // `map_ref` again: the `Matrix4` and the orientation flag ride
+            // across untouched, only the STEP newtype's `(u, v)` relabeling is
+            // dropped. That relabeling has Jacobian determinant +1, so the
+            // composite orientation -- and therefore the surface normal -- is
+            // unchanged either way. Face trims cannot be affected: they are
+            // ERASED (`TrimmedSolid::erase_trims`) before the geometry is
+            // mapped, and every consumer re-derives `(u, v)` by projecting the
+            // 3D boundary onto the modeling surface.
+            Surface::ElementarySurface(ElementarySurface::Sphere(surface))
+                if ROUTE_ANALYTIC_SPHERE
+                    && analytic_sphere_is_representable(&surface.entity().0) =>
+            {
+                Ok(ModelingSurface::SphericalSurface(
+                    surface.map_ref(|sphere| sphere.0),
+                ))
+            }
+            // TORUS ROUTING, spec 012 W1: the sibling of the sphere arm above,
+            // and it was HELD BACK behind an `if false &&` for one round.
+            //
+            // The stated reason to hold was that switching it on MOVED ap224's
+            // pinned refusal from `UnknownClassificationFailed` to
+            // `CreateLoopsStoreFailed{IntersectionCurvesFailed{(15,4),
+            // SsiFailed}}`, read as "SSI cannot intersect the analytic torus
+            // where it could intersect the NURBS form". **That reading was
+            // FALSIFIED by measurement.** With
+            // `MT_SSI_DEBUG_EXCLUSIONS`/`MT_SSI_DEBUG_TRIM_FILTER` on the
+            // failing pair, the SSI backend tested 16 patch pairs, passed 2,
+            // and traced 2 core curves -- the RIGHT ones. The SSI was fine.
+            // What failed was the FACE: `trim_rejected=2`, `side0=0` on all 8
+            // segments, i.e. every traced point tested outside face 15's own
+            // parameter loop, because `Torus::search_parameter` discarded the
+            // caller's hint and spelled the seam vertex a whole period away
+            // from its neighbours. Ledger class C4, fixed at the source
+            // (`monstertruck-geometry/src/specifieds/torus.rs`,
+            // `nearest_periodic_angle`), and with it:
+            //
+            //   * ap224 face 15's `u` trim range: `(0.0645, 6.2832)` -- the
+            //     whole ring -- becomes `(0, PI)`, and face 19's becomes
+            //     `(PI, 2 PI)`. Both now agree with what the same faces report
+            //     over the rational net, to the padding.
+            //   * ZERO SSI face-pair errors on the ap224 union, and
+            //     `ap224_main_solid_union_refuses_typed` passes on its
+            //     ORIGINAL pin, `UnknownClassificationFailed{shell_index: 1}`.
+            //     Nothing had to be re-pinned.
+            //
+            // Coverage, the other reason it was held: `occt_torus_*` in
+            // `user_fixture_boolean_tests` now carries a torus-bearing boolean
+            // that SUCCEEDS against a closed-form volume, so the capability is
+            // covered rather than only its refusal.
+            //
+            // The guard below is the T1 spindle predicate restated verbatim, so
+            // spec 011's degenerate-torus refusal survives this unchanged.
+            Surface::ElementarySurface(ElementarySurface::ToroidalSurface(surface))
+                if analytic_torus_is_representable(surface.entity()) =>
+            {
+                // `*`, not `.clone()`: `Processor<Torus, Matrix4>` is `Copy`.
+                // The dead arm carried the clone unnoticed -- clippy does not
+                // lint through an `if false` guard, which is one more reason a
+                // held-back arm is not a free thing to leave lying around.
+                Ok(ModelingSurface::ToroidalSurface(*surface))
+            }
             _ => value
                 .try_into_homogeneous_bspline_surface()
                 .map(|surface| ModelingSurface::NurbsSurface(NurbsSurface::new(surface)))
@@ -1145,6 +1685,116 @@ fn sampled_parameter_boundary_preserves_unbounded_cylinder_axis_parameter() {
     assert!(max_abs > 10.0);
 }
 
+/// Spec 012 U2. A planar trim sample that overshoots the plane's fictional
+/// `[0, 1]` square keeps the value the solver produced.
+///
+/// `Plane::xy()`'s `u` and `v` ARE world `x` and `y`, so this line's far
+/// endpoint sits at `u = 1 + 5e-7` -- inside `TOLERANCE` of the reported `max`,
+/// which is what `clamp_near_range` used to snap to exactly `1.0`. There is no
+/// domain edge at `u = 1` on a plane; the number is a placeholder.
+#[test]
+fn a_planar_trim_sample_past_the_fictional_unit_square_is_not_snapped_to_it() {
+    let surface = Surface::ElementarySurface(ElementarySurface::Plane(Plane::xy()));
+    let overshoot = 5.0e-7;
+    let curve = Line(
+        Point3::new(1.0 - overshoot, 0.5, 0.0),
+        Point3::new(1.0 + overshoot, 0.5, 0.0),
+    );
+
+    let boundary = sampled_parameter_boundary(&curve, &surface, 1.0e-3).unwrap();
+    let last = *boundary.last().unwrap();
+
+    assert!(
+        last.x > 1.0,
+        "the sample sits past u = 1 and must stay there; got {}",
+        last.x,
+    );
+    assert!(
+        (last.x - (1.0 + overshoot)).abs() < 1.0e-12,
+        "the projected u must be the solver's answer, not the placeholder \
+         boundary; got {}",
+        last.x,
+    );
+}
+
+/// The other half of U2: on a KNOT-bounded surface the clamp is load-bearing and
+/// is kept. The net carries no data past the knot vector, so a Newton answer one
+/// ULP-cloud past the end has a real boundary to come back to.
+///
+/// This bilinear patch spans world `[0, 1]^2` in the `z = 0` plane, so a sample
+/// at world `x = 1 + 5e-7` extrapolates to `u = 1 + 5e-7` -- and must come back
+/// to exactly `1.0`.
+#[test]
+fn a_knot_bounded_surface_still_snaps_a_sample_that_overshoots_its_knots() {
+    let knots = KnotVector::bezier_knot(1);
+    let surface = Surface::BsplineSurface(BsplineSurface::new(
+        (knots.clone(), knots),
+        vec![
+            vec![Point3::new(0.0, 0.0, 0.0), Point3::new(0.0, 1.0, 0.0)],
+            vec![Point3::new(1.0, 0.0, 0.0), Point3::new(1.0, 1.0, 0.0)],
+        ],
+    ));
+    let overshoot = 5.0e-7;
+    let curve = Line(
+        Point3::new(1.0 - overshoot, 0.5, 0.0),
+        Point3::new(1.0 + overshoot, 0.5, 0.0),
+    );
+
+    let boundary = sampled_parameter_boundary(&curve, &surface, 1.0e-3).unwrap();
+
+    assert_eq!(
+        boundary.last().unwrap().x,
+        1.0,
+        "a knot vector IS a bound and the clamp must still snap onto it.",
+    );
+}
+
+/// The guard on the drop is inert, and this is why: no axis whose reported range
+/// is a placeholder carries a period. If that ever stops being true the drop
+/// would take the range away from the periodic wrap arm, which is selected by
+/// `range.is_some()` -- so the invariant is pinned rather than assumed.
+#[test]
+fn no_placeholder_axis_carries_a_period() {
+    let center = Point3::new(0.0, 0.0, 0.0);
+    let axis = Vector3::unit_z();
+    let profile = Point3::new(0.3, 0.0, 0.0);
+    let mut cylinder = Processor::new(RevolutionSurface::by_revolution(
+        Line(profile, profile + axis),
+        center,
+        axis,
+    ));
+    cylinder.invert();
+    let cone = Processor::new(RevolutionSurface::by_revolution(
+        Line(profile, profile + axis + Vector3::unit_x()),
+        center,
+        axis,
+    ));
+
+    let surfaces = [
+        Surface::ElementarySurface(ElementarySurface::Plane(Plane::xy())),
+        Surface::ElementarySurface(ElementarySurface::CylindricalSurface(cylinder)),
+        Surface::ElementarySurface(ElementarySurface::ConicalSurface(cone)),
+        Surface::ElementarySurface(ElementarySurface::Sphere(Processor::new(Sphere(
+            monstertruck_geometry::prelude::Sphere::new(center, 2.0),
+        )))),
+        Surface::ElementarySurface(ElementarySurface::ToroidalSurface(Processor::new(
+            Torus::new(center, 3.0, 1.0),
+        ))),
+    ];
+
+    for surface in surfaces {
+        let (u_real, v_real) = uv_clamp::reported_range_bounds_the_surface(&surface);
+        assert!(
+            u_real || surface.u_period().is_none(),
+            "placeholder u axis with a period: {surface:?}",
+        );
+        assert!(
+            v_real || surface.v_period().is_none(),
+            "placeholder v axis with a period: {surface:?}",
+        );
+    }
+}
+
 #[test]
 fn raw_conic_boundary_without_pcurve_uses_sampled_projection_at_safe_tolerance() {
     let curve = Curve3D::Conic(Conic3D::Ellipse(
@@ -1337,4 +1987,151 @@ fn builder() {
     let mut poly = solid.triangulation(0.1).to_polygon();
     poly.put_together_same_attrs(1.0e-3).remove_unused_attrs();
     assert_eq!(poly.shell_condition(), ShellCondition::Closed);
+}
+
+// ---------------------------------------------------------------------------
+// Spec 012 U1.2: the analytic sphere/torus route.
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+fn u1_step_sphere(radius: f64) -> Surface {
+    Surface::ElementarySurface(ElementarySurface::Sphere(Processor::new(Sphere(
+        monstertruck_geometry::prelude::Sphere::new(Point3::new(1.0, -2.0, 3.0), radius),
+    ))))
+}
+
+#[cfg(test)]
+fn u1_step_torus(large_radius: f64, small_radius: f64) -> Surface {
+    Surface::ElementarySurface(ElementarySurface::ToroidalSurface(Processor::new(
+        Torus::new(Point3::new(1.0, -2.0, 3.0), large_radius, small_radius),
+    )))
+}
+
+/// The routing change is a TESSELLATION change and nothing else: the rational
+/// net the boolean's homogeneous path prepares must be the very same one it
+/// prepared while the modeling surface WAS that net.
+///
+/// Byte-identity, not a tolerance -- both sides call the same builder on the
+/// same `Processor<_, Matrix4>`, so anything short of equality would mean the
+/// route picked up an extra arithmetic step (the C1 re-spanning trap).
+#[test]
+fn the_analytic_route_emits_the_same_rational_net_the_flattened_route_did() {
+    for step in [u1_step_sphere(53.0), u1_step_torus(7.0, 2.0)] {
+        let flattened = step
+            .try_into_homogeneous_bspline_surface()
+            .expect("the builder accepts these radii");
+        let modeling = ModelingSurface::try_from(&step).expect("must convert");
+        assert!(
+            matches!(
+                modeling,
+                ModelingSurface::SphericalSurface(_) | ModelingSurface::ToroidalSurface(_)
+            ),
+            "spheres and tori must reach the analytic variants, got {modeling:?}",
+        );
+        let analytic = modeling
+            .try_into_homogeneous_bspline_surface()
+            .expect("the analytic variant must still yield its net");
+        assert_eq!(
+            flattened.knot_vectors(),
+            analytic.knot_vectors(),
+            "the emitted knot vectors moved",
+        );
+        assert_eq!(
+            flattened.control_points(),
+            analytic.control_points(),
+            "the emitted control net moved",
+        );
+    }
+}
+
+/// The closed form is what the whole track is for: the analytic variants must
+/// spend ZERO adaptive refinement cells where the net spent them by the
+/// million.
+///
+/// A count, not a wall clock (ledger M13/C8): `division_totals` is the
+/// process-wide cell counter the U1.1 budget already maintains.
+#[test]
+fn the_analytic_route_spends_no_adaptive_refinement_cells() {
+    use monstertruck_traits::algo::surface::take_division_totals;
+    for (step, range) in [
+        (
+            u1_step_sphere(53.0),
+            ((0.0, std::f64::consts::PI), (0.0, TAU)),
+        ),
+        (u1_step_torus(7.0, 2.0), ((0.0, TAU), (0.0, TAU))),
+    ] {
+        let modeling = ModelingSurface::try_from(&step).expect("must convert");
+        let net = monstertruck_geometry::prelude::NurbsSurface::new(
+            step.try_into_homogeneous_bspline_surface().unwrap(),
+        );
+        // Each side over ITS OWN declared range -- the analytic one in radians,
+        // the net over its knot span. Comparing them over one frame would be
+        // the C2 trap, and would also stack the extrapolation defect (b) onto
+        // a measurement that is about the closed form (a).
+        let net_range = net.range_tuple();
+
+        let _ = take_division_totals();
+        let _ = modeling.parameter_division(range, 1.0e-3);
+        let (analytic_cells, _) = take_division_totals();
+
+        let _ = net.parameter_division(net_range, 1.0e-3);
+        let (net_cells, _) = take_division_totals();
+
+        assert_eq!(
+            analytic_cells, 0,
+            "the analytic variant must divide in closed form",
+        );
+        assert!(
+            net_cells > 0,
+            "the net must still cost what it always cost, else this test proves nothing",
+        );
+    }
+}
+
+/// Spec 011 T1 must survive the routing change.
+///
+/// The spindle refusal lives in the BUILDER, so an analytic route that stopped
+/// calling the builder would reopen it silently. On a spindle the FORWARD map
+/// stays exact while `search_parameter` is wrong on ~29% of the domain, which
+/// is what places trims -- so the class must keep refusing typed in every
+/// encoding, and horn tori (the fillet form) must keep converting.
+#[test]
+fn a_spindle_torus_is_still_refused_by_the_analytic_route() {
+    // |large| < small in each of the spellings the corpus carries.
+    for (large_radius, small_radius) in [(1.0, 3.0), (0.5, 20.0), (1.0e-3, 1.0)] {
+        let step = u1_step_torus(large_radius, small_radius);
+        assert!(
+            ModelingSurface::try_from(&step).is_err(),
+            "spindle torus (R = {large_radius}, r = {small_radius}) must refuse typed",
+        );
+    }
+    // Horn (R == r) and ring (R > r) are unaffected and must still convert.
+    for (large_radius, small_radius) in [(2.0, 2.0), (7.0, 2.0)] {
+        let step = u1_step_torus(large_radius, small_radius);
+        assert!(
+            matches!(
+                ModelingSurface::try_from(&step),
+                Ok(ModelingSurface::ToroidalSurface(_))
+            ),
+            "torus (R = {large_radius}, r = {small_radius}) must convert typed",
+        );
+    }
+}
+
+/// The guard is the BUILDER's and no wider: a surface the analytic route
+/// declines must land on exactly the answer it lands on today, not on a
+/// different refusal and not on a silent success.
+#[test]
+fn the_analytic_guard_matches_the_builders_own_predicate() {
+    for step in [
+        u1_step_sphere(f64::INFINITY),
+        u1_step_torus(1.0, 3.0),
+        u1_step_torus(f64::INFINITY, 1.0),
+    ] {
+        assert_eq!(
+            step.try_into_homogeneous_bspline_surface().is_none(),
+            ModelingSurface::try_from(&step).is_err(),
+            "the routing guard and the builder must agree on {step:?}",
+        );
+    }
 }

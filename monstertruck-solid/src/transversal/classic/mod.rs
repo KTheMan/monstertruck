@@ -2,8 +2,8 @@
 //!
 //! This subtree grafts the proven upstream boolean assembly from the published
 //! 0.3.2 crate. It is compiled only when the marching SSI is the active backend
-//! (default features, no upgrade-backend feature); an upgrade build never touches it and
-//! runs the current `integrate` pipeline unchanged. The public entry points in
+//! (default features); a build with an external SSI backend never touches it
+//! and runs the current `integrate` pipeline unchanged. The public entry points in
 //! `transversal::integrate` cfg-dispatch `and`/`or`/`difference`/
 //! `symmetric_difference` here.
 //!

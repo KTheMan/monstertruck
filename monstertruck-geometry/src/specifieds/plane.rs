@@ -115,7 +115,56 @@ impl ParametricSurface for Plane {
     fn derivative_uv(&self, _: f64, _: f64) -> Vector3 { Vector3::zero() }
     #[inline(always)]
     fn derivative_vv(&self, _: f64, _: f64) -> Vector3 { Vector3::zero() }
-    /// as square
+    /// The unit square `[0, 1] x [0, 1]` -- a FICTION, and a load-bearing one.
+    ///
+    /// A plane is unbounded in both parameters: `evaluate(u, v)` is defined and
+    /// meaningful for every finite `u`, `v`, and planar-cap trims routinely
+    /// project far outside this square (the STEP bracket's planar faces carry
+    /// world-scaled trim rectangles reaching u ~ 3.9 and v ~ 22.0). The square
+    /// is the `o`/`p`/`q` frame's own cell, not a domain.
+    ///
+    /// AIDEV-NOTE: do NOT "fix" this to `Bound::Unbounded`. It was measured
+    /// (spec 010) and the honest range is the one thing that cannot be reported
+    /// here, for two independent reasons.
+    ///
+    /// First, [`BoundedSurface`] is implemented for `Plane` just below, and its
+    /// `range_tuple` is `try_range_tuple().expect(UNBOUNDED_ERROR)`
+    /// (`monstertruck-traits/src/traits/surface.rs`). An unbounded plane would
+    /// turn every `plane.range_tuple()` into a panic. The v2 mirror further
+    /// down hardcodes the same square for the same reason.
+    ///
+    /// Second, several consumers treat this square as an AUTHORITATIVE domain
+    /// and would change their answers, not merely their diagnostics:
+    ///
+    /// - `monstertruck-healing/src/lib.rs` (`reattach_preserved_face_trims`
+    ///   and `regenerate_linear_trim_segment`) HARD-clamps every projected trim
+    ///   sample into the reported box -- a plane trim at u = 3.9 becomes
+    ///   u = 1.0. It is the square that keeps those two paths self-consistent.
+    /// - `monstertruck-meshing/src/tessellation/triangulation/` meshes an
+    ///   untrimmed plane face as exactly this rectangle, and `boundary.rs`
+    ///   synthesizes a missing loop side from it. An unbounded plane there
+    ///   becomes `FaceDropReason::UnboundedDomain`, which
+    ///   an external SSI boolean backend escalates.
+    /// - a backend AABB pass over `trimmed_surface_range_aabb`
+    ///   rejects a trim rectangle that leaves the surface frame, and the frame
+    ///   for a plane IS this unit cell (via the homogeneous B-spline conversion
+    ///   below, which emits a bezier-1 net over the same cell).
+    /// - the analytic plane-vs-plane SSI in
+    ///   an external analytic SSI backend
+    ///   rejects intersections falling outside the reported ranges.
+    ///
+    /// The modeling projector
+    /// (`monstertruck-modeling/src/geometry.rs::project_onto_surface_domain`) is
+    /// the one place that sees the square and is provably inert against it: a
+    /// plane's projection is linear, so all four solver attempts return the same
+    /// answer and the out-of-domain rejection falls through to the unchanged
+    /// fallback. That is asserted by
+    /// `a_plane_whose_reported_square_is_not_a_real_bound_is_unaffected`.
+    ///
+    /// So: a new rule may NOT treat `try_range_tuple()` as a plane's real
+    /// domain. Clamp, cull, and containment tests against it are wrong for most
+    /// planar trims even though the four consumers above currently survive by
+    /// agreeing with each other about the same fiction.
     #[inline(always)]
     fn parameter_range(&self) -> (ParameterRange, ParameterRange) {
         let range = (Bound::Included(0.0), Bound::Included(1.0));

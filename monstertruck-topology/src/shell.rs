@@ -1,3 +1,4 @@
+use crate::errors::Error;
 use crate::*;
 use monstertruck_core::entry_map::FxEntryMap as EntryMap;
 use rayon::prelude::*;
@@ -559,6 +560,30 @@ impl<P, C, S> Shell<P, C, S> {
                 (!check_connectivity(&mut adjacency.into())).then_some(vertex)
             })
             .collect()
+    }
+
+    /// The precondition a shell must satisfy to be a boundary of a
+    /// [`Solid`](crate::Solid): non-empty, connected, closed and manifold.
+    ///
+    /// This is the SINGLE definition of that invariant.
+    /// [`Solid::try_new`](crate::Solid::try_new) and
+    /// [`TrimmedSolid::try_new`](crate::trimmed::TrimmedSolid::try_new) both
+    /// call it rather than restating it, because two copies of a precondition
+    /// are two preconditions: the trimmed path used to have NO copy at all and
+    /// silently produced solids the plain path would have refused (spec 011,
+    /// ledger class C11).
+    pub fn check_solid_boundary(&self) -> Result<()> {
+        if self.is_empty() {
+            Err(Error::EmptyShell)
+        } else if !self.is_connected() {
+            Err(Error::NotConnected)
+        } else if self.shell_condition() != ShellCondition::Closed {
+            Err(Error::NotClosedShell)
+        } else if !self.singular_vertices().is_empty() {
+            Err(Error::NotManifold)
+        } else {
+            Ok(())
+        }
     }
 
     /// Returns a new shell whose surfaces are mapped by `surface_mapping`,

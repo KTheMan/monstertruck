@@ -98,6 +98,8 @@ pub use topo_traits::*;
 /// `Result` with crate's errors.
 pub type Result<T> = std::result::Result<T, errors::Error>;
 
+/// Axis-aligned bounds that are actually bounds (unlike a vertex hull).
+pub mod bounding;
 /// the building model utility API
 pub mod builder;
 mod closed_sweep;
@@ -126,9 +128,9 @@ pub mod text;
 
 /// Fillet operations for shell edges.
 ///
-/// Requires the `fillet` feature flag. Re-exports from [`monstertruck_solid`].
+/// Requires the `fillet` feature flag. Re-exports from [`monstertruck_fillet`].
 #[cfg(feature = "fillet")]
-pub use monstertruck_solid::{
+pub use monstertruck_fillet::{
     FilletError, FilletIntersectionCurve, FilletOptions, FilletProfile, RadiusSpec,
     fillet_edges_generic as fillet_edges,
 };

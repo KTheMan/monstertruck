@@ -4,6 +4,21 @@ The version is of the bottom crate `monstertruck-render`.
 
 ## Unreleased
 
+- **New crate `monstertruck-healing`**: the shape-healing passes for solids imported from other CAD systems move out of `monstertruck-solid` into their own crate (`split_closed_edges`, `split_closed_faces`, `split_pass_through_edges`, `split_seam_faces`, `strip_seam_edges`). They are post-CSG and kernel-independent, so they no longer belong inside a boolean kernel.
+- **New crate `monstertruck-fillet`**: rolling-ball fillet and chamfer operations on shell edges move out of `monstertruck-solid` for the same reason. `monstertruck-modeling`'s `fillet` feature now re-exports it; the `monstertruck` facade exposes it as `monstertruck::fillet` under the `solid` feature.
+- `monstertruck-solid` is now the boolean kernel and nothing else, and is fully self-contained: it carries the truck-derived polyline-marching pipeline as its default backend (`marching-ssi`, on by default) and no heavy linear-algebra or interval-arithmetic dependencies.
+- Under `monstertruck-solid` `--no-default-features` no boolean backend is compiled; the boolean entry points return a typed `ShapeOpsError::NoBackend` instead of panicking. An external SSI backend exporting the same surface can stand in for the whole `solid` module.
+- **`monstertruck-traits`**: `parameter_division` is now bounded. New `parameter_division_with_budget`, `try_parameter_division`, `BudgetedDivision` and the typed `DivisionTruncated` outcome replace the previously unbounded recursion, which could subdivide without limit on surfaces whose closed-form inverse was discarded. Also new: `division_work`/`division_totals`/`division_max_cells` counters for measuring subdivision cost.
+- **`monstertruck-step` load path**: new `from_step_bytes` entry point; a new structured load report (`load::report`) that names what a file lost and why instead of dropping it silently; UV-domain clamping for STEP surfaces with placeholder parameter ranges; analytic routing for `CYLINDRICAL_SURFACE`, `CONICAL_SURFACE`, `SPHERICAL_SURFACE` and trimmed surfaces of revolution onto closed-form geometry rather than a rational B-spline degrade.
+- Fixed: `SURFACE_OF_LINEAR_EXTRUSION` conversion built a **transposed** control net.
+- Fixed: STEP loads could produce shells whose faces did not share an orientation, which made a divergence-theorem volume come out negative. `monstertruck-healing` gains a signed-volume oracle over the in-repo analytic fixtures.
+- Fixed: the surface projector no longer returns a non-finite `(u, v)`, and no longer queries placeholder parameter domains that cannot answer.
+- Fixed: a fixed `1e-6` tolerance in surface footpoint search was rejecting footpoints the caller had certified exact.
+- **`monstertruck-meshing`**: tessellation gains a strict mode and structured face-drop diagnostics, so a dropped face becomes a typed refusal or a logged warning instead of a silently smaller mesh. Adds a `log` dependency (a zero-cost facade when no logger is installed).
+- Empty-parameter-polyline and degenerate-torus inputs now return typed outcomes instead of panicking.
+- Reference the adjacent face's surface entity from `SURFACE_CURVE` edge associations instead of re-emitting it, shrinking exported STEP files.
+- Save modeling cylinders as an analytic `CYLINDRICAL_SURFACE` in STEP output instead of a rational B-spline degrade.
+- Make the STEP length unit and `distance_accuracy_value` configurable via `StepMeasurementContext`.
 - In the README, we clarified that the subtitle is the origin of the name "truck," and changed all instances of the term in the main text to `truck`.
 - Get more precise part attributions from `Product` and `NextAssemblyUsageOccurrence`.
 - Add the variable `division` to `monstertruck_modeling::builder::rsweep`.

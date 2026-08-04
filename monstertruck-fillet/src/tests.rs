@@ -1529,7 +1529,7 @@ fn custom_profile_bump() {
 // CSG/boolean-result fillet coverage lives in
 // monstertruck-modeling/tests/fillet_test.rs (feature `fillet`): the
 // modeling-curve conversions are feature-gated there, and enabling them in
-// this crate's unit tests would pull in a second monstertruck-solid whose
+// this crate's unit tests would pull in a second monstertruck-fillet whose
 // fillet types cannot unify with the crate under test.
 
 // ---------------------------------------------------------------------------

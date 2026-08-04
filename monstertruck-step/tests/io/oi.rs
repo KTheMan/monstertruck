@@ -223,7 +223,10 @@ fn oi() {
             Vector4::new(1.0, 2.0, 3.0, 1.0),
         )),
     );
-    oitest::<Processor<Torus, Matrix4>, ToroidalSurfaceHolder>(
+    // `TryFrom` since spec 011 T1: the STEP -> geometry torus conversion refuses
+    // the degenerate self-intersecting regime instead of panicking in
+    // `Torus::new`. A ring torus (15 > 9) round-trips exactly as before.
+    oitest_tryfrom::<Processor<Torus, Matrix4>, ToroidalSurfaceHolder>(
         Processor::new(Torus::new(Point3::new(0.0, 0.0, 0.0), 15.0, 9.0)).transformed(
             Matrix4::from_cols(
                 Vector4::new(0.0, 1.0, 0.0, 0.0),
