@@ -80,9 +80,11 @@ the source-shape reconciliation pocket. It starts from fork merge `2cc28fed`
 and preserves upstream pull request 6 head `c19918e9` and stacked pull request 7
 head `558b573e` through merge commits `f4cbe771` and `86a71509`. It ports the
 tracked fillet wrapper to the separate `monstertruck-fillet` crate and refreshes
-the MT-401 source audit. The branch adds no solver capability, promotes no
-evidence class, and is not itself a bounded upstream contribution slice. Future
-slices must start from the eventual upstream merge base.
+the MT-401 source audit. Commit `2a9952e7` preserves the upstream feature graph:
+modeling fillets depend on `monstertruck-fillet` without pulling the
+`monstertruck-solid` Boolean kernel. The branch adds no solver capability,
+promotes no evidence class, and is not itself a bounded upstream contribution
+slice. Future slices must start from the eventual upstream merge base.
 
 ## Minimum imported corpus
 

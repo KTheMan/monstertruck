@@ -5,16 +5,16 @@
 | Field | Value |
 | --- | --- |
 | Story | `MT-401` |
-| Baseline | `86a71509` (`86a7150974cbca52b11609d89c0b90d7cb032a08`) |
+| Baseline | `2a9952e7` (`2a9952e740521fe2eb4b04853208b1dd5d4c4d49`) |
 | Audit date | 2026-08-03 |
 | Platform | `x86_64-pc-windows-msvc` |
 | Toolchain | `rustc 1.94.0 (4a4ef493e 2026-03-02)`, LLVM `21.1.8` |
 | Evidence class | `Implemented` -- source-audit evidence only |
 | Coverage result | All 18 unique public wrapper functions matched the expected set. |
-| Audited package features | `monstertruck-modeling` default, `solid`, and `fillet`; `fillet` enables `solid`. |
-| Audited package manifest | `monstertruck-modeling/Cargo.toml` -- SHA-256 `d48d4c07ef054de65093c1ccc4c4723a01bee4a3ac45152fbf5ad9a9e95a8bab` |
+| Audited package features | `monstertruck-modeling` default, `solid`, and `fillet`; `fillet` depends only on `monstertruck-fillet`. |
+| Audited package manifest | `monstertruck-modeling/Cargo.toml` -- SHA-256 `5e360cfd6c833a0340bb4371991962ab8ee1bf4bd40a5377c3df62ce1e7a69c8` |
 | Audited module exposure | `monstertruck-modeling/src/lib.rs` -- SHA-256 `089a0d77af989a1518fe43d9b8ce2e80726f5080b304619f8b045a7fa9d45db8` |
-| Audited wrapper source | `monstertruck-modeling/src/tracked.rs` -- SHA-256 `a25875d18f1082bafeb2601a11c9d24d3738bbd24d3d6262d6e1f616a4725784` |
+| Audited wrapper source | `monstertruck-modeling/src/tracked.rs` -- SHA-256 `d90b55ac07c4bb030b63cbd6ea3e255581ddabe1ec100e37f342864dd0a82cc4` |
 | Audited session source | `monstertruck-core/src/tracking/session.rs` -- SHA-256 `723a1b053d359cadc66e60ea730bc979591464ce2e95ee997bb5ba5c31741558` |
 | Audited tracking interface | `monstertruck-topology/src/tracking/interface.rs` -- SHA-256 `7df2df51a4baef2f829378d14a717136a22cac449da73bbbc036be5514da7022` |
 | Audited tracking initialization | `monstertruck-topology/src/tracking/initialization.rs` -- SHA-256 `9ec976a7a575975a44cce4c2e3861e7f64d1df1fa2674b68ed93987378704c19` |
@@ -70,7 +70,8 @@ against it; it does not claim that this audit exercised or proved preservation.
 ## Wrapper matrix
 
 The feature value `default` means that the wrapper has no feature gate in the
-audited source. `fillet` enables `solid` in `monstertruck-modeling`.
+audited source. `fillet` and `solid` are independent features in
+`monstertruck-modeling`.
 
 | Public wrapper | Feature / deprecation gate | Sources and mutability | Raw modeling stage | Failure codes and boundary errors | Staging and commit boundary | Caller-visible state at risk | Follow-up owner |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -91,7 +92,7 @@ audited source. `fillet` enables `solid` in `monstertruck-modeling`.
 | `symmetric_difference` | `solid`. | Two immutable `Solid` values; mutable session. | `monstertruck_solid::symmetric_difference` creates a local result solid. | `FP-SOURCE-EMPTY`, `FP-SOURCE-CURRENT`, `FP-RAW-SHAPE`, `FP-OUTPUT-TRACKING`, `FP-LINEAGE`. | Both sources are validated and the raw Boolean completes before staging. `finalize_output` mutates the local solid and records lineage on a cloned session. Success commits the session before returning the solid; failure leaves the output unpublished. | Both sources' `CV-TOPOLOGY` and `CV-GEOMETRY`; `CV-SESSION`, `CV-BINDINGS`, `CV-LINEAGE`, `CV-RESULT`. | `MT-402` / `MT-404`. |
 | `clip_half_space_z` | `solid`. | One immutable `Solid`; mutable session. | `monstertruck_solid::clip_half_space_z` creates a local result solid. | `FP-SOURCE-EMPTY`, `FP-SOURCE-CURRENT`, `FP-RAW-SHAPE`, `FP-OUTPUT-TRACKING`, `FP-LINEAGE`. | The source is validated and raw clipping completes before staging. `finalize_output` mutates the local solid and records lineage on a cloned session. Success commits the session before returning the solid; failure leaves the output unpublished. | `CV-TOPOLOGY`, `CV-GEOMETRY`, `CV-SESSION`, `CV-BINDINGS`, `CV-LINEAGE`, `CV-RESULT`. | `MT-402` / `MT-404`. |
 | `plane_cut` | `solid`. | One immutable `Solid`; mutable session. | `monstertruck_solid::plane_cut` creates a local result solid and section. | `FP-SOURCE-EMPTY`, `FP-SOURCE-CURRENT`, `FP-RAW-SHAPE`, `FP-OUTPUT-TRACKING`, `FP-LINEAGE`, `FP-SECTION-MATCH`. | The source is validated and raw cutting completes before staging. The cloned-session closure finalizes `output.solid` and matches every section face. Any finalization or matching failure leaves the session unchanged and local output unpublished. Success commits the session, then replaces the section with matched tracked faces before returning. | `CV-TOPOLOGY`, `CV-GEOMETRY`, `CV-SESSION`, `CV-BINDINGS`, `CV-LINEAGE`, `CV-RESULT`. | `MT-402` / `MT-404`. |
-| `fillet_edges` | `fillet`, which enables `solid`. | One mutable `Shell`, an immutable selected-edge slice, and a mutable session. | Clones the shell, then `monstertruck_fillet::fillet_edges_generic` mutates only the local clone. | `FP-SOURCE-EMPTY`, `FP-SOURCE-CURRENT`, `FP-RAW-FILLET`, `FP-OUTPUT-TRACKING`, `FP-LINEAGE`. | The shell and every selected edge are validated before cloning. Raw filleting changes only the clone. Finalization uses a cloned session. The session commits after successful finalization, and the infallible shell assignment publishes the local output last. | The shell and selected edges' `CV-TOPOLOGY` and `CV-GEOMETRY`; `CV-SESSION`, `CV-BINDINGS`, `CV-LINEAGE`, `CV-RESULT`, `CV-MUTABLE`. | `MT-402` / `MT-405`. |
+| `fillet_edges` | `fillet`. | One mutable `Shell`, an immutable selected-edge slice, and a mutable session. | Clones the shell, then `monstertruck_fillet::fillet_edges_generic` mutates only the local clone. | `FP-SOURCE-EMPTY`, `FP-SOURCE-CURRENT`, `FP-RAW-FILLET`, `FP-OUTPUT-TRACKING`, `FP-LINEAGE`. | The shell and every selected edge are validated before cloning. Raw filleting changes only the clone. Finalization uses a cloned session. The session commits after successful finalization, and the infallible shell assignment publishes the local output last. | The shell and selected edges' `CV-TOPOLOGY` and `CV-GEOMETRY`; `CV-SESSION`, `CV-BINDINGS`, `CV-LINEAGE`, `CV-RESULT`, `CV-MUTABLE`. | `MT-402` / `MT-405`. |
 
 ## Reproducible coverage check
 
@@ -155,7 +156,7 @@ No Rust source, test, or expected output is changed by this inventory. The
 feature-complete focused package gates passed on the audited tree:
 
 ```text
-cargo test -p monstertruck-modeling --lib --features fillet tracked::tests
+cargo test -p monstertruck-modeling --lib --no-default-features --features fillet tracked::tests
 # 5 passed; 0 failed; 45 filtered out.
 
 cargo clippy -p monstertruck-modeling --all-targets --features fillet -- -W warnings
