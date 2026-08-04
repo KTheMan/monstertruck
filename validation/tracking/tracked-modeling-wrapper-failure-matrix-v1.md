@@ -5,23 +5,23 @@
 | Field | Value |
 | --- | --- |
 | Story | `MT-401` |
-| Baseline | `4054cc81` (`4054cc8122b4a69776664caf7eb948aedfaaa906`) |
+| Baseline | `86a71509` (`86a7150974cbca52b11609d89c0b90d7cb032a08`) |
 | Audit date | 2026-08-03 |
 | Platform | `x86_64-pc-windows-msvc` |
 | Toolchain | `rustc 1.94.0 (4a4ef493e 2026-03-02)`, LLVM `21.1.8` |
 | Evidence class | `Implemented` -- source-audit evidence only |
 | Coverage result | All 18 unique public wrapper functions matched the expected set. |
 | Audited package features | `monstertruck-modeling` default, `solid`, and `fillet`; `fillet` enables `solid`. |
-| Audited package manifest | `monstertruck-modeling/Cargo.toml` -- SHA-256 `e8144574a200aad7a16a3ab74b1711fa35ff850384ef0c9b673ec5ef4ed71b19` |
-| Audited module exposure | `monstertruck-modeling/src/lib.rs` -- SHA-256 `d9fcaa07d3ecf2f7ab18a08402557c1294ef1717f5bfa24b53f35fefcf1928e9` |
-| Audited wrapper source | `monstertruck-modeling/src/tracked.rs` -- SHA-256 `0fcf0e3756fc424cebc75fda2df0da2d145944fc89fd775290d62cbc99258ce1` |
+| Audited package manifest | `monstertruck-modeling/Cargo.toml` -- SHA-256 `d48d4c07ef054de65093c1ccc4c4723a01bee4a3ac45152fbf5ad9a9e95a8bab` |
+| Audited module exposure | `monstertruck-modeling/src/lib.rs` -- SHA-256 `089a0d77af989a1518fe43d9b8ce2e80726f5080b304619f8b045a7fa9d45db8` |
+| Audited wrapper source | `monstertruck-modeling/src/tracked.rs` -- SHA-256 `a25875d18f1082bafeb2601a11c9d24d3738bbd24d3d6262d6e1f616a4725784` |
 | Audited session source | `monstertruck-core/src/tracking/session.rs` -- SHA-256 `723a1b053d359cadc66e60ea730bc979591464ce2e95ee997bb5ba5c31741558` |
 | Audited tracking interface | `monstertruck-topology/src/tracking/interface.rs` -- SHA-256 `7df2df51a4baef2f829378d14a717136a22cac449da73bbbc036be5514da7022` |
 | Audited tracking initialization | `monstertruck-topology/src/tracking/initialization.rs` -- SHA-256 `9ec976a7a575975a44cce4c2e3861e7f64d1df1fa2674b68ed93987378704c19` |
 | Audited topology tracking implementations | `monstertruck-topology/src/tracking/implementations.rs` -- SHA-256 `33b0d97da1c5d066927efd118c23de10e2340afc4a83c5225d8256e4289a3879` |
-| Audited shape-operation errors | `monstertruck-solid/src/transversal/integrate/mod.rs` -- SHA-256 `e3bad7a4b7ff236d1bbc1c1b6f2a2144c8210e4b04a59d4f941bca2009634ad5` |
-| Audited fillet errors | `monstertruck-solid/src/fillet/error.rs` -- SHA-256 `2297592fbb8cba3db7e0dafd9d9d167248d3725e7e55712d869e8b442dfb9a0b` |
-| Audited fillet adapter | `monstertruck-solid/src/fillet/edge_select.rs` -- SHA-256 `89e108e780c6efe0e9b41aec73a63f2e79ff1f941b15e79488e293f7c19e0a0b` |
+| Audited shape-operation errors | `monstertruck-solid/src/transversal/integrate/mod.rs` -- SHA-256 `3d1562b3aab9850ff83cae6eb835067c90e995d6e07afa68ccb54502d0020f5a` |
+| Audited fillet errors | `monstertruck-fillet/src/error.rs` -- SHA-256 `2297592fbb8cba3db7e0dafd9d9d167248d3725e7e55712d869e8b442dfb9a0b` |
+| Audited fillet adapter | `monstertruck-fillet/src/edge_select.rs` -- SHA-256 `89e108e780c6efe0e9b41aec73a63f2e79ff1f941b15e79488e293f7c19e0a0b` |
 
 This inventory records the public tracked-modeling surface and its fallible
 source paths. It does not inject any failure and does not procedurally validate
@@ -91,7 +91,7 @@ audited source. `fillet` enables `solid` in `monstertruck-modeling`.
 | `symmetric_difference` | `solid`. | Two immutable `Solid` values; mutable session. | `monstertruck_solid::symmetric_difference` creates a local result solid. | `FP-SOURCE-EMPTY`, `FP-SOURCE-CURRENT`, `FP-RAW-SHAPE`, `FP-OUTPUT-TRACKING`, `FP-LINEAGE`. | Both sources are validated and the raw Boolean completes before staging. `finalize_output` mutates the local solid and records lineage on a cloned session. Success commits the session before returning the solid; failure leaves the output unpublished. | Both sources' `CV-TOPOLOGY` and `CV-GEOMETRY`; `CV-SESSION`, `CV-BINDINGS`, `CV-LINEAGE`, `CV-RESULT`. | `MT-402` / `MT-404`. |
 | `clip_half_space_z` | `solid`. | One immutable `Solid`; mutable session. | `monstertruck_solid::clip_half_space_z` creates a local result solid. | `FP-SOURCE-EMPTY`, `FP-SOURCE-CURRENT`, `FP-RAW-SHAPE`, `FP-OUTPUT-TRACKING`, `FP-LINEAGE`. | The source is validated and raw clipping completes before staging. `finalize_output` mutates the local solid and records lineage on a cloned session. Success commits the session before returning the solid; failure leaves the output unpublished. | `CV-TOPOLOGY`, `CV-GEOMETRY`, `CV-SESSION`, `CV-BINDINGS`, `CV-LINEAGE`, `CV-RESULT`. | `MT-402` / `MT-404`. |
 | `plane_cut` | `solid`. | One immutable `Solid`; mutable session. | `monstertruck_solid::plane_cut` creates a local result solid and section. | `FP-SOURCE-EMPTY`, `FP-SOURCE-CURRENT`, `FP-RAW-SHAPE`, `FP-OUTPUT-TRACKING`, `FP-LINEAGE`, `FP-SECTION-MATCH`. | The source is validated and raw cutting completes before staging. The cloned-session closure finalizes `output.solid` and matches every section face. Any finalization or matching failure leaves the session unchanged and local output unpublished. Success commits the session, then replaces the section with matched tracked faces before returning. | `CV-TOPOLOGY`, `CV-GEOMETRY`, `CV-SESSION`, `CV-BINDINGS`, `CV-LINEAGE`, `CV-RESULT`. | `MT-402` / `MT-404`. |
-| `fillet_edges` | `fillet`, which enables `solid`. | One mutable `Shell`, an immutable selected-edge slice, and a mutable session. | Clones the shell, then `monstertruck_solid::fillet_edges_generic` mutates only the local clone. | `FP-SOURCE-EMPTY`, `FP-SOURCE-CURRENT`, `FP-RAW-FILLET`, `FP-OUTPUT-TRACKING`, `FP-LINEAGE`. | The shell and every selected edge are validated before cloning. Raw filleting changes only the clone. Finalization uses a cloned session. The session commits after successful finalization, and the infallible shell assignment publishes the local output last. | The shell and selected edges' `CV-TOPOLOGY` and `CV-GEOMETRY`; `CV-SESSION`, `CV-BINDINGS`, `CV-LINEAGE`, `CV-RESULT`, `CV-MUTABLE`. | `MT-402` / `MT-405`. |
+| `fillet_edges` | `fillet`, which enables `solid`. | One mutable `Shell`, an immutable selected-edge slice, and a mutable session. | Clones the shell, then `monstertruck_fillet::fillet_edges_generic` mutates only the local clone. | `FP-SOURCE-EMPTY`, `FP-SOURCE-CURRENT`, `FP-RAW-FILLET`, `FP-OUTPUT-TRACKING`, `FP-LINEAGE`. | The shell and every selected edge are validated before cloning. Raw filleting changes only the clone. Finalization uses a cloned session. The session commits after successful finalization, and the infallible shell assignment publishes the local output last. | The shell and selected edges' `CV-TOPOLOGY` and `CV-GEOMETRY`; `CV-SESSION`, `CV-BINDINGS`, `CV-LINEAGE`, `CV-RESULT`, `CV-MUTABLE`. | `MT-402` / `MT-405`. |
 
 ## Reproducible coverage check
 
@@ -144,8 +144,8 @@ Get-FileHash -Algorithm SHA256 @(
     'monstertruck-topology/src/tracking/initialization.rs',
     'monstertruck-topology/src/tracking/implementations.rs',
     'monstertruck-solid/src/transversal/integrate/mod.rs',
-    'monstertruck-solid/src/fillet/error.rs',
-    'monstertruck-solid/src/fillet/edge_select.rs'
+    'monstertruck-fillet/src/error.rs',
+    'monstertruck-fillet/src/edge_select.rs'
 )
 ```
 
@@ -156,14 +156,14 @@ feature-complete focused package gates passed on the audited tree:
 
 ```text
 cargo test -p monstertruck-modeling --lib --features fillet tracked::tests
-# 5 passed; 0 failed; 23 filtered out.
+# 5 passed; 0 failed; 45 filtered out.
 
 cargo clippy -p monstertruck-modeling --all-targets --features fillet -- -W warnings
 # Passed without warnings.
 ```
 
-`cargo fmt --all` remains a required pre-commit gate when a commit is
-authorized. It was not run for this documentation-only inventory.
+`cargo +nightly fmt --all` and workspace Clippy were also run for the
+reconciliation containing this refreshed inventory.
 
 ## Evidence limit and next action
 

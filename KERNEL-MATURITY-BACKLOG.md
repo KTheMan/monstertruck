@@ -1,8 +1,10 @@
 # Kernel Maturity Backlog
 
 This backlog translates the continuation program into bounded epics and
-reviewable stories. It starts from the continuity integration tip
-`4054cc81` and preserves the evidence vocabulary defined in
+reviewable stories. Its validated continuity baseline starts at integration tip
+`4054cc81`; the current fork stack carries that work through merge `2cc28fed`
+and the upstream-shape reconciliation merges ending at `86a71509`. It preserves
+the evidence vocabulary defined in
 [`PHASE-5-UPSTREAM-READINESS.md`](PHASE-5-UPSTREAM-READINESS.md).
 
 The backlog is planning input, not a production-maturity claim. A story can
@@ -11,9 +13,16 @@ claims remain out of scope until the real-model maturity epic supplies them.
 
 ## Current baseline
 
-- The continuity integration is on
-  `agent/phase-3-variational-continuity` at `4054cc81`.
-- Fork pull requests 4, 5, and 6 are merged into that branch.
+- The exact hosted continuity baseline remains `4054cc81`; its evidence is
+  historical and is not silently promoted to later trees.
+- Fork pull requests 4 through 7 are merged into
+  `agent/phase-3-variational-continuity`, whose current tip is `2cc28fed`.
+- Draft [fork pull request 8](https://github.com/KTheMan/monstertruck/pull/8)
+  preserves exact ancestry for upstream pull request 6 at `c19918e9` and its
+  stacked pull request 7 at `558b573e`. Reconciliation merges `f4cbe771` and
+  `86a71509` retain the upstream shared-crate split, fallible edge shape, and
+  postfix UV naming while preserving fork tracking semantics. This is a
+  preparation branch, not a bounded upstream contribution slice.
 - Fork pull request 4's merged description is reconciled with its final
   five-workflow G1--G3, persistence, tessellation, and CI evidence.
 - The exact combined merge tip passed all seven hosted checks in workflow run
@@ -543,6 +552,7 @@ artifacts.
 | 2026-08-03 | MT-304, MT-305, Epic 3 | Complete | Schema-two public replay evidence at `validation/continuity/replay-batch-v2.json` preserves the schema-one receipt and covers two independently successful duplicate-ID contracts rejecting canonically during preparation, two independently successful one-iteration contracts returning downstream `DidNotConverge(MaximumIterations)` only when dependency-ordered together, and a late invalid-weight failure after a successful staged prefix. Every case repeats the same typed result and preserves geometry, tracking session, and contract inputs; staged surfaces, transitions, and reports compare equal across reruns and no failed batch returns a solution. This is bounded sequential nonconvergence, not global mathematical infeasibility. The receipt was reproduced byte-for-byte on Windows/MSVC. Harness SHA-256: `ff48a623bc8991c35cee0440cf3fcc329a4a5b2398b8b53eedea157246a0f896`; receipt SHA-256: `18090f1546f960a27fc741df632bfb10b6aadf2f056e04827faf40c07e22bb97`. `cargo test -p monstertruck-geometry replay` passed eight replay-filtered tests; workspace Clippy, final focused-example Clippy, and nightly formatting passed. Commit `95e6b9ee` versions the receipt as `Procedurally validated` evidence. | Begin MT-401, then use its wrapper/failure-point inventory to scope MT-402 snapshots. |
 | 2026-08-03 | MT-401 | In progress | The public tracked-modeling wrapper and failure-point inventory was selected against exact integration tip `4054cc81`. Evidence is bounded to source-audited API coverage, feature gates, transaction boundaries, and caller-visible state components; no rollback behavior is promoted. | Create the versioned matrix, verify it against the feature-complete public surface, and record MT-402 snapshot requirements. |
 | 2026-08-03 | MT-401 | Complete | Commit `95e6b9ee` versions `validation/tracking/tracked-modeling-wrapper-failure-matrix-v1.md`, which records all 18 unique public wrappers across the default, `solid`, and `fillet` feature surfaces, including the deprecated `cone` compatibility entry. Each row identifies source arity/mutability, raw operation, typed wrapper failures, staged and publication boundaries, caller-visible state, and its MT-402--MT-405 owner. A mechanical source-to-matrix comparison returned 18/18 with no difference. `cargo test -p monstertruck-modeling --lib --features fillet tracked::tests` passed 5 tests; feature-complete package Clippy passed with `-W warnings`. Matrix SHA-256: `290fe0569387cfcb1d3fa49189665dd819d3def6c6d6eb4ecc55fd13c28182aa`. Evidence class: `Implemented` source-audit evidence only; rollback and atomicity remain unsubstantiated. | Begin MT-402 by implementing canonical snapshots for every recorded `CV-*` component. |
+| 2026-08-03 | Upstream shape reconciliation | Prepared | Draft [fork pull request 8](https://github.com/KTheMan/monstertruck/pull/8) starts from fork merge `2cc28fed`, preserves upstream pull request 6 head `c19918e9` through merge `f4cbe771`, and preserves stacked upstream pull request 7 head `558b573e` through merge `86a71509`. The reconciled tree retains the upstream crate split, Wasm dependency shape, fallible edge construction, and postfix UV names while porting tracked filleting and identity propagation. The MT-401 matrix was refreshed for the new crate paths and source hashes without changing its 18-wrapper scope or `Implemented` evidence boundary; refreshed SHA-256: `b5ac155b32b37f0750740c32ab9e32bb45b059a71ebf793a4a781b7545d1d850`. Local tracked-modeling, replay, formatting, and warning gates pass. | Keep the draft synchronized if either upstream head changes, require its hosted gates before merge, and extract future upstream slices from the eventual upstream merge base rather than this 42-commit fork stack. |
 
 ## Repository constraints
 

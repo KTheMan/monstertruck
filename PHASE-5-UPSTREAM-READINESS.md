@@ -75,6 +75,15 @@ unequal-parameter nonzero-offset G3, Wasm runtime behavior, broad real-world
 production-model coverage, external seam-order certification, and the API
 decisions recorded below.
 
+Draft [fork pull request 8](https://github.com/KTheMan/monstertruck/pull/8) is
+the source-shape reconciliation pocket. It starts from fork merge `2cc28fed`
+and preserves upstream pull request 6 head `c19918e9` and stacked pull request 7
+head `558b573e` through merge commits `f4cbe771` and `86a71509`. It ports the
+tracked fillet wrapper to the separate `monstertruck-fillet` crate and refreshes
+the MT-401 source audit. The branch adds no solver capability, promotes no
+evidence class, and is not itself a bounded upstream contribution slice. Future
+slices must start from the eventual upstream merge base.
+
 ## Minimum imported corpus
 
 The pre-upstream baseline contains three provenance-clean adjacent-seam
