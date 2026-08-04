@@ -347,7 +347,7 @@ mod basis_window_tests {
         assert_eq!(window.len(), 0);
         assert_eq!(window.start_index(), 0);
         assert_eq!(window.total_length(), 5);
-        assert!(window.values().is_empty());
+        assert_eq!(window.values(), &[]);
         assert_eq!(window.to_full_values(), vec![0.0; 5]);
     }
 

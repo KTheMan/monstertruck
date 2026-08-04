@@ -51,79 +51,54 @@ impl<'surface> PreparedProblem<'surface> {
         let span_count = checked_add(first_spans, second_spans, "seam span count overflowed")?;
         budget.ensure(ContinuityResource::Spans, span_count)?;
         let validation_density = validation_density(first_frame, second_frame, request, config)?;
-        let optimizer_sample_upper = checked_mul(
-            span_count,
-            checked_add(
-                config.samples_per_span(),
-                2,
-                "optimizer sample density overflowed",
-            )?,
-            "optimizer sample count overflowed",
-        )?;
-        let validation_sample_upper = checked_mul(
-            span_count,
-            validation_density,
-            "validation sample count overflowed",
-        )?;
-        budget.ensure(
-            ContinuityResource::Samples,
-            checked_add(
-                optimizer_sample_upper,
-                validation_sample_upper,
-                "total sample count overflowed",
-            )?,
-        )?;
-
-        let mut samples = frame_samples(first, first_frame, config.samples_per_span())
-            .into_iter()
-            .chain(
-                frame_samples(second, second_frame, config.samples_per_span())
-                    .into_iter()
-                    .map(|seam| match request.alignment() {
-                        BoundaryAlignment::Aligned => seam,
-                        BoundaryAlignment::Reversed => 1.0 - seam,
-                    }),
-            )
-            .collect::<Vec<_>>();
-        samples.sort_by(f64::total_cmp);
-        samples.dedup_by(|first, second| first.to_bits() == second.to_bits());
-        if samples.is_empty() {
+        let first_samples = frame_samples(first, first_frame, config.samples_per_span());
+        let second_samples = aligned_samples(
+            frame_samples(second, second_frame, config.samples_per_span()),
+            request.alignment(),
+        );
+        let sample_count = merged_unique_count(&first_samples, &second_samples);
+        if sample_count == 0 {
             return Err(ContinuitySolveError::InvalidBoundary(
                 BoundaryEndpoint::First,
             ));
         }
-        let mut validation_samples =
-            frame_validation_samples(first, first_frame, validation_density)
-                .into_iter()
-                .chain(
-                    frame_validation_samples(second, second_frame, validation_density)
-                        .into_iter()
-                        .map(|seam| match request.alignment() {
-                            BoundaryAlignment::Aligned => seam,
-                            BoundaryAlignment::Reversed => 1.0 - seam,
-                        }),
-                )
-                .collect::<Vec<_>>();
-        validation_samples.sort_by(f64::total_cmp);
-        validation_samples.dedup_by(|first, second| first.to_bits() == second.to_bits());
-        validation_samples.retain(|candidate| {
+        let first_validation = frame_validation_samples(first, first_frame, validation_density);
+        let second_validation = aligned_samples(
+            frame_validation_samples(second, second_frame, validation_density),
+            request.alignment(),
+        );
+        let validation_sample_count = merged_unique_count_excluding(
+            &first_validation,
+            &second_validation,
+            &first_samples,
+            &second_samples,
+        );
+        if validation_sample_count == 0 {
+            return Err(ContinuitySolveError::InvalidBoundary(
+                BoundaryEndpoint::First,
+            ));
+        }
+        budget.ensure(
+            ContinuityResource::Samples,
+            checked_add(
+                sample_count,
+                validation_sample_count,
+                "total sample count overflowed",
+            )?,
+        )?;
+        let samples = merged_unique_collect(&first_samples, &second_samples, sample_count);
+        let validation_samples = merged_unique_collect(
+            &first_validation,
+            &second_validation,
+            merged_unique_count(&first_validation, &second_validation),
+        )
+        .into_iter()
+        .filter(|candidate| {
             samples
                 .binary_search_by(|sample| sample.total_cmp(candidate))
                 .is_err()
-        });
-        if validation_samples.is_empty() {
-            return Err(ContinuitySolveError::InvalidBoundary(
-                BoundaryEndpoint::First,
-            ));
-        }
-        budget.ensure(
-            ContinuityResource::Samples,
-            checked_add(
-                samples.len(),
-                validation_samples.len(),
-                "total sample count overflowed",
-            )?,
-        )?;
+        })
+        .collect::<Vec<_>>();
 
         let strip_rows =
             (request.order().constrained_rows() + 2).min(second_frame.cross_control_count());
@@ -273,5 +248,69 @@ impl<'surface> PreparedProblem<'surface> {
             strip_rows,
             qr_elements,
         })
+    }
+}
+
+fn aligned_samples(mut samples: Vec<f64>, alignment: BoundaryAlignment) -> Vec<f64> {
+    if alignment == BoundaryAlignment::Reversed {
+        samples
+            .iter_mut()
+            .for_each(|sample| *sample = 1.0 - *sample);
+        samples.sort_by(f64::total_cmp);
+        samples.dedup_by(|first, second| first.to_bits() == second.to_bits());
+    }
+    samples
+}
+
+fn merged_unique_count(first: &[f64], second: &[f64]) -> usize {
+    let mut count = 0;
+    for_each_merged_unique(first, second, |_| count += 1);
+    count
+}
+
+fn merged_unique_count_excluding(
+    first: &[f64],
+    second: &[f64],
+    excluded_first: &[f64],
+    excluded_second: &[f64],
+) -> usize {
+    let mut count = 0;
+    for_each_merged_unique(first, second, |sample| {
+        let excluded = excluded_first
+            .binary_search_by(|candidate| candidate.total_cmp(&sample))
+            .is_ok()
+            || excluded_second
+                .binary_search_by(|candidate| candidate.total_cmp(&sample))
+                .is_ok();
+        count += usize::from(!excluded);
+    });
+    count
+}
+
+fn merged_unique_collect(first: &[f64], second: &[f64], count: usize) -> Vec<f64> {
+    let mut samples = Vec::with_capacity(count);
+    for_each_merged_unique(first, second, |sample| samples.push(sample));
+    samples
+}
+
+fn for_each_merged_unique(first: &[f64], second: &[f64], mut visit: impl FnMut(f64)) {
+    let (mut first_index, mut second_index, mut previous) = (0, 0, None);
+    while first_index < first.len() || second_index < second.len() {
+        let take_first = second_index == second.len()
+            || (first_index < first.len()
+                && first[first_index].total_cmp(&second[second_index]).is_le());
+        let sample = if take_first {
+            let sample = first[first_index];
+            first_index += 1;
+            sample
+        } else {
+            let sample = second[second_index];
+            second_index += 1;
+            sample
+        };
+        if previous != Some(sample.to_bits()) {
+            visit(sample);
+            previous = Some(sample.to_bits());
+        }
     }
 }

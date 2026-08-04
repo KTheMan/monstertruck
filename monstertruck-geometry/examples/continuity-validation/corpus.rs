@@ -122,7 +122,7 @@ pub enum BoundarySideSpec {
 }
 
 impl BoundarySideSpec {
-    const fn build(self) -> BoundarySide {
+    pub(crate) const fn build(self) -> BoundarySide {
         match self {
             Self::MinU => BoundarySide::MinU,
             Self::MaxU => BoundarySide::MaxU,

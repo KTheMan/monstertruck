@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "fixture_version": "multispan_quintic_curved_seam_v2",
+  "fixture_version": "multispan_quintic_curved_seam_v3",
   "dense_defaults": {
     "seam_samples": 33,
     "stencil_radius": 4,
@@ -23,8 +23,13 @@
       "expectation": {
         "kind": "converged",
         "maturity": "Provisional",
-        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 1e-3],
-        "maximum_normal_angle": 1e-7
+        "maximum_dense_residual_by_order": [
+          1e-09,
+          1e-07,
+          1e-05,
+          0.001
+        ],
+        "maximum_normal_angle": 1e-07
       }
     },
     {
@@ -43,8 +48,13 @@
       "expectation": {
         "kind": "converged",
         "maturity": "Provisional",
-        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 1e-3],
-        "maximum_normal_angle": 1e-7
+        "maximum_dense_residual_by_order": [
+          1e-09,
+          1e-07,
+          1e-05,
+          0.001
+        ],
+        "maximum_normal_angle": 1e-07
       }
     },
     {
@@ -63,8 +73,13 @@
       "expectation": {
         "kind": "converged",
         "maturity": "Provisional",
-        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 1e-3],
-        "maximum_normal_angle": 1e-7
+        "maximum_dense_residual_by_order": [
+          1e-09,
+          1e-07,
+          1e-05,
+          0.001
+        ],
+        "maximum_normal_angle": 1e-07
       }
     },
     {
@@ -92,8 +107,11 @@
       "expectation": {
         "kind": "converged",
         "maturity": "Provisional",
-        "maximum_dense_residual_by_order": [1e-8, 1e-5],
-        "maximum_normal_angle": 1e-5
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
       }
     },
     {
@@ -121,8 +139,11 @@
       "expectation": {
         "kind": "converged",
         "maturity": "Provisional",
-        "maximum_dense_residual_by_order": [1e-8, 1e-5],
-        "maximum_normal_angle": 1e-5
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
       }
     },
     {
@@ -141,8 +162,13 @@
       "expectation": {
         "kind": "converged",
         "maturity": "Provisional",
-        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 1e-3],
-        "maximum_normal_angle": 1e-7
+        "maximum_dense_residual_by_order": [
+          1e-09,
+          1e-07,
+          1e-05,
+          0.001
+        ],
+        "maximum_normal_angle": 1e-07
       }
     },
     {
@@ -161,8 +187,13 @@
       "expectation": {
         "kind": "converged",
         "maturity": "Provisional",
-        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 1e-3],
-        "maximum_normal_angle": 1e-7
+        "maximum_dense_residual_by_order": [
+          1e-09,
+          1e-07,
+          1e-05,
+          0.001
+        ],
+        "maximum_normal_angle": 1e-07
       }
     },
     {
@@ -184,14 +215,20 @@
         "transition_degree": 4,
         "anchor_weight": 0.0,
         "fairness_weight": 0.0,
-        "transition_weight": 0.000001,
+        "transition_weight": 1e-06,
         "experimental_g4": true
       },
       "expectation": {
         "kind": "converged",
         "maturity": "Experimental",
-        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 1e-3, 0.1],
-        "maximum_normal_angle": 1e-7
+        "maximum_dense_residual_by_order": [
+          1e-09,
+          1e-07,
+          1e-05,
+          0.001,
+          0.1
+        ],
+        "maximum_normal_angle": 1e-07
       }
     },
     {
@@ -211,7 +248,9 @@
       "expectation": {
         "kind": "converged",
         "maturity": "Established",
-        "maximum_dense_residual_by_order": [1e-9],
+        "maximum_dense_residual_by_order": [
+          1e-09
+        ],
         "maximum_normal_angle": 0.0
       }
     },
@@ -231,8 +270,12 @@
       "expectation": {
         "kind": "converged",
         "maturity": "Provisional",
-        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5],
-        "maximum_normal_angle": 1e-7
+        "maximum_dense_residual_by_order": [
+          1e-09,
+          1e-07,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-07
       }
     },
     {
@@ -252,8 +295,13 @@
       "expectation": {
         "kind": "converged",
         "maturity": "Provisional",
-        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 1e-3],
-        "maximum_normal_angle": 1e-7
+        "maximum_dense_residual_by_order": [
+          1e-09,
+          1e-07,
+          1e-05,
+          0.001
+        ],
+        "maximum_normal_angle": 1e-07
       }
     },
     {
@@ -272,8 +320,13 @@
       "expectation": {
         "kind": "converged",
         "maturity": "Provisional",
-        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 1e-3],
-        "maximum_normal_angle": 1e-7
+        "maximum_dense_residual_by_order": [
+          1e-09,
+          1e-07,
+          1e-05,
+          0.001
+        ],
+        "maximum_normal_angle": 1e-07
       }
     },
     {
@@ -293,8 +346,779 @@
       "expectation": {
         "kind": "converged",
         "maturity": "Provisional",
-        "maximum_dense_residual_by_order": [1e-8, 1e-5],
-        "maximum_normal_angle": 1e-5
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-minu-minu-aligned-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MinU",
+        "second_side": "MinU",
+        "alignment": "Aligned",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-minu-minu-reversed-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "reversed",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MinU",
+        "second_side": "MinU",
+        "alignment": "Reversed",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-minu-maxu-aligned-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MinU",
+        "second_side": "MaxU",
+        "alignment": "Aligned",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-minu-maxu-reversed-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "reversed",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MinU",
+        "second_side": "MaxU",
+        "alignment": "Reversed",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-minu-minv-aligned-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MinU",
+        "second_side": "MinV",
+        "alignment": "Aligned",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-minu-minv-reversed-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "reversed",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MinU",
+        "second_side": "MinV",
+        "alignment": "Reversed",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-minu-maxv-aligned-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MinU",
+        "second_side": "MaxV",
+        "alignment": "Aligned",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-minu-maxv-reversed-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "reversed",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MinU",
+        "second_side": "MaxV",
+        "alignment": "Reversed",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-maxu-minu-aligned-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MinU",
+        "alignment": "Aligned",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-maxu-minu-reversed-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "reversed",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MinU",
+        "alignment": "Reversed",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-maxu-maxu-aligned-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MaxU",
+        "alignment": "Aligned",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-maxu-maxu-reversed-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "reversed",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MaxU",
+        "alignment": "Reversed",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-maxu-minv-aligned-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MinV",
+        "alignment": "Aligned",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-maxu-minv-reversed-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "reversed",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MinV",
+        "alignment": "Reversed",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-maxu-maxv-aligned-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MaxV",
+        "alignment": "Aligned",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-maxu-maxv-reversed-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "reversed",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MaxV",
+        "alignment": "Reversed",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-minv-minu-aligned-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MinV",
+        "second_side": "MinU",
+        "alignment": "Aligned",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-minv-minu-reversed-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "reversed",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MinV",
+        "second_side": "MinU",
+        "alignment": "Reversed",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-minv-maxu-aligned-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MinV",
+        "second_side": "MaxU",
+        "alignment": "Aligned",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-minv-maxu-reversed-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "reversed",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MinV",
+        "second_side": "MaxU",
+        "alignment": "Reversed",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-minv-minv-aligned-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MinV",
+        "second_side": "MinV",
+        "alignment": "Aligned",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-minv-minv-reversed-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "reversed",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MinV",
+        "second_side": "MinV",
+        "alignment": "Reversed",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-minv-maxv-aligned-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MinV",
+        "second_side": "MaxV",
+        "alignment": "Aligned",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-minv-maxv-reversed-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "reversed",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MinV",
+        "second_side": "MaxV",
+        "alignment": "Reversed",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-maxv-minu-aligned-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MaxV",
+        "second_side": "MinU",
+        "alignment": "Aligned",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-maxv-minu-reversed-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "reversed",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MaxV",
+        "second_side": "MinU",
+        "alignment": "Reversed",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-maxv-maxu-aligned-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MaxV",
+        "second_side": "MaxU",
+        "alignment": "Aligned",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-maxv-maxu-reversed-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "reversed",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MaxV",
+        "second_side": "MaxU",
+        "alignment": "Reversed",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-maxv-minv-aligned-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MaxV",
+        "second_side": "MinV",
+        "alignment": "Aligned",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-maxv-minv-reversed-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "reversed",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MaxV",
+        "second_side": "MinV",
+        "alignment": "Reversed",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-maxv-maxv-aligned-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MaxV",
+        "second_side": "MaxV",
+        "alignment": "Aligned",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
+      }
+    },
+    {
+      "id": "orientation-maxv-maxv-reversed-g1",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "reversed",
+        "scale": 1.0,
+        "planar": true
+      },
+      "request": {
+        "first_side": "MaxV",
+        "second_side": "MaxV",
+        "alignment": "Reversed",
+        "order": 1
+      },
+      "expectation": {
+        "kind": "converged",
+        "maturity": "Provisional",
+        "maximum_dense_residual_by_order": [
+          1e-08,
+          1e-05
+        ],
+        "maximum_normal_angle": 1e-05
       }
     },
     {
@@ -374,7 +1198,7 @@
         "transition_degree": 3,
         "anchor_weight": 0.0,
         "fairness_weight": 0.0,
-        "transition_weight": 0.000001,
+        "transition_weight": 1e-06,
         "experimental_g4": false
       },
       "expectation": {
@@ -401,7 +1225,7 @@
         "transition_degree": 3,
         "anchor_weight": 0.0,
         "fairness_weight": 0.0,
-        "transition_weight": 0.000001,
+        "transition_weight": 1e-06,
         "experimental_g4": false
       },
       "expectation": {

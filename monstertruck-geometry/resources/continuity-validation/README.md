@@ -3,6 +3,7 @@
 The versioned corpus exercises the public boundary-continuity solver against
 procedurally generated multi-span quintic polynomial and rational NURBS
 surfaces. It covers aligned, unequal, and reversed seam parameterizations,
+every ordered pairing of `MinU`, `MaxU`, `MinV`, and `MaxV` in both alignments,
 scale variants, experimental G4 reachability, and structured failure cases.
 
 Successful cases are independently certified at 33 span-distributed Chebyshev

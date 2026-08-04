@@ -1,5 +1,6 @@
 use anyhow::{Result, ensure};
 use monstertruck_geometry::base::Vector4;
+use monstertruck_geometry::nurbs::continuity::BoundarySide;
 use monstertruck_geometry::nurbs::{BsplineSurface, KnotVector, NurbsSurface};
 
 use crate::corpus::{CaseSpec, FixtureMutation, GeometrySpec, WeightModel};
@@ -61,7 +62,38 @@ pub fn build(case: &CaseSpec) -> Result<Fixture> {
             });
         }
     }
-    Ok(Fixture { first, second })
+    Ok(Fixture {
+        first: orient_boundary(first, BoundarySide::MaxU, case.request.first_side.build()),
+        second: orient_boundary(second, BoundarySide::MinU, case.request.second_side.build()),
+    })
+}
+
+fn orient_boundary(
+    surface: NurbsSurface<Vector4>,
+    source: BoundarySide,
+    target: BoundarySide,
+) -> NurbsSurface<Vector4> {
+    let source_is_min = matches!(source, BoundarySide::MinU | BoundarySide::MinV);
+    let target_is_min = matches!(target, BoundarySide::MinU | BoundarySide::MinV);
+    let mut oriented = if source_is_min == target_is_min {
+        surface
+    } else {
+        reverse_u(surface)
+    };
+    if matches!(target, BoundarySide::MinV | BoundarySide::MaxV) {
+        oriented.swap_axes();
+    }
+    oriented
+}
+
+fn reverse_u(surface: NurbsSurface<Vector4>) -> NurbsSurface<Vector4> {
+    let mut knots_u = surface.knot_vector_u().clone();
+    knots_u.invert();
+    let control_points = surface.control_points().iter().rev().cloned().collect();
+    NurbsSurface::new(BsplineSurface::new(
+        (knots_u, surface.knot_vector_v().clone()),
+        control_points,
+    ))
 }
 
 fn cross_knots(degree: usize) -> Result<KnotVector> {

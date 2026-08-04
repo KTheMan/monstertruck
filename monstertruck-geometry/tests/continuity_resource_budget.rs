@@ -142,7 +142,7 @@ fn representative_g3_dimensions_match_the_checked_preflight() {
     let expected = [
         (ContinuityResource::ControlPoints, 48),
         (ContinuityResource::Spans, 2),
-        (ContinuityResource::Samples, 50),
+        (ContinuityResource::Samples, 25),
         (ContinuityResource::Variables, 99),
         (ContinuityResource::Residuals, 897),
         (ContinuityResource::JacobianElements, 29_403),
