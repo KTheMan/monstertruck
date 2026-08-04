@@ -315,8 +315,8 @@ fn exact_bspline_boundary_on_surface(
         curve,
         last_u,
         last_v,
-        |index| surface.column_curve(index),
-        |index| surface.row_curve(index),
+        |index| surface.curve_v(index),
+        |index| surface.curve_u(index),
         ((u0, u1), (v0, v1)),
     )?;
     Some(ParameterCurve::new(boundary, surface.clone()))
@@ -334,8 +334,8 @@ fn exact_nurbs_boundary_on_surface(
         curve,
         last_u,
         last_v,
-        |index| surface.column_curve(index),
-        |index| surface.row_curve(index),
+        |index| surface.curve_v(index),
+        |index| surface.curve_u(index),
         ((u0, u1), (v0, v1)),
     )?;
     Some(ParameterCurve::new(boundary, surface.clone()))
@@ -447,7 +447,7 @@ where
     I: IntoIterator<Item = f64>,
 {
     let mut parameters = parameters.into_iter();
-    let periods = (surface.u_period(), surface.v_period());
+    let periods = (surface.period_u(), surface.period_v());
     let samples: SmallVec<[(Point3, Point2); 5]> =
         parameters.try_fold(SmallVec::new(), |mut samples, parameter| {
             let point = curve.subs(parameter);
@@ -502,8 +502,8 @@ where
         curve,
         last_u,
         last_v,
-        |index| NurbsCurve::new(hom_surface.column_curve(index)),
-        |index| NurbsCurve::new(hom_surface.row_curve(index)),
+        |index| NurbsCurve::new(hom_surface.curve_v(index)),
+        |index| NurbsCurve::new(hom_surface.curve_u(index)),
         ranges,
     )?;
     // The row/column curves parameterize the border in the homogeneous

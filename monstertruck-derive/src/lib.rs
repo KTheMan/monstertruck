@@ -624,8 +624,8 @@ pub fn derive_parametric_surface(input: TokenStream) -> TokenStream {
                 fn derivative_mn(&self, m: usize, n: usize, s: f64, t: f64) -> Self::Vector,
                 fn derivatives(&self, max_order: usize, u: f64, v: f64) -> SurfaceDerivatives<Self::Vector>,
                 fn parameter_range(&self,) -> (monstertruck_traits::ParameterRange, monstertruck_traits::ParameterRange),
-                fn u_period(&self,) -> Option<f64>,
-                fn v_period(&self,) -> Option<f64>,
+                fn period_u(&self,) -> Option<f64>,
+                fn period_v(&self,) -> Option<f64>,
             );
             quote! {
                 #[automatically_derived]
@@ -676,9 +676,9 @@ pub fn derive_parametric_surface(input: TokenStream) -> TokenStream {
                         self.0.parameter_range()
                     }
                     #[inline(always)]
-                    fn u_period(&self) -> Option<f64> { self.0.u_period() }
+                    fn period_u(&self) -> Option<f64> { self.0.period_u() }
                     #[inline(always)]
-                    fn v_period(&self) -> Option<f64> { self.0.v_period() }
+                    fn period_v(&self) -> Option<f64> { self.0.period_v() }
                 }
             }
         }
@@ -717,8 +717,8 @@ pub fn derive_parametric_surface3d(input: TokenStream) -> TokenStream {
                 fn derivative_mn(&self, m: usize, n: usize, s: f64, t: f64) -> Self::Vector,
                 fn derivatives(&self, max_order: usize, u: f64, v: f64) -> SurfaceDerivatives<Self::Vector>,
                 fn parameter_range(&self,) -> (monstertruck_traits::ParameterRange, monstertruck_traits::ParameterRange),
-                fn u_period(&self,) -> Option<f64>,
-                fn v_period(&self,) -> Option<f64>,
+                fn period_u(&self,) -> Option<f64>,
+                fn period_v(&self,) -> Option<f64>,
             );
             let methods1 = methods!(
                 variants,
@@ -772,8 +772,8 @@ pub fn derive_parametric_surface3d(input: TokenStream) -> TokenStream {
                     fn parameter_range(&self,) -> (monstertruck_traits::ParameterRange, monstertruck_traits::ParameterRange) {
                         self.0.parameter_range()
                     }
-                    fn u_period(&self) -> Option<f64> { self.0.u_period() }
-                    fn v_period(&self) -> Option<f64> { self.0.v_period() }
+                    fn period_u(&self) -> Option<f64> { self.0.period_u() }
+                    fn period_v(&self) -> Option<f64> { self.0.period_v() }
                 }
                 #[automatically_derived]
                 impl #generics_params #trait_name1 for #ty #generics_params

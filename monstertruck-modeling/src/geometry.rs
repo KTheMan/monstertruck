@@ -224,8 +224,8 @@ fn parameter_axis_excess(value: f64, range: Option<(f64, f64)>, period: Option<f
 struct SurfaceParameterDomain {
     u_range: Option<(f64, f64)>,
     v_range: Option<(f64, f64)>,
-    u_period: Option<f64>,
-    v_period: Option<f64>,
+    period_u: Option<f64>,
+    period_v: Option<f64>,
 }
 
 /// Whether a curve's reported `parameter_range` BOUNDS it, or is a nominal
@@ -366,16 +366,16 @@ impl SurfaceParameterDomain {
         Self {
             u_range: u_range.filter(|_| u_bounds),
             v_range: v_range.filter(|_| v_bounds),
-            u_period: surface.u_period(),
-            v_period: surface.v_period(),
+            period_u: surface.period_u(),
+            period_v: surface.period_v(),
         }
     }
 
     /// `true` when `uv` is inside the domain up to `slack`. An axis with no
     /// reported bound imposes nothing.
     fn contains(&self, uv: Point2, slack: f64) -> bool {
-        parameter_axis_excess(uv.x, self.u_range, self.u_period) <= slack
-            && parameter_axis_excess(uv.y, self.v_range, self.v_period) <= slack
+        parameter_axis_excess(uv.x, self.u_range, self.period_u) <= slack
+            && parameter_axis_excess(uv.y, self.v_range, self.period_v) <= slack
     }
 }
 
@@ -738,8 +738,8 @@ fn debug_projection_chain(
         census.none,
         census.solves,
         census.non_finite,
-        axis(domain.u_range, domain.u_period),
-        axis(domain.v_range, domain.v_period),
+        axis(domain.u_range, domain.period_u),
+        axis(domain.v_range, domain.period_v),
     );
 }
 
@@ -875,19 +875,19 @@ fn direct_bspline_boundary_line(
     let last_v = surface.control_points().first()?.len().checked_sub(1)?;
     [
         (
-            surface.column_curve(0),
+            surface.curve_v(0),
             Line(Point2::new(u0, v0), Point2::new(u0, v1)),
         ),
         (
-            surface.column_curve(last_u),
+            surface.curve_v(last_u),
             Line(Point2::new(u1, v0), Point2::new(u1, v1)),
         ),
         (
-            surface.row_curve(0),
+            surface.curve_u(0),
             Line(Point2::new(u0, v0), Point2::new(u1, v0)),
         ),
         (
-            surface.row_curve(last_v),
+            surface.curve_u(last_v),
             Line(Point2::new(u0, v1), Point2::new(u1, v1)),
         ),
     ]
@@ -908,19 +908,19 @@ fn direct_nurbs_boundary_line(
     let last_v = surface.control_points().first()?.len().checked_sub(1)?;
     [
         (
-            surface.column_curve(0),
+            surface.curve_v(0),
             Line(Point2::new(u0, v0), Point2::new(u0, v1)),
         ),
         (
-            surface.column_curve(last_u),
+            surface.curve_v(last_u),
             Line(Point2::new(u1, v0), Point2::new(u1, v1)),
         ),
         (
-            surface.row_curve(0),
+            surface.curve_u(0),
             Line(Point2::new(u0, v0), Point2::new(u1, v0)),
         ),
         (
-            surface.row_curve(last_v),
+            surface.curve_u(last_v),
             Line(Point2::new(u0, v1), Point2::new(u1, v1)),
         ),
     ]
@@ -2589,7 +2589,7 @@ mod project_domain_tests {
         let domain = SurfaceParameterDomain::of(&surface);
         assert_eq!(domain.u_range, Some((0.0, 1.0)));
         assert_eq!(
-            domain.u_period, None,
+            domain.period_u, None,
             "the defect needs an UNREPORTED period"
         );
 
@@ -2721,8 +2721,8 @@ mod project_domain_tests {
         let unbounded = SurfaceParameterDomain {
             u_range: None,
             v_range: None,
-            u_period: None,
-            v_period: None,
+            period_u: None,
+            period_v: None,
         };
         let point = Point3::new(-500.0, 900.0, 0.0);
         let hint = Some((3.0, 4.0));
@@ -2796,8 +2796,8 @@ mod project_domain_tests {
         let unbounded = SurfaceParameterDomain {
             u_range: None,
             v_range: None,
-            u_period: None,
-            v_period: None,
+            period_u: None,
+            period_v: None,
         };
         assert!(
             unbounded.contains(Point2::new(f64::NAN, 0.5), TOLERANCE),
@@ -2810,8 +2810,8 @@ mod project_domain_tests {
         let bounded = SurfaceParameterDomain {
             u_range: Some((0.0, 1.0)),
             v_range: Some((0.0, 1.0)),
-            u_period: None,
-            v_period: None,
+            period_u: None,
+            period_v: None,
         };
         assert!(
             !bounded.contains(Point2::new(f64::INFINITY, 0.5), TOLERANCE),
@@ -2921,7 +2921,7 @@ mod project_domain_tests {
             "only the placeholder axis is dropped",
         );
         assert_eq!(
-            domain.u_period,
+            domain.period_u,
             Some(TAU),
             "and the angular axis keeps its period, so the periodic branch of \
              `parameter_axis_excess` still runs",

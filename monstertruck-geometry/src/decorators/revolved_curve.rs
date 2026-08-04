@@ -115,9 +115,9 @@ impl<C: ParametricCurve3D> ParametricSurface for RevolutionSurface<C> {
         )
     }
     #[inline(always)]
-    fn u_period(&self) -> Option<f64> { self.curve.period() }
+    fn period_u(&self) -> Option<f64> { self.curve.period() }
     #[inline(always)]
-    fn v_period(&self) -> Option<f64> { Some(2.0 * PI) }
+    fn period_v(&self) -> Option<f64> { Some(2.0 * PI) }
 }
 
 impl<C: ParametricCurve3D + BoundedCurve> ParametricSurface3D for RevolutionSurface<C> {
@@ -183,9 +183,9 @@ impl<C: ParametricCurve3D> v2::ParametricSurface for RevolutionSurface<C> {
         ParametricSurface::derivative_vv(self, u, v)
     }
     #[inline(always)]
-    fn period_u(&self) -> Option<f64> { ParametricSurface::u_period(self) }
+    fn period_u(&self) -> Option<f64> { ParametricSurface::period_u(self) }
     #[inline(always)]
-    fn period_v(&self) -> Option<f64> { ParametricSurface::v_period(self) }
+    fn period_v(&self) -> Option<f64> { ParametricSurface::period_v(self) }
 }
 
 impl<C: ParametricCurve3D + BoundedCurve> v2::BoundedSurface for RevolutionSurface<C> {

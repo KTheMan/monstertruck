@@ -359,7 +359,7 @@ pub(super) fn concat_fillet_surface(
     let concat_beziers = |i: usize| -> Option<NurbsCurve<Vector4>> {
         let mut collector = CurveCollector::<NurbsCurve<Vector4>>::Singleton;
         (0..surfaces.len()).for_each(|n| {
-            let mut curve = surfaces[n].column_curve(i);
+            let mut curve = surfaces[n].curve_v(i);
             curve.knot_translate(n as f64);
             collector.concat(&curve);
         });
@@ -389,7 +389,7 @@ pub(super) fn cut_face_by_last_bezier(
     fillet_surface: &NurbsSurface<Vector4>,
 ) -> Option<Edge> {
     let len = fillet_surface.control_points().len();
-    let last_long_bezier = fillet_surface.column_curve(len - 1);
+    let last_long_bezier = fillet_surface.curve_v(len - 1);
     let face = &shell[face_index.face_index];
     let filleted_edge = &face.boundaries()[face_index.boundary_index][face_index.edge_index];
     let (trimmed_face, edge1) =

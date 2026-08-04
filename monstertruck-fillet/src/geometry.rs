@@ -334,7 +334,7 @@ pub(super) fn expand_fillet(
         );
 
         let connect = move |(i, collector): (usize, &mut CurveCollector<_>)| {
-            let mut curve = homo_surface.row_curve(i);
+            let mut curve = homo_surface.curve_u(i);
             curve.knot_translate(n as f64);
             collector.concat(&curve);
         };
@@ -390,7 +390,7 @@ pub(super) fn expand_chamfer(
         );
 
         let connect = move |(i, collector): (usize, &mut CurveCollector<_>)| {
-            let mut curve = homo_surface.row_curve(i);
+            let mut curve = homo_surface.curve_u(i);
             curve.knot_translate(n as f64);
             collector.concat(&curve);
         };
@@ -457,7 +457,7 @@ pub(super) fn expand_ridge(
         );
 
         let connect = move |(i, collector): (usize, &mut CurveCollector<_>)| {
-            let mut curve = homo_surface.row_curve(i);
+            let mut curve = homo_surface.curve_u(i);
             curve.knot_translate(n as f64);
             collector.concat(&curve);
         };
@@ -558,7 +558,7 @@ pub(super) fn expand_custom(
         );
 
         let connect = move |(i, collector): (usize, &mut CurveCollector<_>)| {
-            let mut curve = homo_surface.row_curve(i);
+            let mut curve = homo_surface.curve_u(i);
             curve.knot_translate(n as f64);
             collector.concat(&curve);
         };

@@ -112,8 +112,8 @@ pub(super) fn observe_face_drop<S: PreMeshableSurface>(
     FACE_DROP_COUNT.fetch_add(1, Ordering::Relaxed);
     let face = face_idx.map_or(-1i64, |index| index as i64);
     let surface_type = std::any::type_name::<S>();
-    let periodic_u = surface.u_period().is_some();
-    let periodic_v = surface.v_period().is_some();
+    let periodic_u = surface.period_u().is_some();
+    let periodic_v = surface.period_v().is_some();
     log::warn!(
         "tessellation dropped face {face} ({reason}): surface={surface_type} \
          loops={loops} edges={edges} periodic_u={periodic_u} periodic_v={periodic_v} \

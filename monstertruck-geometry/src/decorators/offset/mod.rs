@@ -113,15 +113,15 @@ where
     #[inline(always)]
     fn parameter_range(&self) -> (ParameterRange, ParameterRange) { self.entity.parameter_range() }
     #[inline(always)]
-    fn u_period(&self) -> Option<f64> {
-        match (self.entity.u_period(), self.offset.u_period()) {
+    fn period_u(&self) -> Option<f64> {
+        match (self.entity.period_u(), self.offset.period_u()) {
             (Some(x), Some(y)) if x.near(&y) => Some((x + y) / 2.0),
             _ => None,
         }
     }
     #[inline(always)]
-    fn v_period(&self) -> Option<f64> {
-        match (self.entity.v_period(), self.offset.v_period()) {
+    fn period_v(&self) -> Option<f64> {
+        match (self.entity.period_v(), self.offset.period_v()) {
             (Some(x), Some(y)) if x.near(&y) => Some((x + y) / 2.0),
             _ => None,
         }

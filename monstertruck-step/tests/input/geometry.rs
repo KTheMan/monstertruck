@@ -927,8 +927,8 @@ fn exec_plane(org_coord: [f64; 3], dir_array: [f64; 2], ref_dir_array: [f64; 2])
     let step_plane = step_to_entity::<PlaneHolder>(&step_str);
     let plane = truck::Plane::from(&step_plane);
     assert_near!(plane.origin(), origin);
-    assert_near!(plane.u_axis(), x);
-    assert_near!(plane.v_axis(), y);
+    assert_near!(plane.axis_u(), x);
+    assert_near!(plane.axis_v(), y);
 }
 
 proptest! {

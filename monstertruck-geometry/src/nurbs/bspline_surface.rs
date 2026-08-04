@@ -324,7 +324,7 @@ impl<P> BsplineSurface<P> {
     ///     vec![Vector3::new(0.0, 1.0, 0.0), Vector3::new(1.0, 1.0, 1.0), Vector3::new(2.0, 1.0, 2.0)],
     /// ];
     /// let bspsurface = BsplineSurface::new(knot_vecs, control_points);
-    /// let bspcurve = bspsurface.column_curve(1);
+    /// let bspcurve = bspsurface.curve_v(1);
     ///
     /// assert_eq!(bspcurve.knot_vector(), &KnotVector::bezier_knot(2));
     /// assert_eq!(
@@ -332,13 +332,25 @@ impl<P> BsplineSurface<P> {
     ///     &vec![Vector3::new(0.0, 1.0, 0.0), Vector3::new(1.0, 1.0, 1.0), Vector3::new(2.0, 1.0, 2.0)],
     /// );
     /// ```
-    pub fn column_curve(&self, row_idx: usize) -> BsplineCurve<P>
+    pub fn curve_v(&self, index_u: usize) -> BsplineCurve<P>
     where P: Clone {
         let knot_vec = self.knot_vector_v().clone();
-        let control_points = self.control_points[row_idx].clone();
+        let control_points = self.control_points[index_u].clone();
         BsplineCurve::new_unchecked(knot_vec, control_points)
     }
-    /// Creates the column sectional curve.
+    /// Deprecated alias for [`curve_v`](BsplineSurface::curve_v), the name
+    /// upstream `truck` uses.
+    ///
+    /// Renamed because the row/column vocabulary is crossed with respect to the
+    /// parameter that actually varies: this method fixes the u-index and varies
+    /// **v**, so `curve_v` says what you get and `index_u` says what you pin.
+    #[deprecated(since = "0.3.4", note = "renamed to `curve_v` (it varies v)")]
+    #[inline(always)]
+    pub fn column_curve(&self, row_idx: usize) -> BsplineCurve<P>
+    where P: Clone {
+        self.curve_v(row_idx)
+    }
+    /// Creates the sectional curve along u, at the given v control-point index.
     /// # Examples
     /// ```
     /// use monstertruck_geometry::prelude::*;
@@ -350,7 +362,7 @@ impl<P> BsplineSurface<P> {
     ///     vec![Vector3::new(0.0, 1.0, 0.0), Vector3::new(1.0, 1.0, 1.0), Vector3::new(2.0, 1.0, 2.0)],
     /// ];
     /// let bspsurface = BsplineSurface::new(knot_vecs, control_points);
-    /// let bspcurve = bspsurface.row_curve(1);
+    /// let bspcurve = bspsurface.curve_u(1);
     ///
     /// assert_eq!(bspcurve.knot_vector(), &KnotVector::bezier_knot(1));
     /// assert_eq!(
@@ -358,11 +370,23 @@ impl<P> BsplineSurface<P> {
     ///     &vec![Vector3::new(1.0, 0.0, 1.0), Vector3::new(1.0, 1.0, 1.0)],
     /// );
     /// ```
-    pub fn row_curve(&self, column_idx: usize) -> BsplineCurve<P>
+    pub fn curve_u(&self, index_v: usize) -> BsplineCurve<P>
     where P: Clone {
         let knot_vec = self.knot_vector_u().clone();
-        let control_points: Vec<_> = self.control_points_row_iter(column_idx).cloned().collect();
+        let control_points: Vec<_> = self.control_points_row_iter(index_v).cloned().collect();
         BsplineCurve::new_unchecked(knot_vec, control_points)
+    }
+    /// Deprecated alias for [`curve_u`](BsplineSurface::curve_u), the name
+    /// upstream `truck` uses.
+    ///
+    /// Renamed because the row/column vocabulary is crossed with respect to the
+    /// parameter that actually varies: this method fixes the v-index and varies
+    /// **u**, so `curve_u` says what you get and `index_v` says what you pin.
+    #[deprecated(since = "0.3.4", note = "renamed to `curve_u` (it varies u)")]
+    #[inline(always)]
+    pub fn row_curve(&self, column_idx: usize) -> BsplineCurve<P>
+    where P: Clone {
+        self.curve_u(column_idx)
     }
 }
 
@@ -2253,9 +2277,9 @@ where P: HasScalar<Scalar = f64> + ControlPoint<f64>
         ParametricSurface::derivative_vv(self, u, v)
     }
     #[inline(always)]
-    fn period_u(&self) -> Option<Self::Scalar> { ParametricSurface::u_period(self) }
+    fn period_u(&self) -> Option<Self::Scalar> { ParametricSurface::period_u(self) }
     #[inline(always)]
-    fn period_v(&self) -> Option<Self::Scalar> { ParametricSurface::v_period(self) }
+    fn period_v(&self) -> Option<Self::Scalar> { ParametricSurface::period_v(self) }
 }
 
 impl<P> v2::BoundedSurface for BsplineSurface<P>
