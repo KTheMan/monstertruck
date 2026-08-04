@@ -803,9 +803,9 @@ where V: HasScalar<Scalar = f64> + Homogeneous<Scalar = f64> + ControlPoint<f64,
         ParametricSurface::derivative_vv(self, u, v)
     }
     #[inline(always)]
-    fn period_u(&self) -> Option<Self::Scalar> { ParametricSurface::u_period(self) }
+    fn period_u(&self) -> Option<Self::Scalar> { ParametricSurface::period_u(self) }
     #[inline(always)]
-    fn period_v(&self) -> Option<Self::Scalar> { ParametricSurface::v_period(self) }
+    fn period_v(&self) -> Option<Self::Scalar> { ParametricSurface::period_v(self) }
 }
 
 impl<V> v2::BoundedSurface for NurbsSurface<V>

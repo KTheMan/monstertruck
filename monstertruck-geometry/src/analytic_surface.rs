@@ -95,7 +95,7 @@ fn all_vectors_match<'a>(
     })
 }
 
-fn v_axis_homogeneous_extrusion(
+fn axis_v_homogeneous_extrusion(
     surface: &BsplineSurface<Vector4>,
 ) -> Option<HomogeneousExtrusionSurface> {
     let rows = surface.control_points();
@@ -127,7 +127,7 @@ fn v_axis_homogeneous_extrusion(
     }
 }
 
-fn u_axis_homogeneous_extrusion(
+fn axis_u_homogeneous_extrusion(
     surface: &BsplineSurface<Vector4>,
 ) -> Option<HomogeneousExtrusionSurface> {
     let rows = surface.control_points();
@@ -164,8 +164,8 @@ impl TryIntoAnalyticSurfaceKind for NurbsSurface<Vector4> {
         planar_homogeneous_bspline_surface(surface)
             .map(AnalyticSurfaceKind::Plane)
             .or_else(|| {
-                v_axis_homogeneous_extrusion(surface)
-                    .or_else(|| u_axis_homogeneous_extrusion(surface))
+                axis_v_homogeneous_extrusion(surface)
+                    .or_else(|| axis_u_homogeneous_extrusion(surface))
                     .map(AnalyticSurfaceKind::HomogeneousExtrusion)
             })
     }

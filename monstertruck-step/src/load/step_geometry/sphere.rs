@@ -28,7 +28,7 @@ impl ParametricSurface for Sphere {
         )
     }
     #[inline]
-    fn u_period(&self) -> Option<f64> { Some(2.0 * PI) }
+    fn period_u(&self) -> Option<f64> { Some(2.0 * PI) }
 }
 impl ParametricSurface3D for Sphere {
     #[inline]

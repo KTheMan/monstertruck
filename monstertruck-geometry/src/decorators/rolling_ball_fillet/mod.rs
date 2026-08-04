@@ -201,7 +201,7 @@ where
             self.edge_curve.parameter_range(),
         )
     }
-    fn v_period(&self) -> Option<f64> { self.edge_curve.period() }
+    fn period_v(&self) -> Option<f64> { self.edge_curve.period() }
 }
 
 impl<C, S0, S1, R> ParametricSurface3D for RollingBallFilletSurface<C, S0, S1, R>
@@ -235,11 +235,11 @@ where
         tol: f64,
     ) -> (Vec<f64>, Vec<f64>) {
         nonpositive_tolerance!(tol);
-        // SAFETY: `u_parameter_division` returns `None` only when `contact_circle` fails;
+        // SAFETY: `parameter_division_u` returns `None` only when `contact_circle` fails;
         // within a valid parameter range, this always succeeds.
-        let udiv = self.u_parameter_division(range, tol).unwrap();
+        let udiv = self.parameter_division_u(range, tol).unwrap();
         let mut vdiv = vec![range.1.0, range.1.1];
-        algo::v_parameter_division_for_fillet(self, &udiv, &mut vdiv, tol);
+        algo::parameter_division_v_for_fillet(self, &udiv, &mut vdiv, tol);
         (udiv, vdiv)
     }
 }

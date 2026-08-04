@@ -220,18 +220,18 @@ where
     // Placeholder moves go 7,265 -> 0 and knot moves hold at exactly 88,852.
     let (u_real, v_real) = uv_clamp::reported_range_bounds_the_surface(surface);
     let normalize_uv = |uv: Point2, previous: Option<(f64, f64)>| {
-        let (u_period, v_period) = (surface.u_period(), surface.v_period());
+        let (period_u, period_v) = (surface.period_u(), surface.period_v());
         let (urange, vrange) = surface.try_range_tuple();
         uv_clamp::record_point();
         uv_clamp::record_reported_excess(surface, uv_clamp::Axis::U, u_real, uv.x, urange);
         uv_clamp::record_reported_excess(surface, uv_clamp::Axis::V, v_real, uv.y, vrange);
-        let urange = urange.filter(|_| u_real || u_period.is_some());
-        let vrange = vrange.filter(|_| v_real || v_period.is_some());
+        let urange = urange.filter(|_| u_real || period_u.is_some());
+        let vrange = vrange.filter(|_| v_real || period_v.is_some());
         Some(Point2::new(
             normalize_axis(
                 uv.x,
                 previous.map(|(u, _)| u),
-                u_period,
+                period_u,
                 urange,
                 surface,
                 uv_clamp::Axis::U,
@@ -240,7 +240,7 @@ where
             normalize_axis(
                 uv.y,
                 previous.map(|(_, v)| v),
-                v_period,
+                period_v,
                 vrange,
                 surface,
                 uv_clamp::Axis::V,
@@ -476,7 +476,7 @@ where
     C: ParametricCurve3D<Point = Point3> + BoundedCurve,
 {
     let (t0, t1) = curve.range_tuple();
-    let periods = (surface.u_period(), surface.v_period());
+    let periods = (surface.period_u(), surface.period_v());
     let samples = [
         t0,
         (3.0 * t0 + t1) * 0.25,
@@ -1785,11 +1785,11 @@ fn no_placeholder_axis_carries_a_period() {
     for surface in surfaces {
         let (u_real, v_real) = uv_clamp::reported_range_bounds_the_surface(&surface);
         assert!(
-            u_real || surface.u_period().is_none(),
+            u_real || surface.period_u().is_none(),
             "placeholder u axis with a period: {surface:?}",
         );
         assert!(
-            v_real || surface.v_period().is_none(),
+            v_real || surface.period_v().is_none(),
             "placeholder v axis with a period: {surface:?}",
         );
     }

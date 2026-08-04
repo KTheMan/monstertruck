@@ -427,8 +427,8 @@ where
         let normalize_uv = |uv: Point2, previous: Option<Point2>| {
             let (u_range, v_range) = surface.try_range_tuple();
             Some(Point2::new(
-                normalize_axis(uv.x, previous.map(|uv| uv.x), surface.u_period(), u_range)?,
-                normalize_axis(uv.y, previous.map(|uv| uv.y), surface.v_period(), v_range)?,
+                normalize_axis(uv.x, previous.map(|uv| uv.x), surface.period_u(), u_range)?,
+                normalize_axis(uv.y, previous.map(|uv| uv.y), surface.period_v(), v_range)?,
             ))
         };
         let project = |point: Point3, hint: Option<(f64, f64)>| {
@@ -542,8 +542,8 @@ where
     let normalize_uv = |uv: Point2, previous: Option<Point2>| {
         let (u_range, v_range) = surface.try_range_tuple();
         Some(Point2::new(
-            normalize_axis(uv.x, previous.map(|uv| uv.x), surface.u_period(), u_range)?,
-            normalize_axis(uv.y, previous.map(|uv| uv.y), surface.v_period(), v_range)?,
+            normalize_axis(uv.x, previous.map(|uv| uv.x), surface.period_u(), u_range)?,
+            normalize_axis(uv.y, previous.map(|uv| uv.y), surface.period_v(), v_range)?,
         ))
     };
     let point_to_uv = |point, hint: Option<(f64, f64)>| {

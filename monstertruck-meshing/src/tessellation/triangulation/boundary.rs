@@ -209,7 +209,7 @@ fn report_projection_failure<S: PreMeshableSurface>(
     eprintln!(
         "BPROJ_FAIL face={} attempt={attempt} start={start} vertex={vertex}/{total} \
          stage={stage} point=({:.9},{:.9},{:.9}) prev_uv={previous_text} raw_uv={raw_text} \
-         urange={} vrange={} u_period={} v_period={} residual={residual:.9} \
+         urange={} vrange={} period_u={} period_v={} residual={residual:.9} \
          |du|={du:.9} |dv|={dv:.9} |point|={point_norm:.6} {seam} {nearest} {snp_text} \
          surface={}",
         projection_debug_face(),
@@ -218,8 +218,8 @@ fn report_projection_failure<S: PreMeshableSurface>(
         point.z,
         fmt_range(urange),
         fmt_range(vrange),
-        fmt_option_f64(surface.u_period()),
-        fmt_option_f64(surface.v_period()),
+        fmt_option_f64(surface.period_u()),
+        fmt_option_f64(surface.period_v()),
         std::any::type_name::<S>(),
     );
 }
@@ -635,7 +635,7 @@ impl PolyBoundaryPiece {
                 .position(|(boundary, _)| boundary.is_some())
                 .unwrap_or(0);
             let mut previous = None::<SurfacePoint>;
-            let periodic_surface = surface.u_period().is_some() || surface.v_period().is_some();
+            let periodic_surface = surface.period_u().is_some() || surface.period_v().is_some();
             pieces
                 .into_iter()
                 .cycle()
@@ -730,8 +730,8 @@ impl PolyBoundaryPiece {
         previous: Option<(f64, f64)>,
     ) -> Option<(f64, f64)> {
         let (urange, vrange) = surface.try_range_tuple();
-        let u = Self::normalize_axis(uv.0, previous.map(|(u, _)| u), surface.u_period(), urange)?;
-        let v = Self::normalize_axis(uv.1, previous.map(|(_, v)| v), surface.v_period(), vrange)?;
+        let u = Self::normalize_axis(uv.0, previous.map(|(u, _)| u), surface.period_u(), urange)?;
+        let v = Self::normalize_axis(uv.1, previous.map(|(_, v)| v), surface.period_v(), vrange)?;
         Some((u, v))
     }
 
@@ -921,11 +921,11 @@ impl PolyBoundaryPiece {
         report_projection_outcome("ladder", projected.is_some());
         let mut vec = projected?;
         let grav = vec.iter().fold(Point2::origin(), |g, p| g + p.uv.to_vec()) / vec.len() as f64;
-        if let (Some(up), Some((u0, _))) = (surface.u_period(), urange) {
+        if let (Some(up), Some((u0, _))) = (surface.period_u(), urange) {
             let quot = f64::floor((grav.x - u0) / up);
             vec.iter_mut().for_each(|p| p.x -= quot * up);
         }
-        if let (Some(vp), Some((v0, _))) = (surface.v_period(), vrange) {
+        if let (Some(vp), Some((v0, _))) = (surface.period_v(), vrange) {
             let quot = f64::floor((grav.y - v0) / vp);
             vec.iter_mut().for_each(|p| p.y -= quot * vp);
         }
@@ -1034,7 +1034,7 @@ fn periodic_axis_full_span(
     if curve.len() < 4 || !closed {
         None
     } else {
-        [(0usize, surface.u_period()), (1usize, surface.v_period())]
+        [(0usize, surface.period_u()), (1usize, surface.period_v())]
             .into_iter()
             .filter_map(|(axis, period)| Some((axis, period?)))
             .find(|(axis, period)| {
@@ -1071,8 +1071,8 @@ fn surface_axis_range(
 ) -> (Option<f64>, Option<(f64, f64)>) {
     let (urange, vrange) = surface.try_range_tuple();
     match axis {
-        0 => (surface.u_period(), urange),
-        _ => (surface.v_period(), vrange),
+        0 => (surface.period_u(), urange),
+        _ => (surface.period_v(), vrange),
     }
 }
 
@@ -1289,7 +1289,7 @@ fn periodic_open_axis_full_span(
     if curve.len() < 2 {
         None
     } else {
-        [(0usize, surface.u_period()), (1usize, surface.v_period())]
+        [(0usize, surface.period_u()), (1usize, surface.period_v())]
             .into_iter()
             .filter_map(|(axis, period)| Some((axis, period?)))
             .find(|(axis, period)| {
@@ -1721,14 +1721,14 @@ impl PolyBoundary {
                     align_full_period_open_pair(&mut curve0, &mut curve1, surface);
                 let ((p0, p1), (q0, q1)) = (end_pts(&curve0), end_pts(&curve1));
                 if !full_period_pair_aligned && !p0.x.near(&p1.x) && !q0.x.near(&q1.x) {
-                    if let Some(period) = surface.u_period() {
+                    if let Some(period) = surface.period_u() {
                         align_periodic_open_pair(&curve0, &mut curve1, 0, period);
                     } else if let (Some(urange), _) = surface.try_range_tuple() {
                         normalize_range(&mut curve0, 0, urange);
                         normalize_range(&mut curve1, 0, urange);
                     }
                 } else if !full_period_pair_aligned && !p0.y.near(&p1.y) && !q0.y.near(&q1.y) {
-                    if let Some(period) = surface.v_period() {
+                    if let Some(period) = surface.period_v() {
                         align_periodic_open_pair(&curve0, &mut curve1, 1, period);
                     } else if let (_, Some(vrange)) = surface.try_range_tuple() {
                         normalize_range(&mut curve0, 1, vrange);

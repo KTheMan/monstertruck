@@ -81,18 +81,24 @@ pub trait ParametricSurface: Clone {
     }
     /// `None` in default; `Some(period)` if periodic w.r.t. parameter u.
     #[inline(always)]
-    fn u_period(&self) -> Option<f64> { None }
+    fn period_u(&self) -> Option<f64> { None }
     /// `None` in default; `Some(period)` if periodic w.r.t. parameter v.
     #[inline(always)]
-    fn v_period(&self) -> Option<f64> { None }
-    /// Alias for [`u_period`](ParametricSurface::u_period), consistent with
-    /// `derivative_u` naming (`<type>_<direction>`).
+    fn period_v(&self) -> Option<f64> { None }
+    /// Deprecated alias for [`period_u`](ParametricSurface::period_u).
+    ///
+    /// Renamed for `<property>_<direction>` consistency with `derivative_u`,
+    /// `knot_vector_u` and `cut_u`, which is the convention across this crate.
+    #[deprecated(since = "0.3.4", note = "renamed to `period_u`")]
     #[inline(always)]
-    fn period_u(&self) -> Option<f64> { self.u_period() }
-    /// Alias for [`v_period`](ParametricSurface::v_period), consistent with
-    /// `derivative_v` naming (`<type>_<direction>`).
+    fn u_period(&self) -> Option<f64> { self.period_u() }
+    /// Deprecated alias for [`period_v`](ParametricSurface::period_v).
+    ///
+    /// Renamed for `<property>_<direction>` consistency with `derivative_v`,
+    /// `knot_vector_v` and `cut_v`, which is the convention across this crate.
+    #[deprecated(since = "0.3.4", note = "renamed to `period_v`")]
     #[inline(always)]
-    fn period_v(&self) -> Option<f64> { self.v_period() }
+    fn v_period(&self) -> Option<f64> { self.period_v() }
 }
 
 impl<S: ParametricSurface> ParametricSurface for &S {
@@ -121,9 +127,9 @@ impl<S: ParametricSurface> ParametricSurface for &S {
     #[inline(always)]
     fn parameter_range(&self) -> (ParameterRange, ParameterRange) { (*self).parameter_range() }
     #[inline(always)]
-    fn u_period(&self) -> Option<f64> { (*self).u_period() }
+    fn period_u(&self) -> Option<f64> { (*self).period_u() }
     #[inline(always)]
-    fn v_period(&self) -> Option<f64> { (*self).v_period() }
+    fn period_v(&self) -> Option<f64> { (*self).period_v() }
 }
 
 impl<S: ParametricSurface> ParametricSurface for Box<S> {
@@ -152,9 +158,9 @@ impl<S: ParametricSurface> ParametricSurface for Box<S> {
     #[inline(always)]
     fn parameter_range(&self) -> (ParameterRange, ParameterRange) { (**self).parameter_range() }
     #[inline(always)]
-    fn u_period(&self) -> Option<f64> { (**self).u_period() }
+    fn period_u(&self) -> Option<f64> { (**self).period_u() }
     #[inline(always)]
-    fn v_period(&self) -> Option<f64> { (**self).v_period() }
+    fn period_v(&self) -> Option<f64> { (**self).period_v() }
 }
 
 /// 2D parametric surface
