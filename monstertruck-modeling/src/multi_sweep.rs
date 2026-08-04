@@ -15,7 +15,7 @@ where
         let mut vertex = self.clone();
         (0..division)
             .map(move |_| {
-                let new_vertex = vertex.mapped(point_mapping).into_untracked();
+                let new_vertex = vertex.mapped(point_mapping);
                 let edge = connect_vertices(&vertex, &new_vertex, connect_points);
                 vertex = new_vertex;
                 edge
@@ -47,7 +47,7 @@ where
         let mut edge = self.clone();
         (0..division)
             .map(move |_| {
-                let new_edge = edge.mapped(point_mapping, curve_mapping).into_untracked();
+                let new_edge = edge.mapped(point_mapping, curve_mapping);
                 let face = connect_edges(&edge, &new_edge, connect_points, connect_curves);
                 edge = new_edge;
                 face
@@ -79,7 +79,7 @@ where
         let mut wire = self.clone();
         (0..division)
             .flat_map(move |_| {
-                let new_wire = wire.mapped(point_mapping, curve_mapping).into_untracked();
+                let new_wire = wire.mapped(point_mapping, curve_mapping);
                 let shell: Vec<_> =
                     connect_wires(&wire, &new_wire, connect_points, connect_curves).collect();
                 wire = new_wire;
@@ -113,9 +113,7 @@ where
         let mut shell = Shell::from(vec![self.inverse()]);
         let mut face_cursor = self.clone();
         shell.extend((0..division).flat_map(|_| {
-            let seiling = face_cursor
-                .mapped(point_mapping, curve_mapping, surface_mapping)
-                .into_untracked();
+            let seiling = face_cursor.mapped(point_mapping, curve_mapping, surface_mapping);
             let biter0 = face_cursor.boundary_iters().into_iter().flatten();
             let biter1 = seiling.boundary_iters().into_iter().flatten();
             let vec: Vec<_> =
@@ -157,9 +155,8 @@ where
                 let mut bdry: Shell<P, C, S> = shell.face_iter().map(Face::inverse).collect();
                 let mut shell_cursor = shell;
                 bdry.extend((0..division).flat_map(|_| {
-                    let seiling = shell_cursor
-                        .mapped(point_mapping, curve_mapping, surface_mapping)
-                        .into_untracked();
+                    let seiling =
+                        shell_cursor.mapped(point_mapping, curve_mapping, surface_mapping);
                     let bdries0 = shell_cursor.extract_boundaries();
                     let bdries1 = seiling.extract_boundaries();
                     let biter0 = bdries0.iter().flat_map(Wire::edge_iter);

@@ -39,7 +39,6 @@ impl<P, C> Edge<P, C> {
             orientation: true,
             curve: Arc::new(Mutex::new(curve)),
             stable_id: StableId::UNASSIGNED,
-            tracking_id: None,
         }
     }
 
@@ -48,27 +47,8 @@ impl<P, C> Edge<P, C> {
     pub fn stable_id(&self) -> StableId { self.stable_id }
 
     /// Sets the stable persistent identifier of this edge.
-    ///
-    /// This does not change its session-scoped [`TrackingId`].
     #[inline(always)]
     pub fn set_stable_id(&mut self, id: StableId) { self.stable_id = id; }
-
-    /// Returns the immutable session-scoped tracking identifier, when assigned.
-    #[inline(always)]
-    pub fn tracking_id(&self) -> Option<&TrackingId> { self.tracking_id.as_ref() }
-
-    /// Copies the tracking origin from an edge replaced by an operation.
-    ///
-    /// Operation implementations use this before
-    /// [`TopologyTracking::initialize_tracking`] assigns independently
-    /// addressable identities to duplicate descendants.
-    #[doc(hidden)]
-    pub fn inherit_tracking_from(&mut self, source: &Self) {
-        self.tracking_id.clone_from(&source.tracking_id);
-    }
-
-    #[inline(always)]
-    pub(crate) fn set_tracking_id(&mut self, id: Option<TrackingId>) { self.tracking_id = id; }
 
     /// Generates the edge from `front` to `back`, checking the condition
     /// `front == back` in debug mode and REPORTING a violation rather than
@@ -153,7 +133,6 @@ impl<P, C> Edge<P, C> {
             orientation: !self.orientation,
             curve: Arc::clone(&self.curve),
             stable_id: self.stable_id,
-            tracking_id: self.tracking_id.clone(),
         }
     }
 
@@ -256,7 +235,6 @@ impl<P, C> Edge<P, C> {
             curve: Arc::clone(&self.curve),
             orientation: true,
             stable_id: self.stable_id,
-            tracking_id: self.tracking_id.clone(),
         }
     }
 
@@ -389,11 +367,11 @@ impl<P, C> Edge<P, C> {
         let v1 = self.absolute_back().try_mapped(&mut point_mapping)?;
         let curve = curve_mapping(&*self.curve.lock())?;
         // `.ok()?` rather than a panic (spec 012 U4): this signature already
-        // promises `None`. `Vertex::try_mapped` builds a fresh `Arc` per call,
-        // so the refusal is not expected for valid input.
+        // promises `None`. Measured dead as well as typed -- `Vertex::try_mapped`
+        // builds a FRESH `Arc` per call and `Vertex` identity is
+        // `Arc::as_ptr`, so `v0 == v1` is unreachable here whatever the
+        // receiver looks like. Recorded rather than asserted (C5).
         let mut edge = Edge::debug_new(&v0, &v1, curve).ok()?;
-        edge.stable_id = self.stable_id;
-        edge.tracking_id.clone_from(&self.tracking_id);
         if !self.orientation() {
             edge.invert();
         }
@@ -430,11 +408,13 @@ impl<P, C> Edge<P, C> {
         let v0 = self.absolute_front().mapped(&mut point_mapping);
         let v1 = self.absolute_back().mapped(&mut point_mapping);
         let curve = curve_mapping(&*self.curve.lock());
-        // The infallible signature has no refusal channel. Both mapped
-        // vertices are freshly allocated, so they cannot share identity.
+        // Infallible signature, no channel -- and unlike the general case this
+        // one is PROVABLY total, so nothing is being swallowed: `Vertex::mapped`
+        // is `Vertex::new_with_id`, a fresh `Arc` per call, and `Vertex`
+        // equality is `Arc::as_ptr` equality, so `v0 == v1` cannot hold. Stated
+        // as `new_unchecked` rather than hidden behind `debug_new`'s profile
+        // switch (spec 012 U4).
         let mut edge = Edge::new_unchecked(&v0, &v1, curve);
-        edge.stable_id = self.stable_id;
-        edge.tracking_id.clone_from(&self.tracking_id);
         if edge.orientation() != self.orientation() {
             edge.invert();
         }
@@ -465,14 +445,12 @@ impl<P, C> Edge<P, C> {
             orientation: self.orientation,
             curve: Arc::new(Mutex::new(curve0)),
             stable_id: StableId::UNASSIGNED,
-            tracking_id: None,
         };
         let edge1 = Edge {
             vertices: (vertex.clone(), self.absolute_back().clone()),
             orientation: self.orientation,
             curve: Arc::new(Mutex::new(curve1)),
             stable_id: StableId::UNASSIGNED,
-            tracking_id: None,
         };
         match self.orientation {
             true => (edge0, edge1),
@@ -619,7 +597,6 @@ impl<P, C> Clone for Edge<P, C> {
             orientation: self.orientation,
             curve: Arc::clone(&self.curve),
             stable_id: self.stable_id,
-            tracking_id: self.tracking_id.clone(),
         }
     }
 }

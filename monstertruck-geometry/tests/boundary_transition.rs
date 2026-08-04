@@ -1,9 +1,9 @@
 use monstertruck_geometry::base::{ParametricSurface, Vector4};
-use monstertruck_geometry::nurbs::continuity::{ContinuityOrder, SurfaceBoundary};
+use monstertruck_geometry::nurbs::continuity::BoundaryAlignment;
+use monstertruck_geometry::nurbs::continuity::{BoundarySide, ContinuityOrder};
 use monstertruck_geometry::nurbs::continuity_solver::{
     BoundaryContinuityRequest, BoundaryContinuitySolver, ContinuitySolverConfig,
 };
-use monstertruck_geometry::nurbs::contract::BoundaryAlignment;
 use monstertruck_geometry::nurbs::{BsplineSurface, KnotVector, NurbsSurface};
 
 const SEAM_DEGREE: usize = 3;
@@ -115,12 +115,7 @@ fn consuming_solution_parts_can_retain_the_transition() {
 }
 
 fn request(order: ContinuityOrder, alignment: BoundaryAlignment) -> BoundaryContinuityRequest {
-    BoundaryContinuityRequest::new(
-        SurfaceBoundary::UEnd,
-        SurfaceBoundary::UStart,
-        alignment,
-        order,
-    )
+    BoundaryContinuityRequest::new(BoundarySide::MaxU, BoundarySide::MinU, alignment, order)
 }
 
 fn adjacent_planes(

@@ -868,14 +868,11 @@ where
         let v1 = Vertex::new(curve.subs(t));
         let curve1 = curve.cut(t);
         // Spec 012 U4: `v1` is a freshly allocated `Vertex`, and `Vertex`
-        // equality is `Arc` pointer identity, so neither edge can be
-        // degenerate.
-        let mut first = Edge::new_unchecked(&v0, &v1, curve);
-        let mut second = Edge::new_unchecked(&v1, &v2, curve1);
-        first.inherit_tracking_from(&edge);
-        second.inherit_tracking_from(&edge);
-        wire.push_back(first);
-        wire.push_back(second);
+        // equality is `Arc` pointer identity, so neither of these two edges can
+        // be degenerate. Vacuous check, infallible caller: stated, not
+        // profile-switched.
+        wire.push_back(Edge::new_unchecked(&v0, &v1, curve));
+        wire.push_back(Edge::new_unchecked(&v1, &v2, curve1));
     }
 
     let mut shell = revolve(&wire, origin, axis, sweep, division);

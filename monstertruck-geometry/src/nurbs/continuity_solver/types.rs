@@ -1,11 +1,11 @@
 //! Public configuration, diagnostics, and failures for continuity solving.
 
-use super::super::continuity::BoundaryAlignment;
-use super::super::continuity::{ContinuityMaturity, ContinuityOrder, SurfaceBoundary};
-use serde::{Deserialize, Serialize};
+use super::super::continuity::{
+    BoundaryAlignment, BoundarySide, ContinuityMaturity, ContinuityOrder,
+};
 
 /// Identifies one endpoint of a boundary-continuity problem.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum BoundaryEndpoint {
     /// The fixed reference surface.
     First,
@@ -13,8 +13,8 @@ pub enum BoundaryEndpoint {
     Second,
 }
 
-/// Caller-controlled dimension constrained by a [`ContinuityResourceBudget`](super::ContinuityResourceBudget).
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+/// Caller-controlled dimension constrained by a [`ContinuityBudget`](super::ContinuityBudget).
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum ContinuityResource {
     /// Nonlinear solver iterations.
     Iterations,
@@ -35,10 +35,10 @@ pub enum ContinuityResource {
 }
 
 /// Geometric-continuity request between two tensor-product surface boundaries.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct BoundaryContinuityRequest {
-    first_boundary: SurfaceBoundary,
-    second_boundary: SurfaceBoundary,
+    first_side: BoundarySide,
+    second_side: BoundarySide,
     alignment: BoundaryAlignment,
     order: ContinuityOrder,
 }
@@ -46,24 +46,24 @@ pub struct BoundaryContinuityRequest {
 impl BoundaryContinuityRequest {
     /// Creates a geometric-continuity request.
     pub const fn new(
-        first_boundary: SurfaceBoundary,
-        second_boundary: SurfaceBoundary,
+        first_side: BoundarySide,
+        second_side: BoundarySide,
         alignment: BoundaryAlignment,
         order: ContinuityOrder,
     ) -> Self {
         Self {
-            first_boundary,
-            second_boundary,
+            first_side,
+            second_side,
             alignment,
             order,
         }
     }
 
     /// Returns the boundary on the fixed reference surface.
-    pub const fn first_boundary(self) -> SurfaceBoundary { self.first_boundary }
+    pub const fn first_side(self) -> BoundarySide { self.first_side }
 
     /// Returns the boundary on the optimized surface.
-    pub const fn second_boundary(self) -> SurfaceBoundary { self.second_boundary }
+    pub const fn second_side(self) -> BoundarySide { self.second_side }
 
     /// Returns the seam-parameter alignment.
     pub const fn alignment(self) -> BoundaryAlignment { self.alignment }
@@ -76,7 +76,7 @@ impl BoundaryContinuityRequest {
 ///
 /// These are styling-space tolerances. They are intentionally independent of
 /// topology sewing and solidification tolerances.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ContinuitySolverConfig {
     max_iterations: usize,
     samples_per_span: usize,
@@ -286,7 +286,7 @@ impl ContinuitySolverConfig {
 }
 
 /// Solver termination state.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum ContinuityTermination {
     /// Every requested derivative-order residual met its tolerance.
     Converged,
@@ -297,7 +297,7 @@ pub enum ContinuityTermination {
 }
 
 /// Residual diagnostics for one geometric-continuity order.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct OrderResidual {
     order: ContinuityOrder,
     rms: f64,
@@ -352,7 +352,7 @@ impl OrderResidual {
 }
 
 /// Deterministic diagnostics from one continuity solve.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ContinuitySolveReport {
     termination: ContinuityTermination,
     maturity: ContinuityMaturity,
@@ -393,8 +393,8 @@ impl ContinuitySolveReport {
     /// Returns the termination state.
     pub const fn termination(&self) -> ContinuityTermination { self.termination }
 
-    #[cfg(test)]
-    pub(crate) const fn maturity(&self) -> ContinuityMaturity { self.maturity }
+    /// Returns the public maturity classification of the solved order.
+    pub const fn maturity(&self) -> ContinuityMaturity { self.maturity }
 
     /// Returns the number of attempted nonlinear iterations.
     pub const fn iterations(&self) -> usize { self.iterations }

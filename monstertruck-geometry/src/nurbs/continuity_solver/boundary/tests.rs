@@ -14,7 +14,7 @@ fn surface() -> NurbsSurface<Vector4> {
     NurbsSurface::new(BsplineSurface::new((u_knots, v_knots), control_points))
 }
 
-fn frame(boundary: SurfaceBoundary) -> BoundaryFrame {
+fn frame(boundary: BoundarySide) -> BoundaryFrame {
     BoundaryFrame::try_new(&surface(), boundary)
         .expect("the test surface has finite clamped domains")
 }
@@ -26,10 +26,10 @@ fn assert_close(actual: f64, expected: f64) {
 #[test]
 fn all_boundaries_map_normalized_coordinates_inward() {
     let cases = [
-        (SurfaceBoundary::UStart, (3.5, -1.25), 11.0, 3.0),
-        (SurfaceBoundary::UEnd, (3.5, -1.25), 11.0, -3.0),
-        (SurfaceBoundary::VStart, (2.75, 1.5), 3.0, 11.0),
-        (SurfaceBoundary::VEnd, (2.75, 1.5), 3.0, -11.0),
+        (BoundarySide::MinU, (3.5, -1.25), 11.0, 3.0),
+        (BoundarySide::MaxU, (3.5, -1.25), 11.0, -3.0),
+        (BoundarySide::MinV, (2.75, 1.5), 3.0, 11.0),
+        (BoundarySide::MaxV, (2.75, 1.5), 3.0, -11.0),
     ];
     cases
         .into_iter()
@@ -45,8 +45,8 @@ fn all_boundaries_map_normalized_coordinates_inward() {
 
 #[test]
 fn frames_expose_axis_degree_and_control_layout() {
-    let u_boundary = frame(SurfaceBoundary::UStart);
-    assert_eq!(u_boundary.boundary(), SurfaceBoundary::UStart);
+    let u_boundary = frame(BoundarySide::MinU);
+    assert_eq!(u_boundary.boundary(), BoundarySide::MinU);
     assert_eq!(u_boundary.along_axis(), SurfaceAxis::V);
     assert_eq!(u_boundary.cross_axis(), SurfaceAxis::U);
     assert_eq!(u_boundary.along_degree(), 1);
@@ -70,7 +70,7 @@ fn frames_expose_axis_degree_and_control_layout() {
     assert_close(u_boundary.u_domain().start(), 2.0);
     assert_close(u_boundary.u_domain().end(), 5.0);
 
-    let v_boundary = frame(SurfaceBoundary::VStart);
+    let v_boundary = frame(BoundarySide::MinV);
     assert_eq!(v_boundary.along_axis(), SurfaceAxis::U);
     assert_eq!(v_boundary.cross_axis(), SurfaceAxis::V);
     assert_eq!(v_boundary.along_degree(), 2);
@@ -90,19 +90,19 @@ fn reversed_alignment_reflects_normalized_seam_and_derivative_sign() {
 #[test]
 fn strip_indices_use_boundary_distance_then_seam_order() {
     assert_eq!(
-        frame(SurfaceBoundary::UStart)
+        frame(BoundarySide::MinU)
             .control_strip_indices(2)
             .expect("two rows fit"),
         vec![(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2)],
     );
     assert_eq!(
-        frame(SurfaceBoundary::UEnd)
+        frame(BoundarySide::MaxU)
             .control_strip_indices(2)
             .expect("two rows fit"),
         vec![(3, 0), (3, 1), (3, 2), (2, 0), (2, 1), (2, 2)],
     );
     assert_eq!(
-        frame(SurfaceBoundary::VStart)
+        frame(BoundarySide::MinV)
             .control_strip_indices(2)
             .expect("two rows fit"),
         vec![
@@ -117,7 +117,7 @@ fn strip_indices_use_boundary_distance_then_seam_order() {
         ],
     );
     assert_eq!(
-        frame(SurfaceBoundary::VEnd)
+        frame(BoundarySide::MaxV)
             .control_strip_indices(2)
             .expect("two rows fit"),
         vec![
@@ -141,7 +141,7 @@ fn invalid_surface_layouts_return_errors_without_panicking() {
         Vec::<Vec<Vector4>>::new(),
     ));
     assert_eq!(
-        BoundaryFrame::try_new(&empty, SurfaceBoundary::UStart),
+        BoundaryFrame::try_new(&empty, BoundarySide::MinU),
         Err(BoundaryFrameError::EmptyControlNet),
     );
 
@@ -158,7 +158,7 @@ fn invalid_surface_layouts_return_errors_without_panicking() {
         points.clone(),
     ));
     assert_eq!(
-        BoundaryFrame::try_new(&unclamped, SurfaceBoundary::UStart),
+        BoundaryFrame::try_new(&unclamped, BoundarySide::MinU),
         Err(BoundaryFrameError::UnclampedKnotVector {
             axis: SurfaceAxis::U,
         }),
@@ -172,7 +172,7 @@ fn invalid_surface_layouts_return_errors_without_panicking() {
         ],
     ));
     assert_eq!(
-        BoundaryFrame::try_new(&nonrectangular, SurfaceBoundary::UStart),
+        BoundaryFrame::try_new(&nonrectangular, BoundarySide::MinU),
         Err(BoundaryFrameError::NonRectangularControlNet),
     );
 }
@@ -180,7 +180,7 @@ fn invalid_surface_layouts_return_errors_without_panicking() {
 #[test]
 fn oversized_strips_return_a_typed_error() {
     assert_eq!(
-        frame(SurfaceBoundary::VStart).control_strip_indices(4),
+        frame(BoundarySide::MinV).control_strip_indices(4),
         Err(BoundaryFrameError::StripExceedsControlNet {
             requested: 4,
             available: 3,

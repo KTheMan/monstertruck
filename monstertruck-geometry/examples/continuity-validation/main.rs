@@ -1,6 +1,7 @@
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use monstertruck_geometry::nurbs::continuity_solver::{
-    BoundaryContinuitySolver, ContinuitySolveError, ContinuityTermination,
+    BoundaryContinuitySolver, BoundaryEndpoint, ContinuitySolveError, ContinuitySolveReport,
+    ContinuityTermination, ContinuityWork, take_continuity_work,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -15,7 +16,7 @@ mod dense;
 mod digest;
 mod fixture;
 
-use corpus::{Baseline, CaseSpec, Corpus, ErrorKind, Expectation};
+use corpus::{CaseSpec, Corpus, ErrorKind, Expectation};
 use dense::DenseMetrics;
 
 #[derive(Serialize)]
@@ -44,22 +45,30 @@ struct CaseEvidence {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 struct WorkCounters {
-    iterations: usize,
-    accepted_steps: usize,
-    rejected_steps: usize,
-    variable_count: usize,
-    residual_count: usize,
+    iterations: u64,
+    jacobian_elements: u64,
+    qr_elements: u64,
+    truncated: bool,
+}
+
+impl From<ContinuityWork> for WorkCounters {
+    fn from(work: ContinuityWork) -> Self {
+        Self {
+            iterations: work.iterations,
+            jacobian_elements: work.jacobian_elements,
+            qr_elements: work.qr_elements,
+            truncated: work.truncated,
+        }
+    }
 }
 
 enum Mode {
-    Verify,
     Emit(PathBuf),
     List,
 }
 
 struct Options {
     corpus: PathBuf,
-    baseline: PathBuf,
     case: Option<String>,
     mode: Mode,
 }
@@ -79,7 +88,6 @@ fn main() -> Result<()> {
     }
     let observed = run_corpus(&corpus, options.case.as_deref())?;
     match options.mode {
-        Mode::Verify => verify(&options.baseline, &observed, options.case.is_some()),
         Mode::Emit(path) => {
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)?;
@@ -143,13 +151,15 @@ fn run_case(
 ) -> Result<CaseEvidence> {
     let fixture = fixture::build(case)?;
     let config = case.solver.build();
-    let request = case.request.build();
+    let request = case.request.build()?;
+    take_continuity_work();
     let outcome = BoundaryContinuitySolver::new(config.clone())
         .and_then(|solver| solver.solve(&fixture.first, &fixture.second, request));
+    let work = take_continuity_work();
     match (&case.expectation, outcome) {
         (
             Expectation::Converged {
-                maturity: _,
+                maturity,
                 maximum_dense_residual_by_order,
                 maximum_normal_angle,
             },
@@ -158,6 +168,10 @@ fn run_case(
             ensure!(
                 solution.report().termination() == ContinuityTermination::Converged,
                 "the solver returned a non-converged solution",
+            );
+            ensure!(
+                maturity.matches(solution.report().maturity()),
+                "the solver maturity does not match the corpus expectation",
             );
             let dense = dense::certify(&solution, request, dense_spec, case.geometry.scale)?;
             ensure!(
@@ -184,18 +198,11 @@ fn run_case(
                 maximum_normal_angle,
             );
             let digest = digest::solved(fixture_version, case, dense_spec, &solution, &dense)?;
-            let report = solution.report();
             Ok(CaseEvidence {
                 outcome: "converged".to_owned(),
                 digest,
                 dense: Some(dense),
-                work: Some(WorkCounters {
-                    iterations: report.iterations(),
-                    accepted_steps: report.accepted_steps(),
-                    rejected_steps: report.rejected_steps(),
-                    variable_count: report.variable_count(),
-                    residual_count: report.residual_count(),
-                }),
+                work: Some(work.into()),
                 error: None,
             })
         }
@@ -214,7 +221,7 @@ fn run_case(
                 outcome: outcome.clone(),
                 digest: digest::error(fixture_version, case, dense_spec, &error)?,
                 dense: None,
-                work: None,
+                work: Some(work.into()),
                 error: Some(error),
             })
         }
@@ -230,15 +237,11 @@ fn error_evidence(error: &ContinuitySolveError) -> Value {
             "kind": "invalid_config",
             "message": message,
         }),
-        ContinuitySolveError::ResourceLimitExceeded {
-            resource,
-            requested,
-            limit,
-        } => json!({
-            "kind": "resource_limit_exceeded",
-            "resource": resource,
-            "requested": requested,
-            "limit": limit,
+        ContinuitySolveError::WorkTruncated(truncated) => json!({
+            "kind": "work_truncated",
+            "resource": format!("{:?}", truncated.resource),
+            "requested": truncated.requested,
+            "budget": truncated.budget,
         }),
         ContinuitySolveError::ExperimentalG4Disabled => json!({
             "kind": "experimental_g4_disabled",
@@ -248,12 +251,18 @@ fn error_evidence(error: &ContinuitySolveError) -> Value {
             capability,
         } => json!({
             "kind": "unsupported_capability",
-            "endpoint": endpoint,
-            "capability": capability,
+            "endpoint": endpoint_name(*endpoint),
+            "capability": {
+                "side": format!("{:?}", capability.side()),
+                "requested": capability.requested().as_usize(),
+                "cross_degree": capability.cross_degree(),
+                "cross_control_rows": capability.cross_control_rows(),
+                "level": format!("{:?}", capability.level()),
+            },
         }),
         ContinuitySolveError::InvalidBoundary(endpoint) => json!({
             "kind": "invalid_boundary",
-            "endpoint": endpoint,
+            "endpoint": endpoint_name(*endpoint),
         }),
         ContinuitySolveError::NonPositiveWeight {
             endpoint,
@@ -262,7 +271,7 @@ fn error_evidence(error: &ContinuitySolveError) -> Value {
             weight,
         } => json!({
             "kind": "non_positive_weight",
-            "endpoint": endpoint,
+            "endpoint": endpoint_name(*endpoint),
             "row": row,
             "column": column,
             "weight": weight,
@@ -273,13 +282,13 @@ fn error_evidence(error: &ContinuitySolveError) -> Value {
             column,
         } => json!({
             "kind": "non_finite_control_point",
-            "endpoint": endpoint,
+            "endpoint": endpoint_name(*endpoint),
             "row": row,
             "column": column,
         }),
         ContinuitySolveError::DegenerateBoundary { endpoint, sample } => json!({
             "kind": "degenerate_boundary",
-            "endpoint": endpoint,
+            "endpoint": endpoint_name(*endpoint),
             "sample": sample,
         }),
         ContinuitySolveError::NonFiniteResidual => json!({
@@ -293,9 +302,43 @@ fn error_evidence(error: &ContinuitySolveError) -> Value {
         }),
         ContinuitySolveError::DidNotConverge(report) => json!({
             "kind": "did_not_converge",
-            "report": report,
+            "report": report_evidence(report),
         }),
     }
+}
+
+const fn endpoint_name(endpoint: BoundaryEndpoint) -> &'static str {
+    match endpoint {
+        BoundaryEndpoint::First => "First",
+        BoundaryEndpoint::Second => "Second",
+    }
+}
+
+fn report_evidence(report: &ContinuitySolveReport) -> Value {
+    json!({
+        "termination": format!("{:?}", report.termination()),
+        "maturity": format!("{:?}", report.maturity()),
+        "iterations": report.iterations(),
+        "accepted_steps": report.accepted_steps(),
+        "rejected_steps": report.rejected_steps(),
+        "initial_objective": report.initial_objective(),
+        "final_objective": report.final_objective(),
+        "residuals": report.residuals().iter().map(|residual| json!({
+            "order": residual.order().as_usize(),
+            "rms": residual.rms(),
+            "maximum": residual.maximum(),
+            "worst_sample": residual.worst_sample(),
+            "validation_sample": residual.is_validation_sample(),
+            "cross_derivative": residual.cross_derivative(),
+            "seam_derivative": residual.seam_derivative(),
+        })).collect::<Vec<_>>(),
+        "gradient_infinity_norm": report.gradient_infinity_norm(),
+        "step_norm": report.step_norm(),
+        "damping": report.damping(),
+        "numerical_rank": report.numerical_rank(),
+        "variable_count": report.variable_count(),
+        "residual_count": report.residual_count(),
+    })
 }
 
 fn classify_error(error: &ContinuitySolveError) -> ErrorKind {
@@ -311,41 +354,16 @@ fn classify_error(error: &ContinuitySolveError) -> ErrorKind {
         ContinuitySolveError::NonFiniteJacobian => ErrorKind::NonFiniteJacobian,
         ContinuitySolveError::NoDescentDirection => ErrorKind::NoDescentDirection,
         ContinuitySolveError::DidNotConverge(_) => ErrorKind::DidNotConverge,
-        ContinuitySolveError::ResourceLimitExceeded { .. } => ErrorKind::ResourceLimitExceeded,
+        ContinuitySolveError::WorkTruncated(_) => ErrorKind::WorkTruncated,
     }
-}
-
-fn verify(path: &Path, observed: &ObservedRun, targeted: bool) -> Result<()> {
-    let baseline: Baseline = read_json(path)?;
-    ensure!(baseline.schema_version == observed.schema_version);
-    ensure!(baseline.digest_version == observed.digest_version);
-    if !targeted {
-        ensure!(
-            baseline.cases.len() == observed.cases.len(),
-            "baseline and corpus case counts differ",
-        );
-    }
-    observed.cases.iter().try_for_each(|(id, case)| {
-        let expected = baseline
-            .cases
-            .get(id)
-            .ok_or_else(|| anyhow!("baseline is missing case `{id}`"))?;
-        ensure!(
-            expected == &case.evidence.digest,
-            "digest mismatch for `{id}`: expected {expected}, got {}",
-            case.evidence.digest,
-        );
-        Ok(())
-    })
 }
 
 fn options() -> Result<Options> {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let resource = manifest.join("resources/continuity-validation/v1");
     let mut corpus = resource.join("corpus.json");
-    let mut baseline = resource.join("baseline.json");
     let mut case = None;
-    let mut mode = Mode::Verify;
+    let mut mode = None;
     let mut arguments = env::args().skip(1);
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
@@ -356,19 +374,12 @@ fn options() -> Result<Options> {
                         .ok_or_else(|| anyhow!("--corpus requires a path"))?,
                 );
             }
-            "--baseline" => {
-                baseline = PathBuf::from(
-                    arguments
-                        .next()
-                        .ok_or_else(|| anyhow!("--baseline requires a path"))?,
-                );
-            }
             "--emit" => {
-                mode = Mode::Emit(PathBuf::from(
+                mode = Some(Mode::Emit(PathBuf::from(
                     arguments
                         .next()
                         .ok_or_else(|| anyhow!("--emit requires a path"))?,
-                ));
+                )));
             }
             "--case" => {
                 case = Some(
@@ -377,16 +388,14 @@ fn options() -> Result<Options> {
                         .ok_or_else(|| anyhow!("--case requires an ID"))?,
                 );
             }
-            "--list" => mode = Mode::List,
-            "--verify" => mode = Mode::Verify,
+            "--list" => mode = Some(Mode::List),
             _ => bail!("unknown argument `{argument}`"),
         }
     }
     Ok(Options {
         corpus,
-        baseline,
         case,
-        mode,
+        mode: mode.ok_or_else(|| anyhow!("use --emit <path> or --list"))?,
     })
 }
 

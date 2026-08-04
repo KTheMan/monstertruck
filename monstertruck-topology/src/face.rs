@@ -62,7 +62,6 @@ impl<P, C, S> Face<P, C, S> {
             orientation: true,
             surface: Arc::new(Mutex::new(surface)),
             stable_id: StableId::UNASSIGNED,
-            tracking_id: None,
         }
     }
 
@@ -71,27 +70,8 @@ impl<P, C, S> Face<P, C, S> {
     pub fn stable_id(&self) -> StableId { self.stable_id }
 
     /// Sets the stable persistent identifier of this face.
-    ///
-    /// This does not change its session-scoped [`TrackingId`].
     #[inline(always)]
     pub fn set_stable_id(&mut self, id: StableId) { self.stable_id = id; }
-
-    /// Returns the immutable session-scoped tracking identifier, when assigned.
-    #[inline(always)]
-    pub fn tracking_id(&self) -> Option<&TrackingId> { self.tracking_id.as_ref() }
-
-    /// Copies the tracking origin from a face replaced by an operation.
-    ///
-    /// Operation implementations use this before
-    /// [`TopologyTracking::initialize_tracking`] assigns independently
-    /// addressable identities to duplicate descendants.
-    #[doc(hidden)]
-    pub fn inherit_tracking_from(&mut self, source: &Self) {
-        self.tracking_id.clone_from(&source.tracking_id);
-    }
-
-    #[inline(always)]
-    pub(crate) fn set_tracking_id(&mut self, id: Option<TrackingId>) { self.tracking_id = id; }
 
     /// Creates a new face by a wire.
     /// # Remarks
@@ -207,7 +187,6 @@ impl<P, C, S> Face<P, C, S> {
             surface: Arc::clone(&self.surface),
             orientation: true,
             stable_id: self.stable_id,
-            tracking_id: self.tracking_id.clone(),
         }
     }
 
@@ -456,8 +435,6 @@ impl<P, C, S> Face<P, C, S> {
             .collect::<Option<Vec<_>>>()?;
         let surface = surface_mapping(&*self.surface.lock())?;
         let mut face = Face::debug_new(wires, surface).ok()?;
-        face.stable_id = self.stable_id;
-        face.tracking_id.clone_from(&self.tracking_id);
         if !self.orientation() {
             face.invert();
         }
@@ -530,8 +507,6 @@ impl<P, C, S> Face<P, C, S> {
             .collect();
         let surface = surface_mapping(&*self.surface.lock());
         let mut face = Face::new_unchecked(wires, surface);
-        face.stable_id = self.stable_id;
-        face.tracking_id.clone_from(&self.tracking_id);
         if !self.orientation() {
             face.invert();
         }
@@ -921,7 +896,6 @@ impl<P, C, S> Face<P, C, S> {
             orientation: self.orientation,
             surface: Arc::new(Mutex::new(self.surface())),
             stable_id: StableId::UNASSIGNED,
-            tracking_id: None,
         };
         let boundary = &mut face0.boundaries[0];
         let i = boundary
@@ -946,7 +920,6 @@ impl<P, C, S> Face<P, C, S> {
             orientation: self.orientation,
             surface: Arc::new(Mutex::new(self.surface())),
             stable_id: StableId::UNASSIGNED,
-            tracking_id: None,
         };
         Some((face0, face1))
     }
@@ -1049,7 +1022,6 @@ impl<P, C, S> Face<P, C, S> {
             orientation: self.orientation(),
             surface: Arc::new(Mutex::new(surface)),
             stable_id: StableId::UNASSIGNED,
-            tracking_id: None,
         })
     }
 
@@ -1158,7 +1130,6 @@ impl<P, C, S> Clone for Face<P, C, S> {
             orientation: self.orientation,
             surface: Arc::clone(&self.surface),
             stable_id: self.stable_id,
-            tracking_id: self.tracking_id.clone(),
         }
     }
 }

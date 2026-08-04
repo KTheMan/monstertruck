@@ -247,10 +247,7 @@ pub mod basis;
 /// Compatibility normalization for collections of curves and surfaces.
 pub mod compat;
 
-/// Persistent continuity contracts for parametric replay.
-pub mod contract;
-
-/// Geometric-continuity orders and surface capability diagnostics.
+/// Geometry adapters for trait-owned continuity foundations.
 pub mod continuity;
 
 /// Variational geometric-continuity solver for NURBS surface boundaries.
@@ -258,9 +255,6 @@ pub mod continuity_solver;
 
 /// Fairing and reparameterization utilities for curves.
 pub mod fair;
-
-/// Allocation-light derivative jets for curves and surfaces.
-pub mod jet;
 
 /// Curve and surface offset operations.
 pub mod offset;

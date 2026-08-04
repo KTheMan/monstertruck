@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::base::Vector4;
 #[cfg(test)]
 use crate::nurbs::continuity::BoundaryAlignment;
-use crate::nurbs::continuity::{SurfaceAxis, SurfaceBoundary};
+use crate::nurbs::continuity::{BoundarySide, SurfaceAxis};
 use crate::nurbs::{KnotVector, NurbsSurface};
 
 /// One finite, nonempty surface parameter domain.
@@ -33,10 +33,10 @@ impl ParameterDomain {
     pub(super) fn parameter(self, normalized: f64) -> f64 { self.start + normalized * self.span() }
 }
 
-/// Canonical coordinates and control-net layout for one [`SurfaceBoundary`].
+/// Canonical coordinates and control-net layout for one [`BoundarySide`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct BoundaryFrame {
-    boundary: SurfaceBoundary,
+    boundary: BoundarySide,
     u_domain: ParameterDomain,
     v_domain: ParameterDomain,
     u_degree: usize,
@@ -49,7 +49,7 @@ impl BoundaryFrame {
     /// Builds a validated frame for a tensor-product [`NurbsSurface`].
     pub(super) fn try_new(
         surface: &NurbsSurface<Vector4>,
-        boundary: SurfaceBoundary,
+        boundary: BoundarySide,
     ) -> Result<Self, BoundaryFrameError> {
         let control_points = surface.control_points();
         let v_control_count = control_points
@@ -83,7 +83,7 @@ impl BoundaryFrame {
     /// Returns the selected surface boundary.
     #[inline(always)]
     #[cfg(test)]
-    pub(super) const fn boundary(self) -> SurfaceBoundary { self.boundary }
+    pub(super) const fn boundary(self) -> BoundarySide { self.boundary }
 
     /// Returns the surface's `u` domain.
     #[inline(always)]
@@ -176,8 +176,8 @@ impl BoundaryFrame {
     #[inline(always)]
     pub(super) const fn inward_parameter_sign(self) -> f64 {
         match self.boundary {
-            SurfaceBoundary::UStart | SurfaceBoundary::VStart => 1.0,
-            SurfaceBoundary::UEnd | SurfaceBoundary::VEnd => -1.0,
+            BoundarySide::MinU | BoundarySide::MinV => 1.0,
+            BoundarySide::MaxU | BoundarySide::MaxV => -1.0,
         }
     }
 
@@ -195,8 +195,8 @@ impl BoundaryFrame {
             false => self.cross_domain().parameter(1.0 - inward),
         };
         match self.boundary {
-            SurfaceBoundary::UStart | SurfaceBoundary::UEnd => (cross, along),
-            SurfaceBoundary::VStart | SurfaceBoundary::VEnd => (along, cross),
+            BoundarySide::MinU | BoundarySide::MaxU => (cross, along),
+            BoundarySide::MinV | BoundarySide::MaxV => (along, cross),
         }
     }
 
@@ -212,10 +212,10 @@ impl BoundaryFrame {
             None
         } else {
             Some(match self.boundary {
-                SurfaceBoundary::UStart => (boundary_distance, seam_index),
-                SurfaceBoundary::UEnd => (self.u_control_count - 1 - boundary_distance, seam_index),
-                SurfaceBoundary::VStart => (seam_index, boundary_distance),
-                SurfaceBoundary::VEnd => (seam_index, self.v_control_count - 1 - boundary_distance),
+                BoundarySide::MinU => (boundary_distance, seam_index),
+                BoundarySide::MaxU => (self.u_control_count - 1 - boundary_distance, seam_index),
+                BoundarySide::MinV => (seam_index, boundary_distance),
+                BoundarySide::MaxV => (seam_index, self.v_control_count - 1 - boundary_distance),
             })
         }
     }

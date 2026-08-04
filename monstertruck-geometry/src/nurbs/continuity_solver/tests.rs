@@ -3,8 +3,8 @@ use super::{
     ContinuitySolverConfig, ContinuityTermination,
 };
 use crate::base::Vector4;
-use crate::nurbs::continuity::{ContinuityMaturity, ContinuityOrder, SurfaceBoundary};
-use crate::nurbs::contract::BoundaryAlignment;
+use crate::nurbs::continuity::BoundaryAlignment;
+use crate::nurbs::continuity::{BoundarySide, ContinuityMaturity, ContinuityOrder};
 use crate::nurbs::{BsplineSurface, KnotVector, NurbsSurface};
 
 const SEAM_DEGREE: usize = 3;
@@ -30,7 +30,7 @@ fn solves_exact_boundaries_through_g3() {
         assert_eq!(solution.first(), &first);
         assert_eq!(solution.second(), &second);
         assert_converged(solution.report(), &config, order);
-        assert_eq!(solution.report().maturity(), ContinuityMaturity::Production);
+        assert_eq!(solution.report().maturity(), order.maturity());
         assert_eq!(solution.report().iterations(), 0);
         assert_eq!(solution.report().accepted_steps(), 0);
     });
@@ -182,41 +182,11 @@ fn rejects_insufficient_degree_and_degenerate_boundaries() {
 }
 
 #[test]
-fn configuration_and_report_round_trip_through_json() {
+fn configuration_rejects_excessive_sampling() {
     assert!(matches!(
         BoundaryContinuitySolver::new(ContinuitySolverConfig::default().with_samples_per_span(65),),
         Err(ContinuitySolveError::InvalidConfig(_))
     ));
-
-    let config = ContinuitySolverConfig::default()
-        .with_transition_weight(2.0e-6)
-        .with_rank_tolerance(2.0e-12);
-    let config_json = serde_json::to_string(&config).expect("the finite configuration serializes");
-    let restored: ContinuitySolverConfig =
-        serde_json::from_str(&config_json).expect("the configuration deserializes");
-    assert_eq!(restored, config);
-
-    let (first, second) = adjacent_planes(5, BoundaryAlignment::Aligned, false, 0.0);
-    let solution = BoundaryContinuitySolver::new(config)
-        .expect("the restored configuration is valid")
-        .solve(
-            &first,
-            &second,
-            request(ContinuityOrder::G3, BoundaryAlignment::Aligned),
-        )
-        .expect("the exact surfaces converge");
-    let report_json =
-        serde_json::to_string(solution.report()).expect("finite diagnostics serialize");
-    let report: super::ContinuitySolveReport =
-        serde_json::from_str(&report_json).expect("diagnostics deserialize");
-
-    assert_eq!(report.termination(), solution.report().termination());
-    assert_eq!(report.maturity(), solution.report().maturity());
-    assert_eq!(
-        report.residuals().len(),
-        solution.report().residuals().len()
-    );
-    assert!((report.final_objective() - solution.report().final_objective()).abs() <= f64::EPSILON);
 }
 
 #[test]
@@ -254,12 +224,7 @@ fn solves_geometric_continuity_across_nonlinear_seam_parameters() {
 }
 
 fn request(order: ContinuityOrder, alignment: BoundaryAlignment) -> BoundaryContinuityRequest {
-    BoundaryContinuityRequest::new(
-        SurfaceBoundary::UEnd,
-        SurfaceBoundary::UStart,
-        alignment,
-        order,
-    )
+    BoundaryContinuityRequest::new(BoundarySide::MaxU, BoundarySide::MinU, alignment, order)
 }
 
 fn adjacent_planes(

@@ -4,7 +4,6 @@ on:
   push:
     branches: [master]
   pull_request:
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -76,59 +75,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # The validation fixtures are repository-local, but workspace
-          # dependencies still expect the public resources submodule.
+          # The workspace still expects the public resources submodule.
           submodules: false
       - run: git submodule update --init resources
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      # Emit mode checks all tolerances and immediate-rerun determinism without
+      # Emit mode checks tolerances and immediate-rerun determinism without
       # requiring host-sensitive digest equality with the Windows baseline.
       - run: >-
           cargo run -p monstertruck-geometry
           --example continuity-validation --
           --emit target/continuity-validation-ci.json
-      # Exercise the public STEP workflow, including stress fixtures.
-      # Validate triangles, persistence, and post-reimport certification.
-      - name: Validate imported continuity workflows
-        shell: bash
-        run: |
-          set -euo pipefail
-          run_case() {
-            local fixture="$1"
-            local order="$2"
-            local stem="$3"
-            cargo run -p monstertruck-step \
-              --example continuity-step-validation -- \
-              "validation/continuity/${fixture}" \
-              --order "${order}" \
-              --output "target/continuity-validation/${stem}.step" \
-              --receipt "target/continuity-validation/${stem}.json"
-          }
-          run_case polynomial-g1.step 1 polynomial-g1
-          run_case rational-reversed-g2.step 2 rational-reversed-g2
-          run_case repeated-knot-g2.step 2 repeated-knot-g2
-          run_case extreme-positive-weights-g2.step 2 extreme-positive-weights-g2
-          run_case quintic-g3.step 3 quintic-g3
-      - name: Reject arbitrary trimmed seam transactionally
-        shell: bash
-        run: |
-          set -euo pipefail
-          output_path="target/continuity-validation/arbitrary-trim.step"
-          receipt_path="target/continuity-validation/arbitrary-trim.json"
-          set +e
-          log=$(cargo run -p monstertruck-step \
-            --example continuity-step-validation -- \
-            validation/continuity/arbitrary-trim-negative.step \
-            --order 1 \
-            --output "${output_path}" \
-            --receipt "${receipt_path}" 2>&1)
-          status=$?
-          set -e
-          test "${status}" -ne 0
-          grep -q "arbitrary subcurve" <<<"${log}"
-          test ! -e "${output_path}"
-          test ! -e "${receipt_path}"
 
   meshing-features:
     name: monstertruck-meshing feature subsets
@@ -163,22 +120,3 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: extractions/setup-just@v2
       - run: just wasm-build
-
-  geometry-wasm-tests:
-    name: monstertruck-geometry tests (wasm32 compile)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          # CI cannot clone the `.blueprints` submodule (agent tooling), so do
-          # not recurse. Jobs that compile or run code fetch the public
-          # `resources` submodule explicitly below.
-          submodules: false
-      - run: git submodule update --init resources
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@v2
-      - run: >-
-          cargo test -p monstertruck-geometry --lib
-          --target wasm32-unknown-unknown --no-run

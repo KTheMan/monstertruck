@@ -36,9 +36,6 @@ pub(super) fn cut_face_by_bezier(
     mut bezier: NurbsCurve<Vector4>,
     filleted_edge_id: EdgeId,
 ) -> Option<(Face, Edge)> {
-    let filleted_edge = face
-        .edge_iter()
-        .find(|edge| edge.id() == filleted_edge_id)?;
     let Some((front_edge, back_edge)) = find_adjacent_edge(face, filleted_edge_id) else {
         cut_debug(|| format!("adjacent edges not found for {filleted_edge_id:?}"));
         return None;
@@ -73,9 +70,7 @@ pub(super) fn cut_face_by_bezier(
             });
             return None;
         };
-        let mut retained = cut.0;
-        retained.inherit_tracking_from(&front_edge);
-        retained
+        cut.0
     };
 
     let new_back_edge = {
@@ -111,13 +106,10 @@ pub(super) fn cut_face_by_bezier(
             });
             return None;
         };
-        let mut retained = cut.1;
-        retained.inherit_tracking_from(&back_edge);
-        retained
+        cut.1
     };
 
-    let mut fillet_edge = Edge::new(new_front_edge.back(), new_back_edge.front(), bezier.into());
-    fillet_edge.inherit_tracking_from(&filleted_edge);
+    let fillet_edge = Edge::new(new_front_edge.back(), new_back_edge.front(), bezier.into());
     let new_boundaries = face
         .absolute_boundaries()
         .iter()
@@ -152,7 +144,6 @@ pub(super) fn cut_face_by_bezier(
     if !face.orientation() {
         new_face.invert();
     }
-    new_face.inherit_tracking_from(face);
     Some((new_face, fillet_edge))
 }
 
@@ -214,7 +205,6 @@ pub(super) fn create_new_side(
     if !side.orientation() {
         new_face.invert();
     }
-    new_face.inherit_tracking_from(side);
     Some(new_face)
 }
 

@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow, ensure};
 use monstertruck_geometry::base::{EuclideanSpace, InnerSpace, Point3, Vector3, Zero};
 use monstertruck_geometry::nurbs::NurbsSurface;
-use monstertruck_geometry::nurbs::continuity::SurfaceBoundary;
+use monstertruck_geometry::nurbs::continuity::BoundarySide;
 use monstertruck_geometry::nurbs::continuity_solver::{
     BoundaryContinuityRequest, BoundaryContinuitySolution,
 };
@@ -156,13 +156,13 @@ fn certification_seams(
     chebyshev_count: usize,
     margin: f64,
 ) -> Result<Vec<f64>> {
-    let first_knots = match request.first_boundary() {
-        SurfaceBoundary::UStart | SurfaceBoundary::UEnd => solution.first().knot_vector_v(),
-        SurfaceBoundary::VStart | SurfaceBoundary::VEnd => solution.first().knot_vector_u(),
+    let first_knots = match request.first_side() {
+        BoundarySide::MinU | BoundarySide::MaxU => solution.first().knot_vector_v(),
+        BoundarySide::MinV | BoundarySide::MaxV => solution.first().knot_vector_u(),
     };
-    let second_knots = match request.second_boundary() {
-        SurfaceBoundary::UStart | SurfaceBoundary::UEnd => solution.second().knot_vector_v(),
-        SurfaceBoundary::VStart | SurfaceBoundary::VEnd => solution.second().knot_vector_u(),
+    let second_knots = match request.second_side() {
+        BoundarySide::MinU | BoundarySide::MaxU => solution.second().knot_vector_v(),
+        BoundarySide::MinV | BoundarySide::MaxV => solution.second().knot_vector_u(),
     };
     let first_start = first_knots[0];
     let first_extent = first_knots[first_knots.len() - 1] - first_start;
@@ -287,7 +287,7 @@ fn sample_grids(
                 .map(|&cross| {
                     evaluate_boundary(
                         solution.first(),
-                        request.first_boundary(),
+                        request.first_side(),
                         seam + seam_delta,
                         -cross,
                     )
@@ -307,7 +307,7 @@ fn sample_grids(
                         .ok_or_else(|| anyhow!("the solved transition became non-finite"))?;
                     evaluate_boundary(
                         solution.second(),
-                        request.second_boundary(),
+                        request.second_side(),
                         mapped_seam,
                         mapped_cross,
                     )
@@ -320,7 +320,7 @@ fn sample_grids(
 
 fn evaluate_boundary(
     surface: &NurbsSurface<monstertruck_geometry::base::Vector4>,
-    boundary: SurfaceBoundary,
+    boundary: BoundarySide,
     seam: f64,
     inward: f64,
 ) -> Result<Point3> {
@@ -340,10 +340,10 @@ fn evaluate_boundary(
     let along_u = u_start + seam * (u_end - u_start);
     let along_v = v_start + seam * (v_end - v_start);
     let point = match boundary {
-        SurfaceBoundary::UStart => surface.evaluate(u_start + inward * (u_end - u_start), along_v),
-        SurfaceBoundary::UEnd => surface.evaluate(u_end - inward * (u_end - u_start), along_v),
-        SurfaceBoundary::VStart => surface.evaluate(along_u, v_start + inward * (v_end - v_start)),
-        SurfaceBoundary::VEnd => surface.evaluate(along_u, v_end - inward * (v_end - v_start)),
+        BoundarySide::MinU => surface.evaluate(u_start + inward * (u_end - u_start), along_v),
+        BoundarySide::MaxU => surface.evaluate(u_end - inward * (u_end - u_start), along_v),
+        BoundarySide::MinV => surface.evaluate(along_u, v_start + inward * (v_end - v_start)),
+        BoundarySide::MaxV => surface.evaluate(along_u, v_end - inward * (v_end - v_start)),
     };
     ensure!(
         point.x.is_finite() && point.y.is_finite() && point.z.is_finite(),

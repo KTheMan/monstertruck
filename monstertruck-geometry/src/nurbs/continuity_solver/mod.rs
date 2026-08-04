@@ -19,39 +19,36 @@
 //! samples.
 //!
 //! G0 is the established solver target. G1 through G3 have procedural
-//! polynomial and rational evidence and imported workflow execution, but still
-//! require independent higher-order certification before a production-readiness
-//! claim. G4 uses the same order-generic jet representation and residual
-//! machinery but requires explicit experimental opt-in. Solver tolerances
-//! belong only to the unclamped `f64` styling layer; topology sewing and
-//! solidification tolerances are intentionally absent.
+//! polynomial and rational evidence but still require independent higher-order
+//! certification before a production-readiness claim. G4 uses the same
+//! order-generic implementation machinery but requires explicit experimental
+//! opt-in. Solver tolerances belong only to the unclamped `f64` styling layer;
+//! topology sewing and solidification tolerances are intentionally absent.
 //!
-//! [`crate::nurbs::continuity_solver::BoundaryContinuitySolver::solve`] and
-//! [`crate::nurbs::continuity_solver::execute_boundary_continuity_contracts`] are transactional:
-//! they borrow
-//! inputs, borrow the unchanged master, and own only the solved dependent
-//! surface. Replay resolves persistent semantic
-//! contracts against current-generation tracking IDs, orders acyclic
-//! master-to-dependent chains, and rejects coupled multi-boundary systems until
-//! a future joint solver can preserve all obligations simultaneously.
+//! This first solver deliberately targets the established `f64` trait family.
+//! The scalar-generic `v2` traits remain scaffolding and do not yet expose the
+//! arbitrary-order derivative contract required here, so a later `v2` port is
+//! an explicit migration rather than an implicit claim of genericity.
+//!
+//! [`crate::nurbs::continuity_solver::BoundaryContinuitySolver::solve`] is
+//! transactional: it borrows both inputs, borrows the unchanged master in the
+//! result, and owns only the solved dependent surface.
 
 mod boundary;
 mod dual;
 mod lm;
 mod problem;
 mod qr;
-mod replay;
 mod resource;
 mod sampling;
 mod taylor;
 mod types;
 
-pub use replay::{
-    ContinuityContractSolve, ContinuityReplayError, ContinuityReplayExecutionError,
-    ContinuityReplaySolution, ResolvedBoundaryContinuityRequest, TrackedSurfaceIdRegistry,
-    execute_boundary_continuity_contracts, prepare_boundary_continuity_requests,
+pub use resource::{
+    ContinuityBudget, ContinuityTotals, ContinuityWork, ContinuityWorkTruncated,
+    continuity_max_work, continuity_totals, continuity_work, take_continuity_max_work,
+    take_continuity_totals, take_continuity_work,
 };
-pub use resource::ContinuityResourceBudget;
 pub use types::{
     BoundaryContinuityRequest, BoundaryContinuitySolution, BoundaryEndpoint, BoundaryTransition,
     ContinuityResource, ContinuitySolveError, ContinuitySolveReport, ContinuitySolverConfig,
@@ -65,7 +62,7 @@ mod tests;
 #[derive(Clone, Debug, PartialEq)]
 pub struct BoundaryContinuitySolver {
     config: ContinuitySolverConfig,
-    resource_budget: ContinuityResourceBudget,
+    budget: ContinuityBudget,
 }
 
 impl BoundaryContinuitySolver {
@@ -75,10 +72,10 @@ impl BoundaryContinuitySolver {
     ///
     /// Returns [`ContinuitySolveError::InvalidConfig`] when a convergence,
     /// damping, sampling, rank, or regularization control is invalid, and
-    /// [`ContinuitySolveError::ResourceLimitExceeded`] when the requested
+    /// [`ContinuitySolveError::WorkTruncated`] when the requested
     /// iteration count exceeds the default resource budget.
     pub fn new(config: ContinuitySolverConfig) -> Result<Self, ContinuitySolveError> {
-        Self::new_with_resource_budget(config, ContinuityResourceBudget::default())
+        Self::new_with_budget(config, ContinuityBudget::default())
     }
 
     /// Creates a solver with an explicit dense-work resource budget.
@@ -87,25 +84,22 @@ impl BoundaryContinuitySolver {
     ///
     /// Returns [`ContinuitySolveError::InvalidConfig`] when the solver controls
     /// are invalid, and
-    /// [`ContinuitySolveError::ResourceLimitExceeded`] when the requested
+    /// [`ContinuitySolveError::WorkTruncated`] when the requested
     /// iteration count exceeds the supplied budget.
-    pub fn new_with_resource_budget(
+    pub fn new_with_budget(
         config: ContinuitySolverConfig,
-        resource_budget: ContinuityResourceBudget,
+        budget: ContinuityBudget,
     ) -> Result<Self, ContinuitySolveError> {
         config.validate()?;
-        resource_budget.ensure(ContinuityResource::Iterations, config.max_iterations())?;
-        Ok(Self {
-            config,
-            resource_budget,
-        })
+        budget.ensure(ContinuityResource::Iterations, config.max_iterations())?;
+        Ok(Self { config, budget })
     }
 
     /// Returns the validated solver configuration.
     pub const fn config(&self) -> &ContinuitySolverConfig { &self.config }
 
     /// Returns the validated dense-work resource budget.
-    pub const fn resource_budget(&self) -> &ContinuityResourceBudget { &self.resource_budget }
+    pub const fn budget(&self) -> &ContinuityBudget { &self.budget }
 
     /// Solves one boundary-continuity request without mutating either input.
     ///
@@ -119,7 +113,7 @@ impl BoundaryContinuitySolver {
     /// ```
     /// use monstertruck_geometry::base::Vector4;
     /// use monstertruck_geometry::nurbs::continuity::{
-    ///     BoundaryAlignment, ContinuityOrder, SurfaceBoundary,
+    ///     BoundaryAlignment, ContinuityOrder, BoundarySide,
     /// };
     /// use monstertruck_geometry::nurbs::continuity_solver::{
     ///     BoundaryContinuityRequest, BoundaryContinuitySolver, ContinuitySolverConfig,
@@ -148,8 +142,8 @@ impl BoundaryContinuitySolver {
     /// let first = plane(-1.0);
     /// let second = plane(0.0);
     /// let request = BoundaryContinuityRequest::new(
-    ///     SurfaceBoundary::UEnd,
-    ///     SurfaceBoundary::UStart,
+    ///     BoundarySide::MaxU,
+    ///     BoundarySide::MinU,
     ///     BoundaryAlignment::Aligned,
     ///     ContinuityOrder::G0,
     /// );
@@ -173,6 +167,6 @@ impl BoundaryContinuitySolver {
         second: &crate::nurbs::NurbsSurface<crate::base::Vector4>,
         request: BoundaryContinuityRequest,
     ) -> Result<BoundaryContinuitySolution<'first>, ContinuitySolveError> {
-        lm::solve(first, second, request, &self.config, self.resource_budget)
+        lm::solve(first, second, request, &self.config, self.budget)
     }
 }

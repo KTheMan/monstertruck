@@ -1,8 +1,10 @@
 //! Typed continuity-solver failures.
 
 use super::super::super::continuity::SurfaceContinuityCapability;
-use super::{BoundaryEndpoint, ContinuityResource, ContinuitySolveReport};
+use super::super::resource::ContinuityWorkTruncated;
+use super::{BoundaryEndpoint, ContinuitySolveReport};
 use thiserror::Error;
+
 /// Failure to prepare or solve a geometric-continuity problem.
 #[derive(Clone, Debug, Error, PartialEq)]
 pub enum ContinuitySolveError {
@@ -10,15 +12,8 @@ pub enum ContinuitySolveError {
     #[error("invalid continuity solver configuration: {0}")]
     InvalidConfig(&'static str),
     /// A checked caller-controlled dimension exceeded its solver budget.
-    #[error("continuity solver {resource:?} budget exceeded: requested {requested}, limit {limit}")]
-    ResourceLimitExceeded {
-        /// Dimension that exceeded the budget.
-        resource: ContinuityResource,
-        /// Checked required count.
-        requested: usize,
-        /// Configured maximum count.
-        limit: usize,
-    },
+    #[error(transparent)]
+    WorkTruncated(#[from] ContinuityWorkTruncated),
     /// G4 was requested without explicit experimental opt-in.
     #[error("G4 continuity solving requires explicit experimental opt-in")]
     ExperimentalG4Disabled,

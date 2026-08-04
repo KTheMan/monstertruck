@@ -26,7 +26,7 @@ where
     /// assert_eq!(edge.curve(), 12);
     /// ```
     fn sweep(&self, trans: T, connect_points: Pc, _: Cc) -> Edge<P, C> {
-        let v = self.mapped(trans.mapping()).into_untracked();
+        let v = self.mapped(trans.mapping());
         connect_vertices(self, &v, connect_points.connector())
     }
 }
@@ -89,7 +89,7 @@ where
         let curve_mapping = GeometricMapping::<C>::mapping(trans);
         let connect_points = point_connector.connector();
         let connect_curves = curve_connector.connector();
-        let edge = self.mapped(point_mapping, curve_mapping).into_untracked();
+        let edge = self.mapped(point_mapping, curve_mapping);
         connect_edges(self, &edge, connect_points, connect_curves)
     }
 }
@@ -164,7 +164,7 @@ where
         let curve_mapping = GeometricMapping::<C>::mapping(trans);
         let connect_points = point_connector.connector();
         let connect_curves = curve_connector.connector();
-        let wire = self.mapped(point_mapping, curve_mapping).into_untracked();
+        let wire = self.mapped(point_mapping, curve_mapping);
         connect_wires(self, &wire, connect_points, connect_curves).collect()
     }
 }
@@ -231,9 +231,7 @@ where
         let connect_points = point_connector.connector();
         let connect_curves = curve_connector.connector();
         let mut shell = shell![self.inverse()];
-        let seiling = self
-            .mapped(point_mapping, curve_mapping, surface_mapping)
-            .into_untracked();
+        let seiling = self.mapped(point_mapping, curve_mapping, surface_mapping);
         let biter0 = self.boundary_iters().into_iter().flatten();
         let biter1 = seiling.boundary_iters().into_iter().flatten();
         shell.extend(connect_raw_wires(
@@ -288,9 +286,7 @@ where
             .into_iter()
             .map(move |shell| {
                 let mut bdry = Shell::new();
-                let mut seiling = shell
-                    .mapped(&point_mapping, &curve_mapping, &surface_mapping)
-                    .into_untracked();
+                let mut seiling = shell.mapped(&point_mapping, &curve_mapping, &surface_mapping);
                 bdry.extend(shell.face_iter().map(|face| face.inverse()));
                 let bdries0 = shell.extract_boundaries();
                 let bdries1 = seiling.extract_boundaries();

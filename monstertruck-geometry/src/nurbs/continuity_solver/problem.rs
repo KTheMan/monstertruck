@@ -2,7 +2,7 @@
 
 use super::boundary::BoundaryFrame;
 use super::dual::Dual;
-use super::resource::ContinuityResourceBudget;
+use super::resource::ContinuityBudget;
 use super::sampling::{nonzero_span_count, seam_samples, seam_validation_samples};
 use super::taylor::{JetScalar, TaylorJet};
 use super::types::{
@@ -11,7 +11,7 @@ use super::types::{
 };
 use crate::base::{InnerSpace, Vector3, Vector4};
 use crate::nurbs::continuity::{
-    BoundaryAlignment, ContinuityOrder, SurfaceAxis, SurfaceContinuityCapability,
+    BoundaryAlignment, ContinuityOrder, SurfaceAxis, capability_for_nurbs,
 };
 use crate::nurbs::{BasisWindow, KnotVector, NurbsSurface};
 use monstertruck_traits::ParametricSurface;
@@ -190,11 +190,11 @@ fn validation_density(
 
 fn validate_capability(
     surface: &NurbsSurface<Vector4>,
-    boundary: crate::nurbs::continuity::SurfaceBoundary,
+    boundary: crate::nurbs::continuity::BoundarySide,
     order: ContinuityOrder,
     endpoint: BoundaryEndpoint,
 ) -> Result<(), ContinuitySolveError> {
-    let capability = SurfaceContinuityCapability::for_nurbs(surface, boundary, order);
+    let capability = capability_for_nurbs(surface, boundary, order);
     if capability.is_feasible() {
         Ok(())
     } else {

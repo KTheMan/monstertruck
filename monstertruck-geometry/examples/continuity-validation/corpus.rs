@@ -1,5 +1,7 @@
-use monstertruck_geometry::nurbs::continuity::BoundaryAlignment;
-use monstertruck_geometry::nurbs::continuity::{ContinuityOrder, SurfaceBoundary};
+use anyhow::{Result, anyhow};
+use monstertruck_geometry::nurbs::continuity::{
+    BoundaryAlignment, BoundarySide, ContinuityMaturity, ContinuityOrder,
+};
 use monstertruck_geometry::nurbs::continuity_solver::{
     BoundaryContinuityRequest, ContinuitySolverConfig,
 };
@@ -93,20 +95,56 @@ pub enum FixtureMutation {
 /// Serializable request form with stable enum spellings.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct RequestSpec {
-    pub first_boundary: SurfaceBoundary,
-    pub second_boundary: SurfaceBoundary,
-    pub alignment: BoundaryAlignment,
-    pub order: ContinuityOrder,
+    pub first_side: BoundarySideSpec,
+    pub second_side: BoundarySideSpec,
+    pub alignment: BoundaryAlignmentSpec,
+    pub order: usize,
 }
 
 impl RequestSpec {
-    pub const fn build(self) -> BoundaryContinuityRequest {
-        BoundaryContinuityRequest::new(
-            self.first_boundary,
-            self.second_boundary,
-            self.alignment,
-            self.order,
-        )
+    pub fn build(self) -> Result<BoundaryContinuityRequest> {
+        Ok(BoundaryContinuityRequest::new(
+            self.first_side.build(),
+            self.second_side.build(),
+            self.alignment.build(),
+            ContinuityOrder::new(self.order).map_err(|error| anyhow!(error))?,
+        ))
+    }
+}
+
+/// Evidence-local spelling for a public surface side.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub enum BoundarySideSpec {
+    MinU,
+    MaxU,
+    MinV,
+    MaxV,
+}
+
+impl BoundarySideSpec {
+    const fn build(self) -> BoundarySide {
+        match self {
+            Self::MinU => BoundarySide::MinU,
+            Self::MaxU => BoundarySide::MaxU,
+            Self::MinV => BoundarySide::MinV,
+            Self::MaxV => BoundarySide::MaxV,
+        }
+    }
+}
+
+/// Evidence-local spelling for boundary orientation.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub enum BoundaryAlignmentSpec {
+    Aligned,
+    Reversed,
+}
+
+impl BoundaryAlignmentSpec {
+    pub const fn build(self) -> BoundaryAlignment {
+        match self {
+            Self::Aligned => BoundaryAlignment::Aligned,
+            Self::Reversed => BoundaryAlignment::Reversed,
+        }
     }
 }
 
@@ -163,14 +201,32 @@ pub struct DenseSpec {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Expectation {
     Converged {
-        /// Legacy v1 evidence label retained for digest compatibility.
-        maturity: String,
+        maturity: MaturitySpec,
         maximum_dense_residual_by_order: Vec<f64>,
         maximum_normal_angle: f64,
     },
     Error {
         error: ErrorKind,
     },
+}
+
+/// Evidence-local expected public maturity label.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub enum MaturitySpec {
+    Established,
+    Provisional,
+    Experimental,
+}
+
+impl MaturitySpec {
+    pub const fn matches(self, maturity: ContinuityMaturity) -> bool {
+        matches!(
+            (self, maturity),
+            (Self::Established, ContinuityMaturity::Established)
+                | (Self::Provisional, ContinuityMaturity::Provisional)
+                | (Self::Experimental, ContinuityMaturity::Experimental)
+        )
+    }
 }
 
 /// Stable classification of expected solver errors.
@@ -188,7 +244,7 @@ pub enum ErrorKind {
     NonFiniteJacobian,
     NoDescentDirection,
     DidNotConverge,
-    ResourceLimitExceeded,
+    WorkTruncated,
 }
 
 impl ErrorKind {
@@ -206,15 +262,7 @@ impl ErrorKind {
             Self::NonFiniteJacobian => "non_finite_jacobian",
             Self::NoDescentDirection => "no_descent_direction",
             Self::DidNotConverge => "did_not_converge",
-            Self::ResourceLimitExceeded => "resource_limit_exceeded",
+            Self::WorkTruncated => "work_truncated",
         }
     }
-}
-
-/// Baseline file containing reviewed deterministic digests.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Baseline {
-    pub schema_version: u32,
-    pub digest_version: String,
-    pub cases: std::collections::BTreeMap<String, String>,
 }

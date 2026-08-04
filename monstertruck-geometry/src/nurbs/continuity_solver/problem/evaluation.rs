@@ -5,6 +5,7 @@ use super::transition::{
     physical_control_scalar,
 };
 use super::*;
+use crate::nurbs::continuity_solver::resource::{ContinuityWork, charge_continuity_work};
 
 impl PreparedProblem<'_> {
     pub(in crate::nurbs::continuity_solver) fn initial_variables(&self) -> &[f64] {
@@ -189,6 +190,10 @@ impl PreparedProblem<'_> {
         }
         let values = residuals.iter().map(Dual::value).collect::<Vec<_>>();
         let jacobian = if with_jacobian {
+            charge_continuity_work(ContinuityWork {
+                jacobian_elements: residuals.len().saturating_mul(variable_count) as u64,
+                ..ContinuityWork::default()
+            });
             let rows = residuals
                 .iter()
                 .map(|value| value.gradient().to_vec())

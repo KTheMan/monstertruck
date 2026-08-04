@@ -478,7 +478,6 @@ fn fillet_along_wire_open(
             .collect::<Wire>();
 
         let shared_face = &mut shell[shared_face_index.face_index];
-        let source_face = shared_face.clone();
         let (front_edge, _) =
             find_adjacent_edge(shared_face, wire[0].id()).ok_or(FilletError::GeometryFailed {
                 context: "find front edge on shared face",
@@ -535,8 +534,7 @@ fn fillet_along_wire_open(
             });
         }
         boundaries[shared_face_index.boundary_index] = new_wire;
-        *shared_face = Face::new_unchecked(boundaries, shared_face.oriented_surface());
-        shared_face.inherit_tracking_from(&source_face);
+        *shared_face = Face::new_unchecked(boundaries, shared_face.oriented_surface())
     }
 
     shell.extend(fillet_faces);
@@ -633,11 +631,9 @@ fn fillet_along_wire_closed(
         let new_wire: Wire = wire_edges.into();
 
         let shared_face = &mut shell[shared_face_index.face_index];
-        let source_face = shared_face.clone();
         let mut boundaries = shared_face.boundaries();
         boundaries[shared_face_index.boundary_index] = new_wire;
         *shared_face = Face::new_unchecked(boundaries, shared_face.oriented_surface());
-        shared_face.inherit_tracking_from(&source_face);
     }
 
     shell.extend(fillet_faces);

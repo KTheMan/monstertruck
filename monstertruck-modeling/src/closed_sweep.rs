@@ -15,7 +15,7 @@ where
         let mut vertex = self.clone();
         let mut wire: Wire<P, C> = (1..division)
             .map(|_| {
-                let new_vertex = vertex.mapped(point_mapping).into_untracked();
+                let new_vertex = vertex.mapped(point_mapping);
                 let edge = connect_vertices(&vertex, &new_vertex, connect_points);
                 vertex = new_vertex;
                 edge
@@ -49,7 +49,7 @@ where
         let mut edge = self.clone();
         let mut shell: Shell<P, C, S> = (1..division)
             .map(|_| {
-                let new_edge = edge.mapped(point_mapping, curve_mapping).into_untracked();
+                let new_edge = edge.mapped(point_mapping, curve_mapping);
                 let face = connect_edges(&edge, &new_edge, connect_points, connect_curves);
                 edge = new_edge;
                 face
@@ -83,7 +83,7 @@ where
         let mut wire = self.clone();
         let mut shell: Shell<P, C, S> = (1..division)
             .flat_map(|_| {
-                let new_wire = wire.mapped(point_mapping, curve_mapping).into_untracked();
+                let new_wire = wire.mapped(point_mapping, curve_mapping);
                 let vec: Vec<_> =
                     connect_wires(&wire, &new_wire, connect_points, connect_curves).collect();
                 wire = new_wire;

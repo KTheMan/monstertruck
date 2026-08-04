@@ -2,7 +2,9 @@
 
 use super::problem::{PreparedProblem, ResidualEvaluation};
 use super::qr::solve_column_pivoted;
-use super::resource::ContinuityResourceBudget;
+use super::resource::{
+    ContinuityBudget, ContinuityWork, ContinuityWorkSession, charge_continuity_work,
+};
 use super::types::{
     BoundaryContinuityRequest, BoundaryContinuitySolution, ContinuityResource,
     ContinuitySolveError, ContinuitySolveReport, ContinuitySolveReportData, ContinuitySolverConfig,
@@ -16,9 +18,10 @@ pub(super) fn solve<'first>(
     second: &NurbsSurface<Vector4>,
     request: BoundaryContinuityRequest,
     config: &ContinuitySolverConfig,
-    resource_budget: ContinuityResourceBudget,
+    budget: ContinuityBudget,
 ) -> Result<BoundaryContinuitySolution<'first>, ContinuitySolveError> {
-    let problem = PreparedProblem::new(first, second, request, config, resource_budget)?;
+    let _work_session = ContinuityWorkSession::begin();
+    let problem = PreparedProblem::new(first, second, request, config, budget)?;
     let mut variables = problem.initial_variables().to_vec();
     let mut evaluation = problem.evaluate(&variables, config, true)?;
     let initial_objective = evaluation.objective;
@@ -32,17 +35,19 @@ pub(super) fn solve<'first>(
         certified_residuals(&problem, &variables, &evaluation, request, config)?
     {
         let report = report(
-            ContinuityTermination::Converged,
             request,
-            0,
-            accepted_steps,
-            rejected_steps,
-            initial_objective,
+            ReportState {
+                termination: ContinuityTermination::Converged,
+                iterations: 0,
+                accepted_steps,
+                rejected_steps,
+                initial_objective,
+                step_norm: last_step_norm,
+                damping,
+                numerical_rank,
+            },
             &evaluation,
             &residuals,
-            last_step_norm,
-            damping,
-            numerical_rank,
             problem.variable_count(),
         );
         return Ok(BoundaryContinuitySolution::new(
@@ -53,8 +58,13 @@ pub(super) fn solve<'first>(
         ));
     }
 
-    resource_budget.ensure(ContinuityResource::QrElements, problem.qr_elements())?;
+    budget.ensure(ContinuityResource::QrElements, problem.qr_elements())?;
     for iteration in 1..=config.max_iterations() {
+        charge_continuity_work(ContinuityWork {
+            iterations: 1,
+            qr_elements: problem.qr_elements() as u64,
+            ..ContinuityWork::default()
+        });
         let (rows, rhs) = augmented_system(&evaluation, damping, problem.variable_count());
         let least_squares = solve_column_pivoted(&rows, &rhs, config.rank_tolerance())
             .ok_or(ContinuitySolveError::NoDescentDirection)?;
@@ -86,17 +96,19 @@ pub(super) fn solve<'first>(
                 certified_residuals(&problem, &variables, &evaluation, request, config)?
             {
                 let report = report(
-                    ContinuityTermination::Converged,
                     request,
-                    iteration,
-                    accepted_steps,
-                    rejected_steps,
-                    initial_objective,
+                    ReportState {
+                        termination: ContinuityTermination::Converged,
+                        iterations: iteration,
+                        accepted_steps,
+                        rejected_steps,
+                        initial_objective,
+                        step_norm: last_step_norm,
+                        damping,
+                        numerical_rank,
+                    },
                     &evaluation,
                     &residuals,
-                    last_step_norm,
-                    damping,
-                    numerical_rank,
                     problem.variable_count(),
                 );
                 return Ok(BoundaryContinuitySolution::new(
@@ -112,17 +124,19 @@ pub(super) fn solve<'first>(
             if damping == config.maximum_damping() {
                 let residuals = combined_residuals(&problem, &variables, &evaluation, config)?;
                 let report = report(
-                    ContinuityTermination::NoDescent,
                     request,
-                    iteration,
-                    accepted_steps,
-                    rejected_steps,
-                    initial_objective,
+                    ReportState {
+                        termination: ContinuityTermination::NoDescent,
+                        iterations: iteration,
+                        accepted_steps,
+                        rejected_steps,
+                        initial_objective,
+                        step_norm: last_step_norm,
+                        damping,
+                        numerical_rank,
+                    },
                     &evaluation,
                     &residuals,
-                    last_step_norm,
-                    damping,
-                    numerical_rank,
                     problem.variable_count(),
                 );
                 return Err(ContinuitySolveError::DidNotConverge(Box::new(report)));
@@ -132,17 +146,19 @@ pub(super) fn solve<'first>(
 
     let residuals = combined_residuals(&problem, &variables, &evaluation, config)?;
     let report = report(
-        ContinuityTermination::MaximumIterations,
         request,
-        config.max_iterations(),
-        accepted_steps,
-        rejected_steps,
-        initial_objective,
+        ReportState {
+            termination: ContinuityTermination::MaximumIterations,
+            iterations: config.max_iterations(),
+            accepted_steps,
+            rejected_steps,
+            initial_objective,
+            step_norm: last_step_norm,
+            damping,
+            numerical_rank,
+        },
         &evaluation,
         &residuals,
-        last_step_norm,
-        damping,
-        numerical_rank,
         problem.variable_count(),
     );
     Err(ContinuitySolveError::DidNotConverge(Box::new(report)))
@@ -249,34 +265,37 @@ fn gradient_infinity_norm(evaluation: &ResidualEvaluation) -> f64 {
         .fold(0.0, f64::max)
 }
 
-#[allow(clippy::too_many_arguments)]
-fn report(
+struct ReportState {
     termination: ContinuityTermination,
-    request: BoundaryContinuityRequest,
     iterations: usize,
     accepted_steps: usize,
     rejected_steps: usize,
     initial_objective: f64,
-    evaluation: &ResidualEvaluation,
-    residuals: &[OrderResidual],
     step_norm: f64,
     damping: f64,
     numerical_rank: usize,
+}
+
+fn report(
+    request: BoundaryContinuityRequest,
+    state: ReportState,
+    evaluation: &ResidualEvaluation,
+    residuals: &[OrderResidual],
     variable_count: usize,
 ) -> ContinuitySolveReport {
     ContinuitySolveReport::from_data(ContinuitySolveReportData {
-        termination,
+        termination: state.termination,
         order: request.order(),
-        iterations,
-        accepted_steps,
-        rejected_steps,
-        initial_objective,
+        iterations: state.iterations,
+        accepted_steps: state.accepted_steps,
+        rejected_steps: state.rejected_steps,
+        initial_objective: state.initial_objective,
         final_objective: evaluation.objective,
         residuals: residuals.to_vec(),
         gradient_infinity_norm: gradient_infinity_norm(evaluation),
-        step_norm,
-        damping,
-        numerical_rank,
+        step_norm: state.step_norm,
+        damping: state.damping,
+        numerical_rank: state.numerical_rank,
         variable_count,
         residual_count: evaluation.values.len(),
     })
@@ -302,8 +321,7 @@ fn stable_norm(values: &[f64]) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::nurbs::continuity::{ContinuityOrder, SurfaceBoundary};
-    use crate::nurbs::contract::BoundaryAlignment;
+    use crate::nurbs::continuity::{BoundaryAlignment, BoundarySide, ContinuityOrder};
 
     #[test]
     fn independent_validation_can_veto_collocation_convergence() {
@@ -331,8 +349,8 @@ mod tests {
         assert!(tolerances_met(
             &collocation,
             BoundaryContinuityRequest::new(
-                SurfaceBoundary::UEnd,
-                SurfaceBoundary::UStart,
+                BoundarySide::MaxU,
+                BoundarySide::MinU,
                 BoundaryAlignment::Aligned,
                 ContinuityOrder::G0,
             ),
@@ -341,8 +359,8 @@ mod tests {
         assert!(!tolerances_met(
             &merged,
             BoundaryContinuityRequest::new(
-                SurfaceBoundary::UEnd,
-                SurfaceBoundary::UStart,
+                BoundarySide::MaxU,
+                BoundarySide::MinU,
                 BoundaryAlignment::Aligned,
                 ContinuityOrder::G0,
             ),

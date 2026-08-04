@@ -27,6 +27,10 @@ the order-truncated local map is intended to be evaluated.
 Both run times and solver work counters are emitted; elapsed time is diagnostic
 only and is excluded from equality and digest comparisons.
 
+The evidence schema is example-local. It converts public enums, reports, and
+errors into observation values without making their Rust types a serialization
+or persistence contract.
+
 Emit reviewed observations:
 
 ```powershell
@@ -34,21 +38,6 @@ cargo run -p monstertruck-geometry --example continuity-validation -- `
   --emit target/continuity-validation-observed.json
 ```
 
-Verify the committed baseline:
-
-```powershell
-cargo run -p monstertruck-geometry --example continuity-validation -- --verify
-```
-
-The runner never rewrites the committed baseline. Review emitted metrics and
-copy approved digests into `v1/baseline.json`.
-
-Run emit and verify as separate commands. The fresh-process verify, together
-with each process's immediate rerun check, is the cross-process determinism
-receipt.
-
-`v1/evidence-windows-msvc.json` is the unchanged raw reviewed full-run receipt.
-It records absolute and normalized residuals, worst locations and mixed
-derivatives, solver work counters, and both per-case run times. The recorded
-v4 full emit took 316.8 seconds on Windows `x86_64-pc-windows-msvc` with Rust
-1.94.0 and LLVM 21.1.8.
+The runner does not commit host-specific digest expectations. CI exercises the
+same emit path and requires each case's two immediate runs, outcome, dense
+certificate, digest, and deterministic work units to agree.

@@ -43,13 +43,6 @@ This fork exists to accomplish two main goals:
 
 Per-crate detail and porting verdicts live in [`TRUCK-PARITY.md`](TRUCK-PARITY.md); upstream commits we hand-ported include SHAs in their commit bodies for attribution.
 
-The high-order continuity work is currently in
-[Phase 4 engineering validation](PHASE-4-VALIDATION.md). That program separates
-implemented behavior from analytically verified and realistically validated
-claims, and treats `G4` as an experimental reach goal rather than a release
-requirement. The current findings and gate status are tracked in the
-[Phase 4 audit ledger](PHASE-4-AUDIT.md).
-
 **Workspace Modernization**
 - All crates renamed `truck-*` -> `monstertruck-*`; `truck-platform` -> `monstertruck-gpu`, `truck-stepio/src/{in,out}` -> `monstertruck-step/src/{load,save}`, `truck-shapeops` -> `monstertruck-solid`.
 - Rust edition 2024, `wgpu` 29, `rand` 0.10, `criterion` 0.8, `gloo` 0.12; `web_time::Instant` for `wasm`.

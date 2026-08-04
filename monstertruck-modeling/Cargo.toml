@@ -13,7 +13,6 @@ categories = ["graphics"]
 
 [features]
 default = []
-solid = ["dep:monstertruck-solid"]
 fillet = ["monstertruck-fillet"]
 font = ["dep:ttf-parser"]
 
@@ -27,7 +26,6 @@ monstertruck-core = { workspace = true }
 monstertruck-geometry = { workspace = true }
 monstertruck-traits = { workspace = true, features = ["derive"] }
 monstertruck-mesh = { workspace = true }
-monstertruck-solid = { workspace = true, optional = true }
 monstertruck-fillet = { workspace = true, optional = true }
 monstertruck-topology = { workspace = true }
 rayon = { workspace = true }

@@ -44,6 +44,14 @@ impl Dual {
     }
 
     fn derivative(&self, index: usize) -> f64 { self.gradient.get(index).copied().unwrap_or(0.0) }
+
+    fn product_gradient(&self, other: &Self) -> Vec<f64> {
+        (0..self.gradient_len(other))
+            .map(|index| {
+                self.derivative(index) * other.value + self.value * other.derivative(index)
+            })
+            .collect()
+    }
 }
 
 impl Add for Dual {
@@ -77,16 +85,10 @@ impl Sub for Dual {
 impl Mul for Dual {
     type Output = Self;
 
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, other: Self) -> Self::Output {
-        let count = self.gradient_len(&other);
         Self {
             value: self.value * other.value,
-            gradient: (0..count)
-                .map(|index| {
-                    self.derivative(index) * other.value + self.value * other.derivative(index)
-                })
-                .collect(),
+            gradient: self.product_gradient(&other),
         }
     }
 }

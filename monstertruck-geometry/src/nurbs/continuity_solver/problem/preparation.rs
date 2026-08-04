@@ -8,31 +8,28 @@ impl<'surface> PreparedProblem<'surface> {
         second: &'surface NurbsSurface<Vector4>,
         request: BoundaryContinuityRequest,
         config: &ContinuitySolverConfig,
-        resource_budget: ContinuityResourceBudget,
+        budget: ContinuityBudget,
     ) -> Result<Self, ContinuitySolveError> {
         config.validate()?;
         if request.order() == ContinuityOrder::G4 && !config.allows_experimental_g4() {
             return Err(ContinuitySolveError::ExperimentalG4Disabled);
         }
-        let first_frame = BoundaryFrame::try_new(first, request.first_boundary())
+        let first_frame = BoundaryFrame::try_new(first, request.first_side())
             .map_err(|_| ContinuitySolveError::InvalidBoundary(BoundaryEndpoint::First))?;
-        let second_frame = BoundaryFrame::try_new(second, request.second_boundary())
+        let second_frame = BoundaryFrame::try_new(second, request.second_side())
             .map_err(|_| ContinuitySolveError::InvalidBoundary(BoundaryEndpoint::Second))?;
         validate_capability(
             first,
-            request.first_boundary(),
+            request.first_side(),
             request.order(),
             BoundaryEndpoint::First,
         )?;
         validate_capability(
             second,
-            request.second_boundary(),
+            request.second_side(),
             request.order(),
             BoundaryEndpoint::Second,
         )?;
-        validate_weights(first, BoundaryEndpoint::First, config.minimum_weight())?;
-        validate_weights(second, BoundaryEndpoint::Second, config.minimum_weight())?;
-
         let control_point_count = checked_add(
             checked_mul(
                 first_frame.u_control_count(),
@@ -46,11 +43,13 @@ impl<'surface> PreparedProblem<'surface> {
             )?,
             "surface control-point dimension overflowed",
         )?;
-        resource_budget.ensure(ContinuityResource::ControlPoints, control_point_count)?;
+        budget.ensure(ContinuityResource::ControlPoints, control_point_count)?;
+        validate_weights(first, BoundaryEndpoint::First, config.minimum_weight())?;
+        validate_weights(second, BoundaryEndpoint::Second, config.minimum_weight())?;
         let first_spans = frame_span_count(first, first_frame, BoundaryEndpoint::First)?;
         let second_spans = frame_span_count(second, second_frame, BoundaryEndpoint::Second)?;
         let span_count = checked_add(first_spans, second_spans, "seam span count overflowed")?;
-        resource_budget.ensure(ContinuityResource::Spans, span_count)?;
+        budget.ensure(ContinuityResource::Spans, span_count)?;
         let validation_density = validation_density(first_frame, second_frame, request, config)?;
         let optimizer_sample_upper = checked_mul(
             span_count,
@@ -66,7 +65,7 @@ impl<'surface> PreparedProblem<'surface> {
             validation_density,
             "validation sample count overflowed",
         )?;
-        resource_budget.ensure(
+        budget.ensure(
             ContinuityResource::Samples,
             checked_add(
                 optimizer_sample_upper,
@@ -117,7 +116,7 @@ impl<'surface> PreparedProblem<'surface> {
                 BoundaryEndpoint::First,
             ));
         }
-        resource_budget.ensure(
+        budget.ensure(
             ContinuityResource::Samples,
             checked_add(
                 samples.len(),
@@ -150,7 +149,7 @@ impl<'surface> PreparedProblem<'surface> {
             transition.variable_count(),
             "optimization variable dimension overflowed",
         )?;
-        resource_budget.ensure(ContinuityResource::Variables, variable_count)?;
+        budget.ensure(ContinuityResource::Variables, variable_count)?;
         let taylor_terms = checked_mul(
             request.order().as_usize() + 1,
             request.order().as_usize() + 2,
@@ -196,7 +195,7 @@ impl<'surface> PreparedProblem<'surface> {
             taylor_terms,
             "validation residual dimension overflowed",
         )?;
-        resource_budget.ensure(
+        budget.ensure(
             ContinuityResource::Residuals,
             checked_add(
                 optimizer_residuals,
@@ -204,7 +203,7 @@ impl<'surface> PreparedProblem<'surface> {
                 "total residual dimension overflowed",
             )?,
         )?;
-        resource_budget.ensure(
+        budget.ensure(
             ContinuityResource::JacobianElements,
             checked_mul(
                 optimizer_residuals,

@@ -21,6 +21,7 @@ monstertruck-traits = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+criterion = { workspace = true }
 proptest = { workspace = true, features = ["attr-macro"] }
 serde_json = { workspace = true }
 monstertruck-traits = { workspace = true, features = ["derive", "polynomial"] }
@@ -29,9 +30,5 @@ monstertruck-traits = { workspace = true, features = ["derive", "polynomial"] }
 name = "scalar_generic"
 harness = false
 
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-criterion = { workspace = true }
-
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 getrandom = { workspace = true }
-getrandom03 = { workspace = true }

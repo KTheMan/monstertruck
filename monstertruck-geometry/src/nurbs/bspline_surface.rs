@@ -1057,18 +1057,6 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineSurface<P> {
         self
     }
 
-    /// Elevates the `v` direction to at least `target_degree`.
-    ///
-    /// The geometry and parameterization are preserved. This method is a
-    /// no-op when the current degree already meets or exceeds the target.
-    pub fn elevate_vdegree_to(&mut self, target_degree: usize) -> &mut Self {
-        let current_degree = self.vdegree();
-        (current_degree..target_degree).for_each(|_| {
-            self.elevate_vdegree();
-        });
-        self
-    }
-
     /// Elevates the udegree.
     /// # Examples
     /// ```
@@ -1093,24 +1081,6 @@ impl<P: ControlPoint<f64> + Tolerance> BsplineSurface<P> {
         self.elevate_vdegree();
         self.swap_axes();
         self
-    }
-
-    /// Elevates the `u` direction to at least `target_degree`.
-    ///
-    /// The geometry and parameterization are preserved. This method is a
-    /// no-op when the current degree already meets or exceeds the target.
-    pub fn elevate_udegree_to(&mut self, target_degree: usize) -> &mut Self {
-        let current_degree = self.udegree();
-        (current_degree..target_degree).for_each(|_| {
-            self.elevate_udegree();
-        });
-        self
-    }
-
-    /// Elevates both parameter directions to at least `target_degrees`.
-    pub fn elevate_degrees_to(&mut self, target_degrees: (usize, usize)) -> &mut Self {
-        self.elevate_udegree_to(target_degrees.0)
-            .elevate_vdegree_to(target_degrees.1)
     }
 
     /// Aligns the udegree with the same degrees.

@@ -32,6 +32,9 @@ macro_rules! nonpositive_tolerance {
 /// Abstract traits: `Curve` and `Surface`.
 pub mod traits;
 pub use traits::*;
+/// Checked continuity requests and capability diagnostics.
+pub mod surface_continuity;
+pub use surface_continuity::*;
 /// Algorithms for curves and surfaces.
 pub mod algo;
 /// Scalar-generic v2 trait family.

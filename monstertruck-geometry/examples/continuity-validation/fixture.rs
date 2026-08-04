@@ -18,7 +18,9 @@ pub fn build(case: &CaseSpec) -> Result<Fixture> {
         case.geometry.second_cross_domain_scale.is_finite()
             && case.geometry.second_cross_domain_scale > 0.0
     );
-    ensure!(case.request.alignment == case.geometry.second_seam_parameterization.alignment());
+    ensure!(
+        case.request.alignment.build() == case.geometry.second_seam_parameterization.alignment()
+    );
 
     let cross_degree = case.geometry.cross_degree;
     let cross_knots = cross_knots(cross_degree)?;
