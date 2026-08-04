@@ -87,6 +87,22 @@ jobs:
           --example continuity-validation --
           --emit target/continuity-validation-ci.json
 
+  topology-state-validation:
+    name: topology state validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The workspace still expects the public resources submodule.
+          submodules: false
+      - run: git submodule update --init resources
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: >-
+          cargo run -p monstertruck-topology
+          --example topology-state-validation --
+          --check validation/topology/topology-state-snapshot-v1.json
+
   meshing-features:
     name: monstertruck-meshing feature subsets
     runs-on: ubuntu-latest
