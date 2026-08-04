@@ -37,7 +37,7 @@
 use std::collections::BTreeSet;
 
 use monstertruck_core::{Matrix4, Point3, Rad, Vector3};
-#[cfg(feature = "solid")]
+#[cfg(any(feature = "solid", feature = "fillet"))]
 use monstertruck_topology::TrackingReport;
 use monstertruck_topology::{
     FeatureId, LineageRelation, OperationKind, TopologyTracking, TrackingError, TrackingId,
@@ -140,7 +140,7 @@ fn record_generated(
     Ok(())
 }
 
-#[cfg(feature = "solid")]
+#[cfg(any(feature = "solid", feature = "fillet"))]
 fn record_finalized(
     source: &[TrackingId],
     report: &TrackingReport,
@@ -170,7 +170,7 @@ fn record_finalized(
     Ok(())
 }
 
-#[cfg(feature = "solid")]
+#[cfg(any(feature = "solid", feature = "fillet"))]
 fn finalize_output<T: TopologyTracking>(
     output: &mut T,
     source: &[TrackingId],

@@ -14,7 +14,7 @@ categories = ["graphics"]
 [features]
 default = []
 solid = ["dep:monstertruck-solid"]
-fillet = ["solid", "dep:monstertruck-fillet"]
+fillet = ["monstertruck-fillet"]
 font = ["dep:ttf-parser"]
 
 [dependencies]
