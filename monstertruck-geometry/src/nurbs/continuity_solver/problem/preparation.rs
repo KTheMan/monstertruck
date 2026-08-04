@@ -44,13 +44,13 @@ impl<'surface> PreparedProblem<'surface> {
         )?;
         let control_point_count = checked_add(
             checked_mul(
-                first_frame.u_control_count(),
-                first_frame.v_control_count(),
+                first_frame.control_count_u(),
+                first_frame.control_count_v(),
                 "surface control-point dimension overflowed",
             )?,
             checked_mul(
-                second_frame.u_control_count(),
-                second_frame.v_control_count(),
+                second_frame.control_count_u(),
+                second_frame.control_count_v(),
                 "surface control-point dimension overflowed",
             )?,
             "surface control-point dimension overflowed",
@@ -228,6 +228,7 @@ impl<'surface> PreparedProblem<'surface> {
         validate_regular_boundary(
             first,
             first_frame,
+            BoundaryAlignment::Aligned,
             BoundaryEndpoint::First,
             &samples,
             characteristic_length,
@@ -235,6 +236,7 @@ impl<'surface> PreparedProblem<'surface> {
         validate_regular_boundary(
             second,
             second_frame,
+            request.alignment(),
             BoundaryEndpoint::Second,
             &samples,
             characteristic_length,
@@ -244,7 +246,7 @@ impl<'surface> PreparedProblem<'surface> {
             .control_strip_indices(strip_rows)
             .map_err(|_| ContinuitySolveError::InvalidBoundary(BoundaryEndpoint::Second))?;
         let mut control_offsets =
-            vec![vec![None; second_frame.v_control_count()]; second_frame.u_control_count()];
+            vec![vec![None; second_frame.control_count_v()]; second_frame.control_count_u()];
         control_indices
             .iter()
             .enumerate()
@@ -300,7 +302,7 @@ fn aligned_samples(mut samples: Vec<f64>, alignment: BoundaryAlignment) -> Vec<f
             .iter_mut()
             .for_each(|sample| *sample = 1.0 - *sample);
         samples.sort_by(f64::total_cmp);
-        samples.dedup_by(|first, second| first.to_bits() == second.to_bits());
+        samples.dedup_by(|first, second| first == second);
     }
     samples
 }
@@ -351,9 +353,9 @@ fn for_each_merged_unique(first: &[f64], second: &[f64], mut visit: impl FnMut(f
             second_index += 1;
             sample
         };
-        if previous != Some(sample.to_bits()) {
+        if previous != Some(sample) {
             visit(sample);
-            previous = Some(sample.to_bits());
+            previous = Some(sample);
         }
     }
 }

@@ -66,7 +66,7 @@ pub(super) fn seam_samples(
                     }))
                     .collect::<Vec<_>>();
                 samples.sort_by(f64::total_cmp);
-                samples.dedup_by(|first, second| first.to_bits() == second.to_bits());
+                samples.dedup_by(|first, second| first == second);
                 samples
             })
         }

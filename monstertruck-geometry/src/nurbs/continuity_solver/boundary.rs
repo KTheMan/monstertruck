@@ -3,9 +3,7 @@
 use thiserror::Error;
 
 use crate::base::Vector4;
-#[cfg(test)]
-use crate::nurbs::continuity::BoundaryAlignment;
-use crate::nurbs::continuity::{BoundarySide, SurfaceAxis};
+use crate::nurbs::continuity::{BoundaryAlignment, BoundarySide, SurfaceAxis};
 use crate::nurbs::{KnotVector, NurbsSurface};
 
 /// One finite, nonempty surface parameter domain.
@@ -87,11 +85,17 @@ impl BoundaryFrame {
 
     /// Returns the surface's `u` domain.
     #[inline(always)]
-    pub(super) const fn u_domain(self) -> ParameterDomain { self.u_domain }
+    pub(super) const fn domain_u(self) -> ParameterDomain { self.u_domain }
 
     /// Returns the surface's `v` domain.
     #[inline(always)]
-    pub(super) const fn v_domain(self) -> ParameterDomain { self.v_domain }
+    pub(super) const fn domain_v(self) -> ParameterDomain { self.v_domain }
+
+    #[cfg(test)]
+    pub(super) const fn u_domain(self) -> ParameterDomain { self.domain_u() }
+
+    #[cfg(test)]
+    pub(super) const fn v_domain(self) -> ParameterDomain { self.domain_v() }
 
     /// Returns the parameter axis running along the seam.
     #[inline(always)]
@@ -158,11 +162,11 @@ impl BoundaryFrame {
 
     /// Returns the surface's `u` control-point count.
     #[inline(always)]
-    pub(super) const fn u_control_count(self) -> usize { self.u_control_count }
+    pub(super) const fn control_count_u(self) -> usize { self.u_control_count }
 
     /// Returns the surface's `v` control-point count.
     #[inline(always)]
-    pub(super) const fn v_control_count(self) -> usize { self.v_control_count }
+    pub(super) const fn control_count_v(self) -> usize { self.v_control_count }
 
     /// Returns the positive scale from normalized seam coordinates.
     #[inline(always)]
@@ -244,7 +248,6 @@ impl BoundaryFrame {
 
 /// Maps a normalized seam coordinate according to [`BoundaryAlignment`].
 #[inline(always)]
-#[cfg(test)]
 pub(super) const fn map_normalized_seam(seam: f64, alignment: BoundaryAlignment) -> f64 {
     match alignment {
         BoundaryAlignment::Aligned => seam,

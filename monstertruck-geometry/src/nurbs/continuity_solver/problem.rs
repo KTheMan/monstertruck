@@ -1,6 +1,6 @@
 //! Boundary-problem preparation and analytic residual/Jacobian assembly.
 
-use super::boundary::BoundaryFrame;
+use super::boundary::{BoundaryFrame, map_normalized_seam};
 use super::dual::Dual;
 use super::resource::ContinuityBudget;
 use super::sampling::{nonzero_span_count, seam_samples, seam_validation_samples};
@@ -222,7 +222,7 @@ fn validate_along_knot_continuity(
         .as_slice()
         .get(degree + 1..control_count)
         .unwrap_or_default()
-        .chunk_by(|first, second| first.to_bits() == second.to_bits())
+        .chunk_by(|first, second| first == second)
         .any(|group| group.len() > maximum_multiplicity);
     if insufficient {
         Err(ContinuitySolveError::InvalidBoundary(endpoint))
@@ -347,6 +347,7 @@ fn characteristic_length(
 fn validate_regular_boundary(
     surface: &NurbsSurface<Vector4>,
     frame: BoundaryFrame,
+    alignment: BoundaryAlignment,
     endpoint: BoundaryEndpoint,
     samples: &[f64],
     characteristic_length: f64,
@@ -356,9 +357,10 @@ fn validate_regular_boundary(
         .copied()
         .enumerate()
         .try_for_each(|(sample, seam)| {
+            let seam = map_normalized_seam(seam, alignment);
             let (u, v) = frame.parameters(seam, 0.0);
-            let u_tangent = surface.derivative_u(u, v) * frame.u_domain().span();
-            let v_tangent = surface.derivative_v(u, v) * frame.v_domain().span();
+            let u_tangent = surface.derivative_u(u, v) * frame.domain_u().span();
+            let v_tangent = surface.derivative_v(u, v) * frame.domain_v().span();
             let u_length = u_tangent.magnitude();
             let v_length = v_tangent.magnitude();
             let area = u_tangent.cross(v_tangent).magnitude();
