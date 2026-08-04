@@ -18,9 +18,10 @@
 //! independently after collocation and can veto convergence between optimizer
 //! samples.
 //!
-//! G0 is the established solver target. G1 through G3 have procedural
-//! polynomial and rational evidence but still require independent higher-order
-//! certification before a production-readiness claim. G4 uses the same
+//! G0 is the established solver target. G1 through G3 have independent
+//! finite-difference certification over procedural polynomial and rational
+//! fixtures, but still require external-kernel and production-model evidence
+//! before a production-readiness claim. G4 uses the same
 //! order-generic implementation machinery but requires explicit experimental
 //! opt-in. Solver tolerances belong only to the unclamped `f64` styling layer;
 //! topology sewing and solidification tolerances are intentionally absent.

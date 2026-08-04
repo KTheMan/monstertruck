@@ -33,7 +33,8 @@ fn exact_solutions_expose_the_solver_coordinate_transition_through_g4() {
 
                 assert_eq!(transition.order(), order);
                 assert_eq!(transition.alignment(), alignment);
-                assert_eq!(transition.field_degree(), SEAM_DEGREE);
+                assert_eq!(transition.cross_field_degree(), SEAM_DEGREE);
+                assert_eq!(transition.seam_map_degree(), SEAM_DEGREE + 1);
                 [0.0, 0.23, 0.71, 1.0].into_iter().for_each(|seam| {
                     [-0.1, 0.0, 0.1].into_iter().for_each(|cross| {
                         let mapped = transition

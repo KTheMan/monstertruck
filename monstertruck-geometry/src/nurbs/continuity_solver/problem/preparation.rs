@@ -51,6 +51,22 @@ impl<'surface> PreparedProblem<'surface> {
         let span_count = checked_add(first_spans, second_spans, "seam span count overflowed")?;
         budget.ensure(ContinuityResource::Spans, span_count)?;
         let validation_density = validation_density(first_frame, second_frame, request, config)?;
+        [first_spans, second_spans]
+            .into_iter()
+            .try_for_each(|spans| {
+                budget.ensure(
+                    ContinuityResource::Samples,
+                    optimizer_frame_sample_count(spans, config.samples_per_span())?,
+                )?;
+                budget.ensure(
+                    ContinuityResource::Samples,
+                    checked_mul(
+                        spans,
+                        validation_density,
+                        "validation sample count overflowed",
+                    )?,
+                )
+            })?;
         let first_samples = frame_samples(first, first_frame, config.samples_per_span());
         let second_samples = aligned_samples(
             frame_samples(second, second_frame, config.samples_per_span()),
@@ -249,6 +265,21 @@ impl<'surface> PreparedProblem<'surface> {
             qr_elements,
         })
     }
+}
+
+fn optimizer_frame_sample_count(
+    spans: usize,
+    samples_per_span: usize,
+) -> Result<usize, ContinuitySolveError> {
+    checked_add(
+        checked_mul(
+            spans,
+            checked_add(samples_per_span, 1, "optimizer sample density overflowed")?,
+            "optimizer sample count overflowed",
+        )?,
+        1,
+        "optimizer sample count overflowed",
+    )
 }
 
 fn aligned_samples(mut samples: Vec<f64>, alignment: BoundaryAlignment) -> Vec<f64> {

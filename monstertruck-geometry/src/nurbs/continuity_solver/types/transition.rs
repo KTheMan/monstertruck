@@ -57,8 +57,11 @@ impl BoundaryTransition {
     /// Returns the solved transition order.
     pub const fn order(&self) -> ContinuityOrder { self.order }
 
-    /// Returns the configured Bernstein degree of the transition fields.
-    pub fn field_degree(&self) -> usize { self.seam_map_log_increments.len() }
+    /// Returns the configured Bernstein degree of the cross-seam fields.
+    pub fn cross_field_degree(&self) -> usize { self.seam_map_log_increments.len() }
+
+    /// Returns the Bernstein degree of the endpoint-preserving seam map.
+    pub fn seam_map_degree(&self) -> usize { self.seam_map_log_increments.len() + 1 }
 
     /// Maps a normalized master seam coordinate and signed cross-seam
     /// coordinate to the second frame.

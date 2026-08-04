@@ -26,12 +26,13 @@ pub fn capability_for_bspline<P>(
     side: BoundarySide,
     requested: ContinuityOrder,
 ) -> SurfaceContinuityCapability {
-    let control_points = surface.control_points();
-    let degrees = control_points
-        .first()
-        .is_some_and(|row| !row.is_empty())
-        .then(|| surface.degrees());
-    capability(control_points, degrees, side, requested)
+    capability(
+        surface.control_points(),
+        surface.knot_vector_u().len(),
+        surface.knot_vector_v().len(),
+        side,
+        requested,
+    )
 }
 
 /// Inspects a rational B-spline surface side.
@@ -40,24 +41,33 @@ pub fn capability_for_nurbs<V>(
     side: BoundarySide,
     requested: ContinuityOrder,
 ) -> SurfaceContinuityCapability {
-    let control_points = surface.control_points();
-    let degrees = control_points
-        .first()
-        .is_some_and(|row| !row.is_empty())
-        .then(|| surface.degrees());
-    capability(control_points, degrees, side, requested)
+    capability(
+        surface.control_points(),
+        surface.knot_vector_u().len(),
+        surface.knot_vector_v().len(),
+        side,
+        requested,
+    )
 }
 
 fn capability<P>(
     control_points: &[Vec<P>],
-    degrees: Option<(usize, usize)>,
+    knot_count_u: usize,
+    knot_count_v: usize,
     side: BoundarySide,
     requested: ContinuityOrder,
 ) -> SurfaceContinuityCapability {
-    let dimensions = (
-        control_points.len(),
-        control_points.first().map_or(0, Vec::len),
-    );
-    let degrees = degrees.unwrap_or((0, 0));
+    let dimensions = control_points
+        .first()
+        .map(Vec::len)
+        .filter(|&count| count > 0)
+        .filter(|&count| control_points.iter().all(|row| row.len() == count))
+        .and_then(|count_v| {
+            let count_u = control_points.len();
+            let degree_u = knot_count_u.checked_sub(count_u)?.checked_sub(1)?;
+            let degree_v = knot_count_v.checked_sub(count_v)?.checked_sub(1)?;
+            Some(((degree_u, degree_v), (count_u, count_v)))
+        });
+    let (degrees, dimensions) = dimensions.unwrap_or(((0, 0), (0, 0)));
     SurfaceContinuityCapability::from_degrees_and_dimensions(degrees, dimensions, side, requested)
 }

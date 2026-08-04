@@ -35,7 +35,7 @@ used by surface parameter division.
 
 | Work | Placement |
 | --- | --- |
-| Topology tracking and persistence | Implement later **atop** the existing `StableId`/`StableIdAllocator` identity and `ElementAttributes`/`AttributeValue` storage in `monstertruck-topology`. No parallel identity system belongs in `monstertruck-core`. |
+| Topology tracking and persistence | Implement later **atop** `StableId`/`StableIdAllocator` in `monstertruck-core` and the `ElementAttributes`/`AttributeValue` storage in `monstertruck-topology`. No parallel identity system belongs in `monstertruck-core`. |
 | Modeling tracking wrappers | Implement later **atop** an accepted topology tracking API, not inside the direct geometry solver contribution. |
 | Contract graphs and replay | Implement later **atop** the separately reviewed tracking/persistence layer. Solver acceptance does not imply their API shape. |
 | STEP seam discovery, repair adapters, export, and re-import evidence | Implement later in the best-suited modeling/STEP integration layer **atop** the accepted direct solver API. They do not belong in the solver proposal. |

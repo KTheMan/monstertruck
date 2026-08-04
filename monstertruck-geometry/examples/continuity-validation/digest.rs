@@ -8,7 +8,7 @@ use std::hash::Hasher;
 use crate::corpus::{CaseSpec, DenseSpec};
 use crate::dense::DenseMetrics;
 
-pub const DIGEST_VERSION: &str = "xxh3-64-public-transition-v5";
+pub const DIGEST_VERSION: &str = "xxh3-64-public-transition-v6";
 
 /// Hashes a successful solved case in canonical index order.
 pub fn solved(
@@ -66,7 +66,8 @@ fn hash_transition(solution: &BoundaryContinuitySolution<'_>, hasher: &mut Conte
     let transition = solution.transition();
     format!("{:?}", transition.alignment()).content_hash(hasher);
     transition.order().as_usize().content_hash(hasher);
-    transition.field_degree().content_hash(hasher);
+    transition.cross_field_degree().content_hash(hasher);
+    transition.seam_map_degree().content_hash(hasher);
     let samples = (0..=65)
         .flat_map(|index| {
             [-0.04, -0.03, -0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.04]

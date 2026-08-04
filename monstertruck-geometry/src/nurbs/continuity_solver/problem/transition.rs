@@ -117,29 +117,25 @@ pub(super) fn compose_surface(
         v_base,
         v,
     );
-    let denominator = surface
-        .control_points()
+    let denominator = u_basis
         .iter()
-        .enumerate()
-        .flat_map(|(row, points)| {
-            let u_basis = &u_basis;
+        .flat_map(|(row, basis_u)| {
             let v_basis = &v_basis;
-            points.iter().enumerate().map(move |(column, point)| {
-                u_basis[row].clone()
-                    * v_basis[column].clone()
+            v_basis.iter().map(move |(column, basis_v)| {
+                let point = surface.control_point(row, column);
+                basis_u.clone()
+                    * basis_v.clone()
                     * TaylorJet::constant(order, Dual::constant(point.w))
             })
         })
         .fold(TaylorJet::zero(order), |sum, value| sum + value);
     std::array::from_fn(|coordinate| {
-        let numerator = surface
-            .control_points()
+        let numerator = u_basis
             .iter()
-            .enumerate()
-            .flat_map(|(row, points)| {
-                let u_basis = &u_basis;
+            .flat_map(|(row, basis_u)| {
                 let v_basis = &v_basis;
-                points.iter().enumerate().map(move |(column, point)| {
+                v_basis.iter().map(move |(column, basis_v)| {
+                    let point = surface.control_point(row, column);
                     let physical = match variables {
                         Some((offsets, values)) => offsets[row][column]
                             .map(|offset| values[offset + coordinate].clone())
@@ -148,8 +144,8 @@ pub(super) fn compose_surface(
                             }),
                         None => Dual::constant(physical_coordinate(point, coordinate)),
                     };
-                    u_basis[row].clone()
-                        * v_basis[column].clone()
+                    basis_u.clone()
+                        * basis_v.clone()
                         * TaylorJet::constant(order, physical * Dual::constant(point.w))
                 })
             })
@@ -164,13 +160,25 @@ fn basis_jets(
     control_count: usize,
     base: f64,
     parameter: &TaylorJet<Dual>,
-) -> Vec<TaylorJet<Dual>> {
+) -> BasisJets {
     let order = parameter.order();
     let delta = parameter.clone() - TaylorJet::constant(order, Dual::constant(base));
     let windows = (0..=order)
         .map(|derivative| knots.bspline_basis_functions(degree, derivative, base))
         .collect::<Vec<_>>();
-    (0..control_count)
+    let start = windows
+        .iter()
+        .map(BasisWindow::start_index)
+        .min()
+        .unwrap_or(0)
+        .min(control_count);
+    let end = windows
+        .iter()
+        .map(|window| window.start_index() + window.len())
+        .max()
+        .unwrap_or(start)
+        .min(control_count);
+    let values = (start..end)
         .map(|control| {
             (0..=order).fold(TaylorJet::zero(order), |sum, derivative| {
                 sum + delta
@@ -178,7 +186,22 @@ fn basis_jets(
                     .scaled_f64(basis_value(&windows[derivative], control) / factorial(derivative))
             })
         })
-        .collect()
+        .collect();
+    BasisJets { start, values }
+}
+
+struct BasisJets {
+    start: usize,
+    values: Vec<TaylorJet<Dual>>,
+}
+
+impl BasisJets {
+    fn iter(&self) -> impl Iterator<Item = (usize, &TaylorJet<Dual>)> {
+        self.values
+            .iter()
+            .enumerate()
+            .map(|(offset, value)| (self.start + offset, value))
+    }
 }
 
 fn basis_value(window: &BasisWindow, index: usize) -> f64 {
