@@ -205,6 +205,32 @@ fn validate_capability(
     }
 }
 
+fn validate_along_knot_continuity(
+    surface: &NurbsSurface<Vector4>,
+    frame: BoundaryFrame,
+    order: ContinuityOrder,
+    endpoint: BoundaryEndpoint,
+) -> Result<(), ContinuitySolveError> {
+    let knots = match frame.along_axis() {
+        SurfaceAxis::U => surface.knot_vector_u(),
+        SurfaceAxis::V => surface.knot_vector_v(),
+    };
+    let degree = frame.along_degree();
+    let control_count = frame.along_control_count();
+    let maximum_multiplicity = degree.saturating_sub(order.as_usize());
+    let insufficient = knots
+        .as_slice()
+        .get(degree + 1..control_count)
+        .unwrap_or_default()
+        .chunk_by(|first, second| first.to_bits() == second.to_bits())
+        .any(|group| group.len() > maximum_multiplicity);
+    if insufficient {
+        Err(ContinuitySolveError::InvalidBoundary(endpoint))
+    } else {
+        Ok(())
+    }
+}
+
 fn validate_weights(
     surface: &NurbsSurface<Vector4>,
     endpoint: BoundaryEndpoint,

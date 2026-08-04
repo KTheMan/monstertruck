@@ -182,6 +182,24 @@ fn rejects_insufficient_degree_and_degenerate_boundaries() {
 }
 
 #[test]
+fn rejects_insufficient_along_seam_knot_continuity() {
+    let (first, second) = repeated_seam_knot_planes();
+    let error = BoundaryContinuitySolver::new(ContinuitySolverConfig::default())
+        .expect("the default configuration is valid")
+        .solve(
+            &first,
+            &second,
+            request(ContinuityOrder::G1, BoundaryAlignment::Reversed),
+        )
+        .expect_err("a C0 interior seam knot cannot provide a G1 boundary jet");
+
+    assert!(matches!(
+        error,
+        ContinuitySolveError::InvalidBoundary(super::BoundaryEndpoint::First)
+    ));
+}
+
+#[test]
 fn configuration_rejects_excessive_sampling() {
     assert!(matches!(
         BoundaryContinuitySolver::new(ContinuitySolverConfig::default().with_samples_per_span(65),),
@@ -311,6 +329,31 @@ fn nonlinearly_parameterized_planes() -> (NurbsSurface<Vector4>, NurbsSurface<Ve
         ))
     };
     (surface(false), surface(true))
+}
+
+fn repeated_seam_knot_planes() -> (NurbsSurface<Vector4>, NurbsSurface<Vector4>) {
+    let surface = |second: bool, reversed: bool| {
+        let control_points = (0..=3)
+            .map(|cross| {
+                (0..5)
+                    .map(|seam| {
+                        let seam = seam as f64 / 4.0;
+                        let y = if reversed { 1.0 - seam } else { seam };
+                        let x = cross as f64 / 3.0 - if second { 0.0 } else { 1.0 };
+                        Vector4::new(x, y, 0.0, 1.0)
+                    })
+                    .collect()
+            })
+            .collect();
+        NurbsSurface::new(BsplineSurface::new(
+            (
+                KnotVector::bezier_knot(3),
+                KnotVector::from(vec![0.0, 0.0, 0.0, 0.5, 0.5, 1.0, 1.0, 1.0]),
+            ),
+            control_points,
+        ))
+    };
+    (surface(false, false), surface(true, true))
 }
 
 fn assert_converged(

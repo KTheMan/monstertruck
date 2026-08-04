@@ -30,6 +30,18 @@ impl<'surface> PreparedProblem<'surface> {
             request.order(),
             BoundaryEndpoint::Second,
         )?;
+        validate_along_knot_continuity(
+            first,
+            first_frame,
+            request.order(),
+            BoundaryEndpoint::First,
+        )?;
+        validate_along_knot_continuity(
+            second,
+            second_frame,
+            request.order(),
+            BoundaryEndpoint::Second,
+        )?;
         let control_point_count = checked_add(
             checked_mul(
                 first_frame.u_control_count(),
