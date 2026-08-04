@@ -178,17 +178,33 @@ impl<V> NurbsSurface<V> {
     /// The range of the parameter of the surface.
     #[inline(always)]
     pub fn parameter_range(&self) -> (ParameterRange, ParameterRange) { self.0.parameter_range() }
-    /// Creates the curve whose control points are the `idx`th column control points of `self`.
+    /// Creates the sectional curve along v, at the given u control-point index.
+    #[inline(always)]
+    pub fn curve_v(&self, index_u: usize) -> NurbsCurve<V>
+    where V: Clone {
+        NurbsCurve(self.0.curve_v(index_u))
+    }
+    /// Creates the sectional curve along u, at the given v control-point index.
+    #[inline(always)]
+    pub fn curve_u(&self, index_v: usize) -> NurbsCurve<V>
+    where V: Clone {
+        NurbsCurve(self.0.curve_u(index_v))
+    }
+    /// Deprecated alias for [`curve_v`](NurbsSurface::curve_v), the name
+    /// upstream `truck` uses. It fixes the u-index and varies **v**.
+    #[deprecated(since = "0.3.4", note = "renamed to `curve_v` (it varies v)")]
     #[inline(always)]
     pub fn column_curve(&self, row_idx: usize) -> NurbsCurve<V>
     where V: Clone {
-        NurbsCurve(self.0.column_curve(row_idx))
+        self.curve_v(row_idx)
     }
-    /// Creates the column sectional curve.
+    /// Deprecated alias for [`curve_u`](NurbsSurface::curve_u), the name
+    /// upstream `truck` uses. It fixes the v-index and varies **u**.
+    #[deprecated(since = "0.3.4", note = "renamed to `curve_u` (it varies u)")]
     #[inline(always)]
     pub fn row_curve(&self, column_idx: usize) -> NurbsCurve<V>
     where V: Clone {
-        NurbsCurve(self.0.row_curve(column_idx))
+        self.curve_u(column_idx)
     }
 }
 

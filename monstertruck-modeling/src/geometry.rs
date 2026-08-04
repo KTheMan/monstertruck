@@ -875,19 +875,19 @@ fn direct_bspline_boundary_line(
     let last_v = surface.control_points().first()?.len().checked_sub(1)?;
     [
         (
-            surface.column_curve(0),
+            surface.curve_v(0),
             Line(Point2::new(u0, v0), Point2::new(u0, v1)),
         ),
         (
-            surface.column_curve(last_u),
+            surface.curve_v(last_u),
             Line(Point2::new(u1, v0), Point2::new(u1, v1)),
         ),
         (
-            surface.row_curve(0),
+            surface.curve_u(0),
             Line(Point2::new(u0, v0), Point2::new(u1, v0)),
         ),
         (
-            surface.row_curve(last_v),
+            surface.curve_u(last_v),
             Line(Point2::new(u0, v1), Point2::new(u1, v1)),
         ),
     ]
@@ -908,19 +908,19 @@ fn direct_nurbs_boundary_line(
     let last_v = surface.control_points().first()?.len().checked_sub(1)?;
     [
         (
-            surface.column_curve(0),
+            surface.curve_v(0),
             Line(Point2::new(u0, v0), Point2::new(u0, v1)),
         ),
         (
-            surface.column_curve(last_u),
+            surface.curve_v(last_u),
             Line(Point2::new(u1, v0), Point2::new(u1, v1)),
         ),
         (
-            surface.row_curve(0),
+            surface.curve_u(0),
             Line(Point2::new(u0, v0), Point2::new(u1, v0)),
         ),
         (
-            surface.row_curve(last_v),
+            surface.curve_u(last_v),
             Line(Point2::new(u0, v1), Point2::new(u1, v1)),
         ),
     ]

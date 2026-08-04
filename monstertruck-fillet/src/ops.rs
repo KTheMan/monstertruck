@@ -81,13 +81,13 @@ fn fillet_on_side(
     };
 
     let (new_face0, fillet_edge0) = {
-        let bezier = fillet_surface.column_curve(0);
+        let bezier = fillet_surface.curve_v(0);
         cut_face_by_bezier(face0, bezier, filleted_edge_id).ok_or(FilletError::GeometryFailed {
             context: "cut face0 by bezier",
         })?
     };
     let (new_face1, fillet_edge1) = {
-        let bezier = fillet_surface.column_curve(fillet_surface.control_points().len() - 1);
+        let bezier = fillet_surface.curve_v(fillet_surface.control_points().len() - 1);
         cut_face_by_bezier(face1, bezier.inverse(), filleted_edge_id).ok_or(
             FilletError::GeometryFailed {
                 context: "cut face1 by bezier",
@@ -299,7 +299,7 @@ fn fillet_along_wire_open(
     type CffTuple<'a> = (&'a [NurbsSurface<Vector4>], &'a FaceBoundaryEdgeIndex);
     let create_fillet_face = |(surfaces, face_index): CffTuple<'_>| {
         let fillet_surface = concat_fillet_surface(surfaces)?;
-        let edge0 = create_free_edge(surfaces[1].column_curve(0).into());
+        let edge0 = create_free_edge(surfaces[1].curve_v(0).into());
 
         let edge1 = cut_face_by_last_bezier(shell, *face_index, &fillet_surface)?;
 
@@ -346,7 +346,7 @@ fn fillet_along_wire_open(
             )?;
 
         let edge0 = {
-            let mut bezier = fillet_surfaces[0].column_curve(0);
+            let mut bezier = fillet_surfaces[0].curve_v(0);
             let curve = front_edge.oriented_curve();
             let (t0, _) = search_closest_parameter(&bezier, &curve, (0.0, 1.0), 100).ok_or(
                 FilletError::GeometryFailed {
@@ -406,7 +406,7 @@ fn fillet_along_wire_open(
             )?;
 
         let edge0 = {
-            let mut bezier = fillet_surfaces[len - 1].column_curve(0);
+            let mut bezier = fillet_surfaces[len - 1].curve_v(0);
             let curve = last_edge.oriented_curve();
             let (t0, _) = search_closest_parameter(&bezier, &curve, (1.0, 2.0), 100).ok_or(
                 FilletError::GeometryFailed {
@@ -569,7 +569,7 @@ fn fillet_along_wire_closed(
             concat_fillet_surface(&surfaces).ok_or(FilletError::GeometryFailed {
                 context: "concat closed fillet surface",
             })?;
-        let edge0 = create_free_edge(surfaces[1].column_curve(0).into());
+        let edge0 = create_free_edge(surfaces[1].curve_v(0).into());
 
         let edge1 = cut_face_by_last_bezier(shell, adjacent_faces[i], &fillet_surface).ok_or(
             FilletError::GeometryFailed {

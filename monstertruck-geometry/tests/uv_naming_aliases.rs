@@ -66,3 +66,45 @@ fn deprecated_plane_axis_aliases_match_their_replacements() {
         "the two axes must not be the same vector, or the rows above prove nothing"
     );
 }
+
+/// `row_curve` -> `curve_u` and `column_curve` -> `curve_v` are kept for
+/// compatibility with upstream `truck`, which uses the row/column spelling.
+///
+/// The row/column vocabulary is CROSSED with respect to the parameter that
+/// varies: the *row* curve varies **u**, the *column* curve varies **v**. A
+/// forwarder wired the intuitive-but-wrong way round would compile, return a
+/// real curve, and be silently wrong -- so the surface below is deliberately
+/// asymmetric (u degree 1, v degree 2, and a non-square control net), which
+/// makes an inversion visible in both the knot vector and the point count.
+#[test]
+#[allow(deprecated)]
+fn deprecated_sectional_curve_aliases_match_their_replacements() {
+    let knot_vecs = (KnotVector::bezier_knot(1), KnotVector::bezier_knot(2));
+    let control_points = vec![
+        vec![
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(1.0, 0.0, 1.0),
+            Point3::new(2.0, 0.0, 2.0),
+        ],
+        vec![
+            Point3::new(0.0, 1.0, 0.0),
+            Point3::new(1.0, 1.0, 1.0),
+            Point3::new(2.0, 1.0, 2.0),
+        ],
+    ];
+    let surface = BsplineSurface::new(knot_vecs, control_points);
+
+    // The aliases forward to the same curve...
+    assert_eq!(surface.row_curve(1), surface.curve_u(1));
+    assert_eq!(surface.column_curve(1), surface.curve_v(1));
+
+    // ...and each varies the parameter its NEW name claims. u has degree 1 and
+    // 2 control points; v has degree 2 and 3. Crossing them fails both rows.
+    let along_u = surface.curve_u(1);
+    assert_eq!(along_u.knot_vector(), &KnotVector::bezier_knot(1));
+    assert_eq!(along_u.control_points().len(), 2, "u net is 2 wide");
+
+    let along_v = surface.curve_v(1);
+    assert_eq!(along_v.knot_vector(), &KnotVector::bezier_knot(2));
+    assert_eq!(along_v.control_points().len(), 3, "v net is 3 wide");
+}
