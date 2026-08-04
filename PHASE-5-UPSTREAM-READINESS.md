@@ -43,18 +43,37 @@ tracking and contract replay are later, independently reviewable layers.
 | Area | Current state | Upstream gate |
 | --- | --- | --- |
 | G0--G3 formulas and jets | Analytically verified and procedurally validated. | Preserve exact/property coverage and add executable public examples. |
-| Nonzero repair | Independently certified through G3 on the committed imported fixtures, including a multiplicity-three internal knot and strictly positive rational weights spanning `1e-8` through `1`. | Treat the supported full-boundary G1--G3 scope as production mature; keep arbitrary subcurves and G4 outside this claim. |
+| Nonzero repair | Imported workflow validated through G3 on the committed fixtures, including a multiplicity-three internal knot and strictly positive rational weights spanning `1e-8` through `1`. | Retain the fixture-bounded full-boundary G1--G3 claim; keep unequal-parameter nonzero-offset G3, arbitrary subcurves, and G4 outside it. |
 | G4 | Procedurally validated as experimental reachability. | Keep experimental and outside the upstream acceptance requirement. |
-| Failure safety and resource bounds | Implemented with focused transactional and checked-dimension coverage. | Preserve typed failures; measure accepted-boundary work separately from certification. |
-| Public API compatibility | Audited against the upstream surface; removed topology constructors/setters are restored and ordinary shell serialization remains compatible. | Resolve the recorded maintainer-choice items before proposing each upstream slice. |
-| Public API usability | Runnable rustdoc examples cover tracking, modeling, contracts, direct solving, and replay; the STEP example covers supported and unsupported imported boundaries. | Keep the examples warning-free as slices are separated. |
-| Module responsibility | Large tracking and solver modules are split into focused submodules near the repository guideline. | Preserve the split while extracting upstream slices. |
-| Imported workflow | Validated before export and after re-import through the requested order for five committed positive fixtures: polynomial G1, rational reversed G2, repeated-knot G2, extreme-positive-weight G2, and quintic G3. Every face tessellates exclusively to finite, scale-qualified, consistently oriented triangles; canonical topology and sampled bounding boxes persist. | Retain all five versioned receipts as release regressions. |
-| Persistence | All five repaired shells preserve exact canonical combinatorial signatures after STEP re-import. Their scale-normalized bounding-box drifts are at most `6.127015e-17`, and their post-import seam certificates reproduce the pre-export residuals. | Retain the versioned receipts as regression gates and repeat external OCCT validation when STEP serialization changes. |
-| External interoperability | All six inputs and the repaired Monstertruck G1 output are accepted as valid B-reps by pinned OCCT. OCCT independently confirms the repeated-knot multiplicity and `1e8` rational-weight ratio. | Retain the receipts and repeat them when fixture or STEP serialization changes. |
-| Wasm compile | Geometry test compilation passes. | Preserve upstream's workspace Wasm job and keep the targeted geometry test as additive coverage. |
-| Determinism | Same-host/cross-process Windows evidence and Linux tolerance/outcome CI. | Keep cross-platform bitwise equality unclaimed. |
+| Failure safety | Procedurally validated for the committed synthetic replay chains. Commit `95e6b9ee` records schema-two preparation contradiction, same-surface/coupled-writer/cycle graph rejection, one-iteration bounded sequential nonconvergence, and late dependency failure after a successful staged solve. Every case preserves complete geometry, tracking-session, and contract-input snapshots; staged transitions/reports compare across reruns and failed batches return no solution. The MT-401 matrix source-audits all 18 tracked-modeling wrappers but adds no rollback evidence. The bounded replay case does not establish global mathematical infeasibility. | Implement MT-402 snapshots before tracked-modeling failure injection. |
+| Resource bounds | Implemented with focused checked-dimension coverage. | Measure accepted-boundary work separately from certification. |
+| Public API compatibility | Implemented and audited against the upstream surface; removed topology constructors/setters are restored and ordinary shell serialization remains compatible. | Resolve the recorded maintainer-choice items before proposing each upstream slice. |
+| Public API usability | Implemented with runnable rustdoc examples for tracking, modeling, contracts, direct solving, and replay; the STEP example covers supported and unsupported imported boundaries. | Keep the examples warning-free as slices are separated. |
+| Module responsibility | Implemented by splitting large tracking and solver modules into focused submodules near the repository guideline. | Preserve the split while extracting upstream slices. |
+| Imported workflow | Imported workflow validated before export and after re-import through the requested order for five committed positive fixtures: polynomial G1, rational reversed G2, repeated-knot G2, extreme-positive-weight G2, and quintic G3. Every face tessellates exclusively to finite, scale-qualified, consistently oriented triangles; canonical topology and sampled bounding boxes persist. | Retain all five versioned receipts as release regressions. |
+| Persistence | Imported workflow validated for all five repaired shells: exact canonical combinatorial signatures persist after STEP re-import, scale-normalized bounding-box drifts are at most `6.127015e-17`, and post-import seam certificates reproduce the pre-export residuals. | Retain the versioned receipts as regression gates and repeat external OCCT validation when STEP serialization changes. |
+| External interoperability | Externally validated for B-rep interoperability: all six inputs and the repaired Monstertruck G1 output are accepted as valid B-reps by pinned OCCT, which also confirms the repeated-knot multiplicity and `1e8` rational-weight ratio. External seam-order validation is not claimed. | Retain the receipts and repeat them when fixture or STEP serialization changes. |
+| Wasm compile | Implemented for both the restored full-workspace Wasm build and additive geometry-test compilation. | Preserve both hosted compile gates without promoting runtime usability. |
+| Determinism | Procedurally validated by same-host/cross-process Windows evidence and Linux tolerance/outcome CI. | Keep cross-platform bitwise equality unclaimed. |
 | Performance | Not yet substantiated. | Separate solver time, certification time, iterations, accepted steps, and bounded work dimensions. |
+
+## Integration narrative reconciliation
+
+Fork PR 4 ended at `a98cc9e2` and merged as `13c568ac`. Its final tree includes
+higher-order imported repair, replayable persistence evidence, scale-qualified
+triangle validation, and the repeated-knot and extreme-weight fixtures. All
+seven jobs passed in hosted run `30854797421`. Its merged description now
+records those final capabilities and their remaining limits rather than the
+superseded three-workflow, G1-only deferrals.
+
+Fork PRs 5 and 6 added tracked modeling and provenance integration. The exact
+combined tip later passed all seven jobs in hosted run `30861560069`, attempt 2.
+The five schema-3 receipts close the older three-workflow, G1-only, triangle,
+topology/bounding-box, post-reimport-certificate, and higher-order-certificate
+deferrals. The remaining limits are arbitrary boundary subcurves,
+unequal-parameter nonzero-offset G3, Wasm runtime behavior, broad real-world
+production-model coverage, external seam-order certification, and the API
+decisions recorded below.
 
 ## Minimum imported corpus
 
@@ -65,7 +84,7 @@ fixtures:
 2. a positive nonuniform rational, unequal or reversed `G2` repair;
 3. a degree-three-or-higher, preferably quintic, `G3` repair.
 
-The production stress extension adds:
+The fixture stress extension adds:
 
 4. a polynomial G2 pair with a degree-five seam direction and one internal
    multiplicity-three knot, preserving exactly C2 continuity at that knot;
@@ -124,8 +143,8 @@ The repeated-knot G2 repair has maximum normalized residuals
 `[1.354938e-16, 1.076137e-11, 7.112911e-9]`; the extreme-positive-weight G2
 repair has `[1.750627e-16, 1.095664e-11, 7.007594e-9]`. Their post-import
 certificates reproduce those arrays exactly. Combined with the baseline G1,
-reversed-rational G2, and G3 cases, this substantiates production maturity for
-the explicitly supported full-boundary G1--G3 workflow.
+reversed-rational G2, and G3 cases, this supplies fixture-bounded imported
+workflow validation for the explicitly supported full-boundary G1--G3 path.
 
 Before committing an output or receipt, the example now re-imports the
 in-memory STEP text, matches vertices by scale-relative position, and requires
@@ -206,7 +225,7 @@ The proposed surface is grouped into four independently reviewable layers:
 | --- | --- |
 | Continuity primitives | `ContinuityOrder`, `SurfaceAxis`, `SurfaceBoundary`, `BoundaryAlignment`, `ContinuityCapabilityLevel`, and `SurfaceContinuityCapability`. |
 | Direct solver | `BoundaryContinuitySolver`, `BoundaryContinuityRequest`, `BoundaryEndpoint`, `ContinuitySolverConfig`, `ContinuityResourceBudget`, `ContinuityResource`, `ContinuityTermination`, `OrderResidual`, `ContinuitySolveReport`, `BoundaryContinuitySolution`, `BoundaryTransition`, and `ContinuitySolveError`. |
-| Persistent identity and topology | Core tracking identifiers, bindings, lineage, session, and errors; `TopologyTracking`, `TrackingReport`, explicit `TrackedCompressedShell`/`TrackedCompressedSolid` envelopes; and tracked modeling transforms, sweeps, extrusions, and revolves. |
+| Persistent identity and topology | Core tracking identifiers, bindings, lineage, session, and errors; `TopologyTracking`, `TrackingReport`, explicit `TrackedCompressedShell`/`TrackedCompressedSolid` envelopes; and all 18 tracked modeling wrappers enumerated by the MT-401 version-one failure-point matrix. |
 | Contract replay | `ContractId`, semantic boundary references, `ContinuityContract`, resolved contract types, contract/replay errors, the tracked-surface registry, prepared requests, replay solutions, and batch execution functions. |
 
 `BoundaryAlignment` has one canonical definition in the continuity layer and a
@@ -216,22 +235,24 @@ surface in `BoundaryContinuitySolution` is borrowed, which removes redundant
 deep copies without changing its value semantics. Ordinary `Shell` and `Solid`
 serialization retain the upstream format; tracking persistence is explicit.
 
-The following choices require maintainer review before their owning upstream
-slice is finalized:
+The following register records every unresolved API choice. Role owners identify
+who must decide during slice review; they do not record approval.
 
-- whether `TopologyTracking` should be sealed;
-- whether extensible public enums should be `#[non_exhaustive]`;
-- whether existing broad error variants are acceptable for the first slice;
-- whether solver construction should implement `Default`;
-- whether `ContractId` should implement `FromStr` or `AsRef<str>`;
-- whether public `SmallVec` and QR implementation types expose too much
-  implementation detail;
-- whether experimental G4 enablement should remain a boolean policy;
-- how tracking-session and tracked-envelope schema versions should evolve
-  without breaking the restored upstream serialization format.
+| Decision | Current evidence, not a decision | Owner | Affected contribution slice | Decision state |
+| --- | --- | --- | --- | --- |
+| Seal `TopologyTracking` | The public trait is unsealed and includes the `#[doc(hidden)]` `into_untracked` construction hook. | Upstream topology API maintainers at slice review. | MT-903 -- tracking. | Requires maintainer direction; the current unsealed shape is not accepted policy. |
+| Add `#[non_exhaustive]` to extensible public enums | Audited continuity, solver, tracking, contract, and replay enums are exhaustive; `ContinuityOrder` is a checked newtype. | Maintainer of each owning slice. | MT-901 through MT-904; MT-905 for optional tracked-modeling enums it includes. | Requires maintainer direction per enum and slice; no blanket policy is implied. |
+| Public error granularity | `ContinuityOrder::new` and `TryFrom<usize>` use the crate-wide geometry error; later layers define dedicated solver, tracking, contract, and replay errors. | Upstream continuity-primitives API maintainers at slice review. | MT-901 -- continuity primitives. | Requires maintainer direction on a broad crate error versus a dedicated error. |
+| Solver construction and `Default` | `ContinuitySolverConfig` and `ContinuityResourceBudget` implement `Default`; `BoundaryContinuitySolver` uses validated, fallible `new` and `new_with_resource_budget` constructors. | Upstream direct-solver API maintainers at slice review. | MT-902 -- bounded solver. | Requires maintainer direction; fallible construction is not a decision against `Default`. |
+| `ContractId` string conversions | `ContractId` has validated `new`, `as_str`, `Display`, and Serde support, but no `FromStr` or `AsRef<str>`. | Upstream contract/replay API maintainers at slice review. | MT-904 -- replay. | Requires maintainer direction on `FromStr`, `AsRef<str>`, both, or neither. |
+| Exposed `SmallVec` and QR implementation detail | `CurveJet::into_derivatives` returns `SmallVec`; QR types are crate-private, but `rank_tolerance`, `ContinuityResource::QrElements`, and the QR-element budget expose the algorithm in public controls. | Upstream continuity-primitives maintainer for `SmallVec`; direct-solver maintainer for QR controls. | MT-901 and MT-902. | Requires maintainer direction; decide the two exposures independently. |
+| Experimental G4 policy | G4 remains outside production acceptance; configuration defaults it off and exposes `with_experimental_g4(bool)`. | Upstream direct-solver API maintainers at slice review. | MT-902, with MT-901's checked G4 representation as context. | Requires maintainer direction on the policy type and API; experimental status remains unchanged. |
+| Tracking-session and tracked-envelope schema evolution | Contracts have explicit schema version 1 and reject unknown versions; `TrackingSession`, `TrackedCompressedShell`, and `TrackedCompressedSolid` serialize without envelope schema fields. Ordinary `Shell` and `Solid` compatibility remains mandatory. | Upstream tracking/persistence API maintainers at slice review. | MT-903 -- tracking; MT-504 supplies later schema-evolution evidence. | Requires maintainer direction on versioning and migration while preserving ordinary serialization. |
 
-These are manual API/semver decisions, not hidden validation failures. They are
-kept out of the implementation until the relevant upstream slice is reviewed.
+Until direction is captured, the prototype shapes above are implementation
+evidence only and are not accepted upstream API policy. The open design issue
+[`virtualritz/monstertruck#4`](https://github.com/virtualritz/monstertruck/issues/4)
+has no maintainer response as of 2026-08-03.
 
 ## Validation status and deferred gates
 
@@ -251,6 +272,18 @@ The final local gates pass:
 - finite, nondegenerate, consistently oriented triangle certification before
   export and after re-import for all five positive STEP workflows;
 - deterministic exported G1 bytes and pinned OCCT output validation.
+- the public replay validation example and schema-two receipt for deterministic,
+  transactional preparation contradiction, graph rejection, bounded
+  sequential nonconvergence, and late dependency failure, including staged-prefix
+  transition/report evidence and complete caller-input snapshots.
+
+Exact integration tip `4054cc81` passed all seven Ubuntu jobs in
+[workflow run `30861560069`, attempt 2](https://github.com/KTheMan/monstertruck/actions/runs/30861560069/attempts/2).
+The hosted stable toolchain was `rustc 1.97.1 (8bab26f4f 2026-07-14)`;
+formatting used `rustc 1.99.0-nightly (11177f223 2026-08-02)`. Attempt 1
+failed the existing randomized Newton property test; the unchanged rerun
+passed. The schema-two replay validation was committed afterward at
+`95e6b9ee` and is not part of that hosted run.
 
 The following local commands are deliberately deferred:
 
@@ -266,6 +299,16 @@ The following local commands are deliberately deferred:
 - Cargo reports future-incompatibility notices in third-party `nom 3.2.1` and
   `quick-xml 0.22.0`; no new warning originates in the changed crates.
 
+## Continuation backlog
+
+The remaining integration, continuity, failure-safety, persistence, Wasm,
+performance, real-model, and upstream-preparation work is decomposed into
+epics and stories in
+[`KERNEL-MATURITY-BACKLOG.md`](KERNEL-MATURITY-BACKLOG.md). That document is
+the authoritative completion checklist and progress log. Use the reusable
+[`CONTINUATION-PROMPT.md`](CONTINUATION-PROMPT.md) to start or resume a bounded
+story set while keeping evidence and tracker state synchronized.
+
 ## Work log
 
 - The upstream design discussion was opened and verified while authenticated
@@ -280,6 +323,12 @@ The following local commands are deliberately deferred:
   external evidence. It is not a dependency of the normal Rust test suite.
 - The continuity CI job runs all five imported positive workflows and verifies
   that the arbitrary-trim negative remains typed and transactional.
+- Exact integration tip `4054cc81` passed all seven hosted jobs in workflow run
+  `30861560069`, attempt 2. The unchanged rerun cleared an existing randomized
+  Newton property-test failure from attempt 1.
+- The schema-two replay-batch receipt covers deterministic, transactional
+  preparation contradiction, graph rejection, bounded sequential nonconvergence, and
+  late dependency failure through the public replay API.
 - Regenerating all six STEP fixtures preserves every recorded SHA-256.
 - OCCT independently re-imports every fixture and the repaired G1 output as a
   valid two-face B-spline shell. The negative arbitrary-trim fixture exits with

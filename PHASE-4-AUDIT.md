@@ -75,13 +75,13 @@ robustness issues. No security claim is inferred from this ledger.
 | Area | State | Evidence | Required promotion |
 | --- | --- | --- | --- |
 | `G0`--`G3` exact continuity path | Procedurally validated | The 18-case CAD-like procedural corpus exercises explicit `G0`, `G1`, `G2`, and `G3` layouts. The public certifier checks every mixed derivative through the requested order at endpoints, mapped knot boundaries from both surfaces, and span-interior samples. | Imported production geometry remains a separate evidence class. |
-| Nonzero-offset repair | Procedurally validated through `G1` | The curved-seam quintic offset case converges in two accepted steps and passes independent `G0`/`G1` certification. | Add independently certified nonzero-offset `G2` and `G3` repairs. |
-| Rational derivative and reparameterization formulas | Analytically verified | Independent formula review traced homogeneous jets, quotient conversion, and transition-field composition through order four. The procedural corpus supplies supporting residual evidence for positive nonuniform rational weights. | Imported rational production surfaces remain pending. |
-| Multi-span quintic polynomial and rational path | Procedurally validated | Exact polynomial and nonuniform rational cases contain multiple cross and seam spans. G3 residuals pass the independent public-evaluation certifier. | Add repeated-knot and extreme-positive-weight cases. |
-| Unequal and reversed parameterization | Procedurally validated for the recorded cases | The corpus covers nonlinear unequal `G1`, rational unequal/reversed `G1`, reversed `G3`, and unequal cross-domain `G3`; mapped boundaries from both surfaces are explicit certification samples. | Curved unequal-domain nonzero-offset `G2`/`G3` repair remains pending. |
+| Nonzero-offset repair | Imported workflow validated through `G3` for the recorded fixtures | Five perturbed STEP fixtures pass independent requested-order certification before export and after re-import, including reversed rational `G2`, repeated-knot `G2`, extreme-positive-weight `G2`, and quintic `G3`. | Add unequal-parameter nonzero-offset `G3`; keep broader production-model claims separate. |
+| Rational derivative and reparameterization formulas | Analytically verified | Independent formula review traced homogeneous jets, quotient conversion, and transition-field composition through order four. The procedural corpus supplies supporting residual evidence for positive nonuniform rational weights. | Imported real-world rational production-model coverage remains pending. |
+| Multi-span quintic polynomial and rational path | Imported workflow validated for the recorded fixtures | Imported polynomial and rational repairs include multiple spans, a multiplicity-three internal knot, positive weights spanning `1e-8` through `1`, and independently certified `G2`/`G3` results. | Broader real-model coverage remains separate. |
+| Unequal and reversed parameterization | Imported workflow validated for nonzero-offset `G2`; procedurally validated for the recorded exact `G3` cases | The imported reversed-rational `G2` fixture and procedural nonlinear unequal/reversed cases pass mapped-boundary and interior certification. | Unequal-parameter nonzero-offset `G3` remains pending. |
 | Tracking initialization and compressed restoration | Implemented | Focused regressions cover failed initializer rollback, fallible edge-map identity, kind mismatch rollback, serialized index correspondence, checked indices, and empty-face rejection. | Oversized payload limits and same-kind semantic-reference correspondence. |
-| Tracked cuts and modeling-session atomicity | Implemented | The implementations stage session state through lineage commit; existing success-path cut and modeling tests pass. | Failure injected after partial staged work for every cut and modeling wrapper, with complete pre/post comparison. |
-| Continuity replay after edits and late failure | Procedurally validated for the synthetic chain | `5e22e3a3` advances and rebinds a tracking generation, replays a meaningful upstream repair, rejects stale IDs, orders lexically conflicting contracts by dependency, preserves each solved local transition, and proves unchanged caller input after a downstream failure. | Imported modeling-session edit histories and coupled systems remain pending. |
+| Tracked cuts and modeling-session atomicity | Implemented | The implementations stage session state through lineage commit; existing success-path cut and modeling tests pass. The MT-401 version-one matrix source-audits all 18 public tracked-modeling wrappers, their fallible stages, publication boundaries, and caller-visible state components. | Implement MT-402 complete snapshots, then inject failure after partial staged work for every cut and modeling wrapper. The matrix alone does not substantiate rollback. |
+| Continuity replay after edits and batch failure | Procedurally validated for the committed synthetic replay chains | `5e22e3a3` covers generation rebinding, dependency ordering, accepted transitions, stale IDs, and unchanged caller input after downstream failure. `95e6b9ee` commits the schema-two replay receipt for deterministic preparation contradiction, graph rejection, bounded sequential nonconvergence, and late dependency failure with complete caller-input snapshots plus staged-prefix transition/report evidence. The bounded case is not global mathematical infeasibility evidence. | Imported edit histories and successful coupled solving remain pending. |
 | Solver allocation bounds | Implemented | `bd29b3eb` adds checked budgets and seven focused resource/capability tests cover representative dimensions and typed limit failures. | Corpus measurements at accepted boundaries and host-level deserialization budgets. |
 | Serialized topology robustness | Implemented | `06fedf9c` checks referenced topology indices, face cardinality, tracking dimensions, and index-to-ID correspondence. | Malformed trimmed-route coverage and allocation limits before `Vec` deserialization. |
 | Deterministic output | Procedurally validated on Windows/MSVC | Each case matches an immediate rerun and a separate-process v4 baseline verification. The raw reviewed receipt preserves geometry/report/dense/error evidence and work counters. | Cross-platform digest equivalence is not claimed. |
@@ -133,7 +133,11 @@ robustness issues. No security claim is inferred from this ledger.
   complete session through lineage recording and commit only on success.
   Failed initializer rollback has a focused regression. Equivalent injected
   late-failure coverage for every cut and modeling wrapper remains pending, so
-  the broader end-to-end atomicity claim is not yet substantiated.
+  the broader end-to-end atomicity claim is not yet substantiated. The
+  versioned MT-401 matrix at
+  `validation/tracking/tracked-modeling-wrapper-failure-matrix-v1.md` assigns
+  every public wrapper and visible state component to MT-402--MT-405 without
+  promoting this source audit to procedural evidence.
 
 ### `P4-A004` -- Tracked compressed topology can lose index correspondence
 
@@ -249,29 +253,37 @@ robustness issues. No security claim is inferred from this ledger.
 
 ### Replay and edit history
 
-- Cover the existing same-surface, coupled-writer, and dependency-cycle error
-  variants as complete batches rather than only reviewing their branches.
+- The schema-two replay-batch receipt at
+  `validation/continuity/replay-batch-v2.json` now procedurally validates
+  same-surface, canonical coupled-writer, two- and three-contract dependency
+  cycles, duplicate-ID preparation contradiction, one-iteration bounded
+  sequential nonconvergence, and a late dependency failure after one staged
+  solve. The bounded result is not a global mathematical infeasibility claim. Every
+  public-API case repeats the same typed error and preserves the geometry map,
+  tracking session, and contract inputs. The late-failure control records its
+  changed staged geometry, accepted transition, and solve report while the
+  complete batch returns no solution.
 - Replay imported modeling-session edits with multiple successful dependent
   solves. The committed synthetic chain covers generation rebinding, changed
   geometry, dependency ordering, stale-ID rejection, and late failure.
 
 ### Unequal parameterization and continuity certification
 
-- Add nonzero-offset unequal `G2` and `G3` repairs, repeated knots, and extreme
-  positive rational weights.
+- Add unequal-parameter nonzero-offset `G3` and combine extreme model scales
+  with repeated knots and extreme positive rational weights.
 - Add imported models whose NURBS surfaces, boundary selection, and
   orientation can be reproduced without proprietary or provenance ambiguity.
 
 ### Adversarial and malformed inputs
 
-- Exercise contradictory or unsatisfiable multi-contract batches, late solver
-  failure, near-degenerate boundaries, extreme but positive weights, repeated
+- Exercise near-degenerate boundaries, extreme but positive weights, repeated
   knots, scale extremes, and non-finite transition/configuration values.
 - Add malformed trimmed-topology cases and oversized serialized vector cases.
   The current extraction repairs validate indices after deserialization; they
   do not bound allocation performed by the deserializer itself.
-- Inject semantic-label collisions into tracked cuts and each modeling wrapper
-  after staged work has begun, then compare the full caller-visible session.
+- Use the MT-401 matrix to implement complete MT-402 snapshots, then inject
+  semantic-label collisions into tracked cuts and each modeling wrapper after
+  staged work has begun and compare every recorded caller-visible component.
 
 ### Determinism and procedural corpus
 
@@ -288,7 +300,7 @@ robustness issues. No security claim is inferred from this ledger.
 ## Known repository gate blockers
 
 The checkout and toolchain observations in this table were refreshed on
-2026-07-30. Committed validation receipts retain their original commit scope.
+2026-08-03. Committed validation receipts retain their original commit scope.
 
 | Gate | Current observation | Ownership |
 | --- | --- | --- |
@@ -301,10 +313,10 @@ The checkout and toolchain observations in this table were refreshed on
 | Workspace CPU tests | The `just` executable is absent. Running the exact `test-cpu` recipe's `cargo test` command directly passes, including doctests and all Phase 4 suites. | `just` installation remains an environment convenience blocker only. |
 | Corpus | The corrected v4 full emit passes all 18 cases in 316.8 seconds of recorded case time. A separate process reproduces every v4 baseline digest. | Phase 4. |
 | Formatting | `cargo +nightly fmt --all` established the repository's declared formatting baseline, including mechanical rewrites in Phase 1--3 files, and `cargo +nightly fmt --all -- --check` passes. | Resolved. |
-| GitHub-hosted CI | The fork reports the `CI` workflow as active. The workflow checks nightly formatting, workspace Clippy, the CPU suite, meshing feature combinations, geometry-library Wasm test compilation, and a full 18-case continuity-corpus emit. The final pull request push must pass these hosted checks before leaving draft status. | Phase 4. |
+| GitHub-hosted CI | Exact integration tip `4054cc81` passed nightly formatting, workspace Clippy, the CPU suite, meshing feature combinations, both Wasm compile jobs, and the full continuity workflow in run `30861560069`, attempt 2. Attempt 1 exposed the existing randomized Newton property-test flake; the unchanged rerun passed. | Integration baseline. |
 | `.blueprints` | Initialization was attempted twice and the configured `https://github.com/virtualritz/blueprints.git` returned `Repository not found`. The shared baseline files remain unavailable; the supplied root repository rules governed this work. | Upstream access/setup. |
 | Wasm compile | `cargo test -p monstertruck-geometry --lib --target wasm32-unknown-unknown --no-run` succeeds after the final transition/corpus work and emits the geometry test Wasm module. | Phase 4. |
-| Workspace Wasm test compile | `cargo test --workspace --target wasm32-unknown-unknown --no-run` first exposed and prompted repair of a target-specific `TrimmedFace` import, then reached unrelated legacy dependencies that are not Wasm-compatible: `memchr 1.0.2` expects unavailable `libc` C symbols and `lzma-sys 0.1.20` requires native C headers. The older `just wasm-build` route uses the repository-prohibited `cargo build`, so CI retains the supported geometry test compile instead of claiming workspace-wide Wasm coverage. | Dependency and workspace policy maintenance. |
+| Workspace Wasm build | The restored hosted `cargo build (wasm32)` job runs `just wasm-build` and passed on exact integration tip `4054cc81` in workflow run `30861560069`, attempt 2. Local repository rules prohibit using its `cargo build` recipe for verification. | Hosted integration baseline. |
 | Wasm runtime | No supported-host runtime execution receipt exists. Compile success does not establish browser/runtime usability, deterministic replay, or failure behavior. | Phase 4. |
 
 ## Delivery status
