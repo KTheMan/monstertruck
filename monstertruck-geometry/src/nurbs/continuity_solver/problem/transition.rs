@@ -168,12 +168,14 @@ fn basis_jets(
         .collect::<Vec<_>>();
     let start = windows
         .iter()
+        .filter(|window| !window.is_empty())
         .map(BasisWindow::start_index)
         .min()
         .unwrap_or(0)
         .min(control_count);
     let end = windows
         .iter()
+        .filter(|window| !window.is_empty())
         .map(|window| window.start_index() + window.len())
         .max()
         .unwrap_or(start)

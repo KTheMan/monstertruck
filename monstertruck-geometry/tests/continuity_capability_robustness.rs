@@ -30,12 +30,13 @@ fn empty_control_nets_report_unsupported_without_panicking() {
 #[test]
 fn malformed_nonempty_control_nets_report_unsupported_without_panicking() {
     let point = Vector4::new(0.0, 0.0, 0.0, 1.0);
+    let net = || vec![vec![point; 2]; 2];
     let short_knots = BsplineSurface::new_unchecked(
         (
             KnotVector::from(vec![0.0, 1.0]),
             KnotVector::from(vec![0.0, 1.0]),
         ),
-        vec![vec![point; 2]; 2],
+        net(),
     );
     let nonrectangular = BsplineSurface::new_unchecked(
         (
@@ -44,17 +45,36 @@ fn malformed_nonempty_control_nets_report_unsupported_without_panicking() {
         ),
         vec![vec![point; 2], vec![point]],
     );
-
-    [
-        capability_for_bspline(&short_knots, BoundarySide::MinU, ContinuityOrder::G0),
-        capability_for_nurbs(
-            &NurbsSurface::new(nonrectangular),
-            BoundarySide::MaxV,
-            ContinuityOrder::G0,
-        ),
+    let invalid_knots = [
+        vec![0.0, 0.0, f64::INFINITY, 1.0],
+        vec![0.0, 0.0, 1.0, 0.5],
+        vec![0.0, 0.25, 0.75, 1.0],
     ]
-    .into_iter()
-    .for_each(|capability| {
+    .map(|values| {
+        BsplineSurface::new_unchecked(
+            (
+                KnotVector::from(values),
+                KnotVector::from(vec![0.0, 0.0, 1.0, 1.0]),
+            ),
+            net(),
+        )
+    });
+
+    let capabilities =
+        [
+            capability_for_bspline(&short_knots, BoundarySide::MinU, ContinuityOrder::G0),
+            capability_for_nurbs(
+                &NurbsSurface::new(nonrectangular),
+                BoundarySide::MaxV,
+                ContinuityOrder::G0,
+            ),
+        ]
+        .into_iter()
+        .chain(invalid_knots.iter().map(|surface| {
+            capability_for_bspline(surface, BoundarySide::MaxU, ContinuityOrder::G1)
+        }));
+
+    capabilities.for_each(|capability| {
         assert_eq!(capability.level(), ContinuityCapabilityLevel::Unsupported);
         assert_eq!(capability.cross_control_rows(), 0);
     });

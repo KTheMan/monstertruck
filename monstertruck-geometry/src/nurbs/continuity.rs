@@ -4,7 +4,7 @@
 //! live in [`monstertruck_traits::surface_continuity`]. Local transition semantics and
 //! the numerical solver remain in `monstertruck-geometry`.
 
-use super::{BsplineSurface, NurbsSurface};
+use super::{BsplineSurface, KnotVector, NurbsSurface};
 
 pub use monstertruck_traits::surface_continuity::{
     BoundarySide, ContinuityCapabilityLevel, ContinuityMaturity, ContinuityOrder,
@@ -28,8 +28,8 @@ pub fn capability_for_bspline<P>(
 ) -> SurfaceContinuityCapability {
     capability(
         surface.control_points(),
-        surface.knot_vector_u().len(),
-        surface.knot_vector_v().len(),
+        surface.knot_vector_u(),
+        surface.knot_vector_v(),
         side,
         requested,
     )
@@ -43,8 +43,8 @@ pub fn capability_for_nurbs<V>(
 ) -> SurfaceContinuityCapability {
     capability(
         surface.control_points(),
-        surface.knot_vector_u().len(),
-        surface.knot_vector_v().len(),
+        surface.knot_vector_u(),
+        surface.knot_vector_v(),
         side,
         requested,
     )
@@ -52,8 +52,8 @@ pub fn capability_for_nurbs<V>(
 
 fn capability<P>(
     control_points: &[Vec<P>],
-    knot_count_u: usize,
-    knot_count_v: usize,
+    knots_u: &KnotVector,
+    knots_v: &KnotVector,
     side: BoundarySide,
     requested: ContinuityOrder,
 ) -> SurfaceContinuityCapability {
@@ -64,10 +64,22 @@ fn capability<P>(
         .filter(|&count| control_points.iter().all(|row| row.len() == count))
         .and_then(|count_v| {
             let count_u = control_points.len();
-            let degree_u = knot_count_u.checked_sub(count_u)?.checked_sub(1)?;
-            let degree_v = knot_count_v.checked_sub(count_v)?.checked_sub(1)?;
+            let degree_u = valid_axis_degree(knots_u, count_u)?;
+            let degree_v = valid_axis_degree(knots_v, count_v)?;
             Some(((degree_u, degree_v), (count_u, count_v)))
         });
     let (degrees, dimensions) = dimensions.unwrap_or(((0, 0), (0, 0)));
     SurfaceContinuityCapability::from_degrees_and_dimensions(degrees, dimensions, side, requested)
+}
+
+fn valid_axis_degree(knots: &KnotVector, control_count: usize) -> Option<usize> {
+    let degree = knots.len().checked_sub(control_count)?.checked_sub(1)?;
+    let values = knots.as_slice();
+    let valid_values = values.iter().all(|value| value.is_finite())
+        && values.windows(2).all(|pair| pair[0] <= pair[1]);
+    let positive_domain = values
+        .get(degree)
+        .zip(values.get(control_count))
+        .is_some_and(|(start, end)| end > start);
+    (valid_values && knots.is_clamped(degree) && positive_domain).then_some(degree)
 }
