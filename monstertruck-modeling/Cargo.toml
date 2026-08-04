@@ -13,7 +13,7 @@ categories = ["graphics"]
 
 [features]
 default = []
-fillet = ["monstertruck-solid"]
+fillet = ["monstertruck-fillet"]
 font = ["dep:ttf-parser"]
 
 [dependencies]
@@ -26,10 +26,13 @@ monstertruck-core = { workspace = true }
 monstertruck-geometry = { workspace = true }
 monstertruck-traits = { workspace = true, features = ["derive"] }
 monstertruck-mesh = { workspace = true }
-monstertruck-solid = { workspace = true, optional = true }
+monstertruck-fillet = { workspace = true, optional = true }
 monstertruck-topology = { workspace = true }
 rayon = { workspace = true }
 ttf-parser = { workspace = true, optional = true }
+# `web_time::Instant` is `std::time::Instant` on native and falls back to the
+# browser performance clock on wasm32, where `std::time::Instant::now()` panics.
+web-time = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

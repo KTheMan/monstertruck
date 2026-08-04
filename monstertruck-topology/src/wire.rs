@@ -561,7 +561,13 @@ where
         let vb = edge.absolute_back();
         let vertex1 = vertex_map.entry_or_insert(vb).clone()?;
         let curve = curve_mapping(&*edge.curve.lock())?;
-        Some(Edge::debug_new(&vertex0, &vertex1, curve))
+        // `.ok()` rather than a panic (spec 012 U4). Unlike `Edge::try_mapped`
+        // this one is NOT provably dead: the vertices come out of an
+        // `EntryMap`, so a source edge that is already degenerate
+        // (`front == back`, reachable only via `new_unchecked`) maps both ends
+        // onto the SAME entry and the violation is real. The closure returns
+        // `Option`, so it reports it.
+        Edge::debug_new(&vertex0, &vertex1, curve).ok()
     }
 }
 
@@ -579,7 +585,13 @@ where
         let vb = edge.absolute_back();
         let vertex1 = vertex_map.entry_or_insert(vb).clone();
         let curve = curve_mapping(&*edge.curve.lock());
-        Edge::debug_new(&vertex0, &vertex1, curve)
+        // Infallible signature, no channel: `new_unchecked` stated outright
+        // instead of hidden behind `debug_new`'s profile switch (spec 012 U4).
+        // The mapping is injective on vertex identity, so a degenerate result
+        // means a degenerate SOURCE edge -- an invariant the source wire
+        // arrived with, which this closure cannot report and must not abort on.
+        // The `try` sibling above is the one with somewhere to put it.
+        Edge::new_unchecked(&vertex0, &vertex1, curve)
     }
 }
 

@@ -111,7 +111,9 @@ where
         curve_connector: Cc,
         division: usize,
     ) -> Solid<P, C, S> {
-        Solid::debug_new(
+        // Spec 012 U4, same as `sweep.rs`: infallible trait output, so the
+        // construction is stated rather than profile-switched.
+        Solid::new_unchecked(
             self.boundaries()
                 .iter()
                 .map(move |wire| {

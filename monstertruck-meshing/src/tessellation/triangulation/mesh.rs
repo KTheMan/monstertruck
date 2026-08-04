@@ -1,7 +1,6 @@
 use std::iter;
 
 use super::*;
-use crate::common::FaceNormal;
 use boundary::{PolyBoundary, UvKey, boundary_segment_parameter, uv_key};
 
 const MAX_SURFACE_SPAN_INTERVALS: usize = 32;
@@ -12,16 +11,49 @@ const SURFACE_SPAN_TOLERANCE_FACTOR: f64 = 8.0;
 /// Sums the area-weighted dot product of each face's geometric normal against its
 /// vertex normals. If the total is negative the entire mesh is inverted, keeping
 /// all faces consistently wound.
+///
+/// # Why the weight is the raw cross-product sum and not `FaceNormal`
+///
+/// Ledger class C15, measured 2026-08-01. `FaceNormal::new` NORMALIZES, so a
+/// face of zero area answers `0/0 = NaN`. A sphere's parameter grid ends in a
+/// row of such faces at each pole, and one NaN term makes the whole `vote`
+/// NaN -- at which point `vote < 0.0` is FALSE and the mesh is never corrected.
+///
+/// `occt-sphere.step` measured **-523.253857** on a `+523.5988` ball for
+/// exactly this reason: 158 of its 24,964 mesh faces (one pole strip) voted
+/// NaN, the raw grid winding is `-Su x Sv`, and the correction that exists to
+/// catch that never ran. The torus next to it in the same fixture set has no
+/// degenerate row, voted finite, and was right all along.
+///
+/// The raw sum is also what the doc line above always CLAIMED -- it is
+/// area-weighted, so a degenerate face contributes exactly zero instead of
+/// poisoning the sum, and a large face outvotes a sliver.
 fn ensure_winding_matches_normals(mesh: &mut PolygonMesh) {
     let positions = mesh.positions();
     let normals = mesh.normals();
     let mut vote = 0.0f64;
     for face in mesh.faces().face_iter() {
-        let geo = FaceNormal::new(positions, face, 0).normal;
+        let center = face
+            .iter()
+            .fold(Vector3::zero(), |sum, v| sum + positions[v.pos].to_vec())
+            / face.len() as f64;
+        // Twice the area-weighted normal of the (possibly non-planar) polygon.
+        // Deliberately NOT normalized: see the note above.
+        let geo = face
+            .windows(2)
+            .chain(iter::once([face[face.len() - 1], face[0]].as_ref()))
+            .fold(Vector3::zero(), |sum, v| {
+                let vec0 = positions[v[0].pos].to_vec() - center;
+                let vec1 = positions[v[1].pos].to_vec() - center;
+                sum + vec0.cross(vec1)
+            });
         let vtx: Vector3 = face.iter().fold(Vector3::zero(), |sum, v| {
             sum + v.nor.map(|i| normals[i]).unwrap_or(Vector3::zero())
         });
-        vote += geo.dot(vtx);
+        let term = geo.dot(vtx);
+        if term.is_finite() {
+            vote += term;
+        }
     }
     if vote < 0.0 {
         mesh.invert();

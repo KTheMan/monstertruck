@@ -1,4 +1,4 @@
-use crate::errors::Error;
+#[cfg(test)]
 use crate::shell::ShellCondition;
 use crate::*;
 use rustc_hash::FxHashMap as HashMap;
@@ -44,15 +44,7 @@ impl<P, C, S> Solid<P, C, S> {
     #[inline(always)]
     pub fn try_new(boundaries: Vec<Shell<P, C, S>>) -> Result<Solid<P, C, S>> {
         for shell in &boundaries {
-            if shell.is_empty() {
-                return Err(Error::EmptyShell);
-            } else if !shell.is_connected() {
-                return Err(Error::NotConnected);
-            } else if shell.shell_condition() != ShellCondition::Closed {
-                return Err(Error::NotClosedShell);
-            } else if !shell.singular_vertices().is_empty() {
-                return Err(Error::NotManifold);
-            }
+            shell.check_solid_boundary()?;
         }
         Ok(Solid::new_unchecked(boundaries))
     }
@@ -120,12 +112,34 @@ impl<P, C, S> Solid<P, C, S> {
         &mut self.attributes.vertices
     }
 
-    /// Create with validation only in debug mode.
+    /// Create with validation only in debug mode, REPORTING the violation
+    /// instead of aborting on it.
+    ///
+    /// # Why this returns `Result` (spec 012 U4, ledger C11)
+    ///
+    /// This used to be `cfg!(debug_assertions)` selecting between
+    /// [`Solid::new`] (PANICS on violation) and [`Solid::new_unchecked`]
+    /// (accepts anything) -- the two worst available outcomes, chosen by build
+    /// profile. Measured during spec 011's C11 work: **the same input that
+    /// panicked in a debug build returned `Some(invalid solid)` in RELEASE and
+    /// let a boolean run on a shell with a hole.** So the class had two faces --
+    /// C11 in debug, C9 in release -- and a panic-shaped census could only ever
+    /// see one of them.
+    ///
+    /// The `Result` gives the caller the one thing neither arm offered: a way to
+    /// say so. [`Face::debug_new`](crate::Face::debug_new) already had this
+    /// shape; this is the other two brought to it.
+    ///
+    /// Release still skips the check (that is what `debug_new` is FOR), so a
+    /// release `Ok` is not a validity certificate -- but a caller with an
+    /// `Option`/`Result` channel now propagates the debug refusal instead of
+    /// aborting the process, and the release path is no longer silently
+    /// *different in kind*.
     #[inline(always)]
-    pub fn debug_new(boundaries: Vec<Shell<P, C, S>>) -> Solid<P, C, S> {
+    pub fn debug_new(boundaries: Vec<Shell<P, C, S>>) -> Result<Solid<P, C, S>> {
         match cfg!(debug_assertions) {
-            true => Solid::new(boundaries),
-            false => Solid::new_unchecked(boundaries),
+            true => Solid::try_new(boundaries),
+            false => Ok(Solid::new_unchecked(boundaries)),
         }
     }
 
@@ -135,6 +149,23 @@ impl<P, C, S> Solid<P, C, S> {
     /// Returns the boundary shells
     #[inline(always)]
     pub fn into_boundaries(self) -> Vec<Shell<P, C, S>> { self.boundaries }
+
+    /// The valid EMPTY solid: zero boundary shells, hence zero faces and zero
+    /// volume -- the geometric empty set as a first-class B-rep value.
+    ///
+    /// This is a well-formed [`Solid`]: [`Solid::try_new`] accepts an empty
+    /// boundary list (the per-shell validity loop is vacuously satisfied), so
+    /// the empty set is representable without any `unchecked` escape. Boolean
+    /// operations return it for results that are geometrically, provably empty
+    /// (e.g. the intersection of disjoint solids), so a consumer receives a
+    /// closed zero-volume value rather than an error signal.
+    #[inline(always)]
+    pub fn empty() -> Solid<P, C, S> { Solid::new_unchecked(Vec::new()) }
+
+    /// True when this solid is the EMPTY set: it has no boundary shells (hence
+    /// no faces and zero volume). See [`Solid::empty`].
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool { self.boundaries.is_empty() }
 
     /// Returns an iterator over the faces.
     #[inline(always)]
@@ -340,14 +371,21 @@ impl<P, C, S> Solid<P, C, S> {
         mut curve_mapping: impl FnMut(&C) -> Option<D>,
         mut surface_mapping: impl FnMut(&S) -> Option<T>,
     ) -> Option<Solid<Q, D, T>> {
-        Some(Solid::debug_new(
+        // Spec 012 U4 / ledger C11 instance 2. This is the exact site the 011
+        // backtrace landed on: `extract_healed_trimmed_solid` -> `erase_trims`
+        // -> here, with a shell that is short a face. It used to abort the
+        // process in debug and hand back `Some(invalid solid)` in release.
+        // `.ok()` makes both profiles answer the same shape of thing -- a
+        // `None` this function's signature already promised.
+        Solid::debug_new(
             self.boundaries()
                 .iter()
                 .map(move |shell| {
                     shell.try_mapped(&mut point_mapping, &mut curve_mapping, &mut surface_mapping)
                 })
                 .collect::<Option<Vec<_>>>()?,
-        ))
+        )
+        .ok()
     }
 
     /// Returns a new solid whose surfaces are mapped by `surface_mapping`,
@@ -363,7 +401,22 @@ impl<P, C, S> Solid<P, C, S> {
         mut curve_mapping: impl FnMut(&C) -> D,
         mut surface_mapping: impl FnMut(&S) -> T,
     ) -> Solid<Q, D, T> {
-        Solid::debug_new(
+        // Infallible signature, so there is no channel to report a violation
+        // on -- and `new_unchecked` is stated here rather than hidden behind
+        // `debug_new`'s profile switch, because the alternative was a panic in
+        // debug and this exact call in release (spec 012 U4).
+        //
+        // It costs nothing, and that is provable rather than hoped for.
+        // `Solid::try_new`'s condition is `Shell::check_solid_boundary`, which
+        // is PURELY COMBINATORIAL -- non-empty, connected, closed, no singular
+        // vertex -- and `mapped` rebuilds the identical face/edge/vertex
+        // incidence structure with only the geometry replaced. So the result
+        // satisfies the condition exactly when the RECEIVER does, and a
+        // violation here is always a violation the receiver arrived with
+        // (`Solid::new_unchecked` / `TrimmedSolid::erase_trims` upstream). This
+        // is not the place that can diagnose it: see `try_mapped` above, which
+        // has an `Option` and now uses it.
+        Solid::new_unchecked(
             self.boundaries()
                 .iter()
                 .map(move |shell| {
@@ -637,4 +690,101 @@ fn ensure_edge_stable_ids_preserves_existing_shared_edge_id() {
     assert_eq!(target_ids, vec![existing_id, existing_id]);
     assert!(solid.edge_iter().all(|edge| edge.stable_id().is_assigned()));
     assert!(solid.id_allocator().peek() > existing_id.raw());
+}
+
+/// Spec 012 U4 / ledger class C11: [`Solid::debug_new`] used to choose between
+/// a PANIC and an UNCHECKED construction on `debug_assertions`, so the same
+/// input aborted a debug build and returned `Some(invalid solid)` in release.
+#[cfg(test)]
+mod debug_new_tests {
+    use crate::*;
+
+    /// An open shell -- one triangle. Not a valid solid boundary (not closed),
+    /// which is the shape a shell that lost a face upstream arrives in.
+    fn open_shell() -> Shell<(), (), ()> {
+        let v = Vertex::from_points([(); 3]);
+        let wire: Wire<(), ()> = vec![
+            Edge::new(&v[0], &v[1], ()),
+            Edge::new(&v[1], &v[2], ()),
+            Edge::new(&v[2], &v[0], ()),
+        ]
+        .into();
+        std::iter::once(Face::new(vec![wire], ())).collect()
+    }
+
+    /// The constructor REPORTS instead of aborting. Under `debug_assertions`
+    /// that is a typed `Err`; in release the check is skipped by design, so the
+    /// row pins the profile it is running in rather than pretending there is
+    /// only one.
+    #[test]
+    fn debug_new_reports_an_open_shell_instead_of_panicking() {
+        let outcome = Solid::debug_new(vec![open_shell()]);
+        if cfg!(debug_assertions) {
+            assert!(
+                matches!(outcome, Err(errors::Error::NotClosedShell)),
+                "an open shell must come back as a typed refusal, not a panic",
+            );
+        } else {
+            assert!(
+                outcome.is_ok(),
+                "release still skips the check -- `debug_new` is what it is called",
+            );
+        }
+    }
+
+    /// The measured C11 instance, at topology level: a solid carrying an
+    /// invalid shell (only reachable through `new_unchecked`, which is how
+    /// `TrimmedSolid::erase_trims` builds one) used to ABORT the process here
+    /// in debug and hand back `Some(invalid solid)` in release. `try_mapped`
+    /// has an `Option` and now uses it.
+    ///
+    /// The release arm is not a weaker assertion of the same thing -- it is the
+    /// C9 face of the class, and it is asserted here precisely because a
+    /// panic-shaped census cannot see it.
+    #[test]
+    fn try_mapped_over_an_invalid_solid_refuses_instead_of_aborting() {
+        let invalid = Solid::new_unchecked(vec![open_shell()]);
+        let mapped = invalid.try_mapped(|_| Some(()), |_| Some(()), |_| Some(()));
+        if cfg!(debug_assertions) {
+            assert!(
+                mapped.is_none(),
+                "the debug face of C11: an abort, now a `None` this signature \
+                 already promised",
+            );
+        } else {
+            assert!(
+                mapped.is_some(),
+                "the release face of C11 is C9 -- documented, not fixed by a \
+                 fallible signature alone",
+            );
+        }
+    }
+
+    /// A VALID solid must be unaffected: the refusal added above costs nothing
+    /// on any input that was already good, in either profile.
+    #[test]
+    fn try_mapped_over_a_valid_solid_is_unmoved() {
+        let mapped = super::cube().try_mapped(|_| Some(()), |_| Some(()), |_| Some(()));
+        let mapped = mapped.expect("a closed cube maps");
+        assert_eq!(mapped.boundaries().len(), 1);
+        assert_eq!(mapped.boundaries()[0].len(), 6);
+    }
+
+    /// `mapped` is infallible by signature, so it cannot report -- and it must
+    /// not abort either. It is a total structure-preserving map: the result is
+    /// exactly as valid as the receiver, which is the only honest thing an
+    /// infallible mapping can promise.
+    #[test]
+    fn mapped_over_an_invalid_solid_neither_aborts_nor_launders() {
+        let invalid = Solid::new_unchecked(vec![open_shell()]);
+        let mapped = invalid.mapped(|_| (), |_| (), |_| ());
+        assert_eq!(mapped.boundaries().len(), 1);
+        assert!(
+            matches!(
+                mapped.boundaries()[0].check_solid_boundary(),
+                Err(errors::Error::NotClosedShell)
+            ),
+            "the receiver's invalidity is preserved, not repaired and not hidden",
+        );
+    }
 }

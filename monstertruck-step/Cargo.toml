@@ -48,7 +48,7 @@ serde_json = { workspace = true }
 # (RUSTSEC-2026-0041).
 monstertruck-meshing = { workspace = true, features = ["vtk"] }
 monstertruck-modeling = { workspace = true, features = ["fillet"] }
-# The published classic-backend crate: the solidify example/tests heal boolean
-# output through its public `extract_healed_trimmed_solid`.
-monstertruck-solid = { workspace = true }
+# The published shape-healing crate: the solidify tests heal boolean output
+# through its public `extract_healed_trimmed_solid`.
+monstertruck-healing = { workspace = true }
 vtkio = { workspace = true }

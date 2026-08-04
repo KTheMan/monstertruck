@@ -993,6 +993,21 @@ impl StepFormat for ModelingSurface {
                 let bsp = t_mesh.to_bspline_surface(4);
                 StepFormat::fmt(&bsp, idx, f)
             }
+            // Saved as the exact rational net, which is BYTE-IDENTICAL to what
+            // these faces emitted before spec 012 U1.2 moved them onto the
+            // analytic variants -- they were that net. Emitting a real
+            // `SPHERICAL_SURFACE` / `TOROIDAL_SURFACE` would be better save
+            // fidelity and is recorded as follow-on work, but it is a save
+            // OUTPUT change and this track is the tessellation one.
+            ModelingSurface::SphericalSurface(_) | ModelingSurface::ToroidalSurface(_) => {
+                match self.try_into_homogeneous_bspline_surface() {
+                    Some(bsp) => StepFormat::fmt(&NurbsSurface::new(bsp), idx, f),
+                    // Unreachable through the loader: the variant is only built
+                    // behind the builder's own representability predicate. An
+                    // honest formatter error rather than a panic (ledger C11).
+                    None => Err(std::fmt::Error),
+                }
+            }
         }
     }
 }
@@ -1016,6 +1031,10 @@ impl StepLength for ModelingSurface {
                 let bsp = t_mesh.to_bspline_surface(4);
                 bsp.step_length()
             }
+            // Must agree with `StepFormat::fmt` above, which emits the net.
+            ModelingSurface::SphericalSurface(_) | ModelingSurface::ToroidalSurface(_) => self
+                .try_into_homogeneous_bspline_surface()
+                .map_or(0, |bsp| NurbsSurface::new(bsp).step_length()),
         }
     }
 }

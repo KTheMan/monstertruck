@@ -202,11 +202,22 @@ impl ParameterDivision2D for Sphere {
         tol: f64,
     ) -> (Vec<f64>, Vec<f64>) {
         nonpositive_tolerance!(tol);
-        assert!(
-            tol < self.radius,
-            "Tolerance is larger than the radius of sphere."
-        );
-        let delta = 2.0 * f64::acos(1.0 - tol / self.radius);
+        // A chord ratio at or above 1 used to be `assert!(tol < self.radius)`.
+        // That panic was unreachable while STEP spheres arrived here as rational
+        // nets; spec 012 U1.2 routes them onto this closed form, so a viewer
+        // asking for a chord coarser than a small sphere's radius -- an
+        // assembly-scale `1e-3 * diagonal` against a 2 mm fillet ball, say --
+        // now reaches it. `ParameterDivision2D` has no refusal channel and its
+        // consumers (viewers, area and volume, mesh export) have nowhere to put
+        // one, so a panic here is ledger C11.
+        //
+        // Clamping the RATIO, not the tolerance, and at 1.0 rather than
+        // `UnitCircle`'s 0.8: every ratio that does not panic today is `< 1`
+        // and so is left BYTE-IDENTICAL. At the clamp `delta` is `pi`, i.e. the
+        // coarsest division that still says something -- which is the honest
+        // answer when the chord budget exceeds the whole sphere.
+        let chord_ratio = f64::min(tol / self.radius, 1.0);
+        let delta = 2.0 * f64::acos(1.0 - chord_ratio);
         let u_div = 1 + ((urange.1 - urange.0) / delta).floor() as usize;
         let v_div = 1 + ((vrange.1 - vrange.0) / delta).floor() as usize;
         (
@@ -220,6 +231,43 @@ impl ParameterDivision2D for Sphere {
     }
 }
 
+/// The `v` seam twin of `nearest_periodic_angle` in `specifieds/torus.rs` --
+/// see that function for the measurement that produced this rule.
+///
+/// `2 * PI - acos(cosv)` is exactly `2 * PI` when `cosv` is exactly `1` and
+/// `radius[1] <= 0`, i.e. on the `v = 0` seam with a negative-zero `y`, and
+/// exactly `0` for the same point with a positive-zero `y`. Both spellings are
+/// correct and only the CALLER knows which one its parameter loop is written
+/// in, so the hint decides.
+///
+/// **Not observed failing on any in-repo fixture** -- ap224 carries no spheres
+/// and boxy carries neither spheres nor tori -- but spec 012 U1.2 put spheres
+/// on exactly this code path, so the branch is now as reachable as the torus
+/// one that WAS measured failing. Fixed here rather than left as the twin the
+/// ledger's C3 recurrence guard tells us to diff. `u` is NOT touched: a
+/// sphere's colatitude range `[0, PI]` is closed and non-periodic, so it has
+/// no seam. Unhinted callers are BYTE-IDENTICAL.
+#[inline]
+fn nearest_periodic_v(v: f64, hint: Option<f64>) -> f64 {
+    match hint {
+        None => v,
+        Some(hint) => v + 2.0 * PI * ((hint - v) / (2.0 * PI)).round(),
+    }
+}
+
+/// The `v` a [`SearchParameterHint2D`] carries, or `None`.
+///
+/// `Range` answers `None` deliberately: the pole branch below already reads
+/// `Parameter` and nothing else, and folding a range to a midpoint there would
+/// change an answer this change has no business changing.
+#[inline]
+fn hint_v(hint: SearchParameterHint2D) -> Option<f64> {
+    match hint {
+        SearchParameterHint2D::Parameter(_, v) => Some(v),
+        SearchParameterHint2D::Range(..) | SearchParameterHint2D::None => None,
+    }
+}
+
 impl SearchParameter<SurfaceParameter> for Sphere {
     type Point = Point3;
     #[inline(always)]
@@ -229,21 +277,21 @@ impl SearchParameter<SurfaceParameter> for Sphere {
         hint: H,
         _: usize,
     ) -> Option<(f64, f64)> {
+        let hint = hint_v(hint.into());
         let radius = point - self.center;
         if (self.radius * self.radius).near(&radius.magnitude2()) {
             let radius = radius.normalize();
             let u = f64::acos(radius[2]);
             let sinu = f64::sqrt(1.0 - radius[2] * radius[2]);
             let cosv = f64::clamp(radius[0] / sinu, -1.0, 1.0);
+            // At a pole every `v` is the same 3D point, so the hint is not a
+            // disambiguation there but the whole answer -- unchanged.
             let v = if sinu.so_small() {
-                match hint.into() {
-                    SearchParameterHint2D::Parameter(_, hint) => hint,
-                    _ => 0.0,
-                }
+                hint.unwrap_or(0.0)
             } else if radius[1] > 0.0 {
-                f64::acos(cosv)
+                nearest_periodic_v(f64::acos(cosv), hint)
             } else {
-                2.0 * PI - f64::acos(cosv)
+                nearest_periodic_v(2.0 * PI - f64::acos(cosv), hint)
             };
             Some((u, v))
         } else {
@@ -258,9 +306,13 @@ impl SearchNearestParameter<SurfaceParameter> for Sphere {
     fn search_nearest_parameter<H: Into<SearchParameterHint2D>>(
         &self,
         point: Point3,
-        _: H,
+        hint: H,
         _: usize,
     ) -> Option<(f64, f64)> {
+        // The seam twin of the exact solver above; see [`nearest_periodic_v`].
+        // `project_onto_surface_domain` ALTERNATES the two solvers, so teaching
+        // only one would leave the defect reachable on every other attempt.
+        let hint = hint_v(hint.into());
         let radial_vector = point - self.center;
         // When `point` coincides with `center`, every `(u, v)` on the
         // sphere is equidistant -- there is no unique nearest parameter.
@@ -286,11 +338,12 @@ impl SearchNearestParameter<SurfaceParameter> for Sphere {
             0.0
         } else {
             let cosv = f64::clamp(radius[0] / sinu, -1.0, 1.0);
-            if radius[1] > 0.0 {
+            let v = if radius[1] > 0.0 {
                 f64::acos(cosv)
             } else {
                 2.0 * PI - f64::acos(cosv)
-            }
+            };
+            nearest_periodic_v(v, hint)
         };
         Some((u, v))
     }

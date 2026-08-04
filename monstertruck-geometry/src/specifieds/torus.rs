@@ -191,14 +191,83 @@ impl v2::SearchParameter<v2::D2<f64>> for Torus {
     }
 }
 
+/// The `(u, v)` a [`SearchParameterHint2D`] carries, or `None`.
+///
+/// `Range` answers `None`: it names a rectangle, not a point, and the seam
+/// disambiguation below wants an anchor. Every caller that needs the
+/// disambiguation (the boundary projection chain, the SSI's parameter refiner)
+/// passes `Parameter`.
+#[inline]
+fn hint_parameter(hint: SearchParameterHint2D) -> Option<(f64, f64)> {
+    match hint {
+        SearchParameterHint2D::Parameter(u, v) => Some((u, v)),
+        SearchParameterHint2D::Range(..) | SearchParameterHint2D::None => None,
+    }
+}
+
+/// The co-periodic representative of `angle` nearest `hint` -- `angle + 2 k PI`
+/// for the integer `k` that minimises the distance -- or `angle` unchanged when
+/// no hint is available.
+///
+/// # The defect this closes, measured (spec 012 W1)
+///
+/// A torus is exactly `2 * PI`-periodic in both parameters, so every angle has
+/// infinitely many correct spellings and this routine's branch arithmetic picks
+/// one by a rule that reads only the CURRENT point: `2 * PI - acos(x)` is
+/// exactly `2 * PI` when the point sits on the `u = 0` seam with a negative-zero
+/// `y`, and exactly `0` when the same point carries a positive-zero `y`.
+/// Ordinary for a seam vertex of a real STEP face, and the caller was never
+/// given a way to say which spelling it wanted -- the `hint` argument was
+/// literally discarded (`_: H`).
+///
+/// That is invisible until a torus reaches a caller that PROJECTS a boundary.
+/// `sampled_parameter_boundary` (`monstertruck-modeling/src/geometry.rs`) walks
+/// a face's boundary polyline through this routine, feeding each answer forward
+/// as the next hint, so one seam vertex spelled a whole period away from its
+/// neighbours leaves the face's parameter LOOP with a spike across the entire
+/// domain. Measured on ap224 with spec 012's analytic-torus routing on -- two
+/// `R = 0.9107, r = 0.0312` fillet tori, seam-touching from OPPOSITE sides:
+///
+/// | face | true `u` extent (from the rational net) | analytic answer, before |
+/// |---|---|---|
+/// | 15 | `(0, PI)` | `(0.0645, 6.2832)` -- the whole ring |
+/// | 19 | `(PI, 2 PI)` | `(0, 6.2187)` -- the whole ring |
+///
+/// The SSI then traced the RIGHT curves against the box cutter's planes and the
+/// trim filter discarded every one of them (`side0 = 0` on all 8 segments),
+/// which surfaced as `CreateLoopsStoreFailed{IntersectionCurvesFailed{(15,4),
+/// SsiFailed}}`. **So this is ledger class C4, not a missing analytic SSI path:
+/// the kernel intersected the analytic torus perfectly well and was handed a
+/// face whose own trim loop excluded its interior.**
+///
+/// **A fixed rule cannot work here, and that is a measurement, not a guess.**
+/// The first attempt at this reduced an exact `2 * PI` to `0` -- correct for
+/// face 15, and it moved the refusal straight onto face 19, whose seam vertex
+/// needs the `2 * PI` spelling. The two faces are the same shape on opposite
+/// sides of one seam, so only the CALLER's context distinguishes them, and the
+/// hint is that context.
+///
+/// **Unhinted callers are byte-identical.** `SearchParameterHint2D::None`
+/// returns `angle` untouched, so every call site that passes no hint -- which is
+/// every call site that existed before spec 012 routed tori here -- sees exactly
+/// the arithmetic it saw before.
+#[inline]
+fn nearest_periodic_angle(angle: f64, hint: Option<f64>) -> f64 {
+    match hint {
+        None => angle,
+        Some(hint) => angle + 2.0 * PI * ((hint - angle) / (2.0 * PI)).round(),
+    }
+}
+
 impl SearchParameter<SurfaceParameter> for Torus {
     type Point = Point3;
     fn search_parameter<H: Into<SearchParameterHint2D>>(
         &self,
         point: Point3,
-        _: H,
+        hint: H,
         _: usize,
     ) -> Option<(f64, f64)> {
+        let hint = hint_parameter(hint.into());
         let r = point - self.center();
         let rxy = Vector2::new(r.x, r.y);
         let v = f64::asin(f64::clamp(r.z / self.small_radius(), -1.0, 1.0));
@@ -208,12 +277,17 @@ impl SearchParameter<SurfaceParameter> for Torus {
             (false, false) => v,
             (false, true) => 2.0 * PI + v,
         };
+        let v = nearest_periodic_angle(v, hint.map(|hint| hint.1));
         let rxy_n = rxy.normalize();
         let u = f64::acos(f64::clamp(rxy_n.x, -1.0, 1.0));
         let u = match rxy_n.y < 0.0 {
             true => 2.0 * PI - u,
             false => u,
         };
+        let u = nearest_periodic_angle(u, hint.map(|hint| hint.0));
+        // Still the SAME acceptance test on the SAME surface: `subs` is
+        // `2 * PI`-periodic, so a re-spelled parameter evaluates to the very
+        // same point and this check is unweakened by the re-spelling.
         match self.subs(u, v).near(&point) {
             true => Some((u, v)),
             false => None,
@@ -226,9 +300,10 @@ impl SearchNearestParameter<SurfaceParameter> for Torus {
     fn search_nearest_parameter<H: Into<SearchParameterHint2D>>(
         &self,
         point: Point3,
-        _: H,
+        hint: H,
         _: usize,
     ) -> Option<(f64, f64)> {
+        let hint = hint_parameter(hint.into());
         let r = point - self.center();
         let rxy = Vector2::new(r.x, r.y);
         if rxy.so_small() {
@@ -247,12 +322,19 @@ impl SearchNearestParameter<SurfaceParameter> for Torus {
             true => 2.0 * PI - u,
             false => u,
         };
+        // The same seam disambiguation as the exact solver above -- see
+        // [`nearest_periodic_angle`]. The two are twins over the same branch
+        // arithmetic and `project_onto_surface_domain` ALTERNATES between them
+        // (attempts 0/2 exact, 1/3 nearest), so teaching only one would leave
+        // the defect reachable on every other attempt.
+        let u = nearest_periodic_angle(u, hint.map(|hint| hint.0));
         let v = f64::asin(f64::clamp(small_r.z, -1.0, 1.0));
         let v = match (small_r.dot(large_r) < 0.0, v < 0.0) {
             (true, _) => PI - v,
             (false, false) => v,
             (false, true) => 2.0 * PI + v,
         };
+        let v = nearest_periodic_angle(v, hint.map(|hint| hint.1));
         Some((u, v))
     }
 }

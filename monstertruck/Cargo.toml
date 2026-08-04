@@ -21,7 +21,13 @@ topology = ["monstertruck-topology"]
 mesh = ["traits", "monstertruck-mesh"]
 modeling = ["geometry", "topology", "monstertruck-modeling"]
 meshing = ["mesh", "modeling", "monstertruck-meshing"]
-solid = ["meshing", "monstertruck-solid", "monstertruck-modeling/fillet"]
+solid = [
+    "meshing",
+    "monstertruck-solid",
+    "monstertruck-fillet",
+    "monstertruck-healing",
+    "monstertruck-modeling/fillet",
+]
 assembly = ["monstertruck-assembly"]
 step = ["modeling", "monstertruck-step"]
 gpu = ["monstertruck-gpu"]
@@ -32,7 +38,9 @@ rkyv = ["monstertruck-core/rkyv", "monstertruck-topology?/rkyv"]
 monstertruck-core = { workspace = true }
 monstertruck-assembly = { workspace = true, optional = true }
 monstertruck-derive = { workspace = true, optional = true }
+monstertruck-fillet = { workspace = true, optional = true }
 monstertruck-geometry = { workspace = true, optional = true }
+monstertruck-healing = { workspace = true, optional = true }
 monstertruck-gpu = { workspace = true, optional = true }
 monstertruck-mesh = { workspace = true, optional = true }
 monstertruck-meshing = { workspace = true, optional = true }

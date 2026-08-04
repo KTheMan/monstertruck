@@ -97,6 +97,14 @@ where
                     id,
                     name,
                     description,
+                    // DELIBERATELY DROPPED, and destructured explicitly so a
+                    // future field cannot be dropped by accident. A load-side
+                    // `SHAPE_REPRESENTATION` id indexes the file it was read
+                    // out of; this emitter allocates its own numbering (the
+                    // `sr_idx` below), so writing the carried id back would
+                    // emit a dangling reference. See
+                    // `PartAttributes::shape_representation`.
+                    shape_representation: _,
                 },
         } = self.entity();
         let sdr_idx = idx;
@@ -210,6 +218,10 @@ impl StepFormat for EdgeDisplay<'_> {
             name,
             id,
             description,
+            // An edge never carries one (it is a usage occurrence, not a
+            // product), and the emitter would have nothing to do with it if it
+            // did. Same reasoning as the node impl above.
+            shape_representation: _,
         } = &self.attrs;
 
         f.write_fmt(format_args!(
@@ -434,6 +446,7 @@ mod tests {
                 id: "PART-0001".to_owned(),
                 name: "Mock part".to_owned(),
                 description: "Single mock part used in a structural round-trip test.".to_owned(),
+                shape_representation: None,
             },
         });
         let design: StepDesign<MockShape, _, _> =
@@ -489,6 +502,8 @@ mod tests {
                     id: format!("PART-{name}"),
                     name: format!("Part {name}"),
                     description: format!("test part {name}"),
+                    // An assembly built in memory has no file to be an id into.
+                    shape_representation: None,
                 },
             })
         });
@@ -496,6 +511,7 @@ mod tests {
             id: format!("LINK-{name}"),
             name: format!("Link {name}"),
             description: format!("test link {name}"),
+            shape_representation: None,
         });
         for (target_index, (target, attrs)) in [parts[1], parts[2]]
             .iter()

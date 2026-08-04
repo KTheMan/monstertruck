@@ -50,15 +50,28 @@ impl<P, C> Edge<P, C> {
     #[inline(always)]
     pub fn set_stable_id(&mut self, id: StableId) { self.stable_id = id; }
 
-    /// Generates the edge from `front` to `back`.
-    /// # Remarks
-    /// This method check the condition `front == back` in the debug mode.  
-    /// The programmer must guarantee this condition before using this method.
+    /// Generates the edge from `front` to `back`, checking the condition
+    /// `front == back` in debug mode and REPORTING a violation rather than
+    /// aborting on it.
+    ///
+    /// # Why this returns `Result` (spec 012 U4, ledger C11)
+    ///
+    /// This used to be `cfg!(debug_assertions)` selecting between [`Edge::new`]
+    /// (PANICS when `front == back`) and [`Edge::new_unchecked`] (accepts a
+    /// degenerate edge) -- the two worst available outcomes, chosen by build
+    /// profile, so the failure class had a C11 face in debug and a C9 face in
+    /// release. See [`Solid::debug_new`](crate::Solid::debug_new) for the
+    /// measurement that forced this; [`Face::debug_new`](crate::Face::debug_new)
+    /// already had this shape.
+    ///
+    /// Release still skips the check, so a release `Ok` is not a validity
+    /// certificate -- but a caller with a channel now propagates the debug
+    /// refusal instead of aborting the process.
     #[inline(always)]
-    pub fn debug_new(front: &Vertex<P>, back: &Vertex<P>, curve: C) -> Edge<P, C> {
+    pub fn debug_new(front: &Vertex<P>, back: &Vertex<P>, curve: C) -> Result<Edge<P, C>> {
         match cfg!(debug_assertions) {
-            true => Edge::new(front, back, curve),
-            false => Edge::new_unchecked(front, back, curve),
+            true => Edge::try_new(front, back, curve),
+            false => Ok(Edge::new_unchecked(front, back, curve)),
         }
     }
 
@@ -353,7 +366,12 @@ impl<P, C> Edge<P, C> {
         let v0 = self.absolute_front().try_mapped(&mut point_mapping)?;
         let v1 = self.absolute_back().try_mapped(&mut point_mapping)?;
         let curve = curve_mapping(&*self.curve.lock())?;
-        let mut edge = Edge::debug_new(&v0, &v1, curve);
+        // `.ok()?` rather than a panic (spec 012 U4): this signature already
+        // promises `None`. Measured dead as well as typed -- `Vertex::try_mapped`
+        // builds a FRESH `Arc` per call and `Vertex` identity is
+        // `Arc::as_ptr`, so `v0 == v1` is unreachable here whatever the
+        // receiver looks like. Recorded rather than asserted (C5).
+        let mut edge = Edge::debug_new(&v0, &v1, curve).ok()?;
         if !self.orientation() {
             edge.invert();
         }
@@ -390,7 +408,13 @@ impl<P, C> Edge<P, C> {
         let v0 = self.absolute_front().mapped(&mut point_mapping);
         let v1 = self.absolute_back().mapped(&mut point_mapping);
         let curve = curve_mapping(&*self.curve.lock());
-        let mut edge = Edge::debug_new(&v0, &v1, curve);
+        // Infallible signature, no channel -- and unlike the general case this
+        // one is PROVABLY total, so nothing is being swallowed: `Vertex::mapped`
+        // is `Vertex::new_with_id`, a fresh `Arc` per call, and `Vertex`
+        // equality is `Arc::as_ptr` equality, so `v0 == v1` cannot hold. Stated
+        // as `new_unchecked` rather than hidden behind `debug_new`'s profile
+        // switch (spec 012 U4).
+        let mut edge = Edge::new_unchecked(&v0, &v1, curve);
         if edge.orientation() != self.orientation() {
             edge.invert();
         }
@@ -490,7 +514,13 @@ impl<P, C> Edge<P, C> {
         let t1 = curve1.range_tuple().0;
         curve1.parameter_transform(1.0, t0 - t1);
         let curve = curve0.try_concat(&curve1)?;
-        Ok(Edge::debug_new(self.front(), rhs.back(), curve))
+        // The `front == back` violation `debug_new` checks for is the same one
+        // `ConcatError::SameVertex` names, and it was already rejected above --
+        // so this maps a redundant check onto the error this function already
+        // has, rather than unwrapping it (spec 012 U4: a panic that moves looks
+        // exactly like a panic that was fixed).
+        Edge::debug_new(self.front(), rhs.back(), curve)
+            .map_err(|_| ConcatError::SameVertex(self.front().clone()))
     }
 
     /// Create display struct for debugging the edge.
@@ -641,4 +671,68 @@ impl<P: Debug, C: Debug> Debug for DebugDisplay<'_, Edge<P, C>, EdgeDisplayForma
             }
         }
     }
+}
+
+/// Spec 012 U4 / ledger class C11: [`Edge::debug_new`] used to choose between a
+/// PANIC and an UNCHECKED construction on `debug_assertions` -- the two worst
+/// available outcomes, selected by build profile.
+#[cfg(test)]
+mod debug_new_tests {
+    use crate::*;
+
+    /// The constructor reports rather than aborts. Both profiles are asserted,
+    /// because the whole point of the class is that they differ and only one of
+    /// them was ever looked at.
+    #[test]
+    fn debug_new_reports_a_degenerate_edge_instead_of_panicking() {
+        let v = Vertex::new(());
+        let outcome = Edge::debug_new(&v, &v, ());
+        if cfg!(debug_assertions) {
+            assert_eq!(
+                outcome.err(),
+                Some(errors::Error::SameVertex),
+                "a degenerate edge must come back as a typed refusal, not a panic",
+            );
+        } else {
+            assert!(
+                outcome.is_ok(),
+                "release still skips the check -- the C9 face of the class",
+            );
+        }
+    }
+
+    /// A well-formed edge is unmoved in either profile.
+    #[test]
+    fn debug_new_accepts_a_well_formed_edge() {
+        let v = Vertex::from_points([(); 2]);
+        let edge = Edge::debug_new(&v[0], &v[1], ()).expect("distinct vertices");
+        assert_eq!(edge.front(), &v[0]);
+        assert_eq!(edge.back(), &v[1]);
+    }
+
+    /// `Edge::mapped` calls `new_unchecked` directly, and this pins WHY that is
+    /// sound rather than convenient: `Vertex::mapped` allocates a fresh `Arc`
+    /// per call and `Vertex` equality is `Arc` pointer identity, so the mapped
+    /// ends of any edge -- even one whose points collapse onto each other --
+    /// are distinct vertices. The check `debug_new` would run is vacuous here.
+    #[test]
+    fn mapped_ends_are_distinct_vertices_even_when_the_points_collapse() {
+        let v = Vertex::from_points([0_i32, 1]);
+        let edge = Edge::new(&v[0], &v[1], ());
+        let collapsed = edge.mapped(|_| 0_i32, |()| ());
+        assert_eq!(collapsed.front().point(), collapsed.back().point());
+        assert_ne!(
+            collapsed.front(),
+            collapsed.back(),
+            "identity is the `Arc`, not the point -- so `front == back` is unreachable",
+        );
+    }
+
+    // `Edge::concat`'s disposition is pinned by the TYPE rather than by a row
+    // here: it maps `debug_new`'s refusal onto its own `ConcatError::SameVertex`
+    // (`map_err`), so there is no `unwrap` for a test to catch failing, and the
+    // case is already rejected by the guard above the call. Exercising it needs
+    // a curve type implementing `Concat + Invertible + ParameterTransform`,
+    // which this crate has none of -- `monstertruck-modeling`'s suite covers
+    // `concat` on real curves.
 }

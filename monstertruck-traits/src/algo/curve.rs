@@ -107,7 +107,11 @@ where
     // A non-finite deviation never satisfies the tolerance test and a range that
     // can no longer be halved never improves; both would otherwise subdivide all
     // the way down to the depth cap, i.e. an exponential amount of work.
-    let unsplittable = !dist2.is_finite() || !(range.0 < mid_param && mid_param < range.1);
+    // The halvable test stays in its positive `<` form: with a non-finite
+    // midpoint both comparisons are false, which correctly reads as
+    // unsplittable, while the De Morgan `>=` rewrite would not.
+    let range_is_halvable = range.0 < mid_param && mid_param < range.1;
+    let unsplittable = !dist2.is_finite() || !range_is_halvable;
     if dist2 < tol * tol || trials == 0 || unsplittable {
         (vec![range.0, range.1], vec![ends.0, ends.1])
     } else {

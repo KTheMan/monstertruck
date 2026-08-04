@@ -468,7 +468,19 @@ where
                 formatter.write_fmt(format_args!(
                     "#{face_bound_idx} = FACE_BOUND('', #{edge_loop_idx}, {orientation});
 #{edge_loop_idx} = EDGE_LOOP('', {oriented_edge_indices});\n",
-                    orientation = BooleanDisplay(true),
+                    // `CompressedFace::boundaries` are ABSOLUTE -- oriented
+                    // about the surface's own normal -- while ISO 10303-42
+                    // orients a face's loops about the FACE normal, which is
+                    // the reverse when `orientation` is false. `FACE_BOUND`'s
+                    // own flag is exactly the standard's way to say "reverse
+                    // this loop", so emitting `f.orientation` here writes a
+                    // conforming file AND round-trips through
+                    // `Table::absolute_bound_orientation`, which composes the
+                    // same two flags on the way back in (ledger C15).
+                    //
+                    // This used to be an unconditional `.T.`, which round-tripped
+                    // only because the LOADER dropped the same composition.
+                    orientation = BooleanDisplay(f.orientation),
                     oriented_edge_indices =
                         IndexSliceDisplay(ep_oriented_edges..ep_oriented_edges + b.len()),
                 ))?;

@@ -142,7 +142,7 @@ pub enum ShapeOpsError {
     /// No boolean backend is compiled in. Reachable only under
     /// `--no-default-features` (the default `marching-ssi` backend disabled and
     /// no upgrade backend linked). Enable `marching-ssi` (the published default)
-    /// or link an external SSI boolean-backend upgrade crate.
+    /// or link an external SSI boolean backend.
     #[error(
         "no boolean backend available: enable `marching-ssi` (default) or link an external SSI backend."
     )]

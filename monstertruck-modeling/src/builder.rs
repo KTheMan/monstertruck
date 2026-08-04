@@ -867,8 +867,12 @@ where
         let t = (t0 + t1) * 0.5;
         let v1 = Vertex::new(curve.subs(t));
         let curve1 = curve.cut(t);
-        wire.push_back(Edge::debug_new(&v0, &v1, curve));
-        wire.push_back(Edge::debug_new(&v1, &v2, curve1));
+        // Spec 012 U4: `v1` is a freshly allocated `Vertex`, and `Vertex`
+        // equality is `Arc` pointer identity, so neither of these two edges can
+        // be degenerate. Vacuous check, infallible caller: stated, not
+        // profile-switched.
+        wire.push_back(Edge::new_unchecked(&v0, &v1, curve));
+        wire.push_back(Edge::new_unchecked(&v1, &v2, curve1));
     }
 
     let mut shell = revolve(&wire, origin, axis, sweep, division);
@@ -888,7 +892,13 @@ where
                 shell[0].boundaries()[0][0].inverse()
             } else {
                 let curve = old_wire[2].oriented_curve();
-                Edge::debug_new(old_wire[2].front(), new_wire[0].front(), curve)
+                // Spec 012 U4: `revolve_wire` returns a bare `Shell`, so there
+                // is no channel. Unlike the two above this is NOT provably
+                // vacuous -- both vertices come out of the revolve's own shell.
+                // Stated as unchecked rather than profile-switched (abort in
+                // debug, this exact call in release); the check it drops is on
+                // the builder's own output and has never fired in-gate.
+                Edge::new_unchecked(old_wire[2].front(), new_wire[0].front(), curve)
             };
             new_wire.push_back(new_edge.clone());
             shell[idx] = Face::new_unchecked(vec![new_wire], surface);
@@ -910,7 +920,8 @@ where
                 shell[wire.len() - 1].boundaries()[0][0].inverse()
             } else {
                 let curve = old_wire[2].oriented_curve();
-                Edge::debug_new(new_wire[0].back(), old_wire[2].back(), curve)
+                // Spec 012 U4, mirror of the front-collapse case above.
+                Edge::new_unchecked(new_wire[0].back(), old_wire[2].back(), curve)
             };
             new_wire.push_back(new_edge.clone());
             new_wire.push_back(old_wire[3].clone());

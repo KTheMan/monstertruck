@@ -13,11 +13,16 @@ use std::collections::HashMap;
 use std::result::Result;
 
 pub mod convert;
+/// Typed accounting for what a load kept and what it lost.
+pub mod report;
 /// Geometry parsed from STEP that can be handled by monstertruck.
 pub mod step_geometry;
 /// STEP type definitions: structs, enums, and their From/TryFrom impls.
 mod step_types;
 
+pub use report::{
+    CategoryCount, EntityLoadReport, LossCategory, LossReason, LossTally, ShellLoadReport,
+};
 use step_geometry::StepConvertingError;
 
 /// Public error type returned by STEP loading entry points.
@@ -35,6 +40,16 @@ pub enum LoadError {
     /// A per-entity conversion from STEP types into `monstertruck` types failed.
     #[error("STEP conversion error: {0}")]
     Conversion(String),
+    /// The load SUCCEEDED but lost part of the input.
+    ///
+    /// Never produced by the ordinary load path -- a lossy load still returns
+    /// `Ok`, because every in-gate fixture is lossy today and making loss fatal
+    /// would refuse files the kernel handles correctly. This variant exists so
+    /// that a caller who WANTS strictness gets it in one line, via
+    /// [`ShellLoadReport::require_lossless`] or
+    /// [`EntityLoadReport::require_empty`].
+    #[error("STEP load lost part of the input: {0}")]
+    PartialLoss(String),
 }
 
 impl From<StepConvertingError> for LoadError {
@@ -89,6 +104,7 @@ pub struct Table {
     pub spherical_surface: HashMap<u64, SphericalSurfaceHolder>,
     pub cylindrical_surface: HashMap<u64, CylindricalSurfaceHolder>,
     pub toroidal_surface: HashMap<u64, ToroidalSurfaceHolder>,
+    pub degenerate_toroidal_surface: HashMap<u64, DegenerateToroidalSurfaceHolder>,
     pub conical_surface: HashMap<u64, ConicalSurfaceHolder>,
     pub b_spline_surface_with_knots: HashMap<u64, BsplineSurfaceWithKnotsHolder>,
     pub uniform_surface: HashMap<u64, UniformSurfaceHolder>,
@@ -103,6 +119,7 @@ pub struct Table {
     pub edge_curve: HashMap<u64, EdgeCurveHolder>,
     pub oriented_edge: HashMap<u64, OrientedEdgeHolder>,
     pub edge_loop: HashMap<u64, EdgeLoopHolder>,
+    pub vertex_loop: HashMap<u64, VertexLoopHolder>,
     pub face_bound: HashMap<u64, FaceBoundHolder>,
     pub face_surface: HashMap<u64, FaceSurfaceHolder>,
     pub oriented_face: HashMap<u64, OrientedFaceHolder>,
@@ -137,9 +154,74 @@ pub struct Table {
 
     // dummy
     pub dummy: HashMap<u64, DummyHolder>,
+
+    /// What the table-building pass SWALLOWED: records it refused and then
+    /// dropped, tallied per entity type.
+    ///
+    /// The whole point of this field is that `from_step_bytes` returning `Ok` is
+    /// no longer a claim that the file was fully understood. It used to be one --
+    /// on both Scania corpus files the pass dropped 4,562 records, i.e. their
+    /// entire assembly graph, printed one line per record on stderr, and returned
+    /// `Ok`. Read [`EntityLoadReport`] for what the two swallow mechanisms are and
+    /// why records with no arm at all are NOT counted here (they are in
+    /// [`Self::dummy`], with their names).
+    pub entity_report: EntityLoadReport,
 }
 
 impl Table {
+    /// Record an entity instance the pass is about to swallow, then drop it.
+    ///
+    /// Called by [`FromIterator`] on the `Err` arm of [`Self::push_instance`],
+    /// which is where the swallow physically happens: `push_instance` itself
+    /// returns a typed error and swallows nothing. A caller driving
+    /// `push_instance` by hand should call this on `Err` to get the same tally.
+    pub fn record_refused_instance(
+        &mut self,
+        instance: &EntityInstance,
+        error: &ruststep::error::Error,
+    ) {
+        let (id, name) = match instance {
+            EntityInstance::Simple { id, record } => (*id, record.name.clone()),
+            EntityInstance::Complex {
+                id,
+                subsuper: SubSuperRecord(records),
+            } => (
+                *id,
+                records
+                    .iter()
+                    .map(|record| record.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join("+"),
+            ),
+        };
+        self.entity_report
+            .note_refused(&name, id, error.to_string());
+    }
+
+    /// Record an entity that hit an arity-guarded arm whose guard did not match.
+    ///
+    /// These arms are written `if let Parameter::List(p) = .. && p.len() == N`
+    /// with no `else`, so before this the record vanished with neither an error
+    /// nor a [`Self::dummy`] entry -- invisible even to the census that went
+    /// looking for losses.
+    fn note_unexpected_shape(
+        &mut self,
+        entity_type: &str,
+        id: u64,
+        expected: &str,
+        parameter: &Parameter,
+    ) {
+        let got = match parameter {
+            Parameter::List(params) => format!("a list of {}", params.len()),
+            _ => "a non-list parameter".to_owned(),
+        };
+        self.entity_report.note_shape_unexpected(
+            entity_type,
+            id,
+            format!("expected {expected}, got {got}"),
+        );
+    }
+
     pub fn push_instance(&mut self, instance: &EntityInstance) -> ruststep::error::Result<()> {
         match instance {
             EntityInstance::Simple { id, record } => match record.name.as_str() {
@@ -245,6 +327,16 @@ impl Table {
                     self.toroidal_surface
                         .insert(*id, Deserialize::deserialize(record)?);
                 }
+                // A distinct entity, not a spelling of the above: it carries a
+                // fifth attribute (`select_outer`) and its own WHERE rule
+                // (`major_radius < minor_radius`). Without this arm the record
+                // fell into `dummy` and every face on it could only be refused as
+                // `Lookup failed for #<id>`, naming neither class nor reason --
+                // 253 corpus faces (spec 011 T1).
+                "DEGENERATE_TOROIDAL_SURFACE" => {
+                    self.degenerate_toroidal_surface
+                        .insert(*id, Deserialize::deserialize(record)?);
+                }
                 "CONICAL_SURFACE" => {
                     self.conical_surface
                         .insert(*id, Deserialize::deserialize(record)?);
@@ -294,10 +386,29 @@ impl Table {
                                 orientation: Deserialize::deserialize(&params[4])?,
                             },
                         );
+                    } else {
+                        self.note_unexpected_shape(
+                            "ORIENTED_EDGE",
+                            *id,
+                            "a list of 5",
+                            &record.parameter,
+                        );
                     }
                 }
                 "EDGE_LOOP" => {
                     self.edge_loop
+                        .insert(*id, Deserialize::deserialize(record)?);
+                }
+                // A `loop` subtype with no edges at all -- the point boundary at a
+                // cone apex, a sphere pole, or a stand-in for the closed torus.
+                // Without this arm the record fell into `dummy` and the WIRE that
+                // referenced it was discarded by a `filter_map` with no error and
+                // no message: the only truly silent drop the spec 011 Phase 0
+                // census found, and it bit four in-repo fixtures
+                // (`boxy-with-surfacetex.step` lost 10 of 160 wires). The arm does
+                // not make the loop representable; it makes the loss reportable.
+                "VERTEX_LOOP" => {
+                    self.vertex_loop
                         .insert(*id, Deserialize::deserialize(record)?);
                 }
                 "FACE_BOUND" => {
@@ -328,6 +439,13 @@ impl Table {
                                 orientation: Deserialize::deserialize(&params[3])?,
                             },
                         );
+                    } else {
+                        self.note_unexpected_shape(
+                            "ORIENTED_FACE",
+                            *id,
+                            "a list of 4",
+                            &record.parameter,
+                        );
                     }
                 }
                 "OPEN_SHELL" => {
@@ -350,6 +468,13 @@ impl Table {
                                 orientation: Deserialize::deserialize(&params[3])?,
                             },
                         );
+                    } else {
+                        self.note_unexpected_shape(
+                            "ORIENTED_OPEN_SHELL",
+                            *id,
+                            "a list of 4",
+                            &record.parameter,
+                        );
                     }
                 }
                 "ORIENTED_CLOSED_SHELL" => {
@@ -363,6 +488,13 @@ impl Table {
                                 shell_element: Deserialize::deserialize(&params[2])?,
                                 orientation: Deserialize::deserialize(&params[3])?,
                             },
+                        );
+                    } else {
+                        self.note_unexpected_shape(
+                            "ORIENTED_CLOSED_SHELL",
+                            *id,
+                            "a list of 4",
+                            &record.parameter,
                         );
                     }
                 }
@@ -381,6 +513,13 @@ impl Table {
                                 outer: Deserialize::deserialize(&params[1])?,
                                 voids: Vec::new(),
                             },
+                        );
+                    } else {
+                        self.note_unexpected_shape(
+                            "MANIFOLD_SOLID_BREP",
+                            *id,
+                            "a list of 2",
+                            &record.parameter,
                         );
                     }
                 }
@@ -409,6 +548,13 @@ impl Table {
                                     }),
                                 },
                             },
+                        );
+                    } else {
+                        self.note_unexpected_shape(
+                            "DEFINITIONAL_REPRESENTATION",
+                            *id,
+                            "a list of 3",
+                            &record.parameter,
                         );
                     }
                 }
@@ -439,6 +585,13 @@ impl Table {
                                 description: Deserialize::deserialize(&params[1])?,
                                 of_product: Deserialize::deserialize(&params[2])?,
                             },
+                        );
+                    } else {
+                        self.note_unexpected_shape(
+                            "PRODUCT_DEFINITION_FORMATION_WITH_SPECIFIED_SOURCE",
+                            *id,
+                            "a list of 3 or more",
+                            &record.parameter,
                         );
                     }
                 }
@@ -832,14 +985,68 @@ impl Table {
         let exchange = ruststep::parser::parse(step_str)?;
         Ok(Table::from_data_section(&exchange.data[0]))
     }
+
+    /// Parses STEP file BYTES, decoding UTF-8 where possible and falling back to
+    /// ISO-8859-1 where it is not.
+    ///
+    /// # Why this exists
+    ///
+    /// [`Table::from_step`] takes `&str`, so decoding is the caller's problem --
+    /// and every caller in this workspace solved it with `String::from_utf8`,
+    /// which REJECTS a class of file customers actually send. ISO 10303-21 wants
+    /// non-ASCII carried as `\X2\` escapes, but exporters in non-English locales
+    /// routinely emit raw 8-bit bytes in string literals instead.
+    ///
+    /// Measured on a 100 MB AP203 export from a mainstream converter
+    /// (`Ai-14R.stp`, ASCON, Cyrillic `FILE_NAME`): **11 lines out of 1,543,843
+    /// contain a byte above 127, and every one of them is inside a string
+    /// literal** -- the header `FILE_NAME` and three `REPRESENTATION_ITEM` names.
+    /// Not one is in geometry. Rejecting the whole file over four display strings
+    /// is not a defensible trade.
+    ///
+    /// # What the fallback can and cannot cost you
+    ///
+    /// ISO-8859-1 is a total, lossless byte-to-codepoint map: every byte decodes,
+    /// nothing is dropped or replaced, and the operation cannot fail. So the
+    /// GEOMETRY IS EXACT either way -- coordinates are ASCII in both encodings.
+    ///
+    /// What it can get wrong is the rendering of those few strings. The file
+    /// above is really CP1251, so its `FILE_NAME` decodes to Latin-1 mojibake
+    /// rather than Cyrillic. That is a display concern in a metadata field, and
+    /// this function deliberately does NOT guess the true 8-bit encoding:
+    /// guessing would risk a *wrong* answer where mojibake is merely an ugly one.
+    /// A caller that needs the real text should decode it itself and use
+    /// [`Table::from_step`].
+    ///
+    /// UTF-8 input is unaffected -- it takes the first branch and is
+    /// byte-identical to calling [`Table::from_step`] directly.
+    pub fn from_step_bytes(bytes: &[u8]) -> Result<Table, LoadError> {
+        match std::str::from_utf8(bytes) {
+            Ok(text) => Self::from_step(text),
+            // Infallible by construction: `u8 as char` is the ISO-8859-1 code
+            // page, so every byte has an image and no input can be refused here.
+            Err(_) => {
+                let text: String = bytes.iter().map(|&byte| byte as char).collect();
+                Self::from_step(&text)
+            }
+        }
+    }
 }
 
 impl<'a> FromIterator<&'a EntityInstance> for Table {
+    /// Builds the table, RECORDING every record it has to swallow.
+    ///
+    /// The `eprintln!` is kept verbatim so nothing about the observable output
+    /// changes; what is new is that the swallow also lands in
+    /// [`Table::entity_report`], where a caller can find it after the fact
+    /// instead of having to have been watching stderr.
     fn from_iter<I: IntoIterator<Item = &'a EntityInstance>>(iter: I) -> Table {
         let mut res = Table::default();
         iter.into_iter().for_each(|instance| {
-            res.push_instance(instance)
-                .unwrap_or_else(|e| eprintln!("{e}"))
+            if let Err(e) = res.push_instance(instance) {
+                eprintln!("{e}");
+                res.record_refused_instance(instance, &e);
+            }
         });
         res
     }

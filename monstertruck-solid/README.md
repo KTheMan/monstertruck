@@ -1,6 +1,7 @@
 # `monstertruck-solid`
 
-Boolean operations, fillets, and shape healing for solids.
+Boolean operations for solids. Fillets live in `monstertruck-fillet` and shape
+healing in `monstertruck-healing`; both are post-CSG and kernel-independent.
 
 > Forked from [`truck-shapeops`](https://crates.io/crates/truck-shapeops) v0.4.0 by [ricosjp](https://github.com/ricosjp/truck).
 
