@@ -22,6 +22,31 @@
 //!         .sum()
 //! }
 //! ```
+//!
+//! # Continuity foundations
+//!
+//! [`ContinuityOrder`] provides checked `G0`--`G4` requests, [`BoundarySide`]
+//! names full tensor-product patch sides, and [`SurfaceContinuityCapability`]
+//! carries a representation-specific support determination without embedding
+//! representation rules in this crate. The report does not establish
+//! two-surface or solver feasibility. `G4` is explicitly experimental.
+//!
+//! ```
+//! use monstertruck_traits::{
+//!     BoundarySide, ContinuityOrder, SurfaceContinuityCapability,
+//! };
+//!
+//! # fn main() -> Result<(), monstertruck_traits::UnsupportedContinuityOrder> {
+//! let order = ContinuityOrder::new(3)?;
+//! let capability = SurfaceContinuityCapability::supported(BoundarySide::MinU, order);
+//!
+//! assert_eq!(capability.side(), BoundarySide::MinU);
+//! assert!(capability.is_supported());
+//! assert!(ContinuityOrder::new(5).is_err());
+//! assert!(ContinuityOrder::G4.is_experimental());
+//! # Ok(())
+//! # }
+//! ```
 
 #![cfg_attr(not(debug_assertions), deny(warnings))]
 #![deny(clippy::all, rust_2018_idioms)]
@@ -54,6 +79,9 @@ macro_rules! nonpositive_tolerance {
 /// Abstract traits: `Curve` and `Surface`.
 pub mod traits;
 pub use traits::*;
+/// Checked continuity requests and capability diagnostics.
+pub mod surface_continuity;
+pub use surface_continuity::*;
 /// Algorithms for curves and surfaces.
 pub mod algo;
 /// Scalar-generic v2 trait family.
