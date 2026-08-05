@@ -1,10 +1,11 @@
-use super::{BsplineSurface, KnotVector, NurbsSurface};
-use monstertruck_core::cgmath64::Homogeneous;
+use monstertruck_core::cgmath64::{Homogeneous, control_point::ControlPoint};
 use monstertruck_traits::surface_continuity::{
     BoundarySide, ContinuityOrder, SurfaceContinuityCapability,
 };
 
-impl<P> BsplineSurface<P> {
+use super::{BsplineSurface, KnotVector, NurbsSurface};
+
+impl<P: ControlPoint<f64>> BsplineSurface<P> {
     /// Reports whether this B-spline representation can expose the requested
     /// derivatives along a full parameter-domain side.
     ///
@@ -48,7 +49,7 @@ impl<P> BsplineSurface<P> {
 }
 
 impl<V> NurbsSurface<V>
-where V: Copy + Homogeneous<Scalar = f64>
+where V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>
 {
     /// Reports whether this positive-weight NURBS representation can expose
     /// the requested derivatives along a full parameter-domain side.
