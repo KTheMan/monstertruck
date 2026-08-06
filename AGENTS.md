@@ -22,19 +22,24 @@ Reference:
 
 ## Build, Test, and Development Commands
 
-**Only use `cargo test` and `cargo run`. NEVER use `cargo check` or `cargo build` for verification.**
+**Use `cargo nextest run` for ordinary tests, `cargo test --doc` for doctests,
+and `cargo run` for executable validation. NEVER use `cargo test` for ordinary
+tests. NEVER use `cargo check` or `cargo build` for verification.**
 
 **NEVER run `cargo clean` without asking the user first.**
 
 ```bash
 # Run tests (this also builds everything)
-cargo test -p monstertruck-geometry --lib
+cargo nextest run -p monstertruck-geometry --lib
 
 # Run all core tests
 just test-cpu
 
 # Run a specific test
-cargo test -p monstertruck-geometry test_name
+cargo nextest run -p monstertruck-geometry test_name
+
+# Run doctests separately (`nextest` does not run them)
+cargo test -p monstertruck-geometry --doc
 
 # Format code
 cargo fmt --all
@@ -95,7 +100,9 @@ cargo clippy --all-targets -- -W warnings
 
 ## Testing Guidelines
 
-- **CRITICAL: ALWAYS run `cargo test` and `cargo clippy --all-targets -- -W warnings` before committing!**
+- **CRITICAL: ALWAYS run `just test-cpu`, `just test-doc`, and `cargo clippy --all-targets -- -W warnings` before committing!**
+- **CRITICAL: NEVER use `cargo test` for ordinary unit or integration tests. Use `cargo nextest run`. The work meters are process-global, so `cargo test` can cross-charge concurrently running tests in the same process and produce invalid failures.**
+- **CRITICAL: Run doctests separately with `cargo test --doc`; `cargo nextest run` does not run doctests.**
 - **CRITICAL: Address ALL warnings before EVERY commit!** This includes unused imports, dead code, deprecated API usage, and clippy warnings.
 - Never use `#[allow(warnings)]` or similar suppressions without explicit user approval.
 - **CRITICAL: Never modify test files** -- tests encode human intent.
@@ -137,6 +144,15 @@ asking a human to open the model in a viewer.
 - Use conventional commit prefixes: `feat:`, `fix:`, `chore:`.
 - Keep messages concise and describe the user-facing effect.
 - Every pull request should summarize intent, list key changes, and document how you validated them.
+- **CRITICAL: NEVER claim that hosted CI passed unless `gh pr checks <PR>` reports the checks and their successful results.**
+- Fork pull requests may have no hosted checks. When no checks are reported, state that fact and list only the local validation actually run.
+- Never infer a hosted CI result from local commands or from the presence of workflow files.
+
+## Correct-or-Typed API Rules (HARDLINE)
+
+- **NEVER represent an unsupported result as a `bool` when more than one cause is possible. Carry a typed, actionable reason for the unsupported path.**
+- **NEVER collapse degree, knot, control-net, clamping, periodicity, boundary-side, representation, trimmed-seam, or similar capability failures into a single unsupported bit.**
+- **NEVER return a silent partial result. Truncation and unsupported capability states must identify their condition through a typed error or reason.**
 
 ## Error Handling
 
