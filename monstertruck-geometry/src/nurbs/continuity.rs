@@ -1,6 +1,7 @@
 use monstertruck_core::cgmath64::{Homogeneous, control_point::ControlPoint};
 use monstertruck_traits::surface_continuity::{
-    BoundarySide, ContinuityOrder, SurfaceContinuityCapability,
+    BoundarySide, ContinuityOrder, MAX_CONTINUITY_ORDER, SurfaceContinuityCapability,
+    UnsupportedContinuityCapability,
 };
 
 use super::{BsplineSurface, KnotVector, NurbsSurface};
@@ -23,28 +24,40 @@ impl<P: ControlPoint<f64>> BsplineSurface<P> {
     ///     vec![vec![Point3::new(0.0, 0.0, 0.0); 3]; 2],
     /// );
     ///
-    /// assert!(
-    ///     surface
-    ///         .continuity_capability(BoundarySide::MinV, ContinuityOrder::G2)
-    ///         .is_supported()
-    /// );
+    /// let capability =
+    ///     surface.continuity_capability(BoundarySide::MinV, ContinuityOrder::G2);
+    ///
+    /// assert_eq!(capability.unsupported_reason(), None);
+    /// assert_eq!(capability.maximum_supported_order(), Some(ContinuityOrder::G2));
     /// ```
     pub fn continuity_capability(
         &self,
         side: BoundarySide,
         requested: ContinuityOrder,
     ) -> SurfaceContinuityCapability {
-        let (knots, control_count) = match side {
-            BoundarySide::MinU | BoundarySide::MaxU => {
-                (self.knot_vector_u(), self.control_points().len())
-            }
-            BoundarySide::MinV | BoundarySide::MaxV => (
-                self.knot_vector_v(),
-                self.control_points().first().map_or(0, Vec::len),
-            ),
-        };
+        let control_points = self.control_points();
+        let dimensions = control_points
+            .first()
+            .filter(|row| !row.is_empty())
+            .map(Vec::len)
+            .filter(|&count_v| control_points.iter().all(|row| row.len() == count_v))
+            .map(|count_v| (control_points.len(), count_v));
 
-        capability_for_axis(knots, control_count, side, requested)
+        match dimensions {
+            Some((count_u, count_v)) => {
+                let (knots, control_count) = match side {
+                    BoundarySide::MinU | BoundarySide::MaxU => (self.knot_vector_u(), count_u),
+                    BoundarySide::MinV | BoundarySide::MaxV => (self.knot_vector_v(), count_v),
+                };
+                capability_for_axis(knots, control_count, side, requested)
+            }
+            None => SurfaceContinuityCapability::unsupported(
+                side,
+                requested,
+                UnsupportedContinuityCapability::InvalidControlNet,
+                None,
+            ),
+        }
     }
 }
 
@@ -68,11 +81,10 @@ where V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>
     ///     vec![vec![Vector4::new(0.0, 0.0, 0.0, 1.0); 2]; 2],
     /// ));
     ///
-    /// assert!(
-    ///     surface
-    ///         .continuity_capability(BoundarySide::MaxU, ContinuityOrder::G1)
-    ///         .is_supported()
-    /// );
+    /// let capability =
+    ///     surface.continuity_capability(BoundarySide::MaxU, ContinuityOrder::G1);
+    ///
+    /// assert_eq!(capability.unsupported_reason(), None);
     /// ```
     pub fn continuity_capability(
         &self,
@@ -82,16 +94,30 @@ where V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>
         let polynomial = self
             .non_rationalized()
             .continuity_capability(side, requested);
-        let positive_weights = self
+        let mut weights = self
             .control_points()
             .iter()
             .flatten()
-            .all(|point| point.weight().is_finite() && point.weight() > 0.0);
+            .map(|point| point.weight());
 
-        if polynomial.is_supported() && positive_weights {
-            SurfaceContinuityCapability::supported(side, requested)
+        if polynomial.unsupported_reason().is_some() {
+            polynomial
+        } else if weights.clone().any(|weight| !weight.is_finite()) {
+            SurfaceContinuityCapability::unsupported(
+                side,
+                requested,
+                UnsupportedContinuityCapability::NonFiniteWeight,
+                None,
+            )
+        } else if weights.any(|weight| weight <= 0.0) {
+            SurfaceContinuityCapability::unsupported(
+                side,
+                requested,
+                UnsupportedContinuityCapability::NonPositiveWeight,
+                None,
+            )
         } else {
-            SurfaceContinuityCapability::unsupported(side, requested)
+            polynomial
         }
     }
 }
@@ -102,20 +128,95 @@ fn capability_for_axis(
     side: BoundarySide,
     requested: ContinuityOrder,
 ) -> SurfaceContinuityCapability {
-    let supported = knots
+    let degree = knots
         .len()
         .checked_sub(control_count)
-        .and_then(|difference| difference.checked_sub(1))
-        .is_some_and(|degree| {
-            control_count > requested.as_usize()
-                && degree >= requested.as_usize()
-                && knots.is_clamped(degree)
-        });
+        .and_then(|difference| difference.checked_sub(1));
+    let values = knots.as_slice();
+    let valid_knots = values.iter().all(|value| value.is_finite())
+        && values.windows(2).all(|pair| pair[0] <= pair[1]);
+    let positive_domain = degree.is_some_and(|degree| {
+        values
+            .get(degree)
+            .zip(values.get(control_count))
+            .is_some_and(|(start, end)| end > start)
+    });
 
-    if supported {
-        SurfaceContinuityCapability::supported(side, requested)
+    match degree.filter(|_| valid_knots && positive_domain) {
+        Some(degree) if knots.is_clamped(degree) => {
+            capability_for_degree_and_rows(degree, control_count, side, requested)
+        }
+        Some(_) => SurfaceContinuityCapability::unsupported(
+            side,
+            requested,
+            UnsupportedContinuityCapability::UnclampedBoundary,
+            None,
+        ),
+        None => SurfaceContinuityCapability::unsupported(
+            side,
+            requested,
+            UnsupportedContinuityCapability::InvalidKnotVector,
+            None,
+        ),
+    }
+}
+
+fn capability_for_degree_and_rows(
+    degree: usize,
+    control_count: usize,
+    side: BoundarySide,
+    requested: ContinuityOrder,
+) -> SurfaceContinuityCapability {
+    let required_degree = requested.as_usize();
+    let required_rows = required_degree + 1;
+    let insufficient_degree = degree < required_degree;
+    let insufficient_rows = control_count < required_rows;
+    let maximum_value = degree
+        .min(control_count.saturating_sub(1))
+        .min(MAX_CONTINUITY_ORDER);
+    let maximum_order = match maximum_value {
+        0 => ContinuityOrder::G0,
+        1 => ContinuityOrder::G1,
+        2 => ContinuityOrder::G2,
+        3 => ContinuityOrder::G3,
+        _ => ContinuityOrder::G4,
+    };
+
+    if insufficient_degree && insufficient_rows {
+        SurfaceContinuityCapability::unsupported(
+            side,
+            requested,
+            UnsupportedContinuityCapability::InsufficientDegreeAndControlRows {
+                available_degree: degree,
+                required_degree,
+                available_rows: control_count,
+                required_rows,
+            },
+            Some(maximum_order),
+        )
+    } else if insufficient_degree {
+        SurfaceContinuityCapability::unsupported(
+            side,
+            requested,
+            UnsupportedContinuityCapability::InsufficientDegree {
+                available: degree,
+                required: required_degree,
+            },
+            Some(maximum_order),
+        )
+    } else if insufficient_rows {
+        SurfaceContinuityCapability::unsupported(
+            side,
+            requested,
+            UnsupportedContinuityCapability::InsufficientControlRows {
+                available: control_count,
+                required: required_rows,
+            },
+            Some(maximum_order),
+        )
     } else {
-        SurfaceContinuityCapability::unsupported(side, requested)
+        // SAFETY: Both degree and row checks establish `maximum_order >= requested`.
+        SurfaceContinuityCapability::try_supported_through(side, requested, maximum_order).unwrap()
     }
 }
 
@@ -146,15 +247,24 @@ mod tests {
     fn boundary_side_selects_the_cross_boundary_axis() {
         let surface = polynomial_surface(1, 3);
 
-        assert!(
+        assert_eq!(
             surface
                 .continuity_capability(BoundarySide::MinV, ContinuityOrder::G3)
-                .is_supported()
+                .unsupported_reason(),
+            None
         );
-        assert!(
-            !surface
+        assert_eq!(
+            surface
                 .continuity_capability(BoundarySide::MinU, ContinuityOrder::G2)
-                .is_supported()
+                .unsupported_reason(),
+            Some(
+                UnsupportedContinuityCapability::InsufficientDegreeAndControlRows {
+                    available_degree: 1,
+                    required_degree: 2,
+                    available_rows: 2,
+                    required_rows: 3,
+                }
+            )
         );
     }
 
@@ -171,15 +281,17 @@ mod tests {
             ],
         );
 
-        assert!(
-            !surface
+        assert_eq!(
+            surface
                 .continuity_capability(BoundarySide::MaxU, ContinuityOrder::G1)
-                .is_supported()
+                .unsupported_reason(),
+            Some(UnsupportedContinuityCapability::UnclampedBoundary)
         );
-        assert!(
+        assert_eq!(
             surface
                 .continuity_capability(BoundarySide::MaxV, ContinuityOrder::G1)
-                .is_supported()
+                .unsupported_reason(),
+            None
         );
     }
 
@@ -194,15 +306,17 @@ mod tests {
             vec![vec![Vector4::new(0.0, 0.0, 0.0, 0.0); 2]; 2],
         ));
 
-        assert!(
+        assert_eq!(
             positive
                 .continuity_capability(BoundarySide::MinU, ContinuityOrder::G1)
-                .is_supported()
+                .unsupported_reason(),
+            None
         );
-        assert!(
-            !zero_weight
+        assert_eq!(
+            zero_weight
                 .continuity_capability(BoundarySide::MinU, ContinuityOrder::G0)
-                .is_supported()
+                .unsupported_reason(),
+            Some(UnsupportedContinuityCapability::NonPositiveWeight)
         );
     }
 }
