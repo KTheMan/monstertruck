@@ -171,17 +171,132 @@ pub enum ContinuityCapabilityLevel {
     Recommended,
 }
 
+/// Reason that a control net cannot be inspected for continuity capability.
+#[derive(Clone, Copy, Debug, Error, Hash, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ControlNetContinuityIssue {
+    /// The control net has no usable rows or columns.
+    #[error("the control net is empty")]
+    Empty,
+    /// The control-net rows do not all have the same length.
+    #[error("the control net is not rectangular")]
+    NonRectangular,
+}
+
+/// Reason that a knot vector cannot support continuity inspection.
+#[derive(Clone, Copy, Debug, Error, Hash, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum KnotVectorContinuityIssue {
+    /// The knot and control-point counts cannot define a degree.
+    #[error("the knot count is incompatible with the control-point count")]
+    InvalidLength,
+    /// At least one knot is not finite.
+    #[error("the knot vector contains a non-finite value")]
+    NonFinite,
+    /// The knots are not ordered nondecreasingly.
+    #[error("the knot vector is not nondecreasing")]
+    NonMonotonic,
+    /// The knot vector is not clamped for its degree.
+    #[error("the knot vector is not clamped")]
+    Unclamped,
+    /// The active parameter domain has zero or negative length.
+    #[error("the knot vector has a degenerate parameter domain")]
+    DegenerateDomain,
+}
+
+/// Typed reason that a surface cannot represent a continuity request.
+#[derive(Clone, Copy, Debug, Error, Hash, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum UnsupportedContinuityCapability {
+    /// The surface control net is malformed.
+    #[error("invalid surface control net: {0}")]
+    InvalidControlNet(ControlNetContinuityIssue),
+    /// A parameter axis has an invalid knot vector.
+    #[error("invalid {axis:?}-axis knot vector: {issue}")]
+    InvalidKnotVector {
+        /// Axis described by the invalid knot vector.
+        axis: SurfaceAxis,
+        /// Specific knot-vector failure.
+        issue: KnotVectorContinuityIssue,
+    },
+    /// The cross-boundary degree is below the mathematical minimum.
+    #[error("cross-boundary degree {available} is below the required degree {required}")]
+    InsufficientDegree {
+        /// Available cross-boundary degree.
+        available: usize,
+        /// Required cross-boundary degree.
+        required: usize,
+    },
+    /// The control net has too few cross-boundary rows for the requested jet.
+    #[error("{available} cross-boundary control rows are below the required {required}")]
+    InsufficientControlRows {
+        /// Available cross-boundary control rows.
+        available: usize,
+        /// Required cross-boundary control rows.
+        required: usize,
+    },
+    /// Both degree and control-row requirements are unsatisfied.
+    #[error(
+        "cross-boundary degree {available_degree} and control rows {available_rows} are below the required {required_degree} and {required_rows}"
+    )]
+    InsufficientDegreeAndControlRows {
+        /// Available cross-boundary degree.
+        available_degree: usize,
+        /// Required cross-boundary degree.
+        required_degree: usize,
+        /// Available cross-boundary control rows.
+        available_rows: usize,
+        /// Required cross-boundary control rows.
+        required_rows: usize,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+enum ContinuityCapabilityAssessment {
+    Unsupported(UnsupportedContinuityCapability),
+    Feasible,
+    Recommended,
+}
+
 /// Degree and control-row diagnostics for one full surface side.
 ///
 /// Capability reports mathematical representability only. In particular, a
 /// feasible or recommended `G4` report remains experimental.
+///
+/// # Examples
+///
+/// ```
+/// use monstertruck_traits::{
+///     BoundarySide, ContinuityOrder, SurfaceContinuityCapability,
+///     UnsupportedContinuityCapability,
+/// };
+///
+/// let capability = SurfaceContinuityCapability::from_degrees_and_dimensions(
+///     (2, 5),
+///     (3, 6),
+///     BoundarySide::MinU,
+///     ContinuityOrder::G3,
+/// );
+///
+/// assert_eq!(capability.maximum_supported_order(), Some(ContinuityOrder::G2));
+/// assert_eq!(
+///     capability.unsupported_reason(),
+///     Some(UnsupportedContinuityCapability::InsufficientDegreeAndControlRows {
+///         available_degree: 2,
+///         required_degree: 3,
+///         available_rows: 3,
+///         required_rows: 4,
+///     }),
+/// );
+/// ```
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct SurfaceContinuityCapability {
     side: BoundarySide,
     requested: ContinuityOrder,
     cross_degree: usize,
     cross_control_rows: usize,
-    level: ContinuityCapabilityLevel,
+    maximum_supported_order: Option<ContinuityOrder>,
+    assessment: ContinuityCapabilityAssessment,
 }
 
 impl SurfaceContinuityCapability {
@@ -196,21 +311,77 @@ impl SurfaceContinuityCapability {
             SurfaceAxis::U => (degrees.0, dimensions.0),
             SurfaceAxis::V => (degrees.1, dimensions.1),
         };
-        let level = if cross_degree < requested.minimum_degree()
-            || cross_control_rows < requested.constrained_rows()
-        {
-            ContinuityCapabilityLevel::Unsupported
-        } else if cross_degree < requested.recommended_degree() {
-            ContinuityCapabilityLevel::Feasible
+        let required_degree = requested.minimum_degree();
+        let required_rows = requested.constrained_rows();
+        let insufficient_degree = cross_degree < required_degree;
+        let insufficient_rows = cross_control_rows < required_rows;
+        let maximum_supported_order = if cross_control_rows == 0 {
+            None
         } else {
-            ContinuityCapabilityLevel::Recommended
+            let row_limited = cross_control_rows - 1;
+            let surface_maximum = if cross_degree < row_limited {
+                cross_degree
+            } else {
+                row_limited
+            };
+            let maximum = if surface_maximum < MAX_CONTINUITY_ORDER {
+                surface_maximum
+            } else {
+                MAX_CONTINUITY_ORDER
+            };
+            Some(ContinuityOrder(maximum as u8))
+        };
+        let assessment = if insufficient_degree && insufficient_rows {
+            ContinuityCapabilityAssessment::Unsupported(
+                UnsupportedContinuityCapability::InsufficientDegreeAndControlRows {
+                    available_degree: cross_degree,
+                    required_degree,
+                    available_rows: cross_control_rows,
+                    required_rows,
+                },
+            )
+        } else if insufficient_degree {
+            ContinuityCapabilityAssessment::Unsupported(
+                UnsupportedContinuityCapability::InsufficientDegree {
+                    available: cross_degree,
+                    required: required_degree,
+                },
+            )
+        } else if insufficient_rows {
+            ContinuityCapabilityAssessment::Unsupported(
+                UnsupportedContinuityCapability::InsufficientControlRows {
+                    available: cross_control_rows,
+                    required: required_rows,
+                },
+            )
+        } else if cross_degree < requested.recommended_degree() {
+            ContinuityCapabilityAssessment::Feasible
+        } else {
+            ContinuityCapabilityAssessment::Recommended
         };
         Self {
             side,
             requested,
             cross_degree,
             cross_control_rows,
-            level,
+            maximum_supported_order,
+            assessment,
+        }
+    }
+
+    /// Builds an unsupported report from a typed inspection failure.
+    pub const fn unsupported(
+        side: BoundarySide,
+        requested: ContinuityOrder,
+        reason: UnsupportedContinuityCapability,
+    ) -> Self {
+        Self {
+            side,
+            requested,
+            cross_degree: 0,
+            cross_control_rows: 0,
+            maximum_supported_order: None,
+            assessment: ContinuityCapabilityAssessment::Unsupported(reason),
         }
     }
 
@@ -224,23 +395,60 @@ impl SurfaceContinuityCapability {
     pub const fn maturity(self) -> ContinuityMaturity { self.requested.maturity() }
 
     /// Returns the degree normal to the side in parameter space.
+    ///
+    /// Returns zero when surface validation failed before deriving a degree.
     pub const fn cross_degree(self) -> usize { self.cross_degree }
 
     /// Returns the number of control rows normal to the side.
+    ///
+    /// Returns zero when surface validation failed before producing dimensions.
     pub const fn cross_control_rows(self) -> usize { self.cross_control_rows }
 
-    /// Returns the degree-based capability level.
-    pub const fn level(self) -> ContinuityCapabilityLevel { self.level }
+    /// Returns the coarse capability level.
+    pub const fn level(self) -> ContinuityCapabilityLevel {
+        match self.assessment {
+            ContinuityCapabilityAssessment::Unsupported(_) => {
+                ContinuityCapabilityLevel::Unsupported
+            }
+            ContinuityCapabilityAssessment::Feasible => ContinuityCapabilityLevel::Feasible,
+            ContinuityCapabilityAssessment::Recommended => ContinuityCapabilityLevel::Recommended,
+        }
+    }
+
+    /// Returns the highest continuity order represented by the inspected side.
+    ///
+    /// Returns `None` when invalid surface data prevents capability inspection.
+    pub const fn maximum_supported_order(self) -> Option<ContinuityOrder> {
+        self.maximum_supported_order
+    }
+
+    /// Returns the typed reason that the request is unsupported.
+    pub const fn unsupported_reason(self) -> Option<UnsupportedContinuityCapability> {
+        match self.assessment {
+            ContinuityCapabilityAssessment::Unsupported(reason) => Some(reason),
+            ContinuityCapabilityAssessment::Feasible
+            | ContinuityCapabilityAssessment::Recommended => None,
+        }
+    }
+
+    /// Requires the requested jet to be mathematically representable.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`UnsupportedContinuityCapability`] with the specific failed
+    /// requirement or invalid surface condition.
+    pub const fn require_feasible(self) -> Result<Self, UnsupportedContinuityCapability> {
+        match self.assessment {
+            ContinuityCapabilityAssessment::Unsupported(reason) => Err(reason),
+            ContinuityCapabilityAssessment::Feasible
+            | ContinuityCapabilityAssessment::Recommended => Ok(self),
+        }
+    }
 
     /// Returns the control rows remaining beyond the constrained boundary jet.
     pub const fn fairness_rows(self) -> usize {
         self.cross_control_rows
             .saturating_sub(self.requested.constrained_rows())
-    }
-
-    /// Returns whether the requested jet is mathematically representable.
-    pub const fn is_feasible(self) -> bool {
-        !matches!(self.level, ContinuityCapabilityLevel::Unsupported)
     }
 }
 

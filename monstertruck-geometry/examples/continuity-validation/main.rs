@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, anyhow, bail, ensure};
+use monstertruck_geometry::nurbs::continuity::ContinuityOrder;
 use monstertruck_geometry::nurbs::continuity_solver::{
     BoundaryContinuitySolver, BoundaryEndpoint, ContinuitySolveError, ContinuitySolveReport,
     ContinuityTermination, ContinuityWork, take_continuity_work,
@@ -249,14 +250,19 @@ fn error_evidence(error: &ContinuitySolveError) -> Value {
         ContinuitySolveError::UnsupportedCapability {
             endpoint,
             capability,
+            reason,
         } => json!({
             "kind": "unsupported_capability",
             "endpoint": endpoint_name(*endpoint),
+            "reason": reason.to_string(),
             "capability": {
                 "side": format!("{:?}", capability.side()),
                 "requested": capability.requested().as_usize(),
                 "cross_degree": capability.cross_degree(),
                 "cross_control_rows": capability.cross_control_rows(),
+                "maximum_supported_order": capability
+                    .maximum_supported_order()
+                    .map(ContinuityOrder::as_usize),
                 "level": format!("{:?}", capability.level()),
             },
         }),

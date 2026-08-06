@@ -1,6 +1,8 @@
 //! Typed continuity-solver failures.
 
-use super::super::super::continuity::SurfaceContinuityCapability;
+use super::super::super::continuity::{
+    SurfaceContinuityCapability, UnsupportedContinuityCapability,
+};
 use super::super::resource::ContinuityWorkTruncated;
 use super::{BoundaryEndpoint, ContinuitySolveReport};
 use thiserror::Error;
@@ -17,13 +19,15 @@ pub enum ContinuitySolveError {
     /// G4 was requested without explicit experimental opt-in.
     #[error("G4 continuity solving requires explicit experimental opt-in")]
     ExperimentalG4Disabled,
-    /// A boundary lacks sufficient degree or control rows.
-    #[error("{endpoint:?} boundary cannot represent the requested continuity: {capability:?}")]
+    /// A boundary has an unsupported capability requirement or surface condition.
+    #[error("{endpoint:?} boundary cannot represent the requested continuity: {reason}")]
     UnsupportedCapability {
         /// Problem endpoint that failed capability validation.
         endpoint: BoundaryEndpoint,
-        /// Degree and control-row diagnostics.
+        /// Surface capability diagnostics.
         capability: SurfaceContinuityCapability,
+        /// Specific capability requirement or surface condition that failed.
+        reason: UnsupportedContinuityCapability,
     },
     /// A surface boundary is empty, non-finite, unclamped, or degenerate.
     #[error("{0:?} boundary has an invalid tensor-product parameter domain")]
