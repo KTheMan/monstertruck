@@ -90,6 +90,102 @@ pub enum BoundarySide {
     MaxV,
 }
 
+/// Typed reason that a representation cannot support a continuity request.
+#[derive(Clone, Copy, Debug, Error, Hash, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum UnsupportedContinuityCapability {
+    /// The cross-boundary degree is below the mathematical minimum.
+    #[error("cross-boundary degree {available} is below the required degree {required}")]
+    InsufficientDegree {
+        /// Available cross-boundary degree.
+        available: usize,
+        /// Required cross-boundary degree.
+        required: usize,
+    },
+    /// The control net has too few cross-boundary rows for the requested jet.
+    #[error("{available} cross-boundary control rows are below the required {required}")]
+    InsufficientControlRows {
+        /// Available cross-boundary control rows.
+        available: usize,
+        /// Required cross-boundary control rows.
+        required: usize,
+    },
+    /// Both degree and control-row requirements are unsatisfied.
+    #[error(
+        "cross-boundary degree {available_degree} and control rows {available_rows} are below the required {required_degree} and {required_rows}"
+    )]
+    InsufficientDegreeAndControlRows {
+        /// Available cross-boundary degree.
+        available_degree: usize,
+        /// Required cross-boundary degree.
+        required_degree: usize,
+        /// Available cross-boundary control rows.
+        available_rows: usize,
+        /// Required cross-boundary control rows.
+        required_rows: usize,
+    },
+    /// The representation has an invalid control net.
+    #[error("the surface control net is invalid")]
+    InvalidControlNet,
+    /// The representation has an invalid knot vector.
+    #[error("the surface knot vector is invalid")]
+    InvalidKnotVector,
+    /// The inspected boundary is not clamped.
+    #[error("the inspected boundary is not clamped")]
+    UnclampedBoundary,
+    /// A rational representation contains a non-finite weight.
+    #[error("the surface contains a non-finite rational weight")]
+    NonFiniteWeight,
+    /// A rational representation contains a non-positive weight.
+    #[error("the surface contains a non-positive rational weight")]
+    NonPositiveWeight,
+    /// The inspected side belongs to a periodic parameter direction.
+    #[error("the inspected boundary is periodic")]
+    PeriodicBoundary,
+    /// The surface representation cannot expose the requested boundary jet.
+    #[error("the surface representation cannot expose the requested boundary jet")]
+    UnsupportedRepresentation,
+    /// The request addresses a trimmed seam rather than a full patch side.
+    #[error("trimmed seams are not supported by full-side continuity capability")]
+    TrimmedBoundary,
+}
+
+/// A supported capability report declared an inconsistent maximum order.
+#[derive(Clone, Copy, Debug, Error, Hash, PartialEq, Eq)]
+#[error(
+    "maximum supported continuity order {maximum:?} is below the requested order {requested:?}"
+)]
+pub struct InvalidContinuityCapability {
+    requested: ContinuityOrder,
+    maximum: ContinuityOrder,
+}
+
+impl InvalidContinuityCapability {
+    /// Returns the requested continuity order.
+    pub const fn requested(self) -> ContinuityOrder { self.requested }
+
+    /// Returns the inconsistent maximum order.
+    pub const fn maximum(self) -> ContinuityOrder { self.maximum }
+}
+
+/// Typed support determination for one continuity capability report.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SurfaceContinuitySupport {
+    /// The request is supported through the reported maximum order.
+    Supported {
+        /// Highest supported continuity order.
+        maximum_order: ContinuityOrder,
+    },
+    /// The request is unsupported for a typed reason.
+    Unsupported {
+        /// Actionable unsupported condition.
+        reason: UnsupportedContinuityCapability,
+        /// Highest supported order, when capability inspection succeeded.
+        maximum_order: Option<ContinuityOrder>,
+    },
+}
+
 /// A representation-specific capability report for one full surface side.
 ///
 /// Concrete surface implementations determine support using their own degree,
@@ -101,26 +197,49 @@ pub enum BoundarySide {
 pub struct SurfaceContinuityCapability {
     side: BoundarySide,
     requested: ContinuityOrder,
-    supported: bool,
+    support: SurfaceContinuitySupport,
 }
 
 impl SurfaceContinuityCapability {
-    /// Reports that a representation supports the requested side and order.
-    pub const fn supported(side: BoundarySide, requested: ContinuityOrder) -> Self {
-        Self {
-            side,
-            requested,
-            supported: true,
+    /// Reports support through an explicitly inspected maximum order.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InvalidContinuityCapability`] when `maximum_order` is below
+    /// `requested`.
+    pub const fn try_supported_through(
+        side: BoundarySide,
+        requested: ContinuityOrder,
+        maximum_order: ContinuityOrder,
+    ) -> Result<Self, InvalidContinuityCapability> {
+        if maximum_order.as_usize() < requested.as_usize() {
+            Err(InvalidContinuityCapability {
+                requested,
+                maximum: maximum_order,
+            })
+        } else {
+            Ok(Self {
+                side,
+                requested,
+                support: SurfaceContinuitySupport::Supported { maximum_order },
+            })
         }
     }
 
-    /// Reports that a representation does not support the requested side and
-    /// order.
-    pub const fn unsupported(side: BoundarySide, requested: ContinuityOrder) -> Self {
+    /// Reports a typed unsupported condition and any known maximum order.
+    pub const fn unsupported(
+        side: BoundarySide,
+        requested: ContinuityOrder,
+        reason: UnsupportedContinuityCapability,
+        maximum_order: Option<ContinuityOrder>,
+    ) -> Self {
         Self {
             side,
             requested,
-            supported: false,
+            support: SurfaceContinuitySupport::Unsupported {
+                reason,
+                maximum_order,
+            },
         }
     }
 
@@ -130,11 +249,37 @@ impl SurfaceContinuityCapability {
     /// Returns the requested continuity order.
     pub const fn requested(self) -> ContinuityOrder { self.requested }
 
-    /// Returns whether the inspected representation supports the request.
+    /// Returns the typed support determination.
+    pub const fn support(self) -> SurfaceContinuitySupport { self.support }
+
+    /// Returns the highest supported order when it is known.
+    pub const fn maximum_supported_order(self) -> Option<ContinuityOrder> {
+        match self.support {
+            SurfaceContinuitySupport::Supported { maximum_order } => Some(maximum_order),
+            SurfaceContinuitySupport::Unsupported { maximum_order, .. } => maximum_order,
+        }
+    }
+
+    /// Returns the typed reason that the request is unsupported.
+    pub const fn unsupported_reason(self) -> Option<UnsupportedContinuityCapability> {
+        match self.support {
+            SurfaceContinuitySupport::Supported { .. } => None,
+            SurfaceContinuitySupport::Unsupported { reason, .. } => Some(reason),
+        }
+    }
+
+    /// Requires the representation to support the request.
     ///
-    /// This is a representation capability, not a solver-feasibility or
-    /// two-surface compatibility result.
-    pub const fn is_supported(self) -> bool { self.supported }
+    /// # Errors
+    ///
+    /// Returns [`UnsupportedContinuityCapability`] with the specific failed
+    /// representation requirement.
+    pub const fn require_supported(self) -> Result<Self, UnsupportedContinuityCapability> {
+        match self.support {
+            SurfaceContinuitySupport::Supported { .. } => Ok(self),
+            SurfaceContinuitySupport::Unsupported { reason, .. } => Err(reason),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -172,7 +317,7 @@ mod tests {
     }
 
     #[test]
-    fn capability_reports_preserve_every_side_and_status() {
+    fn capability_reports_preserve_every_side_and_typed_support() {
         [
             BoundarySide::MinU,
             BoundarySide::MaxU,
@@ -181,15 +326,43 @@ mod tests {
         ]
         .into_iter()
         .for_each(|side| {
-            let supported = SurfaceContinuityCapability::supported(side, ContinuityOrder::G3);
-            let unsupported = SurfaceContinuityCapability::unsupported(side, ContinuityOrder::G4);
+            let Ok(supported) = SurfaceContinuityCapability::try_supported_through(
+                side,
+                ContinuityOrder::G3,
+                ContinuityOrder::G4,
+            ) else {
+                panic!("G4 must be a valid maximum for a G3 request");
+            };
+            let unsupported = SurfaceContinuityCapability::unsupported(
+                side,
+                ContinuityOrder::G4,
+                UnsupportedContinuityCapability::InsufficientDegree {
+                    available: 3,
+                    required: 4,
+                },
+                Some(ContinuityOrder::G3),
+            );
 
             assert_eq!(supported.side(), side);
             assert_eq!(supported.requested(), ContinuityOrder::G3);
-            assert!(supported.is_supported());
+            assert_eq!(
+                supported.maximum_supported_order(),
+                Some(ContinuityOrder::G4)
+            );
+            assert_eq!(supported.unsupported_reason(), None);
             assert_eq!(unsupported.side(), side);
             assert_eq!(unsupported.requested(), ContinuityOrder::G4);
-            assert!(!unsupported.is_supported());
+            assert_eq!(
+                unsupported.maximum_supported_order(),
+                Some(ContinuityOrder::G3)
+            );
+            assert_eq!(
+                unsupported.unsupported_reason(),
+                Some(UnsupportedContinuityCapability::InsufficientDegree {
+                    available: 3,
+                    required: 4,
+                })
+            );
         });
     }
 }
