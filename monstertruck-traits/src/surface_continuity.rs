@@ -219,6 +219,31 @@ pub enum UnsupportedContinuityCapability {
         /// Specific knot-vector failure.
         issue: KnotVectorContinuityIssue,
     },
+    /// A rational representation contains a non-finite weight.
+    #[error("the rational control point at ({row}, {column}) has a non-finite weight")]
+    NonFiniteWeight {
+        /// Control-net row containing the invalid weight.
+        row: usize,
+        /// Control-net column containing the invalid weight.
+        column: usize,
+    },
+    /// A rational representation contains a non-positive weight.
+    #[error("the rational control point at ({row}, {column}) has a non-positive weight")]
+    NonPositiveWeight {
+        /// Control-net row containing the invalid weight.
+        row: usize,
+        /// Control-net column containing the invalid weight.
+        column: usize,
+    },
+    /// The inspected side belongs to a periodic parameter direction.
+    #[error("the inspected boundary is periodic")]
+    PeriodicBoundary,
+    /// The representation cannot expose the requested full-boundary jet.
+    #[error("the surface representation cannot expose the requested full-boundary jet")]
+    UnsupportedRepresentation,
+    /// The request addresses a trimmed seam rather than a full patch side.
+    #[error("trimmed seams are unsupported by full-boundary continuity capability")]
+    TrimmedBoundary,
     /// The cross-boundary degree is below the mathematical minimum.
     #[error("cross-boundary degree {available} is below the required degree {required}")]
     InsufficientDegree {
@@ -496,5 +521,38 @@ mod tests {
         assert_eq!(v.level(), ContinuityCapabilityLevel::Unsupported);
         assert_eq!(u.cross_control_rows(), 6);
         assert_eq!(v.cross_control_rows(), 3);
+    }
+
+    #[test]
+    fn unsupported_capability_preserves_every_actionable_reason() {
+        [
+            UnsupportedContinuityCapability::InvalidControlNet(
+                ControlNetContinuityIssue::NonRectangular,
+            ),
+            UnsupportedContinuityCapability::InvalidKnotVector {
+                axis: SurfaceAxis::V,
+                issue: KnotVectorContinuityIssue::NonMonotonic,
+            },
+            UnsupportedContinuityCapability::InsufficientDegree {
+                available: 1,
+                required: 3,
+            },
+            UnsupportedContinuityCapability::NonFiniteWeight { row: 2, column: 4 },
+            UnsupportedContinuityCapability::NonPositiveWeight { row: 3, column: 1 },
+            UnsupportedContinuityCapability::PeriodicBoundary,
+            UnsupportedContinuityCapability::UnsupportedRepresentation,
+            UnsupportedContinuityCapability::TrimmedBoundary,
+        ]
+        .into_iter()
+        .for_each(|reason| {
+            let capability = SurfaceContinuityCapability::unsupported(
+                BoundarySide::MaxU,
+                ContinuityOrder::G3,
+                reason,
+            );
+
+            assert_eq!(capability.unsupported_reason(), Some(reason));
+            assert_eq!(capability.require_feasible(), Err(reason));
+        });
     }
 }

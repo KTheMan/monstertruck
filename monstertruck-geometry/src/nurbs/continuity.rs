@@ -4,6 +4,8 @@
 //! live in [`monstertruck_traits::surface_continuity`]. Local transition semantics and
 //! the numerical solver remain in `monstertruck-geometry`.
 
+use monstertruck_core::cgmath64::{Homogeneous, control_point::ControlPoint};
+
 use super::{BsplineSurface, KnotVector, NurbsSurface};
 
 pub use monstertruck_traits::surface_continuity::{
@@ -41,14 +43,41 @@ pub fn capability_for_nurbs<V>(
     surface: &NurbsSurface<V>,
     side: BoundarySide,
     requested: ContinuityOrder,
-) -> SurfaceContinuityCapability {
-    capability(
+) -> SurfaceContinuityCapability
+where
+    V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>,
+{
+    let polynomial = capability(
         surface.control_points(),
         surface.knot_vector_u(),
         surface.knot_vector_v(),
         side,
         requested,
-    )
+    );
+    let invalid_weight = surface
+        .control_points()
+        .iter()
+        .enumerate()
+        .flat_map(|(row, points)| {
+            points
+                .iter()
+                .enumerate()
+                .map(move |(column, point)| (row, column, point.weight()))
+        })
+        .find_map(|(row, column, weight)| {
+            if !weight.is_finite() {
+                Some(UnsupportedContinuityCapability::NonFiniteWeight { row, column })
+            } else if weight <= 0.0 {
+                Some(UnsupportedContinuityCapability::NonPositiveWeight { row, column })
+            } else {
+                None
+            }
+        });
+
+    match (polynomial.unsupported_reason(), invalid_weight) {
+        (Some(_), _) | (None, None) => polynomial,
+        (None, Some(reason)) => SurfaceContinuityCapability::unsupported(side, requested, reason),
+    }
 }
 
 fn capability<P>(
@@ -113,5 +142,51 @@ fn valid_axis_degree(
         Err(invalid(KnotVectorContinuityIssue::DegenerateDomain))
     } else {
         Ok(degree)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use monstertruck_core::cgmath64::Vector4;
+
+    use super::*;
+
+    fn rational_surface(weight: f64) -> NurbsSurface<Vector4> {
+        NurbsSurface::new(BsplineSurface::new(
+            (KnotVector::bezier_knot(1), KnotVector::bezier_knot(1)),
+            vec![
+                vec![
+                    Vector4::new(0.0, 0.0, 0.0, 1.0),
+                    Vector4::new(0.0, 1.0, 0.0, weight),
+                ],
+                vec![
+                    Vector4::new(1.0, 0.0, 0.0, 1.0),
+                    Vector4::new(1.0, 1.0, 0.0, 1.0),
+                ],
+            ],
+        ))
+    }
+
+    #[test]
+    fn rational_capability_preserves_specific_weight_failures() {
+        let non_finite = capability_for_nurbs(
+            &rational_surface(f64::NAN),
+            BoundarySide::MinU,
+            ContinuityOrder::G1,
+        );
+        let non_positive = capability_for_nurbs(
+            &rational_surface(0.0),
+            BoundarySide::MinU,
+            ContinuityOrder::G1,
+        );
+
+        assert_eq!(
+            non_finite.unsupported_reason(),
+            Some(UnsupportedContinuityCapability::NonFiniteWeight { row: 0, column: 1 })
+        );
+        assert_eq!(
+            non_positive.unsupported_reason(),
+            Some(UnsupportedContinuityCapability::NonPositiveWeight { row: 0, column: 1 })
+        );
     }
 }

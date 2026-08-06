@@ -18,6 +18,8 @@ impl<'surface> PreparedProblem<'surface> {
             .map_err(|_| ContinuitySolveError::InvalidBoundary(BoundaryEndpoint::First))?;
         let second_frame = BoundaryFrame::try_new(second, request.second_side())
             .map_err(|_| ContinuitySolveError::InvalidBoundary(BoundaryEndpoint::Second))?;
+        validate_weights(first, BoundaryEndpoint::First, config.minimum_weight())?;
+        validate_weights(second, BoundaryEndpoint::Second, config.minimum_weight())?;
         validate_capability(
             first,
             request.first_side(),
@@ -56,8 +58,6 @@ impl<'surface> PreparedProblem<'surface> {
             "surface control-point dimension overflowed",
         )?;
         budget.ensure(ContinuityResource::ControlPoints, control_point_count)?;
-        validate_weights(first, BoundaryEndpoint::First, config.minimum_weight())?;
-        validate_weights(second, BoundaryEndpoint::Second, config.minimum_weight())?;
         let first_spans = frame_span_count(first, first_frame, BoundaryEndpoint::First)?;
         let second_spans = frame_span_count(second, second_frame, BoundaryEndpoint::Second)?;
         let span_count = checked_add(first_spans, second_spans, "seam span count overflowed")?;
