@@ -178,6 +178,20 @@ The P3 candidate makes these structural corrections:
   pinned external-kernel evidence remain required without adding an I/O
   dependency to `monstertruck-geometry`.
 
+Implementation revision `15b28c57` passes the prescribed CPU Nextest command
+(`730` passed, `21` skipped), all CPU-crate doctests,
+`cargo clippy --all-targets -- -D warnings`,
+`cargo +nightly fmt --all -- --check`, every workspace `cargo-rdme` check, and
+`git diff --check`. The imported repair example succeeds, and its exported
+two-face artifact passes the pinned local OCCT 7.9.3.1 oracle with two valid
+faces. The tracked continuity fixture sweep passes with one of one fixtures.
+An active-source vocabulary scan found no stale `monstertruck-step`
+implementation path, `monstertruck_step` package alias, `cargo test (cpu)` job
+name, or premature P3 completion claim. Remaining references to
+`monstertruck-step` describe the exact deprecated shim or historical migration;
+`MONSTERTRUCK_STEP_CORPUS` remains the name of the STEP-format corpus variable,
+not a crate alias.
+
 P3 closes only when exact-head local and hosted checks pass and an independent
 agent, instructed to analyze the completion claims against upstream issue #4
 and upstream PR #13, reports no unresolved P3 finding. Until then this section
