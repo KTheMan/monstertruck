@@ -28,11 +28,11 @@
 //! gate; the corpus row that pins the same thing on real ROTOR geometry lives
 //! with the external SSI boolean backend.
 
-use monstertruck_modeling::*;
-use monstertruck_step::load::{
+use monstertruck_io::step::load::{
     Table,
     step_geometry::{Curve3D, StepParameterCurve, Surface as StepSurface},
 };
+use monstertruck_modeling::*;
 use monstertruck_topology::compress::CompressedTrimmedSolid;
 use monstertruck_topology::errors::Error;
 
@@ -90,7 +90,7 @@ fn a_compressed_solid_that_lost_a_face_refuses_typed_instead_of_aborting() {
     drop(dropped);
 
     // The whole recipe the callers use, inside `catch_unwind`: before the fix
-    // this UNWOUND at `monstertruck-topology/src/solid.rs`'s `Solid::new`, so
+    // this UNWOUND at `monstertruck-topology/src/solid/mod.rs`'s `Solid::new`, so
     // asserting on the returned `Err` alone would not have witnessed anything.
     let outcome = std::panic::catch_unwind(move || {
         monstertruck_healing::extract_healed_trimmed_solid(csolid, TOL).map(|solid| {
