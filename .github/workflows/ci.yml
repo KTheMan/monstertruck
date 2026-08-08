@@ -92,6 +92,9 @@ jobs:
           cargo run -p monstertruck-geometry
           --example continuity-validation --
           --emit target/continuity-validation-ci.json
+      - run: >-
+          cargo run -p monstertruck-step
+          --example continuity-repair-step
 
   topology-state-validation:
     name: topology state validation

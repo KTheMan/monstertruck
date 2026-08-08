@@ -38,8 +38,8 @@ used by surface parameter division.
 | Topology tracking and persistence | Implement later **atop** `StableId`/`StableIdAllocator` in `monstertruck-core` and the `ElementAttributes`/`AttributeValue` storage in `monstertruck-topology`. No parallel identity system belongs in `monstertruck-core`. |
 | Modeling tracking wrappers | Implement later **atop** an accepted topology tracking API, not inside the direct geometry solver contribution. |
 | Contract graphs and replay | Implement later **atop** the separately reviewed tracking/persistence layer. Solver acceptance does not imply their API shape. |
-| STEP seam discovery, repair adapters, export, and re-import evidence | Implement later in the best-suited modeling/STEP integration layer **atop** the accepted direct solver API. They do not belong in the solver proposal. |
-| Arbitrary trimmed seams | Keep typed unsupported in that later adapter until a separate API and algorithm review accepts support. Never attempt best-effort repair. |
+| STEP seam discovery, repair adapters, export, and re-import evidence | Implemented in `monstertruck-step::continuity`, atop the direct solver API. `continuity-repair-step` exercises import, shared-edge selection, solve, replacement, tessellation, export, and re-import without adding STEP dependencies to the numerical crate. |
+| Arbitrary trimmed seams | `repair_step_continuity` accepts only an exact complete patch side. Missing, curved, partial, and otherwise arbitrary trims return typed `TrimmedBoundary`; the adapter never attempts best-effort repair. |
 | Tessellation provenance | Implement later **atop** existing topology stable IDs and attributes at the topology/meshing integration boundary. It is not solver state. |
 
 ## Planned review sequence
