@@ -247,6 +247,8 @@ pub mod basis;
 /// Compatibility normalization for collections of curves and surfaces.
 pub mod compat;
 
+mod continuity;
+
 /// Fairing and reparameterization utilities for curves.
 pub mod fair;
 
