@@ -205,9 +205,12 @@ module, and six retained historical branches plus `master` and `dev` did not
 yet carry the hardline rules requested for every undeleted branch. Resolution
 is deliberately literal rather than a documentation-scope exception:
 
-- `AGENTS.md` is now identical on every retained origin branch. It requires
+- `AGENTS.md` is identical on every retained downstream branch. It requires
   Nextest for ordinary tests, separate doctests, typed refusals, exact hosted
-  evidence, and the I/O-owned STEP preview tool.
+  evidence, and the I/O-owned STEP preview tool. The sole exception is the
+  branch that is the live head of upstream PR #13; preserving that accepted
+  three-file contribution boundary takes precedence over downstream guidance
+  propagation.
 - `master` and `dev` contain that guidance directly. PR #12 is refreshed on
   current `master`; PR #11 is refreshed on PR #12; PR #13 is refreshed on
   current `dev`.
@@ -217,6 +220,14 @@ is deliberately literal rather than a documentation-scope exception:
 
 This resolves the reported differences but does not supersede the required
 exact-head local, hosted, and repeated independent gates.
+
+The second P3 gate caught that the literal propagation had temporarily added
+`AGENTS.md` to the live upstream PR #13 branch after maintainer acceptance. The
+branch was restored with a lease-guarded update to exact accepted revision
+`bdac413b`. The live upstream PR again contains only its three trait-owned files
+and retains the maintainer's existing verification and LGTM comments. As the
+maintainer documented, that fork PR reports no hosted checks; downstream PR
+#12 supplies the exact mirror and its own exact-head checks instead.
 
 P3 closes only when exact-head local and hosted checks pass and an independent
 agent, instructed to analyze the completion claims against upstream issue #4
@@ -245,7 +256,7 @@ the correction branch.
 | Layer-2 claim for arbitrary trimmed-seam validation | Issue #4 places the STEP adapter after the numerical solver and requires a typed refusal there, not in the geometry contribution. | Keep full-side solving in layer 2; keep trimmed-seam validation in the later `monstertruck-io::step` integration layer. |
 | Draft notes blaming STEP packaging and randomized-test failures on the fork base | Upstream PRs #12, #14, and #17 corrected the package layout, fixture coverage, and deterministic tests. Retaining those notes would describe resolved failures. | Reintroduce a failure note only with evidence from the exact current revision. |
 | Inline tests in the new geometry continuity module | Current upstream uses sibling `mod.rs` and `tests.rs` files for new modules; only the exact PR #13 trait mirror has a documented nonblocking exception. | Keep new geometry and I/O modules on the sibling-test layout. |
-| Old test, evidence, and STEP diagnostic guidance on retained branch heads | The user required the hardline rules on every undeleted branch, not only current PR heads. | Do not restore branch-local guidance; all retained branches use the canonical root `AGENTS.md`. |
+| Old test, evidence, and STEP diagnostic guidance on retained downstream branch heads | The user required the hardline rules on every undeleted downstream branch, not only current PR heads. | Do not restore branch-local guidance. The live upstream PR #13 head is the necessary exception because changing it would contaminate the accepted three-file contribution. |
 
 The ledger will be extended whenever strict compliance removes more downstream
 work.
