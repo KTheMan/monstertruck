@@ -234,6 +234,14 @@ agent, instructed to analyze the completion claims against upstream issue #4
 and upstream PR #13, reports no unresolved P3 finding. Until then this section
 records a candidate, not a completion claim.
 
+After the two rejected iterations and their documented corrections, the
+repeated independent P3 gate audited exact revision `2172c39f`, the three live
+downstream drafts, the restored upstream contribution head, every retained
+downstream branch, and the exact local and hosted evidence. It reported: "P3
+complete. No unresolved P3 findings remain against upstream issue #4 or PR
+#13, and P1/P2 remain unregressed." P3 is therefore closed. A final independent
+whole-stack audit still guards the combined P1/P2/P3 completion claim.
+
 ## Downstream restoration ledger
 
 These removals are intentional. They may return only through separately
