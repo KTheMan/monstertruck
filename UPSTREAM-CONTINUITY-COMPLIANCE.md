@@ -134,8 +134,9 @@ the pinned OCCT continuity job. The current correction passes
 `cargo clippy --all-targets -- -W warnings`, the prescribed CPU nextest command
 (`729` passed, `21` skipped), all CPU-crate doctests, `cargo-rdme` 2.1.0, the
 imported repair example, and the pinned local OCCT 7.9.3.1 oracle (`2` valid
-faces). Its pushed hosted rerun and exact independent P2 re-audit remain
-required before P2 can close.
+faces). All seven hosted checks for implementation revision `c2c2bd7d` also
+pass, including the pinned OCCT continuity job. The exact independent P2
+re-audit remains required before P2 can close.
 
 This is a candidate completion claim only until the exact independent P2 gate
 re-audits the stable revision. P3 remains closed.
