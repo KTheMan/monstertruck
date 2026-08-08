@@ -2,7 +2,7 @@ use monstertruck_geometry::nurbs::continuity::{
     BoundaryAlignment, ContinuityOrder, UnsupportedContinuityCapability,
 };
 use monstertruck_geometry::nurbs::continuity_solver::{
-    BoundaryContinuitySolver, ContinuitySolverConfig, continuity_work,
+    BoundaryContinuitySolver, ContinuitySolveError, ContinuitySolverConfig, continuity_work,
 };
 use monstertruck_geometry::prelude::{BsplineCurve, KnotVector, ParameterCurve, Plane, Point2};
 use monstertruck_step::continuity::{
@@ -11,6 +11,7 @@ use monstertruck_step::continuity::{
 use monstertruck_step::load::Table;
 use monstertruck_step::load::convert::StepCompressedTrimmedShell;
 use monstertruck_step::load::step_geometry::{Curve2D, ElementarySurface, Line, Surface};
+use monstertruck_step::save::{CompleteStepDisplay, StepModel};
 
 const FIXTURE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -46,7 +47,7 @@ fn imported_arbitrary_trims_are_typed_transactional_refusals() {
         FIRST_FACE,
         Some(Curve2D::Line(Line(
             Point2::new(1.0, 0.0),
-            Point2::new(1.0, 1.0 - f64::EPSILON),
+            Point2::new(1.0, f64::from_bits(1.0_f64.to_bits() - 1)),
         ))),
     );
     assert_trimmed_refusal(
@@ -128,6 +129,85 @@ fn imported_seam_requires_a_real_edge_shared_by_both_faces() {
             edge: not_shared_edge,
         },
     );
+}
+
+#[test]
+fn imported_seam_reports_each_out_of_range_face_position() {
+    let shell = imported_shell();
+    let missing_face = shell.faces.len();
+
+    assert_topology_refusal(
+        shell.clone(),
+        StepContinuitySeam::new(missing_face, SECOND_FACE, SHARED_EDGE)
+            .expect("the selected face indices are distinct"),
+        StepContinuityError::FaceOutOfRange { face: missing_face },
+    );
+    assert_topology_refusal(
+        shell,
+        StepContinuitySeam::new(FIRST_FACE, missing_face, SHARED_EDGE)
+            .expect("the selected face indices are distinct"),
+        StepContinuityError::FaceOutOfRange { face: missing_face },
+    );
+}
+
+#[test]
+fn adapted_solver_failure_leaves_the_imported_shell_unchanged() {
+    let mut shell = imported_shell();
+    let before = shell.clone();
+    let work_before = continuity_work();
+
+    let error = repair_step_continuity(
+        &mut shell,
+        seam(),
+        BoundaryAlignment::Aligned,
+        ContinuityOrder::G4,
+        &solver(),
+    )
+    .expect_err("G4 must require explicit experimental solver opt-in");
+
+    assert!(matches!(
+        error,
+        StepContinuityError::Solve(ContinuitySolveError::ExperimentalG4Disabled),
+    ));
+    assert_eq!(shell, before, "a failed solve must be transactional");
+    assert_eq!(
+        continuity_work(),
+        work_before,
+        "the preflight solver refusal must not charge dense work",
+    );
+}
+
+#[test]
+fn reversed_shared_edge_trim_survives_step_round_trip() {
+    let shell = imported_shell();
+    let step = CompleteStepDisplay::new(StepModel::from(&shell), Default::default()).to_string();
+    let table = Table::from_step(&step).expect("the exported fixture parses");
+    let holder = table
+        .shell
+        .values()
+        .next()
+        .expect("the exported fixture contains a shell");
+    let reimported = table
+        .to_compressed_trimmed_shell(holder)
+        .expect("the exported fixture re-imports");
+    let face = &reimported.faces[SECOND_FACE];
+    let trims = face
+        .boundaries
+        .iter()
+        .flatten()
+        .filter(|edge| edge.trim_curve.is_some())
+        .count();
+    let edge_uses = face.boundaries.iter().flatten().count();
+    let shared_trim = face
+        .boundaries
+        .iter()
+        .flatten()
+        .find(|edge| edge.index == SHARED_EDGE)
+        .and_then(|edge| edge.trim_curve.as_ref());
+
+    assert!(edge_uses > 0);
+    assert_eq!(trims, edge_uses);
+    assert!(shared_trim.is_some());
 }
 
 fn assert_trimmed_refusal(

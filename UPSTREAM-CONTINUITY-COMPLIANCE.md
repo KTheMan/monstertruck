@@ -108,20 +108,33 @@ short line is a typed `TrimmedBoundary` refusal. Missing, curved, partial,
 first-face, and second-face trims refuse transactionally before solver work;
 unsupported surface representations retain `UnsupportedRepresentation`.
 
-The headless imported workflow now proves the fixed control net remains
-unchanged, the dependent control net changes, and every dependent trim is
-rebound. Deterministic public-evaluation finite differences certify `G0` and
-`G1` at both endpoints and nine interior samples after repair and again after
-STEP re-import. Every repaired face must tessellate to nonzero vertices and
-triangles. The exported artifact is checked in hosted CI by
+The headless imported workflow first certifies a conforming imported baseline,
+then applies a deterministic interior control-point edit after import. The edit
+preserves the shared `G0` seam but demonstrably breaks `G1` before the solver
+runs. Repair proves the fixed control net remains unchanged, the edited
+dependent control net changes, and all four dependent edge uses retain bound
+trims. Non-shared boundary edge geometry and vertices are synchronized with the
+replacement face. Trim counts and bindings must remain nonzero and exactly
+equal after STEP re-import; reversed edge-use trims are serialized in the edge
+leader's direction so the shared trim survives the round trip.
+
+Deterministic public-evaluation finite differences certify `G0` and `G1` at
+both endpoints and nine interior samples after repair and again after STEP
+re-import. Every repaired face must tessellate to nonzero vertices and
+triangles. Focused tests cover both out-of-range face positions and prove a
+typed solver failure leaves the imported shell and work meters unchanged. The
+exported artifact is checked in hosted CI by
 `cadquery-ocp==7.9.3.1.1`, which carries OCCT 7.9.3.1, using successful STEP
 transfer, non-null shape, `BRepCheck_Analyzer`, and exact face count as the
 external command-line oracle.
 
-Candidate verification passed `cargo +nightly fmt --all`,
+The preceding candidate at `39ac2ad7` passed all seven hosted checks, including
+the pinned OCCT continuity job. The current correction passes
+`cargo +nightly fmt --all -- --check`,
 `cargo clippy --all-targets -- -W warnings`, the prescribed CPU nextest command
-(`726` passed, `21` skipped), all CPU-crate doctests, the imported repair
-example, and the pinned local OCCT oracle (`2` valid faces). The hosted rerun is
+(`729` passed, `21` skipped), all CPU-crate doctests, `cargo-rdme` 2.1.0, the
+imported repair example, and the pinned local OCCT 7.9.3.1 oracle (`2` valid
+faces). Its pushed hosted rerun and exact independent P2 re-audit remain
 required before P2 can close.
 
 This is a candidate completion claim only until the exact independent P2 gate
@@ -150,6 +163,7 @@ the correction branch.
 | `ContinuityWorkBudget` | Its name incorrectly implied that an input limits bag was the upstream-shaped carrier. | Use `ContinuityLimits` for input and `BudgetedContinuitySolve` for output. |
 | Validation corpus maturity/capability-level schema | Depended on removed downstream-only layer-1 concepts. | A later evidence schema built on accepted public types. |
 | Infallible `StepContinuitySeam::new` | It admitted a pseudo-seam that selected one face twice. | Callers must handle the typed `SameFace` result. |
+| Trimmed STEP export for trim types without `Clone + Invertible` | Correct STEP `PCURVE` emission must reverse a face-local trim when its edge use opposes the shared edge leader. | Downstream trim types must implement `Clone + Invertible`; do not restore directionally invalid serialization. |
 
 The ledger will be extended whenever strict compliance removes more downstream
 work.

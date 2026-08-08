@@ -53,7 +53,7 @@ fn near_endpoint_and_curved_trims_are_not_full_sides() {
     let near_endpoint = line_trim(
         &surface,
         Point2::new(0.0, 0.0),
-        Point2::new(0.0, 1.0 - f64::EPSILON),
+        Point2::new(0.0, f64::from_bits(1.0_f64.to_bits() - 1)),
     );
     let curved = ParameterCurve::new(
         Box::new(Curve2D::BsplineCurve(BsplineCurve::new(

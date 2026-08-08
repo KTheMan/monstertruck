@@ -1,11 +1,12 @@
 //! Runs the imported STEP continuity-repair evidence path headlessly.
 //!
 //! The fixture contains two adjacent NURBS faces. This example imports them,
-//! identifies their shared full-side seam, solves and applies `G1`, certifies
-//! the repaired seam from public surface evaluations, replaces the dependent
-//! face, produces a nonempty tessellation, exports it to STEP, re-imports it,
-//! and repeats the independent certification. It also verifies that an
-//! arbitrary trim receives the required typed refusal before solver work.
+//! identifies their shared full-side seam, applies a deterministic edit that
+//! preserves `G0` while breaking `G1`, solves and applies `G1`, certifies the
+//! repaired seam from public surface evaluations, replaces the dependent face,
+//! produces a nonempty tessellation, exports it to STEP, re-imports it, and
+//! repeats the independent certification. It also verifies that an arbitrary
+//! trim receives the required typed refusal before solver work.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -99,7 +100,7 @@ fn exact_nurbs(surface: &Surface) -> Result<NurbsSurface<Vector4>> {
         .context("continuity evidence requires an exact NURBS representation")
 }
 
-fn certify_g1(first: &Surface, second: &Surface) -> Result<Certification> {
+fn measure_g1(first: &Surface, second: &Surface) -> Result<Certification> {
     let first = exact_nurbs(first)?;
     let second = exact_nurbs(second)?;
     let ((first_min_u, first_max_u), (first_min_v, first_max_v)) = first.range_tuple();
@@ -160,6 +161,11 @@ fn certify_g1(first: &Surface, second: &Surface) -> Result<Certification> {
             })
         },
     )?;
+    Ok(certification)
+}
+
+fn certify_g1(first: &Surface, second: &Surface) -> Result<Certification> {
+    let certification = measure_g1(first, second)?;
     ensure!(
         certification.maximum_position_error <= POSITION_TOLERANCE,
         "independent G0 check measured error {} above {POSITION_TOLERANCE}",
@@ -171,6 +177,53 @@ fn certify_g1(first: &Surface, second: &Surface) -> Result<Certification> {
         1.0 - certification.minimum_normal_alignment,
     );
     Ok(certification)
+}
+
+fn apply_deterministic_edit(shell: &mut StepCompressedTrimmedShell) -> Result<()> {
+    let mut surface = exact_nurbs(&shell.faces[SECOND_FACE].surface)?;
+    surface.elevate_udegree();
+    surface.elevate_vdegree();
+    let seam_control_count = surface
+        .control_points()
+        .first()
+        .map(Vec::len)
+        .context("dependent surface has no control rows")?;
+    surface
+        .control_points_mut()
+        .enumerate()
+        .filter(|(index, _)| index / seam_control_count == 1 && index % seam_control_count == 1)
+        .for_each(|(_, point)| point.z += 0.2 * point.w);
+    let replacement = Surface::NurbsSurface(surface);
+    let face = shell
+        .faces
+        .get_mut(SECOND_FACE)
+        .context("fixture second face is missing")?;
+    face.surface = replacement.clone();
+    face.boundaries
+        .iter_mut()
+        .flatten()
+        .filter_map(|edge| edge.trim_curve.as_mut())
+        .for_each(|trim| {
+            *trim = ParameterCurve::new(trim.curve().clone(), Box::new(replacement.clone()));
+        });
+    Ok(())
+}
+
+fn dependent_trim_state(shell: &StepCompressedTrimmedShell) -> (usize, usize, bool) {
+    let face = &shell.faces[SECOND_FACE];
+    let edge_uses = face.boundaries.iter().flatten().count();
+    let trims = face
+        .boundaries
+        .iter()
+        .flatten()
+        .filter(|edge| edge.trim_curve.is_some())
+        .count();
+    let rebound = face.boundaries.iter().flatten().all(|edge| {
+        edge.trim_curve
+            .as_ref()
+            .is_some_and(|trim| trim.surface().as_ref() == &face.surface)
+    });
+    (edge_uses, trims, rebound)
 }
 
 fn write_export(path: &Path, step: &str) -> Result<()> {
@@ -244,7 +297,26 @@ fn main() -> Result<()> {
 
     let mut shell = imported_shell(FIXTURE)?;
     let original_first = shell.faces[FIRST_FACE].surface.clone();
-    let original_second = shell.faces[SECOND_FACE].surface.clone();
+    let baseline_second = shell.faces[SECOND_FACE].surface.clone();
+    let baseline_certification = certify_g1(&original_first, &baseline_second)?;
+    let imported_trim_state = dependent_trim_state(&shell);
+    ensure!(
+        imported_trim_state.0 > 0
+            && imported_trim_state.0 == imported_trim_state.1
+            && imported_trim_state.2,
+        "the imported dependent face does not have a complete bound trim set",
+    );
+    apply_deterministic_edit(&mut shell)?;
+    let edited_second = shell.faces[SECOND_FACE].surface.clone();
+    let edited_measurement = measure_g1(&original_first, &edited_second)?;
+    ensure!(
+        edited_measurement.maximum_position_error <= POSITION_TOLERANCE,
+        "the deterministic edit moved the shared seam",
+    );
+    ensure!(
+        1.0 - edited_measurement.minimum_normal_alignment > NORMAL_ALIGNMENT_TOLERANCE,
+        "the deterministic edit did not create a measurable G1 defect",
+    );
     let report = repair_step_continuity(
         &mut shell,
         seam,
@@ -258,16 +330,12 @@ fn main() -> Result<()> {
     );
     ensure!(
         exact_nurbs(&shell.faces[SECOND_FACE].surface)?.control_points()
-            != exact_nurbs(&original_second)?.control_points(),
+            != exact_nurbs(&edited_second)?.control_points(),
         "the dependent STEP face control net did not change",
     );
+    let repaired_trim_state = dependent_trim_state(&shell);
     ensure!(
-        shell.faces[SECOND_FACE]
-            .boundaries
-            .iter()
-            .flatten()
-            .filter_map(|edge| edge.trim_curve.as_ref())
-            .all(|trim| trim.surface().as_ref() == &shell.faces[SECOND_FACE].surface),
+        repaired_trim_state == imported_trim_state,
         "dependent trims were not rebound to the repaired face",
     );
     let repaired_certification = certify_g1(
@@ -316,7 +384,7 @@ fn main() -> Result<()> {
         "STEP round-trip changed the repaired face count",
     );
     ensure!(
-        reimported.faces[SECOND_FACE].surface != original_second,
+        reimported.faces[SECOND_FACE].surface != edited_second,
         "STEP round-trip restored the unrepaired dependent face",
     );
     let round_trip_control_error = control_net_error(
@@ -327,14 +395,17 @@ fn main() -> Result<()> {
         round_trip_control_error <= 1.0e-12,
         "STEP round-trip changed the repaired dependent control net by {round_trip_control_error}",
     );
+    let reimported_trim_state = dependent_trim_state(&reimported);
+    let reimported_missing_trims = reimported.faces[SECOND_FACE]
+        .boundaries
+        .iter()
+        .flatten()
+        .filter(|edge| edge.trim_curve.is_none())
+        .map(|edge| edge.index)
+        .collect::<Vec<_>>();
     ensure!(
-        reimported.faces[SECOND_FACE]
-            .boundaries
-            .iter()
-            .flatten()
-            .filter_map(|edge| edge.trim_curve.as_ref())
-            .all(|trim| trim.surface().as_ref() == &reimported.faces[SECOND_FACE].surface),
-        "STEP round-trip did not bind trims to the repaired face",
+        reimported_trim_state == imported_trim_state,
+        "STEP round-trip did not preserve the repaired trim state: imported {imported_trim_state:?}, re-imported {reimported_trim_state:?}, missing {reimported_missing_trims:?}",
     );
     let reimported_certification = certify_g1(
         &reimported.faces[FIRST_FACE].surface,
@@ -343,6 +414,14 @@ fn main() -> Result<()> {
 
     println!("typed_trimmed_refusal=TrimmedBoundary");
     println!("termination={:?}", report.termination());
+    println!(
+        "baseline_minimum_normal_alignment={}",
+        baseline_certification.minimum_normal_alignment,
+    );
+    println!(
+        "edited_minimum_normal_alignment={}",
+        edited_measurement.minimum_normal_alignment,
+    );
     println!(
         "repaired_maximum_position_error={}",
         repaired_certification.maximum_position_error,

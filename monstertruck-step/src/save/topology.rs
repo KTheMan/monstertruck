@@ -1,3 +1,5 @@
+use monstertruck_geometry::prelude::Invertible;
+
 use super::{Result, *};
 trait StepAssociatedEntity {
     fn fmt(&self, idx: usize, formatter: &mut Formatter<'_>) -> Result;
@@ -14,8 +16,27 @@ where T: StepFormat + StepLength
     fn step_length(&self) -> usize { StepLength::step_length(self) }
 }
 
+struct OrientedStepAssociatedEntity<'a, T> {
+    entity: &'a T,
+    inverted: bool,
+}
+
+impl<T> StepAssociatedEntity for OrientedStepAssociatedEntity<'_, T>
+where T: Clone + Invertible + StepFormat + StepLength
+{
+    fn fmt(&self, idx: usize, formatter: &mut Formatter<'_>) -> Result {
+        let mut entity = self.entity.clone();
+        if self.inverted {
+            entity.invert();
+        }
+        StepFormat::fmt(&entity, idx, formatter)
+    }
+
+    fn step_length(&self) -> usize { self.entity.step_length() }
+}
+
 enum StepAssociatedGeometry<'a> {
-    ExactParameterCurve(&'a dyn StepAssociatedEntity),
+    ExactParameterCurve(Box<dyn StepAssociatedEntity + 'a>),
     /// Reference to an already-emitted surface entity (the adjacent face's
     /// surface). It emits nothing and claims no entity index; the enclosing
     /// `SURFACE_CURVE` argument list points at the stored index directly,
@@ -53,7 +74,7 @@ struct StepFace<'a, S> {
 /// so a surface is emitted once (as the face geometry) and referenced, not
 /// duplicated, per bounding edge.
 enum EdgeAssociationSource<'a> {
-    ExactParameterCurve(&'a dyn StepAssociatedEntity),
+    ExactParameterCurve(Box<dyn StepAssociatedEntity + 'a>),
     /// Position of the adjacent face in the shell's face list.
     FaceSurface(usize),
 }
@@ -244,7 +265,7 @@ where
         is_open: bool,
     ) -> Self
     where
-        T: StepFormat + StepLength,
+        T: Clone + Invertible + StepFormat + StepLength,
     {
         let faces = shell
             .faces
@@ -281,7 +302,14 @@ where
                     let association = edge_use
                         .trim_curve
                         .as_ref()
-                        .map(|trim_curve| EdgeAssociationSource::ExactParameterCurve(trim_curve))
+                        .map(|trim_curve| {
+                            EdgeAssociationSource::ExactParameterCurve(Box::new(
+                                OrientedStepAssociatedEntity {
+                                    entity: trim_curve,
+                                    inverted: !edge_use.orientation,
+                                },
+                            ))
+                        })
                         .unwrap_or(EdgeAssociationSource::FaceSurface(face_pos));
                     edge_associations[edge_use.index].push(association);
                 });
@@ -581,7 +609,7 @@ where
     S: StepLength,
 {
     fn new_trimmed<T>(solid: &'a CompressedTrimmedSolid<P, C, S, T>, idx: usize) -> Self
-    where T: StepFormat + StepLength {
+    where T: Clone + Invertible + StepFormat + StepLength {
         let mut cursor = idx + 1;
         let boundaries = solid
             .boundaries
@@ -684,7 +712,7 @@ where
     P: Copy,
     C: StepLength,
     S: StepLength,
-    T: StepFormat + StepLength,
+    T: Clone + Invertible + StepFormat + StepLength,
 {
     fn from(shell: &'a CompressedTrimmedShell<P, C, S, T>) -> Self {
         Self::Shell(StepShell::new_trimmed(shell, 17, true))
@@ -696,7 +724,7 @@ where
     P: Copy,
     C: StepLength,
     S: StepLength,
-    T: StepFormat + StepLength,
+    T: Clone + Invertible + StepFormat + StepLength,
 {
     fn from(solid: &'a CompressedTrimmedSolid<P, C, S, T>) -> Self {
         Self::Solid(StepSolid::new_trimmed(solid, 16))
@@ -794,7 +822,7 @@ where
     P: Copy,
     C: StepLength,
     S: StepLength,
-    T: StepFormat + StepLength,
+    T: Clone + Invertible + StepFormat + StepLength,
 {
     fn from(shell: &'a CompressedTrimmedShell<P, C, S, T>) -> Self {
         Self(shell.into(), StepMeasurementContext::default())
@@ -806,7 +834,7 @@ where
     P: Copy,
     C: StepLength,
     S: StepLength,
-    T: StepFormat + StepLength,
+    T: Clone + Invertible + StepFormat + StepLength,
 {
     fn from(solid: &'a CompressedTrimmedSolid<P, C, S, T>) -> Self {
         Self(solid.into(), StepMeasurementContext::default())
@@ -914,7 +942,7 @@ where
 {
     /// Pushes a trimmed shell to step models.
     pub fn push_trimmed_shell<T>(&mut self, shell: &'a CompressedTrimmedShell<P, C, S, T>)
-    where T: StepFormat + StepLength {
+    where T: Clone + Invertible + StepFormat + StepLength {
         let model = PreStepModel::Shell(StepShell::new_trimmed(shell, self.next_idx + 1, true));
         self.next_idx += model.step_length();
         self.models.push(model)
@@ -922,7 +950,7 @@ where
 
     /// Pushes a trimmed solid to step models.
     pub fn push_trimmed_solid<T>(&mut self, solid: &'a CompressedTrimmedSolid<P, C, S, T>)
-    where T: StepFormat + StepLength {
+    where T: Clone + Invertible + StepFormat + StepLength {
         let model = PreStepModel::Solid(StepSolid::new_trimmed(solid, self.next_idx));
         self.next_idx += model.step_length();
         self.models.push(model)
@@ -983,7 +1011,7 @@ where
     P: Copy,
     C: StepLength,
     S: StepLength,
-    U: StepFormat + StepLength,
+    U: Clone + Invertible + StepFormat + StepLength,
 {
     fn from_iter<T: IntoIterator<Item = &'a CompressedTrimmedShell<P, C, S, U>>>(iter: T) -> Self {
         let mut next_idx = 16;
@@ -1009,7 +1037,7 @@ where
     P: Copy,
     C: StepLength,
     S: StepLength,
-    U: StepFormat + StepLength,
+    U: Clone + Invertible + StepFormat + StepLength,
 {
     fn from_iter<T: IntoIterator<Item = &'a CompressedTrimmedSolid<P, C, S, U>>>(iter: T) -> Self {
         let mut next_idx = 16;

@@ -13,11 +13,12 @@ use monstertruck_geometry::nurbs::continuity_solver::{
     BoundaryContinuityRequest, BoundaryContinuitySolver, ContinuitySolveError,
     ContinuitySolveReport,
 };
+use monstertruck_geometry::prelude::{BoundedCurve, Invertible, ParametricCurve};
 use monstertruck_geometry::prelude::{BoundedSurface, NurbsSurface, ParameterCurve, Vector4};
 use thiserror::Error;
 
 use crate::load::convert::StepCompressedTrimmedShell;
-use crate::load::step_geometry::{Curve2D, Surface};
+use crate::load::step_geometry::{Curve2D, Curve3D, Surface};
 
 /// A shared edge and the two imported faces that meet along it.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
@@ -106,7 +107,8 @@ pub enum StepContinuityError {
 ///
 /// The first face remains fixed. The second face is replaced transactionally
 /// only after the solve succeeds. Its face-local parameter curves are rebound
-/// to the replacement surface before the shell is returned to STEP export.
+/// to the replacement surface, and its changed non-shared boundary edges and
+/// vertices are synchronized before the shell is returned to STEP export.
 ///
 /// # Errors
 ///
@@ -135,20 +137,43 @@ pub fn repair_step_continuity(
     let report = solution.report().clone();
     let replacement = Surface::NurbsSurface(solution.second().clone());
 
-    let face =
-        shell
-            .faces
-            .get_mut(seam.second_face)
-            .ok_or(StepContinuityError::FaceOutOfRange {
-                face: seam.second_face,
-            })?;
-    face.surface = replacement.clone();
-    face.boundaries
-        .iter_mut()
-        .flatten()
-        .filter_map(|edge_use| edge_use.trim_curve.as_mut())
-        .for_each(|trim| {
-            *trim = ParameterCurve::new(trim.curve().clone(), Box::new(replacement.clone()));
+    let rebound_edges = {
+        let face =
+            shell
+                .faces
+                .get_mut(seam.second_face)
+                .ok_or(StepContinuityError::FaceOutOfRange {
+                    face: seam.second_face,
+                })?;
+        face.surface = replacement.clone();
+        face.boundaries
+            .iter_mut()
+            .flatten()
+            .filter_map(|edge_use| {
+                edge_use.trim_curve.as_mut().map(|trim| {
+                    *trim =
+                        ParameterCurve::new(trim.curve().clone(), Box::new(replacement.clone()));
+                    (edge_use.index, edge_use.orientation, trim.clone())
+                })
+            })
+            .collect::<Vec<_>>()
+    };
+    if let Curve3D::SurfaceCurve(surface_curve) = shell.edges[seam.shared_edge].curve.clone() {
+        shell.edges[seam.shared_edge].curve = surface_curve.leader().clone();
+    }
+    rebound_edges
+        .into_iter()
+        .filter(|(edge, _, _)| *edge != seam.shared_edge)
+        .for_each(|(edge_index, orientation, mut trim)| {
+            if !orientation {
+                trim.invert();
+            }
+            let (minimum, maximum) = trim.range_tuple();
+            let endpoints = (trim.subs(minimum), trim.subs(maximum));
+            let edge = &mut shell.edges[edge_index];
+            shell.vertices[edge.vertices.0] = endpoints.0;
+            shell.vertices[edge.vertices.1] = endpoints.1;
+            edge.curve = Curve3D::ParameterCurve(trim);
         });
 
     Ok(report)
