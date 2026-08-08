@@ -240,7 +240,10 @@ downstream drafts, the restored upstream contribution head, every retained
 downstream branch, and the exact local and hosted evidence. It reported: "P3
 complete. No unresolved P3 findings remain against upstream issue #4 or PR
 #13, and P1/P2 remain unregressed." P3 is therefore closed. A final independent
-whole-stack audit still guards the combined P1/P2/P3 completion claim.
+whole-stack audit then inspected exact revision `f87365a9` and all live branch,
+draft, upstream, and check evidence. It reported: "Complete resolution
+confirmed. No unresolved P1, P2, or P3 findings remain against upstream issue
+#4 or PR #13." The combined completion claim is therefore accepted.
 
 ## Downstream restoration ledger
 
