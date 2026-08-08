@@ -8,7 +8,7 @@ impl<'surface> PreparedProblem<'surface> {
         second: &'surface NurbsSurface<Vector4>,
         request: BoundaryContinuityRequest,
         config: &ContinuitySolverConfig,
-        budget: ContinuityBudget,
+        budget: ContinuityWorkBudget,
     ) -> Result<Self, ContinuitySolveError> {
         config.validate()?;
         if request.order() == ContinuityOrder::G4 && !config.allows_experimental_g4() {

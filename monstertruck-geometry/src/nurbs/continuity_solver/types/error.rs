@@ -3,7 +3,7 @@
 use super::super::super::continuity::{
     InspectedSurfaceContinuityCapability, UnsupportedContinuityCapability,
 };
-use super::super::resource::ContinuityWorkTruncated;
+use super::super::resource::ContinuityTruncated;
 use super::{BoundaryEndpoint, ContinuitySolveReport};
 use thiserror::Error;
 
@@ -15,7 +15,7 @@ pub enum ContinuitySolveError {
     InvalidConfig(&'static str),
     /// A checked caller-controlled dimension exceeded its solver budget.
     #[error(transparent)]
-    WorkTruncated(#[from] ContinuityWorkTruncated),
+    Truncated(#[from] ContinuityTruncated),
     /// G4 was requested without explicit experimental opt-in.
     #[error("G4 continuity solving requires explicit experimental opt-in")]
     ExperimentalG4Disabled,

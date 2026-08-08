@@ -80,7 +80,6 @@ fn hash_transition(solution: &BoundaryContinuitySolution<'_>, hasher: &mut Conte
 fn hash_report(solution: &BoundaryContinuitySolution<'_>, hasher: &mut ContentHasher) {
     let report = solution.report();
     format!("{:?}", report.termination()).content_hash(hasher);
-    format!("{:?}", report.maturity()).content_hash(hasher);
     report.iterations().content_hash(hasher);
     report.accepted_steps().content_hash(hasher);
     report.rejected_steps().content_hash(hasher);

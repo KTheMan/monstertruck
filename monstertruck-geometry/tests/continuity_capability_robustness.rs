@@ -1,7 +1,6 @@
 use monstertruck_geometry::base::Vector4;
 use monstertruck_geometry::nurbs::continuity::{
-    BoundarySide, ContinuityCapabilityLevel, ContinuityOrder, capability_for_bspline,
-    capability_for_nurbs,
+    BoundarySide, ContinuityOrder, capability_for_bspline, capability_for_nurbs,
 };
 use monstertruck_geometry::nurbs::{BsplineSurface, KnotVector, NurbsSurface};
 
@@ -22,7 +21,7 @@ fn empty_control_nets_report_unsupported_without_panicking() {
     ]
     .into_iter()
     .for_each(|capability| {
-        assert_eq!(capability.level(), ContinuityCapabilityLevel::Unsupported);
+        assert!(capability.unsupported_reason().is_some());
         assert_eq!(capability.cross_control_rows(), 0);
     });
 }
@@ -75,7 +74,7 @@ fn malformed_nonempty_control_nets_report_unsupported_without_panicking() {
         }));
 
     capabilities.for_each(|capability| {
-        assert_eq!(capability.level(), ContinuityCapabilityLevel::Unsupported);
+        assert!(capability.unsupported_reason().is_some());
         assert_eq!(capability.cross_control_rows(), 0);
     });
 }

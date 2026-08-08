@@ -4,7 +4,7 @@ use super::{
 };
 use crate::base::Vector4;
 use crate::nurbs::continuity::BoundaryAlignment;
-use crate::nurbs::continuity::{BoundarySide, ContinuityMaturity, ContinuityOrder};
+use crate::nurbs::continuity::{BoundarySide, ContinuityOrder};
 use crate::nurbs::{BsplineSurface, KnotVector, NurbsSurface};
 
 const SEAM_DEGREE: usize = 3;
@@ -30,7 +30,6 @@ fn solves_exact_boundaries_through_g3() {
         assert_eq!(solution.first(), &first);
         assert_eq!(solution.second(), &second);
         assert_converged(solution.report(), &config, order);
-        assert_eq!(solution.report().maturity(), order.maturity());
         assert_eq!(solution.report().iterations(), 0);
         assert_eq!(solution.report().accepted_steps(), 0);
     });
@@ -113,10 +112,6 @@ fn g4_requires_opt_in_and_remains_reachable() {
 
     assert_eq!(solution.second(), &second);
     assert_converged(solution.report(), &config, ContinuityOrder::G4);
-    assert_eq!(
-        solution.report().maturity(),
-        ContinuityMaturity::Experimental
-    );
 }
 
 #[test]

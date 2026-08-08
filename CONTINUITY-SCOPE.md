@@ -24,10 +24,10 @@ controls. Evidence uses example-local DTOs rather than publishing a solver
 serialization or persistence contract. The solver uses the established `f64`
 trait family deliberately. A later port to the scalar-generic v2 traits is a
 separate migration after v2 exposes the required arbitrary-order derivative
-contract. `G1` through `G3` remain provisional, while `G4` is explicitly
+contract. `G0` through `G3` are the production target, while `G4` is explicitly
 experimental and requires public opt-in.
 
-Dense work uses explicit budgets, typed `ContinuityWorkTruncated` refusal, and
+Dense work uses explicit budgets, typed `ContinuityTruncated` refusal, and
 deterministic work meters. This follows the bounded-work vocabulary already
 used by surface parameter division.
 

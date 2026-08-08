@@ -9,9 +9,9 @@ use monstertruck_core::cgmath64::{Homogeneous, control_point::ControlPoint};
 use super::{BsplineSurface, KnotVector, NurbsSurface};
 
 pub use monstertruck_traits::surface_continuity::{
-    BoundarySide, ContinuityMaturity, ContinuityOrder, InvalidContinuityCapability,
-    MAX_CONTINUITY_ORDER, SurfaceContinuityCapability, SurfaceContinuitySupport,
-    UnsupportedContinuityCapability, UnsupportedContinuityOrder,
+    BoundarySide, ContinuityOrder, InvalidContinuityCapability, MAX_CONTINUITY_ORDER,
+    SurfaceContinuityCapability, SurfaceContinuitySupport, UnsupportedContinuityCapability,
+    UnsupportedContinuityOrder,
 };
 
 /// Orientation of the second boundary relative to the first.
@@ -23,24 +23,12 @@ pub enum BoundaryAlignment {
     Reversed,
 }
 
-/// Representation-specific inspection level retained by geometry diagnostics.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub enum ContinuityCapabilityLevel {
-    /// A representation requirement is unsatisfied.
-    Unsupported,
-    /// The requested boundary jet is representable.
-    Feasible,
-    /// The representation has the preferred styling degree.
-    Recommended,
-}
-
 /// A concrete surface inspection paired with the trait-owned capability report.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct InspectedSurfaceContinuityCapability {
     report: SurfaceContinuityCapability,
     cross_degree: usize,
     cross_control_rows: usize,
-    level: ContinuityCapabilityLevel,
 }
 
 impl InspectedSurfaceContinuityCapability {
@@ -48,13 +36,11 @@ impl InspectedSurfaceContinuityCapability {
         report: SurfaceContinuityCapability,
         cross_degree: usize,
         cross_control_rows: usize,
-        level: ContinuityCapabilityLevel,
     ) -> Self {
         Self {
             report,
             cross_degree,
             cross_control_rows,
-            level,
         }
     }
 
@@ -81,9 +67,6 @@ impl InspectedSurfaceContinuityCapability {
     /// Returns zero when representation validation failed before deriving the
     /// control-net dimensions.
     pub const fn cross_control_rows(self) -> usize { self.cross_control_rows }
-
-    /// Returns the geometry-specific inspection level.
-    pub const fn level(self) -> ContinuityCapabilityLevel { self.level }
 
     /// Returns the highest supported order when inspection established it.
     pub const fn maximum_supported_order(self) -> Option<ContinuityOrder> {
@@ -186,7 +169,6 @@ where
             ),
             polynomial.cross_degree,
             polynomial.cross_control_rows,
-            ContinuityCapabilityLevel::Unsupported,
         ),
     }
 }
@@ -222,7 +204,6 @@ fn capability<P>(
             SurfaceContinuityCapability::unsupported(side, requested, reason, None),
             0,
             0,
-            ContinuityCapabilityLevel::Unsupported,
         ),
     }
 }
@@ -267,18 +248,11 @@ fn capability_from_facts(
     } else {
         None
     };
-    let preferred_degree = if required_degree == 0 {
-        0
-    } else {
-        2 * required_degree - 1
-    };
-
     match reason {
         Some(reason) => InspectedSurfaceContinuityCapability::new(
             SurfaceContinuityCapability::unsupported(side, requested, reason, maximum_order),
             cross_degree,
             cross_control_rows,
-            ContinuityCapabilityLevel::Unsupported,
         ),
         None => {
             let report = match maximum_order.and_then(|maximum_order| {
@@ -293,17 +267,7 @@ fn capability_from_facts(
                     maximum_order,
                 ),
             };
-            let level = if cross_degree < preferred_degree {
-                ContinuityCapabilityLevel::Feasible
-            } else {
-                ContinuityCapabilityLevel::Recommended
-            };
-            InspectedSurfaceContinuityCapability::new(
-                report,
-                cross_degree,
-                cross_control_rows,
-                level,
-            )
+            InspectedSurfaceContinuityCapability::new(report, cross_degree, cross_control_rows)
         }
     }
 }

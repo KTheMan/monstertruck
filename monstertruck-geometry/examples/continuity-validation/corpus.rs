@@ -1,7 +1,5 @@
 use anyhow::{Result, anyhow};
-use monstertruck_geometry::nurbs::continuity::{
-    BoundaryAlignment, BoundarySide, ContinuityMaturity, ContinuityOrder,
-};
+use monstertruck_geometry::nurbs::continuity::{BoundaryAlignment, BoundarySide, ContinuityOrder};
 use monstertruck_geometry::nurbs::continuity_solver::{
     BoundaryContinuityRequest, ContinuitySolverConfig,
 };
@@ -201,32 +199,12 @@ pub struct DenseSpec {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Expectation {
     Converged {
-        maturity: MaturitySpec,
         maximum_dense_residual_by_order: Vec<f64>,
         maximum_normal_angle: f64,
     },
     Error {
         error: ErrorKind,
     },
-}
-
-/// Evidence-local expected public maturity label.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
-pub enum MaturitySpec {
-    Established,
-    Provisional,
-    Experimental,
-}
-
-impl MaturitySpec {
-    pub const fn matches(self, maturity: ContinuityMaturity) -> bool {
-        matches!(
-            (self, maturity),
-            (Self::Established, ContinuityMaturity::Established)
-                | (Self::Provisional, ContinuityMaturity::Provisional)
-                | (Self::Experimental, ContinuityMaturity::Experimental)
-        )
-    }
 }
 
 /// Stable classification of expected solver errors.
@@ -244,7 +222,7 @@ pub enum ErrorKind {
     NonFiniteJacobian,
     NoDescentDirection,
     DidNotConverge,
-    WorkTruncated,
+    Truncated,
 }
 
 impl ErrorKind {
@@ -262,7 +240,7 @@ impl ErrorKind {
             Self::NonFiniteJacobian => "non_finite_jacobian",
             Self::NoDescentDirection => "no_descent_direction",
             Self::DidNotConverge => "did_not_converge",
-            Self::WorkTruncated => "work_truncated",
+            Self::Truncated => "truncated",
         }
     }
 }

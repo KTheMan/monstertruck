@@ -1,8 +1,6 @@
 //! Public configuration, diagnostics, and failures for continuity solving.
 
-use super::super::continuity::{
-    BoundaryAlignment, BoundarySide, ContinuityMaturity, ContinuityOrder,
-};
+use super::super::continuity::{BoundaryAlignment, BoundarySide, ContinuityOrder};
 
 /// Identifies one endpoint of a boundary-continuity problem.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
@@ -13,7 +11,7 @@ pub enum BoundaryEndpoint {
     Second,
 }
 
-/// Caller-controlled dimension constrained by a [`ContinuityBudget`](super::ContinuityBudget).
+/// Caller-controlled dimension constrained by a [`ContinuityWorkBudget`](super::ContinuityWorkBudget).
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum ContinuityResource {
     /// Nonlinear solver iterations.
@@ -355,7 +353,6 @@ impl OrderResidual {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ContinuitySolveReport {
     termination: ContinuityTermination,
-    maturity: ContinuityMaturity,
     iterations: usize,
     accepted_steps: usize,
     rejected_steps: usize,
@@ -374,7 +371,6 @@ impl ContinuitySolveReport {
     pub(super) fn from_data(data: ContinuitySolveReportData) -> Self {
         Self {
             termination: data.termination,
-            maturity: data.order.maturity(),
             iterations: data.iterations,
             accepted_steps: data.accepted_steps,
             rejected_steps: data.rejected_steps,
@@ -392,9 +388,6 @@ impl ContinuitySolveReport {
 
     /// Returns the termination state.
     pub const fn termination(&self) -> ContinuityTermination { self.termination }
-
-    /// Returns the public maturity classification of the solved order.
-    pub const fn maturity(&self) -> ContinuityMaturity { self.maturity }
 
     /// Returns the number of attempted nonlinear iterations.
     pub const fn iterations(&self) -> usize { self.iterations }
@@ -438,7 +431,6 @@ impl ContinuitySolveReport {
 
 pub(super) struct ContinuitySolveReportData {
     pub(super) termination: ContinuityTermination,
-    pub(super) order: ContinuityOrder,
     pub(super) iterations: usize,
     pub(super) accepted_steps: usize,
     pub(super) rejected_steps: usize,

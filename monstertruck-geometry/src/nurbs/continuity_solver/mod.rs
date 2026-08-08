@@ -46,9 +46,9 @@ mod taylor;
 mod types;
 
 pub use resource::{
-    ContinuityBudget, ContinuityTotals, ContinuityWork, ContinuityWorkTruncated,
-    continuity_max_work, continuity_totals, continuity_work, take_continuity_max_work,
-    take_continuity_totals, take_continuity_work,
+    ContinuityTruncated, ContinuityWork, ContinuityWorkBudget, continuity_max_work,
+    continuity_totals, continuity_work, take_continuity_max_work, take_continuity_totals,
+    take_continuity_work,
 };
 pub use types::{
     BoundaryContinuityRequest, BoundaryContinuitySolution, BoundaryEndpoint, BoundaryTransition,
@@ -63,7 +63,7 @@ mod tests;
 #[derive(Clone, Debug, PartialEq)]
 pub struct BoundaryContinuitySolver {
     config: ContinuitySolverConfig,
-    budget: ContinuityBudget,
+    budget: ContinuityWorkBudget,
 }
 
 impl BoundaryContinuitySolver {
@@ -73,10 +73,10 @@ impl BoundaryContinuitySolver {
     ///
     /// Returns [`ContinuitySolveError::InvalidConfig`] when a convergence,
     /// damping, sampling, rank, or regularization control is invalid, and
-    /// [`ContinuitySolveError::WorkTruncated`] when the requested
+    /// [`ContinuitySolveError::Truncated`] when the requested
     /// iteration count exceeds the default resource budget.
     pub fn new(config: ContinuitySolverConfig) -> Result<Self, ContinuitySolveError> {
-        Self::new_with_budget(config, ContinuityBudget::default())
+        Self::new_with_budget(config, ContinuityWorkBudget::default())
     }
 
     /// Creates a solver with an explicit dense-work resource budget.
@@ -85,11 +85,11 @@ impl BoundaryContinuitySolver {
     ///
     /// Returns [`ContinuitySolveError::InvalidConfig`] when the solver controls
     /// are invalid, and
-    /// [`ContinuitySolveError::WorkTruncated`] when the requested
+    /// [`ContinuitySolveError::Truncated`] when the requested
     /// iteration count exceeds the supplied budget.
     pub fn new_with_budget(
         config: ContinuitySolverConfig,
-        budget: ContinuityBudget,
+        budget: ContinuityWorkBudget,
     ) -> Result<Self, ContinuitySolveError> {
         config.validate()?;
         budget.ensure(ContinuityResource::Iterations, config.max_iterations())?;
@@ -100,7 +100,7 @@ impl BoundaryContinuitySolver {
     pub const fn config(&self) -> &ContinuitySolverConfig { &self.config }
 
     /// Returns the validated dense-work resource budget.
-    pub const fn budget(&self) -> &ContinuityBudget { &self.budget }
+    pub const fn budget(&self) -> &ContinuityWorkBudget { &self.budget }
 
     /// Solves one boundary-continuity request without mutating either input.
     ///

@@ -65,20 +65,6 @@ impl ContinuityOrder {
     /// Returns whether this order is experimental.
     #[inline(always)]
     pub const fn is_experimental(self) -> bool { self.0 == Self::G4.0 }
-
-    /// Returns the solver maturity classification retained by the downstream
-    /// validation API.
-    #[doc(hidden)]
-    #[inline(always)]
-    pub const fn maturity(self) -> ContinuityMaturity {
-        if self.0 == Self::G0.0 {
-            ContinuityMaturity::Established
-        } else if self.0 <= Self::G3.0 {
-            ContinuityMaturity::Provisional
-        } else {
-            ContinuityMaturity::Experimental
-        }
-    }
 }
 
 impl TryFrom<usize> for ContinuityOrder {
@@ -89,18 +75,6 @@ impl TryFrom<usize> for ContinuityOrder {
 
 impl From<ContinuityOrder> for usize {
     fn from(value: ContinuityOrder) -> Self { value.as_usize() }
-}
-
-/// Solver maturity classification retained for downstream report compatibility.
-#[doc(hidden)]
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub enum ContinuityMaturity {
-    /// Established positional-continuity target.
-    Established,
-    /// Implemented higher-order target awaiting independent certification.
-    Provisional,
-    /// Experimental reachability outside the production target.
-    Experimental,
 }
 
 /// Side of a full tensor-product surface parameter domain.

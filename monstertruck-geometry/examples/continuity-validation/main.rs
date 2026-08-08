@@ -160,7 +160,6 @@ fn run_case(
     match (&case.expectation, outcome) {
         (
             Expectation::Converged {
-                maturity,
                 maximum_dense_residual_by_order,
                 maximum_normal_angle,
             },
@@ -169,10 +168,6 @@ fn run_case(
             ensure!(
                 solution.report().termination() == ContinuityTermination::Converged,
                 "the solver returned a non-converged solution",
-            );
-            ensure!(
-                maturity.matches(solution.report().maturity()),
-                "the solver maturity does not match the corpus expectation",
             );
             let dense = dense::certify(&solution, request, dense_spec, case.geometry.scale)?;
             ensure!(
@@ -238,8 +233,8 @@ fn error_evidence(error: &ContinuitySolveError) -> Value {
             "kind": "invalid_config",
             "message": message,
         }),
-        ContinuitySolveError::WorkTruncated(truncated) => json!({
-            "kind": "work_truncated",
+        ContinuitySolveError::Truncated(truncated) => json!({
+            "kind": "truncated",
             "resource": format!("{:?}", truncated.resource),
             "requested": truncated.requested,
             "budget": truncated.budget,
@@ -263,7 +258,6 @@ fn error_evidence(error: &ContinuitySolveError) -> Value {
                 "maximum_supported_order": capability
                     .maximum_supported_order()
                     .map(ContinuityOrder::as_usize),
-                "level": format!("{:?}", capability.level()),
             },
         }),
         ContinuitySolveError::InvalidBoundary(endpoint) => json!({
@@ -323,7 +317,6 @@ const fn endpoint_name(endpoint: BoundaryEndpoint) -> &'static str {
 fn report_evidence(report: &ContinuitySolveReport) -> Value {
     json!({
         "termination": format!("{:?}", report.termination()),
-        "maturity": format!("{:?}", report.maturity()),
         "iterations": report.iterations(),
         "accepted_steps": report.accepted_steps(),
         "rejected_steps": report.rejected_steps(),
@@ -360,7 +353,7 @@ fn classify_error(error: &ContinuitySolveError) -> ErrorKind {
         ContinuitySolveError::NonFiniteJacobian => ErrorKind::NonFiniteJacobian,
         ContinuitySolveError::NoDescentDirection => ErrorKind::NoDescentDirection,
         ContinuitySolveError::DidNotConverge(_) => ErrorKind::DidNotConverge,
-        ContinuitySolveError::WorkTruncated(_) => ErrorKind::WorkTruncated,
+        ContinuitySolveError::Truncated(_) => ErrorKind::Truncated,
     }
 }
 

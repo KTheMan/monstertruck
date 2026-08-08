@@ -2,7 +2,7 @@
 
 use super::boundary::{BoundaryFrame, map_normalized_seam};
 use super::dual::Dual;
-use super::resource::ContinuityBudget;
+use super::resource::ContinuityWorkBudget;
 use super::sampling::{nonzero_span_count, seam_samples, seam_validation_samples};
 use super::taylor::{JetScalar, TaylorJet};
 use super::types::{

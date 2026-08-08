@@ -3,7 +3,7 @@
 use super::problem::{PreparedProblem, ResidualEvaluation};
 use super::qr::solve_column_pivoted;
 use super::resource::{
-    ContinuityBudget, ContinuityWork, ContinuityWorkSession, charge_continuity_work,
+    ContinuityWork, ContinuityWorkBudget, ContinuityWorkSession, charge_continuity_work,
 };
 use super::types::{
     BoundaryContinuityRequest, BoundaryContinuitySolution, ContinuityResource,
@@ -18,7 +18,7 @@ pub(super) fn solve<'first>(
     second: &NurbsSurface<Vector4>,
     request: BoundaryContinuityRequest,
     config: &ContinuitySolverConfig,
-    budget: ContinuityBudget,
+    budget: ContinuityWorkBudget,
 ) -> Result<BoundaryContinuitySolution<'first>, ContinuitySolveError> {
     let _work_session = ContinuityWorkSession::begin();
     let problem = PreparedProblem::new(first, second, request, config, budget)?;
@@ -35,7 +35,6 @@ pub(super) fn solve<'first>(
         certified_residuals(&problem, &variables, &evaluation, request, config)?
     {
         let report = report(
-            request,
             ReportState {
                 termination: ContinuityTermination::Converged,
                 iterations: 0,
@@ -96,7 +95,6 @@ pub(super) fn solve<'first>(
                 certified_residuals(&problem, &variables, &evaluation, request, config)?
             {
                 let report = report(
-                    request,
                     ReportState {
                         termination: ContinuityTermination::Converged,
                         iterations: iteration,
@@ -124,7 +122,6 @@ pub(super) fn solve<'first>(
             if damping == config.maximum_damping() {
                 let residuals = combined_residuals(&problem, &variables, &evaluation, config)?;
                 let report = report(
-                    request,
                     ReportState {
                         termination: ContinuityTermination::NoDescent,
                         iterations: iteration,
@@ -146,7 +143,6 @@ pub(super) fn solve<'first>(
 
     let residuals = combined_residuals(&problem, &variables, &evaluation, config)?;
     let report = report(
-        request,
         ReportState {
             termination: ContinuityTermination::MaximumIterations,
             iterations: config.max_iterations(),
@@ -277,7 +273,6 @@ struct ReportState {
 }
 
 fn report(
-    request: BoundaryContinuityRequest,
     state: ReportState,
     evaluation: &ResidualEvaluation,
     residuals: &[OrderResidual],
@@ -285,7 +280,6 @@ fn report(
 ) -> ContinuitySolveReport {
     ContinuitySolveReport::from_data(ContinuitySolveReportData {
         termination: state.termination,
-        order: request.order(),
         iterations: state.iterations,
         accepted_steps: state.accepted_steps,
         rejected_steps: state.rejected_steps,

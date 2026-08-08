@@ -13,7 +13,7 @@ use super::types::{ContinuityResource, ContinuitySolveError};
 /// sampling or dense linear algebra. Use [`Self::unbounded`] only when a
 /// trusted caller applies an equivalent external budget.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub struct ContinuityBudget {
+pub struct ContinuityWorkBudget {
     max_iterations: usize,
     max_control_points: usize,
     max_spans: usize,
@@ -24,7 +24,7 @@ pub struct ContinuityBudget {
     max_qr_elements: usize,
 }
 
-impl Default for ContinuityBudget {
+impl Default for ContinuityWorkBudget {
     fn default() -> Self {
         Self {
             max_iterations: 128,
@@ -39,7 +39,7 @@ impl Default for ContinuityBudget {
     }
 }
 
-impl ContinuityBudget {
+impl ContinuityWorkBudget {
     /// Returns a budget with no intentional finite limits.
     ///
     /// Checked dimension arithmetic still rejects integer overflow.
@@ -147,7 +147,7 @@ impl ContinuityBudget {
             Ok(())
         } else {
             mark_continuity_truncated();
-            Err(ContinuityWorkTruncated {
+            Err(ContinuityTruncated {
                 resource,
                 requested,
                 budget,
@@ -189,19 +189,6 @@ static CONTINUITY_ITERATIONS_MAX: AtomicU64 = AtomicU64::new(0);
 static CONTINUITY_JACOBIAN_ELEMENTS_MAX: AtomicU64 = AtomicU64::new(0);
 static CONTINUITY_QR_ELEMENTS_MAX: AtomicU64 = AtomicU64::new(0);
 
-/// Process-wide continuity work and refusal totals.
-#[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq)]
-pub struct ContinuityTotals {
-    /// Nonlinear iterations attempted.
-    pub iterations: u64,
-    /// Dense Jacobian elements consumed.
-    pub jacobian_elements: u64,
-    /// Dense augmented QR elements consumed.
-    pub qr_elements: u64,
-    /// Checked budget refusals.
-    pub truncations: u64,
-}
-
 /// Reads work charged on this thread without clearing it.
 #[must_use]
 pub fn continuity_work() -> ContinuityWork { CONTINUITY_WORK.with(Cell::get) }
@@ -211,25 +198,33 @@ pub fn take_continuity_work() -> ContinuityWork {
     CONTINUITY_WORK.replace(ContinuityWork::default())
 }
 
-/// Reads process-wide work charged across every thread.
+/// Reads process-wide work and refusal totals across every thread.
 #[must_use]
-pub fn continuity_totals() -> ContinuityTotals {
-    ContinuityTotals {
-        iterations: CONTINUITY_ITERATIONS_TOTAL.load(Relaxed),
-        jacobian_elements: CONTINUITY_JACOBIAN_ELEMENTS_TOTAL.load(Relaxed),
-        qr_elements: CONTINUITY_QR_ELEMENTS_TOTAL.load(Relaxed),
-        truncations: CONTINUITY_TRUNCATIONS_TOTAL.load(Relaxed),
-    }
+pub fn continuity_totals() -> (ContinuityWork, u64) {
+    let truncations = CONTINUITY_TRUNCATIONS_TOTAL.load(Relaxed);
+    (
+        ContinuityWork {
+            iterations: CONTINUITY_ITERATIONS_TOTAL.load(Relaxed),
+            jacobian_elements: CONTINUITY_JACOBIAN_ELEMENTS_TOTAL.load(Relaxed),
+            qr_elements: CONTINUITY_QR_ELEMENTS_TOTAL.load(Relaxed),
+            truncated: truncations != 0,
+        },
+        truncations,
+    )
 }
 
-/// Zeroes the process-wide meter and returns what it held.
-pub fn take_continuity_totals() -> ContinuityTotals {
-    ContinuityTotals {
-        iterations: CONTINUITY_ITERATIONS_TOTAL.swap(0, Relaxed),
-        jacobian_elements: CONTINUITY_JACOBIAN_ELEMENTS_TOTAL.swap(0, Relaxed),
-        qr_elements: CONTINUITY_QR_ELEMENTS_TOTAL.swap(0, Relaxed),
-        truncations: CONTINUITY_TRUNCATIONS_TOTAL.swap(0, Relaxed),
-    }
+/// Zeroes the process-wide work and refusal totals and returns what they held.
+pub fn take_continuity_totals() -> (ContinuityWork, u64) {
+    let truncations = CONTINUITY_TRUNCATIONS_TOTAL.swap(0, Relaxed);
+    (
+        ContinuityWork {
+            iterations: CONTINUITY_ITERATIONS_TOTAL.swap(0, Relaxed),
+            jacobian_elements: CONTINUITY_JACOBIAN_ELEMENTS_TOTAL.swap(0, Relaxed),
+            qr_elements: CONTINUITY_QR_ELEMENTS_TOTAL.swap(0, Relaxed),
+            truncated: truncations != 0,
+        },
+        truncations,
+    )
 }
 
 /// Reads the high-water mark for one complete continuity solve.
@@ -314,7 +309,7 @@ fn mark_continuity_truncated() {
 /// A checked continuity-work dimension exceeded its explicit budget.
 #[derive(Clone, Copy, Debug, Error, Hash, PartialEq, Eq)]
 #[error("continuity solver {resource:?} budget exhausted: requested {requested}, budget {budget}")]
-pub struct ContinuityWorkTruncated {
+pub struct ContinuityTruncated {
     /// Dimension that exceeded the budget.
     pub resource: ContinuityResource,
     /// Checked required count.
@@ -352,14 +347,14 @@ mod tests {
     #[test]
     fn budget_refusal_is_typed_and_marks_the_work_meter() {
         take_continuity_work();
-        let error = ContinuityBudget::unbounded()
+        let error = ContinuityWorkBudget::unbounded()
             .with_max_variables(3)
             .ensure(ContinuityResource::Variables, 4)
             .expect_err("the checked dimension exceeds its budget");
 
         assert_eq!(
             error,
-            ContinuitySolveError::WorkTruncated(ContinuityWorkTruncated {
+            ContinuitySolveError::Truncated(ContinuityTruncated {
                 resource: ContinuityResource::Variables,
                 requested: 4,
                 budget: 3,
