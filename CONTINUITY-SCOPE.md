@@ -27,9 +27,10 @@ separate migration after v2 exposes the required arbitrary-order derivative
 contract. `G0` through `G3` are the production target, while `G4` is explicitly
 experimental and requires public opt-in.
 
-Dense work uses explicit budgets, typed `ContinuityTruncated` refusal, and
-deterministic work meters. This follows the bounded-work vocabulary already
-used by surface parameter division.
+Dense work uses explicit `ContinuityLimits`, a `BudgetedContinuitySolve`
+outcome, typed `ContinuityTruncated` refusal, and deterministic work meters.
+This follows the bounded-work carrier/refusal/meter shape already used by
+surface parameter division.
 
 ## Explicitly out of scope
 
@@ -38,7 +39,7 @@ used by surface parameter division.
 | Topology tracking and persistence | Implement later **atop** `StableId`/`StableIdAllocator` in `monstertruck-core` and the `ElementAttributes`/`AttributeValue` storage in `monstertruck-topology`. No parallel identity system belongs in `monstertruck-core`. |
 | Modeling tracking wrappers | Implement later **atop** an accepted topology tracking API, not inside the direct geometry solver contribution. |
 | Contract graphs and replay | Implement later **atop** the separately reviewed tracking/persistence layer. Solver acceptance does not imply their API shape. |
-| STEP seam discovery, repair adapters, export, and re-import evidence | Implemented in `monstertruck-step::continuity`, atop the direct solver API. `continuity-repair-step` exercises import, shared-edge selection, solve, replacement, tessellation, export, and re-import without adding STEP dependencies to the numerical crate. |
+| STEP seam selection/identification, repair adapters, export, and re-import evidence | Implemented in `monstertruck-step::continuity`, atop the direct solver API. Automatic seam discovery remains an explicit non-goal. `continuity-repair-step` exercises import, adjacent shared-edge selection, solve, independent certification, replacement, nonempty tessellation, export, re-import, repeated certification, and a pinned OCCT validity oracle without adding STEP dependencies to the numerical crate. |
 | Arbitrary trimmed seams | `repair_step_continuity` accepts only an exact complete patch side. Missing, curved, partial, and otherwise arbitrary trims return typed `TrimmedBoundary`; the adapter never attempts best-effort repair. |
 | Tessellation provenance | Implement later **atop** existing topology stable IDs and attributes at the topology/meshing integration boundary. It is not solver state. |
 

@@ -13,10 +13,7 @@ use monstertruck_geometry::nurbs::continuity_solver::{
     BoundaryContinuityRequest, BoundaryContinuitySolver, ContinuitySolveError,
     ContinuitySolveReport,
 };
-use monstertruck_geometry::prelude::{
-    BoundedSurface, BsplineSurface, NurbsSurface, ParameterCurve, TryIntoHomogeneousBsplineSurface,
-    Vector4,
-};
+use monstertruck_geometry::prelude::{BoundedSurface, NurbsSurface, ParameterCurve, Vector4};
 use thiserror::Error;
 
 use crate::load::convert::StepCompressedTrimmedShell;
@@ -32,11 +29,24 @@ pub struct StepContinuitySeam {
 
 impl StepContinuitySeam {
     /// Creates an imported seam selection.
-    pub const fn new(first_face: usize, second_face: usize, shared_edge: usize) -> Self {
-        Self {
-            first_face,
-            second_face,
-            shared_edge,
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StepContinuityError::SameFace`] when both indices select the
+    /// same face rather than an adjacent pair.
+    pub const fn new(
+        first_face: usize,
+        second_face: usize,
+        shared_edge: usize,
+    ) -> Result<Self, StepContinuityError> {
+        if first_face == second_face {
+            Err(StepContinuityError::SameFace { face: first_face })
+        } else {
+            Ok(Self {
+                first_face,
+                second_face,
+                shared_edge,
+            })
         }
     }
 
@@ -53,6 +63,12 @@ impl StepContinuitySeam {
 /// Failure to adapt an imported STEP seam to the continuity solver.
 #[derive(Clone, Debug, Error, PartialEq)]
 pub enum StepContinuityError {
+    /// A seam must join two distinct adjacent faces.
+    #[error("STEP continuity seam selects face {face} twice")]
+    SameFace {
+        /// Repeated face index.
+        face: usize,
+    },
     /// A selected face index is not present in the imported shell.
     #[error("STEP continuity face index {face} is out of range")]
     FaceOutOfRange {
@@ -65,6 +81,12 @@ pub enum StepContinuityError {
         /// Face that does not use the edge.
         face: usize,
         /// Missing edge-use index.
+        edge: usize,
+    },
+    /// The selected shared edge is not present in the imported shell.
+    #[error("STEP continuity edge index {edge} is out of range")]
+    EdgeOutOfRange {
+        /// Missing edge index.
         edge: usize,
     },
     /// An imported face cannot expose the requested full-side capability.
@@ -100,12 +122,16 @@ pub fn repair_step_continuity(
     order: ContinuityOrder,
     solver: &BoundaryContinuitySolver,
 ) -> Result<ContinuitySolveReport, StepContinuityError> {
+    shell
+        .edges
+        .get(seam.shared_edge)
+        .ok_or(StepContinuityError::EdgeOutOfRange {
+            edge: seam.shared_edge,
+        })?;
     let first = selected_surface(shell, seam.first_face, seam.shared_edge)?;
     let second = selected_surface(shell, seam.second_face, seam.shared_edge)?;
-    let first_surface = exact_nurbs(first.surface, seam.first_face)?;
-    let second_surface = exact_nurbs(second.surface, seam.second_face)?;
     let request = BoundaryContinuityRequest::new(first.side, second.side, alignment, order);
-    let solution = solver.solve(&first_surface, &second_surface, request)?;
+    let solution = solver.solve(&first.surface, &second.surface, request)?;
     let report = solution.report().clone();
     let replacement = Surface::NurbsSurface(solution.second().clone());
 
@@ -128,9 +154,9 @@ pub fn repair_step_continuity(
     Ok(report)
 }
 
-#[derive(Clone, Copy)]
-struct SelectedSurface<'a> {
-    surface: &'a Surface,
+#[derive(Clone)]
+struct SelectedSurface {
+    surface: NurbsSurface<Vector4>,
     side: BoundarySide,
 }
 
@@ -138,7 +164,7 @@ fn selected_surface(
     shell: &StepCompressedTrimmedShell,
     face_index: usize,
     edge_index: usize,
-) -> Result<SelectedSurface<'_>, StepContinuityError> {
+) -> Result<SelectedSurface, StepContinuityError> {
     let face = shell
         .faces
         .get(face_index)
@@ -152,73 +178,59 @@ fn selected_surface(
             face: face_index,
             edge: edge_index,
         })?;
+    let surface = exact_nurbs(&face.surface, face_index)?;
     let side = edge_use
         .trim_curve
         .as_ref()
-        .and_then(|trim| full_boundary_side(trim, &face.surface))
+        .and_then(|trim| full_boundary_side(trim, &surface))
         .ok_or(StepContinuityError::UnsupportedCapability {
             face: face_index,
             reason: UnsupportedContinuityCapability::TrimmedBoundary,
         })?;
-    Ok(SelectedSurface {
-        surface: &face.surface,
-        side,
-    })
+    Ok(SelectedSurface { surface, side })
 }
 
 fn exact_nurbs(
     surface: &Surface,
     face_index: usize,
 ) -> Result<NurbsSurface<Vector4>, StepContinuityError> {
-    surface
-        .try_into_homogeneous_bspline_surface()
-        .map(NurbsSurface::new)
-        .ok_or(StepContinuityError::UnsupportedCapability {
+    match surface {
+        Surface::BsplineSurface(surface) => Ok(NurbsSurface::from(surface.clone())),
+        Surface::NurbsSurface(surface) => Ok(surface.clone()),
+        _ => Err(StepContinuityError::UnsupportedCapability {
             face: face_index,
             reason: UnsupportedContinuityCapability::UnsupportedRepresentation,
-        })
+        }),
+    }
 }
 
 fn full_boundary_side(
     trim: &crate::load::step_geometry::StepParameterCurve,
-    surface: &Surface,
+    surface: &NurbsSurface<Vector4>,
 ) -> Option<BoundarySide> {
     let Curve2D::Line(line) = trim.curve().as_ref() else {
         return None;
     };
-    let converted: BsplineSurface<Vector4> = surface.try_into_homogeneous_bspline_surface()?;
-    let ((min_u, max_u), (min_v, max_v)) = BoundedSurface::range_tuple(&converted);
+    let ((min_u, max_u), (min_v, max_v)) = BoundedSurface::range_tuple(surface);
     let first = line.0;
     let second = line.1;
-    let scale = [min_u, max_u, min_v, max_v]
-        .into_iter()
-        .map(f64::abs)
-        .fold(1.0, f64::max);
-    let tolerance = f64::EPSILON * scale * 16.0;
-    let near = |left: f64, right: f64| (left - right).abs() <= tolerance;
     let spans = |left: f64, right: f64, minimum: f64, maximum: f64| {
-        (near(left, minimum) && near(right, maximum))
-            || (near(left, maximum) && near(right, minimum))
+        (left == minimum && right == maximum) || (left == maximum && right == minimum)
     };
 
-    if near(first.x, min_u) && near(second.x, min_u) && spans(first.y, second.y, min_v, max_v) {
+    if first.x == min_u && second.x == min_u && spans(first.y, second.y, min_v, max_v) {
         Some(BoundarySide::MinU)
-    } else if near(first.x, max_u)
-        && near(second.x, max_u)
-        && spans(first.y, second.y, min_v, max_v)
-    {
+    } else if first.x == max_u && second.x == max_u && spans(first.y, second.y, min_v, max_v) {
         Some(BoundarySide::MaxU)
-    } else if near(first.y, min_v)
-        && near(second.y, min_v)
-        && spans(first.x, second.x, min_u, max_u)
-    {
+    } else if first.y == min_v && second.y == min_v && spans(first.x, second.x, min_u, max_u) {
         Some(BoundarySide::MinV)
-    } else if near(first.y, max_v)
-        && near(second.y, max_v)
-        && spans(first.x, second.x, min_u, max_u)
-    {
+    } else if first.y == max_v && second.y == max_v && spans(first.x, second.x, min_u, max_u) {
         Some(BoundarySide::MaxV)
     } else {
         None
     }
 }
+
+#[cfg(test)]
+#[path = "continuity/tests.rs"]
+mod tests;

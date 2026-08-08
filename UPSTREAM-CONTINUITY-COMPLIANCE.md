@@ -100,6 +100,33 @@ PR #13." P1 is therefore closed; P2 may proceed.
   validation.
 - STEP remains outside the numerical geometry crate's dependency graph.
 
+Candidate P2 resolution makes seam construction reject a repeated face and
+checks that the shared edge exists in the imported shell before deriving exact
+full-side capability from both face-local edge uses. Exact means exact: all
+four sides and both endpoint directions are accepted, while even a one-ULP
+short line is a typed `TrimmedBoundary` refusal. Missing, curved, partial,
+first-face, and second-face trims refuse transactionally before solver work;
+unsupported surface representations retain `UnsupportedRepresentation`.
+
+The headless imported workflow now proves the fixed control net remains
+unchanged, the dependent control net changes, and every dependent trim is
+rebound. Deterministic public-evaluation finite differences certify `G0` and
+`G1` at both endpoints and nine interior samples after repair and again after
+STEP re-import. Every repaired face must tessellate to nonzero vertices and
+triangles. The exported artifact is checked in hosted CI by
+`cadquery-ocp==7.9.3.1.1`, which carries OCCT 7.9.3.1, using successful STEP
+transfer, non-null shape, `BRepCheck_Analyzer`, and exact face count as the
+external command-line oracle.
+
+Candidate verification passed `cargo +nightly fmt --all`,
+`cargo clippy --all-targets -- -W warnings`, the prescribed CPU nextest command
+(`726` passed, `21` skipped), all CPU-crate doctests, the imported repair
+example, and the pinned local OCCT oracle (`2` valid faces). The hosted rerun is
+required before P2 can close.
+
+This is a candidate completion claim only until the exact independent P2 gate
+re-audits the stable revision. P3 remains closed.
+
 ### P3 -- structure and evidence state
 
 P3 opens only after P2 passes its independent gate. Its acceptance checklist
@@ -122,6 +149,7 @@ the correction branch.
 | `BoundaryContinuitySolver::new_with_budget`, its stored budget, and `budget()` | Made the input limits bag look like the required budgeted outcome API. | Downstream callers must use `solve_with_budget` and inspect `BudgetedContinuitySolve`. |
 | `ContinuityWorkBudget` | Its name incorrectly implied that an input limits bag was the upstream-shaped carrier. | Use `ContinuityLimits` for input and `BudgetedContinuitySolve` for output. |
 | Validation corpus maturity/capability-level schema | Depended on removed downstream-only layer-1 concepts. | A later evidence schema built on accepted public types. |
+| Infallible `StepContinuitySeam::new` | It admitted a pseudo-seam that selected one face twice. | Callers must handle the typed `SameFace` result. |
 
 The ledger will be extended whenever strict compliance removes more downstream
 work.

@@ -86,6 +86,12 @@ jobs:
       - run: git submodule update --init resources
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # `cadquery-ocp` 7.9.3.1.1 packages the OCCT 7.9.3.1 kernel used by the
+      # command-line STEP validity oracle below.
+      - run: python -m pip install --disable-pip-version-check cadquery-ocp==7.9.3.1.1
       # Emit mode checks tolerances and immediate-rerun determinism without
       # requiring host-sensitive digest equality with the Windows baseline.
       - run: >-
@@ -94,7 +100,11 @@ jobs:
           --emit target/continuity-validation-ci.json
       - run: >-
           cargo run -p monstertruck-step
-          --example continuity-repair-step
+          --example continuity-repair-step --
+          --out target/continuity-repaired.step
+      - run: >-
+          python validation/continuity/validate_occt.py
+          target/continuity-repaired.step
 
   topology-state-validation:
     name: topology state validation
