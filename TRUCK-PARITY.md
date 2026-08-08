@@ -34,7 +34,7 @@ has diverged beyond upstream.
 | `truck-meshalgo` | `monstertruck-meshing` |
 | `truck-modeling` | `monstertruck-modeling` |
 | `truck-shapeops` | `monstertruck-solid` |
-| `truck-stepio` | `monstertruck-step` |
+| `truck-stepio` | `monstertruck-io::step` |
 | `truck-platform` | `monstertruck-gpu` |
 | `truck-rendimpl` | `monstertruck-render` |
 | `truck-assembly` | `monstertruck-assembly` |
@@ -90,9 +90,9 @@ has diverged beyond upstream.
 - ahead -- `strip_seam_edges` healing pass splits STEP seam wires (one edge twice, opposite orientations) into simple wires; no upstream equivalent.
 - reference-only -- fillet branches (`simple-fillet-with-side`, `fix-fillet-estimation`): mine tests/numerical fixes only; do not resurrect old fillet architecture.
 
-## `monstertruck-step` (`truck-stepio`)
+## `monstertruck-io::step` (`truck-stepio`)
 
-- ahead -- `src/in` -> `src/load`, `src/out` -> `src/save`; `LoadError` thiserror enum; `Table::from_step` returns `Result`.
+- ahead -- `src/in` -> `src/step/load`, `src/out` -> `src/step/save`; `LoadError` thiserror enum; `Table::from_step` returns `Result`.
 - ported -- revolved-line-to-cylinder surface conversion fix (`524f5f53`), adapted to `RevolutionSurface` naming.
 - ported -- `ToSameGeometry` for STEP 2D geometries (`08d2cbf1`): `Line<Point2>`, `Processor<TrimmedCurve<UnitCircle<Point2>>, Matrix3>`, `BsplineCurve<Point2>`.
 - ported -- assembly STEP output as `save/assembly.rs` (`213-assy-step-output`/`0394eb43`/`82114a04`): `StepDesign`, `MatrixAsAxis`, renamed `PartAttrs` -> `PartAttributes`, `DisplayByStep` -> `StepFormat`.

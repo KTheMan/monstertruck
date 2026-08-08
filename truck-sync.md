@@ -56,7 +56,7 @@ Use this mapping when reading upstream commits:
 | `truck-meshalgo` | `monstertruck-meshing` |
 | `truck-modeling` | `monstertruck-modeling` |
 | `truck-shapeops` | `monstertruck-solid` |
-| `truck-stepio` | `monstertruck-step` |
+| `truck-stepio` | `monstertruck-io::step` |
 | `truck-platform` | `monstertruck-gpu` |
 | `truck-rendimpl` | `monstertruck-render` |
 | `truck-assembly` | `monstertruck-assembly` |
@@ -65,8 +65,8 @@ Use this mapping when reading upstream commits:
 
 STEP path mapping:
 
-- `truck-stepio/src/in` -> `monstertruck-step/src/load`.
-- `truck-stepio/src/out` -> `monstertruck-step/src/save`.
+- `truck-stepio/src/in` -> `monstertruck-io/src/step/load`.
+- `truck-stepio/src/out` -> `monstertruck-io/src/step/save`.
 
 Geometry naming mapping:
 
@@ -83,7 +83,7 @@ Our v0.3.0 prep changed something in every renamed crate since the merge base:
 - `derivatives.rs` was renamed/reworked in `monstertruck-core`.
 - `rbf_surface` -> `rolling_ball_fillet` and `af_surface` -> `approximate_fillet_surface` in `monstertruck-geometry`.
 - Public trait methods were removed or renamed in `monstertruck-traits`.
-- `step/{in,out}` -> `step/{load,save}` plus substantial STEP conic/trim fixes in `monstertruck-step`.
+- `step/{in,out}` -> `step/{load,save}` plus substantial STEP conic/trim fixes in `monstertruck-io::step`.
 - `monstertruck-meshing` triangulation was heavily rewritten.
 - Directory renames `truck-*` -> `monstertruck-*` defeat git's rename detection across many files.
 
@@ -131,7 +131,7 @@ Before any code ports:
 
 Target:
 
-- `monstertruck-step/src/load/step_geometry/geom_impls.rs`.
+- `monstertruck-io/src/step/load/step_geometry/geom_impls/`.
 
 Why:
 
@@ -148,7 +148,7 @@ Porting notes:
 
 Target:
 
-- `monstertruck-step/src/load/step_geometry/geom_impls.rs`.
+- `monstertruck-io/src/step/load/step_geometry/geom_impls/`.
 
 Why:
 
@@ -181,7 +181,7 @@ Porting notes:
 
 Targets:
 
-- `monstertruck-traits/src/algo/surface.rs`.
+- `monstertruck-traits/src/algo/surface/mod.rs`.
 - Possibly related derivative code only if required by tests.
 
 Why:
@@ -273,16 +273,16 @@ Upstream:
 
 Verdict:
 
-- Complementary, but not urgent.
+- Completed downstream.
 
 Why:
 
-- Current `monstertruck-step/src/save` has geometry and topology save modules, but no assembly save module.
-- Assembly STEP output is useful but touches `monstertruck-assembly`, `monstertruck-step`, wasm/examples/tests.
+- `monstertruck-io/src/step/save/assembly/` now carries assembly STEP output and structural round-trip tests.
+- The retired `monstertruck-step` crate is an implementation-free compatibility shim.
 
-Design requirements before porting:
+Implemented shape:
 
-- Add `monstertruck-step/src/save/assembly.rs`.
+- Keep assembly output in `monstertruck-io/src/step/save/assembly/`.
 - Use `assembly` in new names, not `assy`.
 - Keep existing `monstertruck-assembly::assy` module only for compatibility; do not spread the abbreviation.
 - Avoid upstream's broad generic display machinery if a smaller API can cover current `monstertruck` shapes.

@@ -145,9 +145,43 @@ verdict does not pre-approve P3 structure, base, or evidence findings.
 
 ### P3 -- structure and evidence state
 
-P3 opens only after P2 passes its independent gate. Its acceptance checklist
-will be reconstructed against the then-current upstream branch and review
-comments before any P3 completion claim is made.
+P3 opened only after the independent P2 gate accepted the stable P2 evidence.
+The independent P3 baseline then rejected completion until the downstream
+stack followed the current upstream repository shape through revision
+`a60482c3` (upstream PRs #12--#18), the draft PR descriptions reported exact
+hosted results, and every STEP implementation moved into `monstertruck-io`.
+
+The P3 candidate makes these structural corrections:
+
+- The fork's `master` and `dev` bases merge current upstream `a60482c3`
+  without rewriting their downstream history. The audited P1 and P2 revisions
+  remain ancestors of their current correction heads.
+- Downstream PR #12 remains based on `master` and has only the layer-1 trait
+  and guidance delta. Downstream PR #11 is stacked directly on PR #12 and has
+  only the two-file layer-2 geometry capability delta.
+- Arbitrary trimmed-seam validation is not claimed as layer-2 solver work in
+  PR #11. It stays in the later STEP integration layer and refuses typed
+  `TrimmedBoundary` before numerical work.
+- The imported repair adapter now lives at
+  `monstertruck_io::step::continuity`. Its sibling tests, external test,
+  executable example, and tracked fixture all live under `monstertruck-io`.
+  The deprecated `monstertruck-step` crate is restored to the exact upstream
+  implementation-free re-export shim.
+- The continuity fixture is a `.step` file in an enumerated, nonempty corpus,
+  so the upstream moved-fixture guard fails if its directory moves or empties.
+- The pinned OCCT job runs the `monstertruck-io` example. The CPU job is named
+  for Nextest, and active commands, feature tables, and diagnostic guidance use
+  the current I/O package vocabulary.
+- The accepted P1 trait files remain byte-for-byte identical to upstream PR
+  #13. The accepted P2 import, deterministic edit, typed refusal, transactional
+  replacement, independent certification, tessellation, STEP round trip, and
+  pinned external-kernel evidence remain required without adding an I/O
+  dependency to `monstertruck-geometry`.
+
+P3 closes only when exact-head local and hosted checks pass and an independent
+agent, instructed to analyze the completion claims against upstream issue #4
+and upstream PR #13, reports no unresolved P3 finding. Until then this section
+records a candidate, not a completion claim.
 
 ## Downstream restoration ledger
 
@@ -167,6 +201,9 @@ the correction branch.
 | Validation corpus maturity/capability-level schema | Depended on removed downstream-only layer-1 concepts. | A later evidence schema built on accepted public types. |
 | Infallible `StepContinuitySeam::new` | It admitted a pseudo-seam that selected one face twice. | Callers must handle the typed `SameFace` result. |
 | Trimmed STEP export for trim types without `Clone + Invertible` | Correct STEP `PCURVE` emission must reverse a face-local trim when its edge use opposes the shared edge leader. | Downstream trim types must implement `Clone + Invertible`; do not restore directionally invalid serialization. |
+| Continuity implementation under `monstertruck-step` | Upstream PR #12 folded STEP implementation into `monstertruck-io`; the old crate is only a deprecated re-export shim. | All future STEP continuity work belongs in `monstertruck_io::step::continuity`. The shim must remain implementation-free. |
+| Layer-2 claim for arbitrary trimmed-seam validation | Issue #4 places the STEP adapter after the numerical solver and requires a typed refusal there, not in the geometry contribution. | Keep full-side solving in layer 2; keep trimmed-seam validation in the later `monstertruck-io::step` integration layer. |
+| Draft notes blaming STEP packaging and randomized-test failures on the fork base | Upstream PRs #12, #14, and #17 corrected the package layout, fixture coverage, and deterministic tests. Retaining those notes would describe resolved failures. | Reintroduce a failure note only with evidence from the exact current revision. |
 
 The ledger will be extended whenever strict compliance removes more downstream
 work.

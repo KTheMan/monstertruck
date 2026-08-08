@@ -155,7 +155,7 @@
 //! | [`meshing`]  | `monstertruck-meshing`  | [`mesh`], [`modeling`]              |
 //! | [`solid`]    | `monstertruck-solid`, `monstertruck-fillet`, `monstertruck-healing` | [`meshing`] |
 //! | [`assembly`] | `monstertruck-assembly` |                                 |
-//! | [`step`]     | `monstertruck-step`     | [`modeling`]                      |
+//! | [`step`]     | `monstertruck-io`       | [`modeling`]                      |
 //! | [`gpu`]      | `monstertruck-gpu`      |                                 |
 //! | [`render`]   | `monstertruck-render`   | [`gpu`], [`mesh`], [`meshing`]        |
 //!
@@ -234,7 +234,7 @@ pub use monstertruck_healing as healing;
 pub use monstertruck_assembly as assembly;
 
 #[cfg(feature = "step")]
-pub use monstertruck_step as step;
+pub use monstertruck_io::step;
 
 #[cfg(feature = "gpu")]
 pub use monstertruck_gpu as gpu;
