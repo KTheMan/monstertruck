@@ -192,6 +192,12 @@ name, or premature P3 completion claim. Remaining references to
 `MONSTERTRUCK_STEP_CORPUS` remains the name of the STEP-format corpus variable,
 not a crate alias.
 
+All seven hosted checks pass on exact candidate revision `1d6f0f82`:
+`cargo build (wasm32)`, `cargo clippy`, `cargo fmt`,
+`cargo nextest (cpu)`, `continuity validation corpus`,
+`monstertruck-meshing feature subsets`, and `topology state validation`. The
+continuity job runs the I/O-owned repair example and the pinned OCCT oracle.
+
 P3 closes only when exact-head local and hosted checks pass and an independent
 agent, instructed to analyze the completion claims against upstream issue #4
 and upstream PR #13, reports no unresolved P3 finding. Until then this section
