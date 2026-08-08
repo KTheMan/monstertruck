@@ -134,12 +134,14 @@ the pinned OCCT continuity job. The current correction passes
 `cargo clippy --all-targets -- -W warnings`, the prescribed CPU nextest command
 (`729` passed, `21` skipped), all CPU-crate doctests, `cargo-rdme` 2.1.0, the
 imported repair example, and the pinned local OCCT 7.9.3.1 oracle (`2` valid
-faces). All seven hosted checks for implementation revision `c2c2bd7d` also
-pass, including the pinned OCCT continuity job. The exact independent P2
-re-audit remains required before P2 can close.
+faces). All seven hosted checks for implementation revision `c2c2bd7d` and
+stable documentation revision `3ccefe49` also pass, including the pinned OCCT
+continuity job. The final independent P2 gate reported: "P2 complete. No
+unresolved P2 findings remain against upstream issue #4 or PR #13 at stable
+revision `3ccefe49`." P2 is therefore closed; P3 may proceed.
 
-This is a candidate completion claim only until the exact independent P2 gate
-re-audits the stable revision. P3 remains closed.
+The independent reviewer also confirmed that P1 remains unregressed. This P2
+verdict does not pre-approve P3 structure, base, or evidence findings.
 
 ### P3 -- structure and evidence state
 
