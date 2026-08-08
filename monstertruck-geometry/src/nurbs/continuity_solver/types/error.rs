@@ -1,7 +1,7 @@
 //! Typed continuity-solver failures.
 
 use super::super::super::continuity::{
-    SurfaceContinuityCapability, UnsupportedContinuityCapability,
+    InspectedSurfaceContinuityCapability, UnsupportedContinuityCapability,
 };
 use super::super::resource::ContinuityWorkTruncated;
 use super::{BoundaryEndpoint, ContinuitySolveReport};
@@ -25,7 +25,7 @@ pub enum ContinuitySolveError {
         /// Problem endpoint that failed capability validation.
         endpoint: BoundaryEndpoint,
         /// Surface capability diagnostics.
-        capability: SurfaceContinuityCapability,
+        capability: Box<InspectedSurfaceContinuityCapability>,
         /// Specific capability requirement or surface condition that failed.
         reason: UnsupportedContinuityCapability,
     },

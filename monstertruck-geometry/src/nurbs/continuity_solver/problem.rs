@@ -195,13 +195,14 @@ fn validate_capability(
     endpoint: BoundaryEndpoint,
 ) -> Result<(), ContinuitySolveError> {
     let capability = capability_for_nurbs(surface, boundary, order);
-    capability.require_feasible().map(|_| ()).map_err(|reason| {
-        ContinuitySolveError::UnsupportedCapability {
+    capability
+        .require_supported()
+        .map(|_| ())
+        .map_err(|reason| ContinuitySolveError::UnsupportedCapability {
             endpoint,
-            capability,
+            capability: Box::new(capability),
             reason,
-        }
-    })
+        })
 }
 
 fn validate_along_knot_continuity(

@@ -3,7 +3,9 @@
 use thiserror::Error;
 
 use crate::base::Vector4;
-use crate::nurbs::continuity::{BoundaryAlignment, BoundarySide, SurfaceAxis};
+use crate::nurbs::continuity::{
+    BoundaryAlignment, BoundarySide, SurfaceAxis, boundary_axis, cross_axis,
+};
 use crate::nurbs::{KnotVector, NurbsSurface};
 
 /// One finite, nonempty surface parameter domain.
@@ -99,11 +101,11 @@ impl BoundaryFrame {
 
     /// Returns the parameter axis running along the seam.
     #[inline(always)]
-    pub(super) const fn along_axis(self) -> SurfaceAxis { self.boundary.boundary_axis() }
+    pub(super) const fn along_axis(self) -> SurfaceAxis { boundary_axis(self.boundary) }
 
     /// Returns the parameter axis pointing across the seam.
     #[inline(always)]
-    pub(super) const fn cross_axis(self) -> SurfaceAxis { self.boundary.cross_axis() }
+    pub(super) const fn cross_axis(self) -> SurfaceAxis { cross_axis(self.boundary) }
 
     /// Returns the domain running along the seam.
     #[inline(always)]

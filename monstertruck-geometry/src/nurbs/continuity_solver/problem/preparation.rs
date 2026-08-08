@@ -128,8 +128,7 @@ impl<'surface> PreparedProblem<'surface> {
         })
         .collect::<Vec<_>>();
 
-        let strip_rows =
-            (request.order().constrained_rows() + 2).min(second_frame.cross_control_count());
+        let strip_rows = (request.order().as_usize() + 3).min(second_frame.cross_control_count());
         let strip_control_count = checked_mul(
             strip_rows,
             second_frame.along_control_count(),
