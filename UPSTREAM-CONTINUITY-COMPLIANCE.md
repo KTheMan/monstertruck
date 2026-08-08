@@ -198,6 +198,26 @@ All seven hosted checks pass on exact candidate revision `1d6f0f82`:
 `monstertruck-meshing feature subsets`, and `topology state validation`. The
 continuity job runs the I/O-owned repair example and the pinned OCCT oracle.
 
+The first exact P3 gate rejected revision `d7e5c734` for three remaining
+differences. The visual-debugging guidance on PRs #12 and #11 still named the
+retired STEP crate, the new geometry continuity module still embedded its test
+module, and six retained historical branches plus `master` and `dev` did not
+yet carry the hardline rules requested for every undeleted branch. Resolution
+is deliberately literal rather than a documentation-scope exception:
+
+- `AGENTS.md` is now identical on every retained origin branch. It requires
+  Nextest for ordinary tests, separate doctests, typed refusals, exact hosted
+  evidence, and the I/O-owned STEP preview tool.
+- `master` and `dev` contain that guidance directly. PR #12 is refreshed on
+  current `master`; PR #11 is refreshed on PR #12; PR #13 is refreshed on
+  current `dev`.
+- Both PR #11 and the dev integration use sibling
+  `continuity/mod.rs` and `continuity/tests.rs` files. The exact upstream PR
+  #13 trait mirror retains its explicitly nonblocking inline-test exception.
+
+This resolves the reported differences but does not supersede the required
+exact-head local, hosted, and repeated independent gates.
+
 P3 closes only when exact-head local and hosted checks pass and an independent
 agent, instructed to analyze the completion claims against upstream issue #4
 and upstream PR #13, reports no unresolved P3 finding. Until then this section
@@ -224,6 +244,8 @@ the correction branch.
 | Continuity implementation under `monstertruck-step` | Upstream PR #12 folded STEP implementation into `monstertruck-io`; the old crate is only a deprecated re-export shim. | All future STEP continuity work belongs in `monstertruck_io::step::continuity`. The shim must remain implementation-free. |
 | Layer-2 claim for arbitrary trimmed-seam validation | Issue #4 places the STEP adapter after the numerical solver and requires a typed refusal there, not in the geometry contribution. | Keep full-side solving in layer 2; keep trimmed-seam validation in the later `monstertruck-io::step` integration layer. |
 | Draft notes blaming STEP packaging and randomized-test failures on the fork base | Upstream PRs #12, #14, and #17 corrected the package layout, fixture coverage, and deterministic tests. Retaining those notes would describe resolved failures. | Reintroduce a failure note only with evidence from the exact current revision. |
+| Inline tests in the new geometry continuity module | Current upstream uses sibling `mod.rs` and `tests.rs` files for new modules; only the exact PR #13 trait mirror has a documented nonblocking exception. | Keep new geometry and I/O modules on the sibling-test layout. |
+| Old test, evidence, and STEP diagnostic guidance on retained branch heads | The user required the hardline rules on every undeleted branch, not only current PR heads. | Do not restore branch-local guidance; all retained branches use the canonical root `AGENTS.md`. |
 
 The ledger will be extended whenever strict compliance removes more downstream
 work.
