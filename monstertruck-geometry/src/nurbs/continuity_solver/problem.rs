@@ -2,7 +2,7 @@
 
 use super::boundary::{BoundaryFrame, map_normalized_seam};
 use super::dual::Dual;
-use super::resource::ContinuityWorkBudget;
+use super::resource::ContinuityLimits;
 use super::sampling::{nonzero_span_count, seam_samples, seam_validation_samples};
 use super::taylor::{JetScalar, TaylorJet};
 use super::types::{
@@ -32,6 +32,7 @@ pub(super) struct PreparedProblem<'surface> {
     transition: TransitionLayout,
     initial_variables: Vec<f64>,
     strip_rows: usize,
+    jacobian_elements: usize,
     qr_elements: usize,
 }
 

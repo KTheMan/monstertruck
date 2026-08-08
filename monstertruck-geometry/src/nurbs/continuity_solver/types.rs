@@ -11,10 +11,10 @@ pub enum BoundaryEndpoint {
     Second,
 }
 
-/// Caller-controlled dimension constrained by a [`ContinuityWorkBudget`](super::ContinuityWorkBudget).
+/// Caller-controlled dimension constrained by a [`ContinuityLimits`](super::ContinuityLimits).
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum ContinuityResource {
-    /// Nonlinear solver iterations.
+    /// Cumulative nonlinear solver iterations.
     Iterations,
     /// Combined input-surface control points.
     ControlPoints,
@@ -26,9 +26,9 @@ pub enum ContinuityResource {
     Variables,
     /// Optimizer and independent validation residuals.
     Residuals,
-    /// Dense optimizer Jacobian elements.
+    /// Cumulative dense optimizer Jacobian elements.
     JacobianElements,
-    /// Dense augmented QR matrix elements.
+    /// Cumulative dense augmented QR matrix elements.
     QrElements,
 }
 

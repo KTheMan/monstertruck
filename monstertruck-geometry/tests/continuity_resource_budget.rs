@@ -2,14 +2,14 @@ use monstertruck_geometry::base::Vector4;
 use monstertruck_geometry::nurbs::continuity::BoundaryAlignment;
 use monstertruck_geometry::nurbs::continuity::{BoundarySide, ContinuityOrder};
 use monstertruck_geometry::nurbs::continuity_solver::{
-    BoundaryContinuityRequest, BoundaryContinuitySolver, ContinuityResource, ContinuitySolveError,
-    ContinuitySolverConfig, ContinuityTruncated, ContinuityWorkBudget, take_continuity_work,
+    BoundaryContinuityRequest, BoundaryContinuitySolver, ContinuityLimits, ContinuityResource,
+    ContinuitySolveError, ContinuitySolverConfig, ContinuityTruncated, take_continuity_work,
 };
 use monstertruck_geometry::nurbs::{BsplineSurface, KnotVector, NurbsSurface};
 
 #[test]
 fn resource_budget_builders_expose_their_limits() {
-    let budget = ContinuityWorkBudget::default()
+    let budget = ContinuityLimits::default()
         .with_max_iterations(64)
         .with_max_samples(4_096)
         .with_max_jacobian_elements(1_048_576);
@@ -17,7 +17,7 @@ fn resource_budget_builders_expose_their_limits() {
     assert_eq!(budget.max_iterations(), 64);
     assert_eq!(budget.max_samples(), 4_096);
     assert_eq!(budget.max_jacobian_elements(), 1_048_576);
-    assert_ne!(budget, ContinuityWorkBudget::default());
+    assert_ne!(budget, ContinuityLimits::default());
 }
 
 #[test]
@@ -37,27 +37,27 @@ fn every_preflight_dimension_has_a_typed_limit() {
     [
         (
             ContinuityResource::ControlPoints,
-            ContinuityWorkBudget::unbounded().with_max_control_points(1),
+            ContinuityLimits::unbounded().with_max_control_points(1),
         ),
         (
             ContinuityResource::Spans,
-            ContinuityWorkBudget::unbounded().with_max_spans(1),
+            ContinuityLimits::unbounded().with_max_spans(1),
         ),
         (
             ContinuityResource::Samples,
-            ContinuityWorkBudget::unbounded().with_max_samples(1),
+            ContinuityLimits::unbounded().with_max_samples(1),
         ),
         (
             ContinuityResource::Variables,
-            ContinuityWorkBudget::unbounded().with_max_variables(1),
+            ContinuityLimits::unbounded().with_max_variables(1),
         ),
         (
             ContinuityResource::Residuals,
-            ContinuityWorkBudget::unbounded().with_max_residuals(1),
+            ContinuityLimits::unbounded().with_max_residuals(1),
         ),
         (
             ContinuityResource::JacobianElements,
-            ContinuityWorkBudget::unbounded().with_max_jacobian_elements(1),
+            ContinuityLimits::unbounded().with_max_jacobian_elements(1),
         ),
     ]
     .into_iter()
@@ -65,11 +65,12 @@ fn every_preflight_dimension_has_a_typed_limit() {
         let (first, second) = adjacent_planes(0.0);
         let original_first = first.clone();
         let original_second = second.clone();
-        let error =
-            BoundaryContinuitySolver::new_with_budget(ContinuitySolverConfig::default(), budget)
-                .expect("the positive test budget is valid")
-                .solve(&first, &second, request())
-                .expect_err("the selected dimension exceeds its one-element limit");
+        let budgeted = BoundaryContinuitySolver::new(ContinuitySolverConfig::default())
+            .expect("the solver configuration is valid")
+            .solve_with_budget(&first, &second, request(), budget);
+        let error = budgeted
+            .outcome
+            .expect_err("the selected dimension exceeds its one-element limit");
 
         assert!(matches!(
             error,
@@ -84,57 +85,133 @@ fn every_preflight_dimension_has_a_typed_limit() {
 }
 
 #[test]
-fn iteration_limit_is_checked_when_the_solver_is_created() {
-    let error = BoundaryContinuitySolver::new_with_budget(
-        ContinuitySolverConfig::default().with_max_iterations(9),
-        ContinuityWorkBudget::unbounded().with_max_iterations(8),
-    )
-    .expect_err("the requested iteration count exceeds the explicit budget");
+fn iteration_limit_is_charged_only_when_an_iteration_is_attempted() {
+    let solver =
+        BoundaryContinuitySolver::new(ContinuitySolverConfig::default().with_max_iterations(9))
+            .expect("the solver configuration is valid");
+    let (first, exact) = adjacent_planes(0.0);
+    let exact = solver.solve_with_budget(
+        &first,
+        &exact,
+        request(),
+        ContinuityLimits::unbounded().with_max_iterations(0),
+    );
+
+    assert!(exact.outcome.is_ok());
+    assert_eq!(exact.work.iterations, 0);
+    assert_eq!(exact.truncated, None);
+
+    let (_, perturbed) = adjacent_planes(1.0e-3);
+    let refused = solver.solve_with_budget(
+        &first,
+        &perturbed,
+        request(),
+        ContinuityLimits::unbounded().with_max_iterations(0),
+    );
+    let error = refused
+        .outcome
+        .expect_err("the first attempted iteration exceeds the explicit budget");
 
     assert!(matches!(
         error,
         ContinuitySolveError::Truncated(ContinuityTruncated {
             resource: ContinuityResource::Iterations,
-            requested: 9,
-            budget: 8,
+            spent: 0,
+            requested: 1,
+            budget: 0,
         })
     ));
 }
 
 #[test]
 fn qr_budget_is_only_required_after_zero_iteration_certification() {
-    let budget = ContinuityWorkBudget::unbounded().with_max_qr_elements(0);
-    let solver =
-        BoundaryContinuitySolver::new_with_budget(ContinuitySolverConfig::default(), budget)
-            .expect("the positive QR budget is valid");
+    let budget = ContinuityLimits::unbounded().with_max_qr_elements(0);
+    let solver = BoundaryContinuitySolver::new(ContinuitySolverConfig::default())
+        .expect("the solver configuration is valid");
     let (first, exact) = adjacent_planes(0.0);
 
     take_continuity_work();
-    solver
-        .solve(&first, &exact, request())
+    let exact = solver.solve_with_budget(&first, &exact, request(), budget);
+    exact
+        .outcome
         .expect("an exact problem does not allocate an augmented QR matrix");
     let exact_work = take_continuity_work();
+    assert_eq!(exact.work, exact_work);
+    assert_eq!(exact.truncated, None);
     assert_eq!(exact_work.iterations, 0);
     assert!(exact_work.jacobian_elements > 0);
     assert_eq!(exact_work.qr_elements, 0);
 
     let (_, perturbed) = adjacent_planes(1.0e-3);
     take_continuity_work();
-    let error = solver
-        .solve(&first, &perturbed, request())
+    let refused = solver.solve_with_budget(&first, &perturbed, request(), budget);
+    let error = refused
+        .outcome
         .expect_err("a non-exact problem requires the bounded QR path");
     let refused_work = take_continuity_work();
+    assert_eq!(refused.work, refused_work);
+    assert_eq!(
+        refused.truncated,
+        Some(match error {
+            ContinuitySolveError::Truncated(truncated) => truncated,
+            _ => panic!("the explicit QR limit must produce a typed refusal"),
+        })
+    );
     assert!(refused_work.jacobian_elements > 0);
     assert_eq!(refused_work.qr_elements, 0);
     assert!(refused_work.truncated);
     assert!(matches!(
-        error,
-        ContinuitySolveError::Truncated(ContinuityTruncated {
+        refused.truncated,
+        Some(ContinuityTruncated {
             resource: ContinuityResource::QrElements,
+            spent: 0,
             requested: 39_204,
             budget: 0,
         })
     ));
+}
+
+#[test]
+fn jacobian_and_qr_limits_apply_to_cumulative_actual_work() {
+    let solver = BoundaryContinuitySolver::new(ContinuitySolverConfig::default())
+        .expect("the solver configuration is valid");
+    let (first, perturbed) = adjacent_planes(1.0e-3);
+    let jacobian = solver.solve_with_budget(
+        &first,
+        &perturbed,
+        request(),
+        ContinuityLimits::unbounded().with_max_jacobian_elements(29_403),
+    );
+
+    assert!(matches!(
+        jacobian.truncated,
+        Some(ContinuityTruncated {
+            resource: ContinuityResource::JacobianElements,
+            spent: 29_403,
+            requested: 58_806,
+            budget: 29_403,
+        })
+    ));
+    assert_eq!(jacobian.work.jacobian_elements, 29_403);
+
+    let (_, qr_perturbed) = adjacent_planes(1.0e-2);
+    let qr = solver.solve_with_budget(
+        &first,
+        &qr_perturbed,
+        request(),
+        ContinuityLimits::unbounded().with_max_qr_elements(39_204),
+    );
+
+    assert_eq!(
+        qr.truncated,
+        Some(ContinuityTruncated {
+            resource: ContinuityResource::QrElements,
+            spent: 39_204,
+            requested: 78_408,
+            budget: 39_204,
+        })
+    );
+    assert_eq!(qr.work.qr_elements, 39_204);
 }
 
 #[test]
@@ -151,33 +228,34 @@ fn representative_g3_dimensions_match_the_checked_preflight() {
     expected.into_iter().for_each(|(resource, requested)| {
         let budget = match resource {
             ContinuityResource::ControlPoints => {
-                ContinuityWorkBudget::unbounded().with_max_control_points(requested - 1)
+                ContinuityLimits::unbounded().with_max_control_points(requested - 1)
             }
             ContinuityResource::Spans => {
-                ContinuityWorkBudget::unbounded().with_max_spans(requested - 1)
+                ContinuityLimits::unbounded().with_max_spans(requested - 1)
             }
             ContinuityResource::Samples => {
-                ContinuityWorkBudget::unbounded().with_max_samples(requested - 1)
+                ContinuityLimits::unbounded().with_max_samples(requested - 1)
             }
             ContinuityResource::Variables => {
-                ContinuityWorkBudget::unbounded().with_max_variables(requested - 1)
+                ContinuityLimits::unbounded().with_max_variables(requested - 1)
             }
             ContinuityResource::Residuals => {
-                ContinuityWorkBudget::unbounded().with_max_residuals(requested - 1)
+                ContinuityLimits::unbounded().with_max_residuals(requested - 1)
             }
             ContinuityResource::JacobianElements => {
-                ContinuityWorkBudget::unbounded().with_max_jacobian_elements(requested - 1)
+                ContinuityLimits::unbounded().with_max_jacobian_elements(requested - 1)
             }
             ContinuityResource::Iterations | ContinuityResource::QrElements => {
                 unreachable!("the table covers preparation dimensions only")
             }
         };
         let (first, second) = adjacent_planes(0.0);
-        let error =
-            BoundaryContinuitySolver::new_with_budget(ContinuitySolverConfig::default(), budget)
-                .expect("the threshold-minus-one budget is valid")
-                .solve(&first, &second, request())
-                .expect_err("the checked representative dimension exceeds its limit");
+        let budgeted = BoundaryContinuitySolver::new(ContinuitySolverConfig::default())
+            .expect("the solver configuration is valid")
+            .solve_with_budget(&first, &second, request(), budget);
+        let error = budgeted
+            .outcome
+            .expect_err("the checked representative dimension exceeds its limit");
 
         assert!(matches!(
             error,
@@ -185,6 +263,7 @@ fn representative_g3_dimensions_match_the_checked_preflight() {
                 resource: actual,
                 requested: actual_requested,
                 budget,
+                ..
             }) if actual == resource
                 && actual_requested == requested
                 && budget == requested - 1

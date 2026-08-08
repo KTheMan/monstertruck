@@ -2,12 +2,10 @@
 
 use super::problem::{PreparedProblem, ResidualEvaluation};
 use super::qr::solve_column_pivoted;
-use super::resource::{
-    ContinuityWork, ContinuityWorkBudget, ContinuityWorkSession, charge_continuity_work,
-};
+use super::resource::{ContinuityBudget, ContinuityWork, ContinuityWorkSession};
 use super::types::{
-    BoundaryContinuityRequest, BoundaryContinuitySolution, ContinuityResource,
-    ContinuitySolveError, ContinuitySolveReport, ContinuitySolveReportData, ContinuitySolverConfig,
+    BoundaryContinuityRequest, BoundaryContinuitySolution, ContinuitySolveError,
+    ContinuitySolveReport, ContinuitySolveReportData, ContinuitySolverConfig,
     ContinuityTermination, OrderResidual,
 };
 use crate::base::Vector4;
@@ -18,12 +16,12 @@ pub(super) fn solve<'first>(
     second: &NurbsSurface<Vector4>,
     request: BoundaryContinuityRequest,
     config: &ContinuitySolverConfig,
-    budget: ContinuityWorkBudget,
+    budget: ContinuityBudget,
 ) -> Result<BoundaryContinuitySolution<'first>, ContinuitySolveError> {
     let _work_session = ContinuityWorkSession::begin();
-    let problem = PreparedProblem::new(first, second, request, config, budget)?;
+    let problem = PreparedProblem::new(first, second, request, config, budget.limits())?;
     let mut variables = problem.initial_variables().to_vec();
-    let mut evaluation = problem.evaluate(&variables, config, true)?;
+    let mut evaluation = problem.evaluate(&variables, config, true, budget)?;
     let initial_objective = evaluation.objective;
     let mut damping = config.initial_damping();
     let mut accepted_steps = 0;
@@ -57,13 +55,12 @@ pub(super) fn solve<'first>(
         ));
     }
 
-    budget.ensure(ContinuityResource::QrElements, problem.qr_elements())?;
     for iteration in 1..=config.max_iterations() {
-        charge_continuity_work(ContinuityWork {
+        budget.charge(ContinuityWork {
             iterations: 1,
             qr_elements: problem.qr_elements() as u64,
             ..ContinuityWork::default()
-        });
+        })?;
         let (rows, rhs) = augmented_system(&evaluation, damping, problem.variable_count());
         let least_squares = solve_column_pivoted(&rows, &rhs, config.rank_tolerance())
             .ok_or(ContinuitySolveError::NoDescentDirection)?;
@@ -78,7 +75,7 @@ pub(super) fn solve<'first>(
             .zip(&least_squares.step)
             .map(|(&value, &step)| value + step)
             .collect::<Vec<_>>();
-        let trial = match problem.evaluate(&trial_variables, config, false) {
+        let trial = match problem.evaluate(&trial_variables, config, false, budget) {
             Ok(trial) => Some(trial),
             Err(ContinuitySolveError::NonFiniteResidual) => None,
             Err(error) => return Err(error),
@@ -88,7 +85,7 @@ pub(super) fn solve<'first>(
             .is_some_and(|trial| trial.objective < evaluation.objective)
         {
             variables = trial_variables;
-            evaluation = problem.evaluate(&variables, config, true)?;
+            evaluation = problem.evaluate(&variables, config, true, budget)?;
             accepted_steps += 1;
             damping = (damping / 3.0).max(config.minimum_damping());
             if let Some(residuals) =

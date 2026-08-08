@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 
 use thiserror::Error;
 
-use super::types::{ContinuityResource, ContinuitySolveError};
+use super::types::{BoundaryContinuitySolution, ContinuityResource, ContinuitySolveError};
 
 /// Finite work limits applied by [`BoundaryContinuitySolver`](super::BoundaryContinuitySolver).
 ///
@@ -13,7 +13,7 @@ use super::types::{ContinuityResource, ContinuitySolveError};
 /// sampling or dense linear algebra. Use [`Self::unbounded`] only when a
 /// trusted caller applies an equivalent external budget.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub struct ContinuityWorkBudget {
+pub struct ContinuityLimits {
     max_iterations: usize,
     max_control_points: usize,
     max_spans: usize,
@@ -24,7 +24,7 @@ pub struct ContinuityWorkBudget {
     max_qr_elements: usize,
 }
 
-impl Default for ContinuityWorkBudget {
+impl Default for ContinuityLimits {
     fn default() -> Self {
         Self {
             max_iterations: 128,
@@ -39,7 +39,7 @@ impl Default for ContinuityWorkBudget {
     }
 }
 
-impl ContinuityWorkBudget {
+impl ContinuityLimits {
     /// Returns a budget with no intentional finite limits.
     ///
     /// Checked dimension arithmetic still rejects integer overflow.
@@ -56,7 +56,7 @@ impl ContinuityWorkBudget {
         }
     }
 
-    /// Returns the nonlinear iteration limit.
+    /// Returns the cumulative nonlinear iteration limit.
     pub const fn max_iterations(self) -> usize { self.max_iterations }
 
     /// Returns the combined surface control-point limit.
@@ -74,13 +74,13 @@ impl ContinuityWorkBudget {
     /// Returns the combined optimizer and certification residual limit.
     pub const fn max_residuals(self) -> usize { self.max_residuals }
 
-    /// Returns the optimizer Jacobian element limit.
+    /// Returns the cumulative optimizer Jacobian element limit.
     pub const fn max_jacobian_elements(self) -> usize { self.max_jacobian_elements }
 
-    /// Returns the augmented QR matrix element limit.
+    /// Returns the cumulative augmented QR matrix element limit.
     pub const fn max_qr_elements(self) -> usize { self.max_qr_elements }
 
-    /// Sets the nonlinear iteration limit.
+    /// Sets the cumulative nonlinear iteration limit.
     pub const fn with_max_iterations(mut self, limit: usize) -> Self {
         self.max_iterations = limit;
         self
@@ -116,13 +116,13 @@ impl ContinuityWorkBudget {
         self
     }
 
-    /// Sets the optimizer Jacobian element limit.
+    /// Sets the cumulative optimizer Jacobian element limit.
     pub const fn with_max_jacobian_elements(mut self, limit: usize) -> Self {
         self.max_jacobian_elements = limit;
         self
     }
 
-    /// Sets the augmented QR matrix element limit.
+    /// Sets the cumulative augmented QR matrix element limit.
     pub const fn with_max_qr_elements(mut self, limit: usize) -> Self {
         self.max_qr_elements = limit;
         self
@@ -132,8 +132,25 @@ impl ContinuityWorkBudget {
         self,
         resource: ContinuityResource,
         requested: usize,
+        spent: usize,
     ) -> Result<(), ContinuitySolveError> {
-        let budget = match resource {
+        let budget = self.limit(resource);
+        if requested <= budget {
+            Ok(())
+        } else {
+            mark_continuity_truncated();
+            Err(ContinuityTruncated {
+                resource,
+                spent,
+                requested,
+                budget,
+            }
+            .into())
+        }
+    }
+
+    const fn limit(self, resource: ContinuityResource) -> usize {
+        match resource {
             ContinuityResource::Iterations => self.max_iterations,
             ContinuityResource::ControlPoints => self.max_control_points,
             ContinuityResource::Spans => self.max_spans,
@@ -142,18 +159,15 @@ impl ContinuityWorkBudget {
             ContinuityResource::Residuals => self.max_residuals,
             ContinuityResource::JacobianElements => self.max_jacobian_elements,
             ContinuityResource::QrElements => self.max_qr_elements,
-        };
-        if requested <= budget {
-            Ok(())
-        } else {
-            mark_continuity_truncated();
-            Err(ContinuityTruncated {
-                resource,
-                requested,
-                budget,
-            }
-            .into())
         }
+    }
+
+    pub(super) fn ensure_dimension(
+        self,
+        resource: ContinuityResource,
+        requested: usize,
+    ) -> Result<(), ContinuitySolveError> {
+        self.ensure(resource, requested, 0)
     }
 }
 
@@ -213,6 +227,20 @@ pub fn continuity_totals() -> (ContinuityWork, u64) {
     )
 }
 
+/// One explicit-limit solve and the deterministic work it consumed.
+///
+/// A truncated solve never contains a partial solution. Its typed refusal is
+/// available both through [`Self::outcome`] and [`Self::truncated`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct BudgetedContinuitySolve<'first> {
+    /// Completed solution or typed solve failure.
+    pub outcome: Result<BoundaryContinuitySolution<'first>, ContinuitySolveError>,
+    /// Work charged by this solve only.
+    pub work: ContinuityWork,
+    /// Typed budget refusal, when one limit was exhausted.
+    pub truncated: Option<ContinuityTruncated>,
+}
+
 /// Zeroes the process-wide work and refusal totals and returns what they held.
 pub fn take_continuity_totals() -> (ContinuityWork, u64) {
     let truncations = CONTINUITY_TRUNCATIONS_TOTAL.swap(0, Relaxed);
@@ -268,6 +296,63 @@ pub(super) fn charge_continuity_work(work: ContinuityWork) {
     }
 }
 
+pub(super) fn continuity_work_since(start: ContinuityWork, truncated: bool) -> ContinuityWork {
+    let end = continuity_work();
+    ContinuityWork {
+        iterations: end.iterations.saturating_sub(start.iterations),
+        jacobian_elements: end
+            .jacobian_elements
+            .saturating_sub(start.jacobian_elements),
+        qr_elements: end.qr_elements.saturating_sub(start.qr_elements),
+        truncated,
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct ContinuityBudget {
+    limits: ContinuityLimits,
+    start: ContinuityWork,
+}
+
+impl ContinuityBudget {
+    pub(super) const fn new(limits: ContinuityLimits, start: ContinuityWork) -> Self {
+        Self { limits, start }
+    }
+
+    pub(super) const fn limits(self) -> ContinuityLimits { self.limits }
+
+    pub(super) fn charge(self, work: ContinuityWork) -> Result<(), ContinuitySolveError> {
+        let spent = continuity_work_since(self.start, false);
+        [
+            (
+                ContinuityResource::Iterations,
+                spent.iterations,
+                work.iterations,
+            ),
+            (
+                ContinuityResource::JacobianElements,
+                spent.jacobian_elements,
+                work.jacobian_elements,
+            ),
+            (
+                ContinuityResource::QrElements,
+                spent.qr_elements,
+                work.qr_elements,
+            ),
+        ]
+        .into_iter()
+        .filter(|(_, _, charge)| *charge != 0)
+        .try_for_each(|(resource, spent, charge)| {
+            let spent = usize::try_from(spent).unwrap_or(usize::MAX);
+            let charge = usize::try_from(charge).unwrap_or(usize::MAX);
+            self.limits
+                .ensure(resource, spent.saturating_add(charge), spent)
+        })?;
+        charge_continuity_work(work);
+        Ok(())
+    }
+}
+
 pub(super) struct ContinuityWorkSession {
     start: ContinuityWork,
 }
@@ -308,11 +393,16 @@ fn mark_continuity_truncated() {
 
 /// A checked continuity-work dimension exceeded its explicit budget.
 #[derive(Clone, Copy, Debug, Error, Hash, PartialEq, Eq)]
-#[error("continuity solver {resource:?} budget exhausted: requested {requested}, budget {budget}")]
+#[error(
+    "continuity solver {resource:?} budget exhausted: spent {spent}, next cumulative work \
+     {requested}, budget {budget}"
+)]
 pub struct ContinuityTruncated {
     /// Dimension that exceeded the budget.
     pub resource: ContinuityResource,
-    /// Checked required count.
+    /// Work already consumed in the exhausted resource's meter unit.
+    pub spent: usize,
+    /// Required dimension or next cumulative work count.
     pub requested: usize,
     /// Configured maximum count.
     pub budget: usize,
@@ -347,15 +437,16 @@ mod tests {
     #[test]
     fn budget_refusal_is_typed_and_marks_the_work_meter() {
         take_continuity_work();
-        let error = ContinuityWorkBudget::unbounded()
+        let error = ContinuityLimits::unbounded()
             .with_max_variables(3)
-            .ensure(ContinuityResource::Variables, 4)
+            .ensure_dimension(ContinuityResource::Variables, 4)
             .expect_err("the checked dimension exceeds its budget");
 
         assert_eq!(
             error,
             ContinuitySolveError::Truncated(ContinuityTruncated {
                 resource: ContinuityResource::Variables,
+                spent: 0,
                 requested: 4,
                 budget: 3,
             })

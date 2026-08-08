@@ -23,75 +23,6 @@ pub enum BoundaryAlignment {
     Reversed,
 }
 
-/// A concrete surface inspection paired with the trait-owned capability report.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub struct InspectedSurfaceContinuityCapability {
-    report: SurfaceContinuityCapability,
-    cross_degree: usize,
-    cross_control_rows: usize,
-}
-
-impl InspectedSurfaceContinuityCapability {
-    const fn new(
-        report: SurfaceContinuityCapability,
-        cross_degree: usize,
-        cross_control_rows: usize,
-    ) -> Self {
-        Self {
-            report,
-            cross_degree,
-            cross_control_rows,
-        }
-    }
-
-    /// Returns the trait-owned capability report.
-    pub const fn report(self) -> SurfaceContinuityCapability { self.report }
-
-    /// Returns the inspected surface side.
-    pub const fn side(self) -> BoundarySide { self.report.side() }
-
-    /// Returns the requested continuity order.
-    pub const fn requested(self) -> ContinuityOrder { self.report.requested() }
-
-    /// Returns the typed support determination.
-    pub const fn support(self) -> SurfaceContinuitySupport { self.report.support() }
-
-    /// Returns the degree normal to the inspected side.
-    ///
-    /// Returns zero when representation validation failed before deriving a
-    /// degree.
-    pub const fn cross_degree(self) -> usize { self.cross_degree }
-
-    /// Returns the number of control rows normal to the inspected side.
-    ///
-    /// Returns zero when representation validation failed before deriving the
-    /// control-net dimensions.
-    pub const fn cross_control_rows(self) -> usize { self.cross_control_rows }
-
-    /// Returns the highest supported order when inspection established it.
-    pub const fn maximum_supported_order(self) -> Option<ContinuityOrder> {
-        self.report.maximum_supported_order()
-    }
-
-    /// Returns the typed reason that the request is unsupported.
-    pub const fn unsupported_reason(self) -> Option<UnsupportedContinuityCapability> {
-        self.report.unsupported_reason()
-    }
-
-    /// Requires the representation to support the request.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`UnsupportedContinuityCapability`] with the failed
-    /// representation requirement.
-    pub const fn require_supported(self) -> Result<Self, UnsupportedContinuityCapability> {
-        match self.report.require_supported() {
-            Ok(_) => Ok(self),
-            Err(reason) => Err(reason),
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub(crate) enum SurfaceAxis {
     U,
@@ -117,7 +48,7 @@ pub fn capability_for_bspline<P>(
     surface: &BsplineSurface<P>,
     side: BoundarySide,
     requested: ContinuityOrder,
-) -> InspectedSurfaceContinuityCapability {
+) -> SurfaceContinuityCapability {
     capability(
         surface.control_points(),
         surface.knot_vector_u(),
@@ -132,7 +63,7 @@ pub fn capability_for_nurbs<V>(
     surface: &NurbsSurface<V>,
     side: BoundarySide,
     requested: ContinuityOrder,
-) -> InspectedSurfaceContinuityCapability
+) -> SurfaceContinuityCapability
 where
     V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>,
 {
@@ -160,15 +91,11 @@ where
 
     match (polynomial.unsupported_reason(), invalid_weight) {
         (Some(_), _) | (None, None) => polynomial,
-        (None, Some(reason)) => InspectedSurfaceContinuityCapability::new(
-            SurfaceContinuityCapability::unsupported(
-                side,
-                requested,
-                reason,
-                polynomial.maximum_supported_order(),
-            ),
-            polynomial.cross_degree,
-            polynomial.cross_control_rows,
+        (None, Some(reason)) => SurfaceContinuityCapability::unsupported(
+            side,
+            requested,
+            reason,
+            polynomial.maximum_supported_order(),
         ),
     }
 }
@@ -179,7 +106,7 @@ fn capability<P>(
     knots_v: &KnotVector,
     side: BoundarySide,
     requested: ContinuityOrder,
-) -> InspectedSurfaceContinuityCapability {
+) -> SurfaceContinuityCapability {
     let facts = control_points
         .first()
         .filter(|row| !row.is_empty())
@@ -200,11 +127,7 @@ fn capability<P>(
 
     match facts {
         Ok((degrees, dimensions)) => capability_from_facts(degrees, dimensions, side, requested),
-        Err(reason) => InspectedSurfaceContinuityCapability::new(
-            SurfaceContinuityCapability::unsupported(side, requested, reason, None),
-            0,
-            0,
-        ),
+        Err(reason) => SurfaceContinuityCapability::unsupported(side, requested, reason, None),
     }
 }
 
@@ -213,7 +136,7 @@ fn capability_from_facts(
     dimensions: (usize, usize),
     side: BoundarySide,
     requested: ContinuityOrder,
-) -> InspectedSurfaceContinuityCapability {
+) -> SurfaceContinuityCapability {
     let (cross_degree, cross_control_rows) = match cross_axis(side) {
         SurfaceAxis::U => (degrees.0, dimensions.0),
         SurfaceAxis::V => (degrees.1, dimensions.1),
@@ -249,26 +172,20 @@ fn capability_from_facts(
         None
     };
     match reason {
-        Some(reason) => InspectedSurfaceContinuityCapability::new(
-            SurfaceContinuityCapability::unsupported(side, requested, reason, maximum_order),
-            cross_degree,
-            cross_control_rows,
-        ),
-        None => {
-            let report = match maximum_order.and_then(|maximum_order| {
-                SurfaceContinuityCapability::try_supported_through(side, requested, maximum_order)
-                    .ok()
-            }) {
-                Some(report) => report,
-                None => SurfaceContinuityCapability::unsupported(
-                    side,
-                    requested,
-                    UnsupportedContinuityCapability::UnsupportedRepresentation,
-                    maximum_order,
-                ),
-            };
-            InspectedSurfaceContinuityCapability::new(report, cross_degree, cross_control_rows)
+        Some(reason) => {
+            SurfaceContinuityCapability::unsupported(side, requested, reason, maximum_order)
         }
+        None => match maximum_order.and_then(|maximum_order| {
+            SurfaceContinuityCapability::try_supported_through(side, requested, maximum_order).ok()
+        }) {
+            Some(report) => report,
+            None => SurfaceContinuityCapability::unsupported(
+                side,
+                requested,
+                UnsupportedContinuityCapability::UnsupportedRepresentation,
+                maximum_order,
+            ),
+        },
     }
 }
 

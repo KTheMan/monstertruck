@@ -236,6 +236,7 @@ fn error_evidence(error: &ContinuitySolveError) -> Value {
         ContinuitySolveError::Truncated(truncated) => json!({
             "kind": "truncated",
             "resource": format!("{:?}", truncated.resource),
+            "spent": truncated.spent,
             "requested": truncated.requested,
             "budget": truncated.budget,
         }),
@@ -253,8 +254,6 @@ fn error_evidence(error: &ContinuitySolveError) -> Value {
             "capability": {
                 "side": format!("{:?}", capability.side()),
                 "requested": capability.requested().as_usize(),
-                "cross_degree": capability.cross_degree(),
-                "cross_control_rows": capability.cross_control_rows(),
                 "maximum_supported_order": capability
                     .maximum_supported_order()
                     .map(ContinuityOrder::as_usize),

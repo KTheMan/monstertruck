@@ -46,9 +46,9 @@ mod taylor;
 mod types;
 
 pub use resource::{
-    ContinuityTruncated, ContinuityWork, ContinuityWorkBudget, continuity_max_work,
-    continuity_totals, continuity_work, take_continuity_max_work, take_continuity_totals,
-    take_continuity_work,
+    BudgetedContinuitySolve, ContinuityLimits, ContinuityTruncated, ContinuityWork,
+    continuity_max_work, continuity_totals, continuity_work, take_continuity_max_work,
+    take_continuity_totals, take_continuity_work,
 };
 pub use types::{
     BoundaryContinuityRequest, BoundaryContinuitySolution, BoundaryEndpoint, BoundaryTransition,
@@ -63,7 +63,6 @@ mod tests;
 #[derive(Clone, Debug, PartialEq)]
 pub struct BoundaryContinuitySolver {
     config: ContinuitySolverConfig,
-    budget: ContinuityWorkBudget,
 }
 
 impl BoundaryContinuitySolver {
@@ -72,35 +71,14 @@ impl BoundaryContinuitySolver {
     /// # Errors
     ///
     /// Returns [`ContinuitySolveError::InvalidConfig`] when a convergence,
-    /// damping, sampling, rank, or regularization control is invalid, and
-    /// [`ContinuitySolveError::Truncated`] when the requested
-    /// iteration count exceeds the default resource budget.
+    /// damping, sampling, rank, or regularization control is invalid.
     pub fn new(config: ContinuitySolverConfig) -> Result<Self, ContinuitySolveError> {
-        Self::new_with_budget(config, ContinuityWorkBudget::default())
-    }
-
-    /// Creates a solver with an explicit dense-work resource budget.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ContinuitySolveError::InvalidConfig`] when the solver controls
-    /// are invalid, and
-    /// [`ContinuitySolveError::Truncated`] when the requested
-    /// iteration count exceeds the supplied budget.
-    pub fn new_with_budget(
-        config: ContinuitySolverConfig,
-        budget: ContinuityWorkBudget,
-    ) -> Result<Self, ContinuitySolveError> {
         config.validate()?;
-        budget.ensure(ContinuityResource::Iterations, config.max_iterations())?;
-        Ok(Self { config, budget })
+        Ok(Self { config })
     }
 
     /// Returns the validated solver configuration.
     pub const fn config(&self) -> &ContinuitySolverConfig { &self.config }
-
-    /// Returns the validated dense-work resource budget.
-    pub const fn budget(&self) -> &ContinuityWorkBudget { &self.budget }
 
     /// Solves one boundary-continuity request without mutating either input.
     ///
@@ -168,6 +146,35 @@ impl BoundaryContinuitySolver {
         second: &crate::nurbs::NurbsSurface<crate::base::Vector4>,
         request: BoundaryContinuityRequest,
     ) -> Result<BoundaryContinuitySolution<'first>, ContinuitySolveError> {
-        lm::solve(first, second, request, &self.config, self.budget)
+        self.solve_with_budget(first, second, request, ContinuityLimits::default())
+            .outcome
+    }
+
+    /// Solves with explicit deterministic work limits and reports actual work.
+    ///
+    /// Unlike [`Self::solve`], budget exhaustion is retained in the
+    /// [`BudgetedContinuitySolve`] carrier for headroom studies. The carrier
+    /// never returns partially solved geometry: [`BudgetedContinuitySolve::outcome`]
+    /// is an error whenever [`BudgetedContinuitySolve::truncated`] is present.
+    pub fn solve_with_budget<'first>(
+        &self,
+        first: &'first crate::nurbs::NurbsSurface<crate::base::Vector4>,
+        second: &crate::nurbs::NurbsSurface<crate::base::Vector4>,
+        request: BoundaryContinuityRequest,
+        limits: ContinuityLimits,
+    ) -> BudgetedContinuitySolve<'first> {
+        let start = continuity_work();
+        let budget = resource::ContinuityBudget::new(limits, start);
+        let outcome = lm::solve(first, second, request, &self.config, budget);
+        let truncated = match &outcome {
+            Err(ContinuitySolveError::Truncated(truncated)) => Some(*truncated),
+            _ => None,
+        };
+        let work = resource::continuity_work_since(start, truncated.is_some());
+        BudgetedContinuitySolve {
+            outcome,
+            work,
+            truncated,
+        }
     }
 }

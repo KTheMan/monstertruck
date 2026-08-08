@@ -5,7 +5,7 @@ use super::transition::{
     physical_control_scalar,
 };
 use super::*;
-use crate::nurbs::continuity_solver::resource::{ContinuityWork, charge_continuity_work};
+use crate::nurbs::continuity_solver::resource::{ContinuityBudget, ContinuityWork};
 
 impl PreparedProblem<'_> {
     pub(in crate::nurbs::continuity_solver) fn initial_variables(&self) -> &[f64] {
@@ -66,8 +66,16 @@ impl PreparedProblem<'_> {
         variables: &[f64],
         config: &ContinuitySolverConfig,
         with_jacobian: bool,
+        budget: ContinuityBudget,
     ) -> Result<ResidualEvaluation, ContinuitySolveError> {
-        self.evaluate_samples(variables, config, with_jacobian, &self.samples, true)
+        self.evaluate_samples(
+            variables,
+            config,
+            with_jacobian,
+            &self.samples,
+            true,
+            Some(budget),
+        )
     }
 
     pub(in crate::nurbs::continuity_solver) fn validation_residuals(
@@ -75,8 +83,15 @@ impl PreparedProblem<'_> {
         variables: &[f64],
         config: &ContinuitySolverConfig,
     ) -> Result<Vec<OrderResidual>, ContinuitySolveError> {
-        self.evaluate_samples(variables, config, false, &self.validation_samples, false)
-            .map(|evaluation| evaluation.residuals)
+        self.evaluate_samples(
+            variables,
+            config,
+            false,
+            &self.validation_samples,
+            false,
+            None,
+        )
+        .map(|evaluation| evaluation.residuals)
     }
 
     fn evaluate_samples(
@@ -86,11 +101,22 @@ impl PreparedProblem<'_> {
         with_jacobian: bool,
         samples: &[f64],
         include_regularization: bool,
+        budget: Option<ContinuityBudget>,
     ) -> Result<ResidualEvaluation, ContinuitySolveError> {
         if variables.len() != self.variable_count() {
             return Err(ContinuitySolveError::InvalidConfig(
                 "optimization variable dimension changed",
             ));
+        }
+        if with_jacobian {
+            budget
+                .ok_or(ContinuitySolveError::InvalidConfig(
+                    "Jacobian evaluation requires a work budget",
+                ))?
+                .charge(ContinuityWork {
+                    jacobian_elements: self.jacobian_elements as u64,
+                    ..ContinuityWork::default()
+                })?;
         }
         let variable_count = usize::from(with_jacobian) * variables.len();
         let scalars = variables
@@ -190,10 +216,6 @@ impl PreparedProblem<'_> {
         }
         let values = residuals.iter().map(Dual::value).collect::<Vec<_>>();
         let jacobian = if with_jacobian {
-            charge_continuity_work(ContinuityWork {
-                jacobian_elements: residuals.len().saturating_mul(variable_count) as u64,
-                ..ContinuityWork::default()
-            });
             let rows = residuals
                 .iter()
                 .map(|value| value.gradient().to_vec())
