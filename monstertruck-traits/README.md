@@ -39,12 +39,12 @@ experimental.
 
 ```rust
 use monstertruck_traits::{
-    BoundarySide, ContinuityOrder, SurfaceContinuityCapability,
+    BoundarySide, ContinuityOrder, InvalidContinuityCapability, SurfaceContinuityCapability,
     UnsupportedContinuityCapability,
 };
 
-let order = ContinuityOrder::new(3)?;
-let capability = SurfaceContinuityCapability::unsupported(
+let order = ContinuityOrder::G3;
+let capability = SurfaceContinuityCapability::try_unsupported(
     BoundarySide::MinU,
     order,
     UnsupportedContinuityCapability::InsufficientDegree {
@@ -52,7 +52,7 @@ let capability = SurfaceContinuityCapability::unsupported(
         required: 3,
     },
     Some(ContinuityOrder::G2),
-);
+)?;
 
 assert_eq!(capability.side(), BoundarySide::MinU);
 assert_eq!(capability.maximum_supported_order(), Some(ContinuityOrder::G2));

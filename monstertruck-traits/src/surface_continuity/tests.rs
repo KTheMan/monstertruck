@@ -47,7 +47,7 @@ fn capability_reports_preserve_every_side_and_typed_support() {
         ) else {
             panic!("G4 must be a valid maximum for a G3 request");
         };
-        let unsupported = SurfaceContinuityCapability::unsupported(
+        let Ok(unsupported) = SurfaceContinuityCapability::try_unsupported(
             side,
             ContinuityOrder::G4,
             UnsupportedContinuityCapability::InsufficientDegree {
@@ -55,7 +55,9 @@ fn capability_reports_preserve_every_side_and_typed_support() {
                 required: 4,
             },
             Some(ContinuityOrder::G3),
-        );
+        ) else {
+            panic!("G3 must be a valid maximum for an unsupported G4 request");
+        };
 
         assert_eq!(supported.side(), side);
         assert_eq!(supported.requested(), ContinuityOrder::G3);
@@ -78,4 +80,29 @@ fn capability_reports_preserve_every_side_and_typed_support() {
             })
         );
     });
+}
+
+#[test]
+fn capability_reports_reject_inconsistent_maximum_orders() {
+    let supported = SurfaceContinuityCapability::try_supported_through(
+        BoundarySide::MinU,
+        ContinuityOrder::G3,
+        ContinuityOrder::G2,
+    )
+    .expect_err("a supported maximum must cover the requested order");
+    let unsupported = SurfaceContinuityCapability::try_unsupported(
+        BoundarySide::MinU,
+        ContinuityOrder::G3,
+        UnsupportedContinuityCapability::InsufficientDegree {
+            available: 2,
+            required: 3,
+        },
+        Some(ContinuityOrder::G3),
+    )
+    .expect_err("an unsupported maximum must be below the requested order");
+
+    assert_eq!(supported.requested(), ContinuityOrder::G3);
+    assert_eq!(supported.maximum(), ContinuityOrder::G2);
+    assert_eq!(unsupported.requested(), ContinuityOrder::G3);
+    assert_eq!(unsupported.maximum(), ContinuityOrder::G3);
 }
