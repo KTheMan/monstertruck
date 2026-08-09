@@ -150,10 +150,10 @@ pub enum UnsupportedContinuityCapability {
     TrimmedBoundary,
 }
 
-/// A supported capability report declared an inconsistent maximum order.
+/// A capability report declared an inconsistent maximum order.
 #[derive(Clone, Copy, Debug, Error, Hash, PartialEq, Eq)]
 #[error(
-    "maximum supported continuity order {maximum:?} is below the requested order {requested:?}"
+    "maximum supported continuity order {maximum:?} is inconsistent with the requested order {requested:?}"
 )]
 pub struct InvalidContinuityCapability {
     requested: ContinuityOrder,
@@ -227,19 +227,29 @@ impl SurfaceContinuityCapability {
     }
 
     /// Reports a typed unsupported condition and any known maximum order.
-    pub const fn unsupported(
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InvalidContinuityCapability`] when `maximum_order` is not
+    /// below `requested`.
+    pub const fn try_unsupported(
         side: BoundarySide,
         requested: ContinuityOrder,
         reason: UnsupportedContinuityCapability,
         maximum_order: Option<ContinuityOrder>,
-    ) -> Self {
-        Self {
-            side,
-            requested,
-            support: SurfaceContinuitySupport::Unsupported {
-                reason,
-                maximum_order,
-            },
+    ) -> Result<Self, InvalidContinuityCapability> {
+        match maximum_order {
+            Some(maximum) if maximum.as_usize() >= requested.as_usize() => {
+                Err(InvalidContinuityCapability { requested, maximum })
+            }
+            _ => Ok(Self {
+                side,
+                requested,
+                support: SurfaceContinuitySupport::Unsupported {
+                    reason,
+                    maximum_order,
+                },
+            }),
         }
     }
 

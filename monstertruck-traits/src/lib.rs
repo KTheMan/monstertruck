@@ -35,13 +35,13 @@
 //!
 //! ```
 //! use monstertruck_traits::{
-//!     BoundarySide, ContinuityOrder, SurfaceContinuityCapability,
+//!     BoundarySide, ContinuityOrder, InvalidContinuityCapability, SurfaceContinuityCapability,
 //!     UnsupportedContinuityCapability,
 //! };
 //!
-//! # fn main() -> Result<(), monstertruck_traits::UnsupportedContinuityOrder> {
-//! let order = ContinuityOrder::new(3)?;
-//! let capability = SurfaceContinuityCapability::unsupported(
+//! # fn main() -> Result<(), InvalidContinuityCapability> {
+//! let order = ContinuityOrder::G3;
+//! let capability = SurfaceContinuityCapability::try_unsupported(
 //!     BoundarySide::MinU,
 //!     order,
 //!     UnsupportedContinuityCapability::InsufficientDegree {
@@ -49,7 +49,7 @@
 //!         required: 3,
 //!     },
 //!     Some(ContinuityOrder::G2),
-//! );
+//! )?;
 //!
 //! assert_eq!(capability.side(), BoundarySide::MinU);
 //! assert_eq!(capability.maximum_supported_order(), Some(ContinuityOrder::G2));
