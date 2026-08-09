@@ -34,13 +34,15 @@
 //! experimental.
 //!
 //! ```
+//! # use std::error::Error;
+//! #
 //! use monstertruck_traits::{
-//!     BoundarySide, ContinuityOrder, InvalidContinuityCapability, SurfaceContinuityCapability,
+//!     BoundarySide, ContinuityOrder, SurfaceContinuityCapability,
 //!     UnsupportedContinuityCapability,
 //! };
 //!
-//! # fn main() -> Result<(), InvalidContinuityCapability> {
-//! let order = ContinuityOrder::G3;
+//! # fn main() -> Result<(), Box<dyn Error>> {
+//! let order = ContinuityOrder::new(3)?;
 //! let capability = SurfaceContinuityCapability::try_unsupported(
 //!     BoundarySide::MinU,
 //!     order,
