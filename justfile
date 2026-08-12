@@ -1,4 +1,5 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
+set windows-shell := ["powershell.exe", "-NoLogo", "-NoProfile", "-Command"]
 
 # Crates exercised by `test-cpu` (anything that doesn't need a GPU).
 cpu_crates := "-p monstertruck-core -p monstertruck-traits -p monstertruck-geometry -p monstertruck-topology -p monstertruck-mesh -p monstertruck-meshing -p monstertruck-modeling -p monstertruck-solid -p monstertruck-healing -p monstertruck-fillet -p monstertruck-io"
