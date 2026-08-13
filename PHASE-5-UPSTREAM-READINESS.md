@@ -11,8 +11,8 @@ after maintainer approval, an upstream contribution based on current
 | `upstream/master` | `609c1b5a` | Merged PR 13 continuity-traits foundation and current upstream authority. |
 | `agent/upstream-layer-2-replacement` | `39f6a86a` | Local upstream-shaped geometry candidate containing representation inspection, transitions, and a bounded transactional full-side solver. Not pushed or accepted upstream. |
 | `dev` | current branch head | First proving ground; plan integration descends from `3a81e439`, while code evidence remains bound to `47e837ca`. |
-| `master` | `0dd9fdc9` | Second proving ground and current local fork baseline. Not pushed. |
-| `agent/mt402-state-snapshots` | based on `dev` | Review branch for the superseded custom MT-402 harness and current plans. |
+| `master` | current branch head | Second proving ground; runtime promotion lineage descends from `0dd9fdc9`. Not pushed. |
+| `agent/mt402-state-snapshots` | `e1708d66` | Preserved review branch for the plan rewrite and superseded custom MT-402 assessment. |
 | `archive/mt402-superseded-modeling-harness` | `568c3c4f` | Unmerged preservation of the superseded harness and its useful probes. |
 
 Validation claims in this document apply only to the revision named in their
@@ -93,15 +93,14 @@ until upstream solver acceptance and an approved tracking/modeling shape.
 
 | Worktree | Role |
 | --- | --- |
-| Repository root | Preservation checkout for earlier uncommitted work and history inspection. |
+| Repository root | Active workspace on the reconciled local `master` lineage. |
 | `monstertruck-dev-integration` | Current `dev` proving ground; plan integration descends from `3a81e439` and runtime evidence is bound to `47e837ca`. |
-| `monstertruck-master-strict-compliance` | Local `master` proving ground at `0dd9fdc9`. |
+| `monstertruck-master-strict-compliance` | Current local `master` proving ground; runtime promotion lineage descends from `0dd9fdc9`. |
 | `monstertruck-upstream-layer2` | Focused upstream layer-2 candidate at `39f6a86a`. |
-| `monstertruck-production-g3` | Isolated production `G3` evidence worktree. |
-| `monstertruck-mt402-conformance` | Review checkout for current plans and archived MT-402 design work. |
 
-Keep each worktree until its unique work is committed, deliberately moved, or
-recorded as superseded. No worktree is evidence for a different revision.
+The production-`G3`, plan-review, and superseded MT-402 work remain preserved
+as branch refs at `8c4ec61c`, `e1708d66`, and `568c3c4f` after their dedicated
+worktrees are retired. No worktree is evidence for a different revision.
 
 ## Phase completion
 
