@@ -10,40 +10,43 @@ here.
 | Work | Revision | State |
 | --- | --- | --- |
 | Upstream continuity-traits foundation | `upstream/master` at `609c1b5a` | Merged upstream through PR 13. |
-| Upstream-shaped geometry layer | `39f6a86a` | Implemented and verified locally; API and contribution shape are not accepted upstream. |
+| Upstream capability-inspection slice | PR 19 at `bf4cd9c5` | Maintainer-authored, open against `609c1b5a`, and authoritative for the proposed capability API. |
+| Local transition and solver follow-on | `39f6a86a` | Implemented and verified locally, but based on the superseded combined shape; it must be recut after PR 19 lands. |
 | Production full-boundary `G3` gate | code tree `47e837ca`; plan integration `3a81e439` | Complete and independently verified locally; later dev commits are documentation-only. |
 | Second proving-ground promotion | current local `master` head; runtime promotion lineage at `0dd9fdc9` | Complete locally; not pushed. |
 | Experimental `G4` | local continuity branches | Reachable only through an explicit experimental boundary; not production. |
 | MT-402 custom modeling snapshots | archive commit `568c3c4f` | Superseded by the topology-owned snapshot foundation; preserved for selective later extraction only. |
 
-## P0 -- Upstream solver proposal
+## P0 -- Reconcile PR 19 and propose the solver follow-on
 
-### MT-901 -- Audit the focused layer-2 delta
+### MT-901 -- Track the exact PR 19 revision
 
-- Compare `39f6a86a` directly with `609c1b5a`.
-- Confirm that the delta contains only representation inspection, transition
-  semantics, bounded solving, documentation, and scoped evidence.
-- Separate any tooling, tracking, persistence, or fork-integration material.
+- Treat `bf4cd9c5` as the current capability-inspection authority while PR 19
+  remains open.
+- Preserve its inherent `continuity_capability` methods, checked
+  `try_unsupported` helper invariant, typed reasons, and single-surface scope.
+- Keep transition compatibility and solver feasibility outside PR 19.
 
-**Done when:** The review records the exact minimal delta and no claim extends
-beyond the reviewed revision.
+**Done when:** PR 19 lands or changes, the exact reviewed head is recorded, and
+no local claim extends beyond that revision.
 
-### MT-902 -- Obtain API and contribution-shape direction
+### MT-902 -- Reconcile the merged capability slice
 
-- Present the geometry layer as one coherent proposal.
-- Enumerate provisional public names and signatures that require approval.
-- Preserve typed unsupported and truncation outcomes, measured work, and
-  transactional behavior.
-- Keep `G4` explicitly experimental.
+- After PR 19 merges, fetch the resulting `upstream/master` revision.
+- Reconcile that revision into `master`, then `dev`, in the order required by
+  `AGENTS.md`.
+- Replace the local free-function capability adapters with the merged inherent
+  methods and preserve upstream diagnostic precedence exactly.
 
-**Done when:** Maintainer direction is recorded for the proposed public surface
-and contribution boundary. Local implementation does not satisfy this gate by
-itself.
+**Done when:** Both proving grounds contain the exact merged capability source
+and the local solver compiles against it without compatibility aliases.
 
-### MT-903 -- Recut the approved contribution
+### MT-903 -- Propose and recut the solver follow-on
 
 - Start from the then-current `upstream/master`.
-- Apply only the approved layer-2 implementation.
+- Apply only transition semantics, bounded solving, and their scoped evidence;
+  do not duplicate PR 19 capability code.
+- Obtain maintainer direction for the public transition and solver surface.
 - Port the relevant production `G3` evidence from `47e837ca`.
 - Retain typed refusal for arbitrary trimmed seams.
 
@@ -123,14 +126,15 @@ After the upstream solver and downstream replay boundaries are stable:
 
 ## Dependency order
 
-1. Complete MT-901 and MT-902.
-2. Complete MT-903 and MT-904 on current `upstream/master`.
-3. Reconcile the accepted result through the proving grounds governed by
+1. Track PR 19 and complete MT-901 when its exact merged revision is known.
+2. Complete MT-902 through both proving grounds.
+3. Complete MT-903 and MT-904 on the resulting current `upstream/master`.
+4. Reconcile the accepted result through the proving grounds governed by
    `AGENTS.md`.
-4. Begin tracking, persistence, contracts, and replay only after upstream
+5. Begin tracking, persistence, contracts, and replay only after upstream
    solver acceptance.
-5. Re-evaluate the preserved MT-402 probes before starting MT-403 through MT-405.
-6. Expand broader kernel maturity work from stable, revision-bounded evidence.
+6. Re-evaluate the preserved MT-402 probes before starting MT-403 through MT-405.
+7. Expand broader kernel maturity work from stable, revision-bounded evidence.
 
 ## Worktree disposition
 
