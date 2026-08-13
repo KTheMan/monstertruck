@@ -91,12 +91,7 @@ where
 
     match (polynomial.unsupported_reason(), invalid_weight) {
         (Some(_), _) | (None, None) => polynomial,
-        (None, Some(reason)) => SurfaceContinuityCapability::unsupported(
-            side,
-            requested,
-            reason,
-            polynomial.maximum_supported_order(),
-        ),
+        (None, Some(reason)) => unsupported_capability(side, requested, reason, None),
     }
 }
 
@@ -127,7 +122,7 @@ fn capability<P>(
 
     match facts {
         Ok((degrees, dimensions)) => capability_from_facts(degrees, dimensions, side, requested),
-        Err(reason) => SurfaceContinuityCapability::unsupported(side, requested, reason, None),
+        Err(reason) => unsupported_capability(side, requested, reason, None),
     }
 }
 
@@ -172,14 +167,12 @@ fn capability_from_facts(
         None
     };
     match reason {
-        Some(reason) => {
-            SurfaceContinuityCapability::unsupported(side, requested, reason, maximum_order)
-        }
+        Some(reason) => unsupported_capability(side, requested, reason, maximum_order),
         None => match maximum_order.and_then(|maximum_order| {
             SurfaceContinuityCapability::try_supported_through(side, requested, maximum_order).ok()
         }) {
             Some(report) => report,
-            None => SurfaceContinuityCapability::unsupported(
+            None => unsupported_capability(
                 side,
                 requested,
                 UnsupportedContinuityCapability::UnsupportedRepresentation,
@@ -187,6 +180,17 @@ fn capability_from_facts(
             ),
         },
     }
+}
+
+fn unsupported_capability(
+    side: BoundarySide,
+    requested: ContinuityOrder,
+    reason: UnsupportedContinuityCapability,
+    maximum_order: Option<ContinuityOrder>,
+) -> SurfaceContinuityCapability {
+    let maximum_order = maximum_order.filter(|maximum| maximum.as_usize() < requested.as_usize());
+    // SAFETY: `maximum_order` is either absent or strictly below `requested`.
+    SurfaceContinuityCapability::try_unsupported(side, requested, reason, maximum_order).unwrap()
 }
 
 fn valid_axis_degree(

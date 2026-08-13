@@ -148,6 +148,84 @@ asking a human to open the model in a viewer.
 - Fork pull requests may have no hosted checks. When no checks are reported, state that fact and list only the local validation actually run.
 - Never infer a hosted CI result from local commands or from the presence of workflow files.
 
+## Branch Governance and Upstream Readiness
+
+### Authority and contribution shape
+
+- Treat current `upstream/master`, merged upstream semantics, and explicit
+  maintainer direction as the source of truth. When they disagree with a
+  downstream prototype, update the prototype rather than preserving a
+  conflicting compatibility path.
+- Follow `propose -> approve -> implement` for upstream API changes. Do not
+  present an unapproved downstream API shape as accepted upstream policy.
+- Preserve genuinely useful downstream ideas when they fit the established
+  semantics. Separate or revise them when their contribution shape has not yet
+  been approved; do not discard them merely because they extend the current
+  minimum.
+- Keep upstream pull requests narrowly reviewable and based on current
+  `upstream/master`. Extract the already-proven minimal patch rather than
+  merging downstream branch history into an upstream contribution branch.
+- Keep tooling-only, repository-guidance, validation-history, and unrelated
+  downstream changes out of continuity contribution branches.
+
+### Two proving grounds
+
+- Topic branches merge into `dev` through pull requests. Before merge, each
+  topic must conform to current upstream vocabulary, crate ownership, error
+  semantics, module layout, and approved API direction.
+- The `dev` branch is the first proving ground. It may integrate broader
+  downstream layers and evidence, but must not retain APIs or compatibility
+  aliases that contradict established upstream semantics.
+- Keep `dev` synchronized by merging the reconciled `master` branch into it
+  whenever upstream semantics land. Repair active topic branches before they
+  merge into the refreshed `dev` branch.
+- Promotion from `dev` to `master` requires a pull request and is a second,
+  independent proving ground. It is not automatic consolidation.
+- Before a `dev -> master` promotion, reconcile `master` with current
+  `upstream/master`. Re-audit semantic conformance, cross-crate behavior,
+  feature combinations, documentation, and validation claims against the
+  exact promotion revision.
+- The `master` branch is the validated fork baseline. Do not promote an
+  experiment that obscures established upstream semantics; isolate it behind
+  an explicit experimental boundary or leave it on `dev`.
+- Create an upstream contribution branch only after the implementation has
+  passed the relevant `dev` and `master` gates. Rebase the contribution as a
+  clean, focused patch on current `upstream/master`, then rerun validation on
+  that exact tree.
+
+### Propagating upstream decisions
+
+When upstream establishes or merges semantics, apply this sequence:
+
+1. Reconcile the change into `master` while preserving only intentional
+   fork-local guidance and tooling differences.
+2. Merge the reconciled `master` into `dev`.
+3. Repair active topic branches before accepting them into `dev`.
+4. Revalidate the integrated result during the next `dev -> master` pull
+   request.
+5. Extract future upstream pull requests from the resulting conforming
+   implementation onto current `upstream/master`.
+
+### Continuity program boundaries
+
+- The production target is complex parametric operations with independently
+  validated continuity through at least `G3`. Any `G4` path remains explicitly
+  experimental in its public API, configuration, documentation, and evidence.
+- Keep checked continuity order and representation-neutral capability
+  vocabulary in `monstertruck-traits`. Keep representation inspection, local
+  transition semantics, and numerical solving in `monstertruck-geometry`.
+- Reuse existing arbitrary-order derivative APIs rather than adding parallel
+  public jet-access vocabulary.
+- Land the bounded, transactional solver before tracking, persistence,
+  contracts, or replay. Later layers must use the existing stable identity and
+  attribute systems rather than introducing a parallel identity model.
+- Keep STEP integration and imported-model evidence outside the numerical
+  geometry crate. Arbitrary trimmed seams must refuse with a typed reason
+  rather than attempting a best-effort solve.
+- Bounded operations must expose typed truncation, measured work, and no
+  partial result. Tests involving process-global work meters must run under
+  Nextest process isolation.
+
 ## Correct-or-Typed API Rules (HARDLINE)
 
 - **NEVER represent an unsupported result as a `bool` when more than one cause is possible. Carry a typed, actionable reason for the unsupported path.**
