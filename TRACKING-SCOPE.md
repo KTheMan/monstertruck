@@ -36,7 +36,7 @@ not publish a new snapshot, tracking, persistence, or serialization API.
 | Semantic references | Retained only as [`AttributeValue::IdSet`] values in [`ElementAttributes`] keyed by existing [`StableId`] values. |
 | Tracking session, bindings, and lineage | Deferred. Implement later **atop** a separately accepted topology tracking API. |
 | Typed modeling results, publication state, and caller-owned mutable arguments | Deferred to the modeling-wrapper failure-injection layer **atop** accepted topology tracking. |
-| Broad Phase 4/5 planning documents | Not restored. This focused scope file supersedes their contribution-shape claims. |
+| Earlier Phase 4/5 planning documents | Rewritten around the reconciled continuity revisions. This file remains authoritative for the MT-402 snapshot boundary; the current plans govern the broader contribution sequence. |
 | Host/toolchain snapshot metadata | Removed from the committed receipt. Cross-architecture hash equivalence remains out of scope and should be validated externally with a portability matrix after the hash encoding is architecture-independent. |
 
 ## Review order
