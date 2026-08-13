@@ -11,7 +11,7 @@ here.
 | --- | --- | --- |
 | Upstream continuity-traits foundation | `upstream/master` at `609c1b5a` | Merged upstream through PR 13. |
 | Upstream-shaped geometry layer | `39f6a86a` | Implemented and verified locally; API and contribution shape are not accepted upstream. |
-| Production full-boundary `G3` gate | `dev` at `47e837ca` | Complete and independently verified locally. |
+| Production full-boundary `G3` gate | code tree `47e837ca`; plan integration `3a81e439` | Complete and independently verified locally; later dev commits are documentation-only. |
 | Second proving-ground promotion | local `master` at `0dd9fdc9` | Complete locally; not pushed. |
 | Experimental `G4` | local continuity branches | Reachable only through an explicit experimental boundary; not production. |
 | MT-402 custom modeling snapshots | archive commit `568c3c4f` | Superseded by the topology-owned snapshot foundation; preserved for selective later extraction only. |

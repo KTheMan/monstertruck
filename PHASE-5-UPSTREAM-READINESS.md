@@ -10,7 +10,7 @@ after maintainer approval, an upstream contribution based on current
 | --- | --- | --- |
 | `upstream/master` | `609c1b5a` | Merged PR 13 continuity-traits foundation and current upstream authority. |
 | `agent/upstream-layer-2-replacement` | `39f6a86a` | Local upstream-shaped geometry candidate containing representation inspection, transitions, and a bounded transactional full-side solver. Not pushed or accepted upstream. |
-| `dev` | `47e837ca` | First proving ground with the locally verified production `G3` gate. |
+| `dev` | current branch head | First proving ground; plan integration descends from `3a81e439`, while code evidence remains bound to `47e837ca`. |
 | `master` | `0dd9fdc9` | Second proving ground and current local fork baseline. Not pushed. |
 | `agent/mt402-state-snapshots` | based on `dev` | Review branch for the superseded custom MT-402 harness and current plans. |
 | `archive/mt402-superseded-modeling-harness` | `568c3c4f` | Unmerged preservation of the superseded harness and its useful probes. |
@@ -94,7 +94,7 @@ until upstream solver acceptance and an approved tracking/modeling shape.
 | Worktree | Role |
 | --- | --- |
 | Repository root | Preservation checkout for earlier uncommitted work and history inspection. |
-| `monstertruck-dev-integration` | `dev` proving ground at `47e837ca`. |
+| `monstertruck-dev-integration` | Current `dev` proving ground; plan integration descends from `3a81e439` and runtime evidence is bound to `47e837ca`. |
 | `monstertruck-master-strict-compliance` | Local `master` proving ground at `0dd9fdc9`. |
 | `monstertruck-upstream-layer2` | Focused upstream layer-2 candidate at `39f6a86a`. |
 | `monstertruck-production-g3` | Isolated production `G3` evidence worktree. |
