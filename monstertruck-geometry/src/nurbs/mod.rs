@@ -247,6 +247,12 @@ pub mod basis;
 /// Compatibility normalization for collections of curves and surfaces.
 pub mod compat;
 
+/// Geometry adapters for trait-owned continuity foundations.
+pub mod continuity;
+
+/// Variational geometric-continuity solver for NURBS surface boundaries.
+pub mod continuity_solver;
+
 /// Fairing and reparameterization utilities for curves.
 pub mod fair;
 
