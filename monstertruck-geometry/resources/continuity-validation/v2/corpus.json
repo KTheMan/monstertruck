@@ -1,0 +1,371 @@
+{
+  "schema_version": 2,
+  "fixture_version": "production_g3_conditioned_multispan_v2",
+  "dense_defaults": {
+    "seam_samples": 33,
+    "stencil_radius": 4,
+    "normalized_step": 0.005
+  },
+  "cases": [
+    {
+      "id": "polynomial-aligned-offset-repair-g3",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "boundary_offset": 0.001,
+        "perturbation_first_row": 1
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MinU",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "expectation": {
+        "kind": "converged",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 0.001],
+        "maximum_normal_angle": 1e-7,
+        "minimum_accepted_steps": 1,
+        "require_changed_second": true
+      }
+    },
+    {
+      "id": "rational-aligned-offset-repair-g3",
+      "geometry": {
+        "weight_model": "rational",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "boundary_offset": 0.001,
+        "perturbation_first_row": 1
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MinU",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "expectation": {
+        "kind": "converged",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 0.001],
+        "maximum_normal_angle": 1e-7,
+        "minimum_accepted_steps": 1,
+        "require_changed_second": true
+      }
+    },
+    {
+      "id": "polynomial-reversed-offset-repair-g3",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "reversed",
+        "scale": 1.0,
+        "boundary_offset": 0.001,
+        "perturbation_first_row": 1
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MinU",
+        "alignment": "Reversed",
+        "order": 3
+      },
+      "expectation": {
+        "kind": "converged",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 0.001],
+        "maximum_normal_angle": 1e-7,
+        "minimum_accepted_steps": 1,
+        "require_changed_second": true
+      }
+    },
+    {
+      "id": "rational-reversed-offset-repair-g3",
+      "geometry": {
+        "weight_model": "rational",
+        "second_seam_parameterization": "reversed",
+        "scale": 1.0,
+        "boundary_offset": 0.001,
+        "perturbation_first_row": 1
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MinU",
+        "alignment": "Reversed",
+        "order": 3
+      },
+      "expectation": {
+        "kind": "converged",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 0.001],
+        "maximum_normal_angle": 1e-7,
+        "minimum_accepted_steps": 1,
+        "require_changed_second": true
+      }
+    },
+    {
+      "id": "polynomial-unequal-offset-repair-g3",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "unequal",
+        "scale": 1.0,
+        "boundary_offset": 0.001,
+        "perturbation_first_row": 1
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MinU",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "solver": {
+        "samples_per_span": 4,
+        "transition_degree": 8,
+        "transition_weight": 0.0
+      },
+      "expectation": {
+        "kind": "converged",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 0.001],
+        "maximum_normal_angle": 1e-7,
+        "minimum_accepted_steps": 1,
+        "require_changed_second": true
+      }
+    },
+    {
+      "id": "rational-unequal-offset-repair-g3",
+      "geometry": {
+        "weight_model": "rational",
+        "second_seam_parameterization": "unequal",
+        "scale": 1.0,
+        "boundary_offset": 0.001,
+        "perturbation_first_row": 1
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MinU",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "solver": {
+        "samples_per_span": 4,
+        "transition_degree": 8,
+        "transition_weight": 0.0
+      },
+      "expectation": {
+        "kind": "converged",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 0.001],
+        "maximum_normal_angle": 1e-7,
+        "minimum_accepted_steps": 1,
+        "require_changed_second": true
+      }
+    },
+    {
+      "id": "polynomial-unequal-reversed-offset-repair-g3",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "unequal_reversed",
+        "scale": 1.0,
+        "boundary_offset": 0.001,
+        "perturbation_first_row": 1
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MinU",
+        "alignment": "Reversed",
+        "order": 3
+      },
+      "solver": {
+        "samples_per_span": 4,
+        "transition_degree": 8,
+        "transition_weight": 0.0
+      },
+      "expectation": {
+        "kind": "converged",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 0.001],
+        "maximum_normal_angle": 1e-7,
+        "minimum_accepted_steps": 1,
+        "require_changed_second": true
+      }
+    },
+    {
+      "id": "rational-unequal-reversed-offset-repair-g3",
+      "geometry": {
+        "weight_model": "rational",
+        "second_seam_parameterization": "unequal_reversed",
+        "scale": 1.0,
+        "boundary_offset": 0.001,
+        "perturbation_first_row": 1
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MinU",
+        "alignment": "Reversed",
+        "order": 3
+      },
+      "solver": {
+        "samples_per_span": 4,
+        "transition_degree": 8,
+        "transition_weight": 0.0
+      },
+      "expectation": {
+        "kind": "converged",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 0.001],
+        "maximum_normal_angle": 1e-7,
+        "minimum_accepted_steps": 1,
+        "require_changed_second": true
+      }
+    },
+    {
+      "id": "polynomial-repeated-interior-offset-repair-g3",
+      "geometry": {
+        "weight_model": "polynomial",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "boundary_offset": 0.001,
+        "seam_knot_profile": "repeated_g3",
+        "perturbation_first_row": 1
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MinU",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "expectation": {
+        "kind": "converged",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 0.001],
+        "maximum_normal_angle": 1e-7,
+        "minimum_accepted_steps": 1,
+        "require_changed_second": true
+      }
+    },
+    {
+      "id": "rational-conditioned-repeated-repair-g3-scale-small",
+      "geometry": {
+        "weight_model": "rational_conditioned",
+        "second_seam_parameterization": "equal",
+        "scale": 0.001,
+        "boundary_offset": 0.001,
+        "seam_knot_profile": "repeated_g3",
+        "perturbation_first_row": 1
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MinU",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "expectation": {
+        "kind": "converged",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 0.001],
+        "maximum_normal_angle": 1e-7,
+        "minimum_accepted_steps": 1,
+        "require_changed_second": true
+      }
+    },
+    {
+      "id": "rational-conditioned-repeated-repair-g3-scale-1",
+      "geometry": {
+        "weight_model": "rational_conditioned",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "boundary_offset": 0.001,
+        "seam_knot_profile": "repeated_g3",
+        "perturbation_first_row": 1
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MinU",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "expectation": {
+        "kind": "converged",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 0.001],
+        "maximum_normal_angle": 1e-7,
+        "minimum_accepted_steps": 1,
+        "require_changed_second": true
+      }
+    },
+    {
+      "id": "rational-conditioned-repeated-repair-g3-scale-large",
+      "geometry": {
+        "weight_model": "rational_conditioned",
+        "second_seam_parameterization": "equal",
+        "scale": 1000.0,
+        "boundary_offset": 0.001,
+        "seam_knot_profile": "repeated_g3",
+        "perturbation_first_row": 1
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MinU",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "expectation": {
+        "kind": "converged",
+        "maximum_dense_residual_by_order": [1e-9, 1e-7, 1e-5, 0.001],
+        "maximum_normal_angle": 1e-7,
+        "minimum_accepted_steps": 1,
+        "require_changed_second": true
+      }
+    },
+    {
+      "id": "rational-conditioned-repeated-iteration-budget-g3",
+      "geometry": {
+        "weight_model": "rational_conditioned",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "boundary_offset": 0.001,
+        "seam_knot_profile": "repeated_g3",
+        "perturbation_first_row": 1
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MinU",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "limits": {
+        "max_iterations": 0
+      },
+      "expectation": {
+        "kind": "error",
+        "error": "truncated",
+        "truncation": {
+          "resource": "iterations",
+          "spent": 0,
+          "requested": 1,
+          "budget": 0
+        }
+      }
+    },
+    {
+      "id": "rational-conditioned-repeated-qr-budget-g3",
+      "geometry": {
+        "weight_model": "rational_conditioned",
+        "second_seam_parameterization": "equal",
+        "scale": 1.0,
+        "boundary_offset": 0.001,
+        "seam_knot_profile": "repeated_g3",
+        "perturbation_first_row": 1
+      },
+      "request": {
+        "first_side": "MaxU",
+        "second_side": "MinU",
+        "alignment": "Aligned",
+        "order": 3
+      },
+      "limits": {
+        "max_qr_elements": 0
+      },
+      "expectation": {
+        "kind": "error",
+        "error": "truncated",
+        "truncation": {
+          "resource": "qr_elements",
+          "spent": 0,
+          "requested": 191268,
+          "budget": 0
+        }
+      }
+    }
+  ]
+}

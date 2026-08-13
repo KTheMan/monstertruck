@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use monstertruck_geometry::nurbs::continuity::{BoundaryAlignment, BoundarySide, ContinuityOrder};
 use monstertruck_geometry::nurbs::continuity_solver::{
-    BoundaryContinuityRequest, ContinuitySolverConfig,
+    BoundaryContinuityRequest, ContinuityLimits, ContinuityResource, ContinuitySolverConfig,
 };
 use serde::{Deserialize, Serialize};
 
@@ -22,6 +22,8 @@ pub struct CaseSpec {
     pub request: RequestSpec,
     #[serde(default)]
     pub solver: SolverSpec,
+    #[serde(default)]
+    pub limits: LimitsSpec,
     pub expectation: Expectation,
 }
 
@@ -40,6 +42,10 @@ pub struct GeometrySpec {
     #[serde(default = "default_cross_degree")]
     pub cross_degree: usize,
     #[serde(default)]
+    pub seam_knot_profile: SeamKnotProfile,
+    #[serde(default)]
+    pub perturbation_first_row: usize,
+    #[serde(default)]
     pub mutation: FixtureMutation,
 }
 
@@ -53,6 +59,16 @@ const fn default_domain_scale() -> f64 { 1.0 }
 pub enum WeightModel {
     Polynomial,
     Rational,
+    RationalConditioned,
+}
+
+/// Seam-direction knot multiplicities used by the procedural fixture.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SeamKnotProfile {
+    #[default]
+    Simple,
+    RepeatedG3,
 }
 
 /// Parameterization applied to the dependent surface's seam.
@@ -186,6 +202,32 @@ impl SolverSpec {
     }
 }
 
+/// Explicit deterministic limits exercised by the evidence runner.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(default)]
+pub struct LimitsSpec {
+    pub max_iterations: usize,
+    pub max_qr_elements: usize,
+}
+
+impl Default for LimitsSpec {
+    fn default() -> Self {
+        let limits = ContinuityLimits::default();
+        Self {
+            max_iterations: limits.max_iterations(),
+            max_qr_elements: limits.max_qr_elements(),
+        }
+    }
+}
+
+impl LimitsSpec {
+    pub fn build(self) -> ContinuityLimits {
+        ContinuityLimits::default()
+            .with_max_iterations(self.max_iterations)
+            .with_max_qr_elements(self.max_qr_elements)
+    }
+}
+
 /// Independent dense finite-difference controls.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct DenseSpec {
@@ -201,10 +243,42 @@ pub enum Expectation {
     Converged {
         maximum_dense_residual_by_order: Vec<f64>,
         maximum_normal_angle: f64,
+        #[serde(default)]
+        minimum_accepted_steps: usize,
+        #[serde(default)]
+        require_changed_second: bool,
     },
     Error {
         error: ErrorKind,
+        #[serde(default)]
+        truncation: Option<TruncationSpec>,
     },
+}
+
+/// Exact typed budget refusal expected from the bounded-solve carrier.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub struct TruncationSpec {
+    pub resource: ContinuityResourceSpec,
+    pub spent: usize,
+    pub requested: usize,
+    pub budget: usize,
+}
+
+/// Evidence-local spelling for a bounded solver resource.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContinuityResourceSpec {
+    Iterations,
+    QrElements,
+}
+
+impl ContinuityResourceSpec {
+    pub const fn build(self) -> ContinuityResource {
+        match self {
+            Self::Iterations => ContinuityResource::Iterations,
+            Self::QrElements => ContinuityResource::QrElements,
+        }
+    }
 }
 
 /// Stable classification of expected solver errors.

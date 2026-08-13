@@ -1,8 +1,8 @@
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use monstertruck_geometry::nurbs::continuity::ContinuityOrder;
 use monstertruck_geometry::nurbs::continuity_solver::{
-    BoundaryContinuitySolver, BoundaryEndpoint, ContinuitySolveError, ContinuitySolveReport,
-    ContinuityTermination, ContinuityWork, take_continuity_work,
+    BoundaryContinuitySolution, BoundaryContinuitySolver, BoundaryEndpoint, ContinuitySolveError,
+    ContinuitySolveReport, ContinuityTermination, ContinuityTruncated, ContinuityWork,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -41,6 +41,7 @@ struct CaseEvidence {
     digest: String,
     dense: Option<DenseMetrics>,
     work: Option<WorkCounters>,
+    truncation: Option<TruncationEvidence>,
     error: Option<Value>,
 }
 
@@ -63,6 +64,25 @@ impl From<ContinuityWork> for WorkCounters {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+struct TruncationEvidence {
+    resource: String,
+    spent: usize,
+    requested: usize,
+    budget: usize,
+}
+
+impl From<ContinuityTruncated> for TruncationEvidence {
+    fn from(truncated: ContinuityTruncated) -> Self {
+        Self {
+            resource: format!("{:?}", truncated.resource),
+            spent: truncated.spent,
+            requested: truncated.requested,
+            budget: truncated.budget,
+        }
+    }
+}
+
 enum Mode {
     Emit(PathBuf),
     List,
@@ -77,7 +97,10 @@ struct Options {
 fn main() -> Result<()> {
     let options = options()?;
     let corpus: Corpus = read_json(&options.corpus)?;
-    ensure!(corpus.schema_version == 1, "unsupported corpus schema");
+    ensure!(
+        matches!(corpus.schema_version, 1 | 2),
+        "unsupported corpus schema",
+    );
     let mut ids = HashSet::new();
     ensure!(
         corpus.cases.iter().all(|case| ids.insert(case.id.clone())),
@@ -138,7 +161,7 @@ fn run_corpus(corpus: &Corpus, selected_case: Option<&str>) -> Result<ObservedRu
         "selected corpus case was not found",
     );
     Ok(ObservedRun {
-        schema_version: 1,
+        schema_version: corpus.schema_version,
         digest_version: digest::DIGEST_VERSION,
         fixture_version: corpus.fixture_version.clone(),
         cases,
@@ -153,21 +176,42 @@ fn run_case(
     let fixture = fixture::build(case)?;
     let config = case.solver.build();
     let request = case.request.build()?;
-    take_continuity_work();
-    let outcome = BoundaryContinuitySolver::new(config.clone())
-        .and_then(|solver| solver.solve(&fixture.first, &fixture.second, request));
-    let work = take_continuity_work();
+    let (outcome, work, truncation) = match BoundaryContinuitySolver::new(config.clone()) {
+        Ok(solver) => {
+            let budgeted = solver.solve_with_budget(
+                &fixture.first,
+                &fixture.second,
+                request,
+                case.limits.build(),
+            );
+            (budgeted.outcome, budgeted.work, budgeted.truncated)
+        }
+        Err(error) => (Err(error), ContinuityWork::default(), None),
+    };
+    ensure_carrier_consistency(&outcome, truncation)?;
     match (&case.expectation, outcome) {
         (
             Expectation::Converged {
                 maximum_dense_residual_by_order,
                 maximum_normal_angle,
+                minimum_accepted_steps,
+                require_changed_second,
             },
             Ok(solution),
         ) => {
             ensure!(
                 solution.report().termination() == ContinuityTermination::Converged,
                 "the solver returned a non-converged solution",
+            );
+            ensure!(
+                solution.report().accepted_steps() >= *minimum_accepted_steps,
+                "accepted {} steps, expected at least {}",
+                solution.report().accepted_steps(),
+                minimum_accepted_steps,
+            );
+            ensure!(
+                !require_changed_second || solution.second() != &fixture.second,
+                "the solved dependent surface was unchanged",
             );
             let dense = dense::certify(&solution, request, dense_spec, case.geometry.scale)?;
             ensure!(
@@ -199,18 +243,26 @@ fn run_case(
                 digest,
                 dense: Some(dense),
                 work: Some(work.into()),
+                truncation: truncation.map(Into::into),
                 error: None,
             })
         }
         (Expectation::Converged { .. }, Err(error)) => {
             Err(anyhow!("expected convergence, got {error}"))
         }
-        (Expectation::Error { error: expected }, Err(error)) => {
+        (
+            Expectation::Error {
+                error: expected,
+                truncation: expected_truncation,
+            },
+            Err(error),
+        ) => {
             let actual = classify_error(&error);
             ensure!(
                 actual == *expected,
                 "expected error {expected:?}, got {actual:?}: {error}",
             );
+            validate_expected_truncation(*expected_truncation, truncation)?;
             let outcome = actual.as_str().to_owned();
             let error = error_evidence(&error);
             Ok(CaseEvidence {
@@ -218,12 +270,51 @@ fn run_case(
                 digest: digest::error(fixture_version, case, dense_spec, &error)?,
                 dense: None,
                 work: Some(work.into()),
+                truncation: truncation.map(Into::into),
                 error: Some(error),
             })
         }
-        (Expectation::Error { error }, Ok(_)) => {
+        (Expectation::Error { error, .. }, Ok(_)) => {
             bail!("expected error {error:?}, but the solver converged")
         }
+    }
+}
+
+fn ensure_carrier_consistency(
+    outcome: &Result<BoundaryContinuitySolution<'_>, ContinuitySolveError>,
+    truncation: Option<ContinuityTruncated>,
+) -> Result<()> {
+    match (outcome, truncation) {
+        (Err(ContinuitySolveError::Truncated(error)), Some(carried)) => {
+            ensure!(
+                *error == carried,
+                "carrier truncation did not match its typed error"
+            );
+            Ok(())
+        }
+        (Err(ContinuitySolveError::Truncated(_)), None) => {
+            bail!("typed truncation was missing from the bounded-solve carrier")
+        }
+        (_, Some(_)) => bail!("bounded-solve carrier exposed truncation with a different outcome"),
+        (_, None) => Ok(()),
+    }
+}
+
+fn validate_expected_truncation(
+    expected: Option<corpus::TruncationSpec>,
+    actual: Option<ContinuityTruncated>,
+) -> Result<()> {
+    match (expected, actual) {
+        (Some(expected), Some(actual)) => {
+            ensure!(actual.resource == expected.resource.build());
+            ensure!(actual.spent == expected.spent);
+            ensure!(actual.requested == expected.requested);
+            ensure!(actual.budget == expected.budget);
+            Ok(())
+        }
+        (Some(_), None) => bail!("expected a bounded-solve carrier truncation"),
+        (None, Some(_)) => bail!("unexpected bounded-solve carrier truncation"),
+        (None, None) => Ok(()),
     }
 }
 
@@ -358,7 +449,7 @@ fn classify_error(error: &ContinuitySolveError) -> ErrorKind {
 
 fn options() -> Result<Options> {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let resource = manifest.join("resources/continuity-validation/v1");
+    let resource = manifest.join("resources/continuity-validation/v2");
     let mut corpus = resource.join("corpus.json");
     let mut case = None;
     let mut mode = None;

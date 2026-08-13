@@ -8,7 +8,7 @@ use std::hash::Hasher;
 use crate::corpus::{CaseSpec, DenseSpec};
 use crate::dense::DenseMetrics;
 
-pub const DIGEST_VERSION: &str = "xxh3-64-public-transition-v6";
+pub const DIGEST_VERSION: &str = "xxh3-64-public-transition-v7";
 
 /// Hashes a successful solved case in canonical index order.
 pub fn solved(

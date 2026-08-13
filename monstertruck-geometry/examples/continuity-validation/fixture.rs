@@ -3,7 +3,7 @@ use monstertruck_geometry::base::Vector4;
 use monstertruck_geometry::nurbs::continuity::BoundarySide;
 use monstertruck_geometry::nurbs::{BsplineSurface, KnotVector, NurbsSurface};
 
-use crate::corpus::{CaseSpec, FixtureMutation, GeometrySpec, WeightModel};
+use crate::corpus::{CaseSpec, FixtureMutation, GeometrySpec, SeamKnotProfile, WeightModel};
 
 /// Fully constructed surfaces for one corpus case.
 pub struct Fixture {
@@ -26,9 +26,7 @@ pub fn build(case: &CaseSpec) -> Result<Fixture> {
     let cross_degree = case.geometry.cross_degree;
     let cross_knots = cross_knots(cross_degree)?;
     let seam_degree = 5;
-    let seam_knots = KnotVector::try_from(vec![
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25, 0.5, 0.75, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-    ])?;
+    let seam_knots = seam_knots(case.geometry.seam_knot_profile)?;
     let cross_count = cross_knots.len() - cross_degree - 1;
     let seam_count = seam_knots.len() - seam_degree - 1;
     let seam_greville = greville_values(&seam_knots, seam_degree, seam_count);
@@ -49,6 +47,7 @@ pub fn build(case: &CaseSpec) -> Result<Fixture> {
     perturb_boundary(
         &mut second,
         case.geometry.boundary_offset * case.geometry.scale,
+        case.geometry.perturbation_first_row,
     );
     match case.geometry.mutation {
         FixtureMutation::None => {}
@@ -66,6 +65,18 @@ pub fn build(case: &CaseSpec) -> Result<Fixture> {
         first: orient_boundary(first, BoundarySide::MaxU, case.request.first_side.build()),
         second: orient_boundary(second, BoundarySide::MinU, case.request.second_side.build()),
     })
+}
+
+fn seam_knots(profile: SeamKnotProfile) -> Result<KnotVector> {
+    KnotVector::try_from(match profile {
+        SeamKnotProfile::Simple => vec![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25, 0.5, 0.75, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+        ],
+        SeamKnotProfile::RepeatedG3 => vec![
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25, 0.5, 0.5, 0.75, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+        ],
+    })
+    .map_err(Into::into)
 }
 
 fn orient_boundary(
@@ -129,14 +140,12 @@ fn tensor_points(
             } else {
                 0.18 * x * x + 0.07 * x * x * x - 0.1
             };
-            let cross_weight = match weight_model {
-                WeightModel::Polynomial => 1.0,
-                WeightModel::Rational => 1.0 + 0.08 * ((cross * 5 + 3) % 7) as f64,
-            };
+            let cross_weight = cross_weight(weight_model, cross);
             seam_values
                 .iter()
-                .map(|&y| {
-                    let seam_weight = weight(weight_model);
+                .enumerate()
+                .map(|(column, &y)| {
+                    let seam_weight = seam_weight(weight_model, column);
                     let homogeneous_weight = cross_weight * seam_weight;
                     let z = cross_z + if planar { 0.0 } else { seam_z(y) };
                     Vector4::new(
@@ -186,11 +195,12 @@ fn reparameterize_second(
                 } else {
                     geometry.scale * seam_z(greville[0])
                 };
-            let cross_weight = reference.w / weight(geometry.weight_model);
+            let cross_weight = reference.w / seam_weight(geometry.weight_model, 0);
             seam_values
                 .iter()
-                .map(|&y| {
-                    let seam_weight = weight(geometry.weight_model);
+                .enumerate()
+                .map(|(column, &y)| {
+                    let seam_weight = seam_weight(geometry.weight_model, column);
                     let homogeneous_weight = cross_weight * seam_weight;
                     let z = cross_z
                         + if geometry.planar {
@@ -225,16 +235,30 @@ fn seam_z(parameter: f64) -> f64 {
     0.08 * parameter * (1.0 - parameter) + 0.03 * parameter * parameter * parameter
 }
 
-fn weight(model: WeightModel) -> f64 {
+fn cross_weight(model: WeightModel, index: usize) -> f64 {
     match model {
         WeightModel::Polynomial => 1.0,
-        WeightModel::Rational => 1.2,
+        WeightModel::Rational => 1.0 + 0.08 * ((index * 5 + 3) % 7) as f64,
+        WeightModel::RationalConditioned => conditioned_weight(index),
     }
 }
 
-fn perturb_boundary(surface: &mut NurbsSurface<Vector4>, physical_offset: f64) {
+fn seam_weight(model: WeightModel, index: usize) -> f64 {
+    match model {
+        WeightModel::Polynomial => 1.0,
+        WeightModel::Rational => 1.2,
+        WeightModel::RationalConditioned => conditioned_weight(index),
+    }
+}
+
+fn conditioned_weight(index: usize) -> f64 {
+    const EXPONENTS: [i32; 6] = [-5, -3, -1, 1, 3, 5];
+    2.0_f64.powi(EXPONENTS[index % EXPONENTS.len()])
+}
+
+fn perturb_boundary(surface: &mut NurbsSurface<Vector4>, physical_offset: f64, first_row: usize) {
     let rows = surface.control_points().len().min(4);
-    (0..rows).for_each(|row| {
+    (first_row.min(rows)..rows).for_each(|row| {
         let pattern = [1.0, -0.5, 0.25, -0.125][row];
         let columns = surface.control_points()[row].len();
         (0..columns).for_each(|column| {
