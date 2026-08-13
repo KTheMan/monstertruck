@@ -67,13 +67,6 @@ pub fn capability_for_nurbs<V>(
 where
     V: Homogeneous<Scalar = f64> + ControlPoint<f64, Diff = V>,
 {
-    let polynomial = capability(
-        surface.control_points(),
-        surface.knot_vector_u(),
-        surface.knot_vector_v(),
-        side,
-        requested,
-    );
     let invalid_weight = surface
         .control_points()
         .iter()
@@ -89,9 +82,15 @@ where
             }
         });
 
-    match (polynomial.unsupported_reason(), invalid_weight) {
-        (Some(_), _) | (None, None) => polynomial,
-        (None, Some(reason)) => unsupported_capability(side, requested, reason, None),
+    match invalid_weight {
+        Some(reason) => unsupported_capability(side, requested, reason, None),
+        None => capability(
+            surface.control_points(),
+            surface.knot_vector_u(),
+            surface.knot_vector_v(),
+            side,
+            requested,
+        ),
     }
 }
 
