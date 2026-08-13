@@ -1,10 +1,17 @@
 # Continuity validation corpus
 
-The versioned corpus exercises the public boundary-continuity solver against
+The versioned corpora exercise the public boundary-continuity solver against
 procedurally generated multi-span quintic polynomial and rational NURBS
 surfaces. It covers aligned, unequal, and reversed seam parameterizations,
 every ordered pairing of `MinU`, `MaxU`, `MinV`, and `MaxV` in both alignments,
 scale variants, experimental G4 reachability, and structured failure cases.
+
+The preserved `v1` corpus supplies broad orientation and experimental coverage.
+The default `v2` production-G3 gate adds changed-solution repair evidence for
+aligned, reversed, unequal, and unequal-reversed seams. It includes a valid
+degree-five seam with a repeated interior knot and positive rational weights
+spanning `2^-10..=2^10` at scales `10^-3`, `1`, and `10^3`. Explicit iteration
+and QR limits verify exact typed truncation through the bounded-solve carrier.
 
 Successful cases are independently certified at 33 span-distributed Chebyshev
 seam coordinates, both endpoints, and every mapped span boundary from both the
