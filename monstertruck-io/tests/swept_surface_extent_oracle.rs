@@ -58,7 +58,7 @@
 //! Corpus-gated and `#[ignore]`d. Run with:
 //!
 //! ```text
-//! flock -o /tmp/mt-cargo.lock cargo nextest run -p monstertruck-step \
+//! flock -o /tmp/mt-cargo.lock cargo nextest run -p monstertruck-io \
 //!     --run-ignored all -E 'test(swept_surface_extent)' --no-capture
 //! ```
 

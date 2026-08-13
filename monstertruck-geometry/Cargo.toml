@@ -23,6 +23,7 @@ monstertruck-traits = { workspace = true, features = ["derive"] }
 anyhow = { workspace = true }
 criterion = { workspace = true }
 proptest = { workspace = true, features = ["attr-macro"] }
+serde_json = { workspace = true }
 monstertruck-traits = { workspace = true, features = ["derive", "polynomial"] }
 
 [[bench]]

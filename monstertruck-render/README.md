@@ -12,8 +12,9 @@ use monstertruck_render::*;
 
 let handler = pollster::block_on(DeviceHandler::default_device());
 let mut scene = Scene::new(handler, &Default::default());
+let mesh = PolygonMesh::default();
 
-// Create render instances from a mesh
+// Create render instances from a mesh.
 let creator = scene.instance_creator();
 let instance: PolygonInstance = creator.create_instance(
     &mesh,

@@ -42,13 +42,18 @@ struct Corpus {
     minimum_files: usize,
 }
 
-const CORPORA: [Corpus; 1] = [
+const CORPORA: [Corpus; 2] = [
     // The shared `resources` submodule: small analytic solids plus ABC samples.
     // The frozen third-party exports live only in the private tree, so this
     // repository has one corpus where that one has two.
     Corpus {
         relative_path: "../resources/step",
         minimum_files: 10,
+    },
+    // Imported continuity evidence owned by the STEP I/O layer.
+    Corpus {
+        relative_path: "tests/fixtures/continuity",
+        minimum_files: 1,
     },
 ];
 
@@ -137,8 +142,9 @@ fn every_fixture_in_the_repository_loads() {
         failures.len() + loaded,
         failures.join("\n  "),
     );
+    let minimum_files = CORPORA.iter().map(|corpus| corpus.minimum_files).sum();
     assert!(
-        loaded >= 10,
-        "expected at least 10 fixtures (10 present when this was written), loaded {loaded}"
+        loaded >= minimum_files,
+        "expected at least {minimum_files} fixtures, loaded {loaded}"
     );
 }

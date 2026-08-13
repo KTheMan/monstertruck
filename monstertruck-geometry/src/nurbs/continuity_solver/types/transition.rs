@@ -1,0 +1,171 @@
+//! Immutable local seam-coordinate transitions.
+
+use super::super::super::continuity::BoundaryAlignment;
+use super::super::super::continuity::ContinuityOrder;
+
+const MAX_TRANSITION_CONTROL_COUNT: usize = 66;
+/// Immutable local coordinate transition from the master seam to the second surface.
+///
+/// The transition maps a normalized master seam coordinate and the solver's
+/// signed common cross-seam coordinate to normalized coordinates on the second
+/// boundary frame. The cross-seam coordinate is zero on the seam and positive
+/// into the second surface, so it is the negative of the first surface's
+/// normalized inward coordinate.
+///
+/// Cross-seam terms are the solver's Taylor expansion about `cross = 0`,
+/// truncated at [`Self::order`]. The expansion is intended for local seam
+/// certification. Finite output away from the seam does not guarantee that the
+/// mapped coordinates remain in either surface domain or that the truncated
+/// map is globally invertible. For `G0`, only the seam correspondence is
+/// solved; the identity cross coordinate returned away from the seam is a
+/// convention.
+///
+/// The transition exposes the accepted reparameterization without exposing
+/// optimizer variables or mutable solver state.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BoundaryTransition {
+    order: ContinuityOrder,
+    alignment: BoundaryAlignment,
+    seam_map_log_increments: Vec<f64>,
+    alpha_fields: Vec<Vec<f64>>,
+    log_beta_field: Vec<f64>,
+    higher_beta_fields: Vec<Vec<f64>>,
+}
+
+impl BoundaryTransition {
+    pub(in crate::nurbs::continuity_solver) const fn new(
+        order: ContinuityOrder,
+        alignment: BoundaryAlignment,
+        seam_map_log_increments: Vec<f64>,
+        alpha_fields: Vec<Vec<f64>>,
+        log_beta_field: Vec<f64>,
+        higher_beta_fields: Vec<Vec<f64>>,
+    ) -> Self {
+        Self {
+            order,
+            alignment,
+            seam_map_log_increments,
+            alpha_fields,
+            log_beta_field,
+            higher_beta_fields,
+        }
+    }
+
+    /// Returns the second boundary's orientation relative to the master.
+    pub const fn alignment(&self) -> BoundaryAlignment { self.alignment }
+
+    /// Returns the solved transition order.
+    pub const fn order(&self) -> ContinuityOrder { self.order }
+
+    /// Returns the configured Bernstein degree of the cross-seam fields.
+    pub fn cross_field_degree(&self) -> usize { self.seam_map_log_increments.len() }
+
+    /// Returns the Bernstein degree of the endpoint-preserving seam map.
+    pub fn seam_map_degree(&self) -> usize { self.seam_map_log_increments.len() + 1 }
+
+    /// Maps a normalized master seam coordinate and signed cross-seam
+    /// coordinate to the second frame.
+    ///
+    /// `cross` is zero on the seam and positive into the second surface. It is
+    /// the negative of the first surface's normalized inward coordinate.
+    ///
+    /// This evaluates the local Taylor expansion through [`Self::order`].
+    /// Callers performing certification should use a one-sided stencil within
+    /// each surface domain and keep cross-seam samples near zero.
+    ///
+    /// Returns `None` when either input or the evaluated transition is
+    /// non-finite.
+    pub fn mapped_coordinates(&self, seam: f64, cross: f64) -> Option<(f64, f64)> {
+        if !seam.is_finite() || !cross.is_finite() {
+            None
+        } else {
+            let mapped_seam = self.mapped_seam(seam)?;
+            if self.order == ContinuityOrder::G0 {
+                Some((mapped_seam, cross))
+            } else {
+                let second_seam = self.alpha_fields.iter().enumerate().try_fold(
+                    mapped_seam,
+                    |value, (index, field)| {
+                        let order = index + 1;
+                        bernstein_value(field, seam).map(|coefficient| {
+                            value + coefficient * cross.powi(order as i32) / factorial(order)
+                        })
+                    },
+                )?;
+                let first_beta = bernstein_value(&self.log_beta_field, seam)?.exp();
+                let second_cross = self.higher_beta_fields.iter().enumerate().try_fold(
+                    first_beta * cross,
+                    |value, (index, field)| {
+                        let order = index + 2;
+                        bernstein_value(field, seam).map(|coefficient| {
+                            value + coefficient * cross.powi(order as i32) / factorial(order)
+                        })
+                    },
+                )?;
+                (second_seam.is_finite() && second_cross.is_finite())
+                    .then_some((second_seam, second_cross))
+            }
+        }
+    }
+
+    fn mapped_seam(&self, seam: f64) -> Option<f64> {
+        let total = self
+            .seam_map_log_increments
+            .iter()
+            .try_fold(1.0, |total, value| {
+                let increment = value.exp();
+                let next = total + increment;
+                (increment.is_finite() && next.is_finite()).then_some(next)
+            })?;
+        let control_count = self
+            .seam_map_log_increments
+            .len()
+            .checked_add(2)
+            .filter(|&count| count <= MAX_TRANSITION_CONTROL_COUNT)?;
+        let mut controls = [0.0; MAX_TRANSITION_CONTROL_COUNT];
+        let mut cumulative = 0.0;
+        self.seam_map_log_increments
+            .iter()
+            .map(|value| value.exp())
+            .chain(std::iter::once(1.0))
+            .enumerate()
+            .for_each(|(index, increment)| {
+                cumulative += increment / total;
+                controls[index + 1] = cumulative;
+            });
+        let mapped = bernstein_value(&controls[..control_count], seam)?;
+        let aligned = match self.alignment {
+            BoundaryAlignment::Aligned => mapped,
+            BoundaryAlignment::Reversed => 1.0 - mapped,
+        };
+        aligned.is_finite().then_some(aligned)
+    }
+}
+
+fn bernstein_value(coefficients: &[f64], parameter: f64) -> Option<f64> {
+    if coefficients.is_empty() || coefficients.len() > MAX_TRANSITION_CONTROL_COUNT {
+        None
+    } else {
+        let mut level = [0.0; MAX_TRANSITION_CONTROL_COUNT];
+        level[..coefficients.len()].copy_from_slice(coefficients);
+        (1..coefficients.len()).for_each(|remaining| {
+            (0..coefficients.len() - remaining).for_each(|index| {
+                level[index] = (1.0 - parameter) * level[index] + parameter * level[index + 1];
+            });
+        });
+        level[0].is_finite().then_some(level[0])
+    }
+}
+
+const fn factorial(value: usize) -> f64 {
+    match value {
+        0 | 1 => 1.0,
+        2 => 2.0,
+        3 => 6.0,
+        4 => 24.0,
+        _ => f64::INFINITY,
+    }
+}
+
+#[cfg(test)]
+mod tests;

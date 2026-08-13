@@ -50,7 +50,7 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
 
   test:
-    name: cargo test (cpu)
+    name: cargo nextest (cpu)
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -73,6 +73,54 @@ jobs:
       - run: just readme-check
       - run: just test-cpu
       - run: just test-doc
+
+  continuity-validation:
+    name: continuity validation corpus
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The workspace still expects the public resources submodule.
+          submodules: false
+      - run: git submodule update --init resources
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # `cadquery-ocp` 7.9.3.1.1 packages the OCCT 7.9.3.1 kernel used by the
+      # command-line STEP validity oracle below.
+      - run: python -m pip install --disable-pip-version-check cadquery-ocp==7.9.3.1.1
+      # Emit mode checks tolerances and immediate-rerun determinism without
+      # requiring host-sensitive digest equality with the Windows baseline.
+      - run: >-
+          cargo run -p monstertruck-geometry
+          --example continuity-validation --
+          --emit target/continuity-validation-ci.json
+      - run: >-
+          cargo run -p monstertruck-io
+          --example continuity-repair-step --
+          --out target/continuity-repaired.step
+      - run: >-
+          python validation/continuity/validate_occt.py
+          target/continuity-repaired.step
+
+  topology-state-validation:
+    name: topology state validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The workspace still expects the public resources submodule.
+          submodules: false
+      - run: git submodule update --init resources
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: >-
+          cargo run -p monstertruck-topology
+          --example topology-state-validation --
+          --check validation/topology/topology-state-snapshot-v1.json
 
   meshing-features:
     name: monstertruck-meshing feature subsets
