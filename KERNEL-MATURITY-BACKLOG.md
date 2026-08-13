@@ -12,7 +12,7 @@ here.
 | Upstream continuity-traits foundation | `upstream/master` at `609c1b5a` | Merged upstream through PR 13. |
 | Upstream-shaped geometry layer | `39f6a86a` | Implemented and verified locally; API and contribution shape are not accepted upstream. |
 | Production full-boundary `G3` gate | code tree `47e837ca`; plan integration `3a81e439` | Complete and independently verified locally; later dev commits are documentation-only. |
-| Second proving-ground promotion | local `master` at `0dd9fdc9` | Complete locally; not pushed. |
+| Second proving-ground promotion | current local `master` head; runtime promotion lineage at `0dd9fdc9` | Complete locally; not pushed. |
 | Experimental `G4` | local continuity branches | Reachable only through an explicit experimental boundary; not production. |
 | MT-402 custom modeling snapshots | archive commit `568c3c4f` | Superseded by the topology-owned snapshot foundation; preserved for selective later extraction only. |
 
@@ -134,9 +134,12 @@ After the upstream solver and downstream replay boundaries are stable:
 
 ## Worktree disposition
 
-- Keep the root preservation checkout until every unique uncommitted change is
-  classified.
-- Keep the dev, master, upstream-layer-2, production-`G3`, and MT-402
-  worktrees while they own distinct review or evidence responsibilities.
+- Use the repository root as the active workspace on the reconciled local
+  `master` lineage.
+- Keep dedicated dev, master, and upstream-layer-2 worktrees for their distinct
+  proving-ground and upstream-review responsibilities.
+- Preserve the production-`G3`, plan-review, and superseded MT-402 work as
+  branch refs at `8c4ec61c`, `e1708d66`, and `568c3c4f`; they do not require
+  permanent worktrees.
 - Retire a worktree only after its unique work is preserved and its replacement
   revision is recorded here or in the phase plan.
