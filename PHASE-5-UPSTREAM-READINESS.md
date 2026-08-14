@@ -97,13 +97,14 @@ until upstream solver acceptance and an approved tracking/modeling shape.
 | Worktree | Role |
 | --- | --- |
 | Repository root | Active topic workspace; currently used for PR 19 reconciliation work. |
-| `monstertruck-dev-integration` | Current `dev` proving ground; plan integration descends from `3a81e439` and runtime evidence is bound to `47e837ca`. |
-| `monstertruck-master-strict-compliance` | Current local `master` proving ground; runtime promotion lineage descends from `0dd9fdc9`. |
-| `monstertruck-upstream-layer2` | Historical PR 19 review checkout at `bf4cd9c5`; merged authority is `06201787`, and the prior combined candidate remains preserved at `39f6a86a`. |
+| `monstertruck-dev` | Current `dev` proving ground; plan integration descends from `3a81e439` and runtime evidence is bound to `47e837ca`. |
+| `monstertruck-master` | Current local `master` proving ground; runtime promotion lineage descends from `0dd9fdc9`. |
 
 The production-`G3`, plan-review, and superseded MT-402 work remain preserved
 as branch refs at `8c4ec61c`, `e1708d66`, and `568c3c4f` after their dedicated
 worktrees are retired. No worktree is evidence for a different revision.
+The historical PR 19 review worktree was retired after merged authority
+`06201787` was reconciled through both proving grounds.
 
 ## Phase completion
 
