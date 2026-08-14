@@ -96,11 +96,9 @@ program remain deferred until the upstream solver shape is accepted.
 
 ## Open audit work
 
-1. Reconcile merged PR 19 revision `06201787` through the local proving grounds.
-2. Reconcile the merged capability slice through `master`, then `dev`.
-3. Propose transition and solver APIs without duplicating the capability slice.
-4. Recut the approved follow-on on the then-current `upstream/master`.
-5. Re-run the production `G3`, experimental `G4`, and imported STEP evidence on
+1. Propose transition and solver APIs without duplicating the capability slice.
+2. Recut the approved follow-on on the then-current `upstream/master`.
+3. Re-run the production `G3`, experimental `G4`, and imported STEP evidence on
    that exact contribution revision.
-6. Broaden imported-model provenance and conditioning evidence without
+4. Broaden imported-model provenance and conditioning evidence without
    extending the supported seam class.

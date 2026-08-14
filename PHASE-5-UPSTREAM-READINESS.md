@@ -40,25 +40,25 @@ approved upstream.
 
 ## Upstream proposal gate
 
-The immediate upstream-facing action is to reconcile exact merged revision
-`06201787` through the local proving grounds. That PR contains only:
+Merged revision `06201787` is reconciled through both local proving grounds.
+The immediate upstream-facing action is to propose the transition and solver
+follow-on without extending the accepted capability slice, which contains only:
 
 1. concrete B-spline and NURBS capability inspection;
 2. typed unsupported outcomes and highest-supported-order reporting;
 3. the checked `try_unsupported` invariant in one local helper.
 
 Two-surface compatibility, transition semantics, and solver feasibility are
-explicitly outside PR 19. They must be proposed as a follow-on after the merged
-capability source is reconciled through the local proving grounds.
+explicitly outside PR 19. They must be proposed as a separate follow-on.
 
 ## Contribution sequence
 
-1. Record reviewed PR 19 head `bf4cd9c5` and merged revision `06201787`.
-2. Reconcile `06201787` into `master`, then `dev`. Production solver
-   code must consume the inherent methods; stricter downstream validation
-   adapters must remain outside the upstream recut.
-3. Adapt the local transition and solver implementation to the inherent
-   capability methods and exact diagnostic precedence that upstream lands.
+1. Preserve reviewed PR 19 head `bf4cd9c5` and merged revision `06201787` as
+   provenance.
+2. Keep the completed `master` then `dev` reconciliation synchronized if
+   upstream advances.
+3. Keep the local transition and solver implementation on the inherent
+   capability methods and exact merged diagnostic precedence.
 4. Prepare a separate transition and solver proposal with typed truncation,
    measured work, transactional behavior, and experimental `G4` called out.
 5. Recut the approved follow-on as a clean branch from the then-current

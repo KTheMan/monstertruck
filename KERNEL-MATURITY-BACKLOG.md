@@ -30,17 +30,17 @@ here.
 **Done:** PR 19 merged as `06201787`; the reviewed head was `bf4cd9c5`, and no
 local claim extends beyond the merged revision.
 
-### MT-902 -- Reconcile the merged capability slice
+### MT-902 -- Reconcile the merged capability slice -- complete
 
-- Reconcile `06201787` into `master`, then `dev`, in the order required by
-  `AGENTS.md`.
-- Make production solver call sites use the merged inherent methods and
-  preserve upstream diagnostic precedence exactly. Keep any stricter local
-  validation adapters out of the upstream contribution.
+- Reconciled `06201787` into `master` at `0c24aeb0`, then into `dev` at
+  `2f081f7d`, in the order required by `AGENTS.md`.
+- Production solver call sites use the merged inherent methods and preserve
+  upstream diagnostic precedence exactly. Stricter local validation adapters
+  remain excluded from the upstream contribution.
 
-**Done when:** Both proving grounds contain the exact merged capability
-semantics, the local solver consumes the inherent methods, and the upstream
-recut contains no downstream validation adapters.
+**Done:** Both proving grounds contain the exact merged capability semantics,
+and the local solver consumes the inherent methods. The follow-on recut must
+contain no downstream validation adapters.
 
 ### MT-903 -- Propose and recut the solver follow-on
 
@@ -128,7 +128,7 @@ After the upstream solver and downstream replay boundaries are stable:
 ## Dependency order
 
 1. Keep MT-901's merged authority fixed at `06201787` until upstream advances.
-2. Complete MT-902 through both proving grounds.
+2. Keep completed MT-902 synchronized if upstream advances.
 3. Complete MT-903 and MT-904 on the resulting current `upstream/master`.
 4. Reconcile the accepted result through the proving grounds governed by
    `AGENTS.md`.
