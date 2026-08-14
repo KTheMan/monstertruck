@@ -141,8 +141,9 @@ After the upstream solver and downstream replay boundaries are stable:
 
 - Use the repository root as the active topic workspace. Keep branch-specific
   proving-ground work in the dedicated `dev` and `master` worktrees.
-- Keep dedicated dev, master, and upstream-layer-2 worktrees for their distinct
-  proving-ground and upstream-review responsibilities.
+- Keep dedicated `dev` and `master` worktrees for their distinct proving-ground
+  responsibilities. Create an upstream-contribution worktree only when a clean
+  recut is ready to start from current `upstream/master`.
 - Preserve the production-`G3`, plan-review, and superseded MT-402 work as
   branch refs at `8c4ec61c`, `e1708d66`, and `568c3c4f`; they do not require
   permanent worktrees.
