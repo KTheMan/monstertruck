@@ -3,9 +3,11 @@
 This document defines the reproducible validation surface for the reconciled
 continuity work. The primary evidence tree is `dev` at `47e837ca`, built from
 the upstream foundation at `609c1b5a` and the upstream-shaped geometry layer at
-`39f6a86a`. Open upstream PR 19 at `bf4cd9c5` supersedes the capability portion
-of that local layer, but the production evidence has not yet been rerun on a
-PR-19-conforming solver tree.
+`39f6a86a`. Upstream PR 19, merged as `06201787` from reviewed head `bf4cd9c5`,
+supersedes the capability portion of that local layer. The current
+reconciliation reruns the capability,
+production `G3`, and experimental `G4` evidence with production solver calls
+using PR 19's inherent capability method on the merged source shape.
 
 ## Evidence classes
 
@@ -111,7 +113,8 @@ classes, production `G4`, general topology sewing, or upstream API acceptance.
 | Revision | Validation statement |
 | --- | --- |
 | `609c1b5a` | Upstream PR 13 traits foundation. |
-| `bf4cd9c5` | Open upstream PR 19 capability-inspection head; `gh pr checks 19` reported all five hosted checks successful for this revision. |
+| `bf4cd9c5` | Reviewed PR 19 capability-inspection head; `gh pr checks 19` reported all five hosted checks successful for this revision before merge. |
+| `06201787` | Merged upstream PR 19 capability-inspection authority. |
 | `39f6a86a` | Locally verified combined layer-2 implementation; its capability portion predates PR 19 and is superseded for future upstream work. |
 | `47e837ca` | Locally verified production `G3` corpus and STEP evidence in the first proving ground. |
 | `0dd9fdc9` | Local second proving-ground promotion; not pushed. |

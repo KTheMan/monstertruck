@@ -9,9 +9,9 @@ here.
 
 | Work | Revision | State |
 | --- | --- | --- |
-| Upstream continuity-traits foundation | `upstream/master` at `609c1b5a` | Merged upstream through PR 13. |
-| Upstream capability-inspection slice | PR 19 at `bf4cd9c5` | Maintainer-authored, open against `609c1b5a`, and authoritative for the proposed capability API. |
-| Local transition and solver follow-on | `39f6a86a` | Implemented and verified locally, but based on the superseded combined shape; it must be recut after PR 19 lands. |
+| Upstream continuity foundation | `upstream/master` at `06201787` | Merged upstream through PR 19, including PR 13's checked traits and PR 19's inherent geometry inspection. |
+| Upstream capability-inspection slice | PR 19 merged as `06201787` | Maintainer-authored and authoritative for the capability API and diagnostic precedence. |
+| Local transition and solver follow-on | `39f6a86a` | Implemented and verified locally, but based on the superseded combined shape; it must be recut on merged authority `06201787`. |
 | Production full-boundary `G3` gate | code tree `47e837ca`; plan integration `3a81e439` | Complete and independently verified locally; later dev commits are documentation-only. |
 | Second proving-ground promotion | current local `master` head; runtime promotion lineage at `0dd9fdc9` | Complete locally; not pushed. |
 | Experimental `G4` | local continuity branches | Reachable only through an explicit experimental boundary; not production. |
@@ -19,27 +19,28 @@ here.
 
 ## P0 -- Reconcile PR 19 and propose the solver follow-on
 
-### MT-901 -- Track the exact PR 19 revision
+### MT-901 -- Record the exact merged PR 19 revision
 
-- Treat `bf4cd9c5` as the current capability-inspection authority while PR 19
-  remains open.
+- Treat merged `upstream/master` at `06201787` as the capability-inspection
+  authority.
 - Preserve its inherent `continuity_capability` methods, checked
   `try_unsupported` helper invariant, typed reasons, and single-surface scope.
 - Keep transition compatibility and solver feasibility outside PR 19.
 
-**Done when:** PR 19 lands or changes, the exact reviewed head is recorded, and
-no local claim extends beyond that revision.
+**Done:** PR 19 merged as `06201787`; the reviewed head was `bf4cd9c5`, and no
+local claim extends beyond the merged revision.
 
 ### MT-902 -- Reconcile the merged capability slice
 
-- After PR 19 merges, fetch the resulting `upstream/master` revision.
-- Reconcile that revision into `master`, then `dev`, in the order required by
+- Reconcile `06201787` into `master`, then `dev`, in the order required by
   `AGENTS.md`.
-- Replace the local free-function capability adapters with the merged inherent
-  methods and preserve upstream diagnostic precedence exactly.
+- Make production solver call sites use the merged inherent methods and
+  preserve upstream diagnostic precedence exactly. Keep any stricter local
+  validation adapters out of the upstream contribution.
 
-**Done when:** Both proving grounds contain the exact merged capability source
-and the local solver compiles against it without compatibility aliases.
+**Done when:** Both proving grounds contain the exact merged capability
+semantics, the local solver consumes the inherent methods, and the upstream
+recut contains no downstream validation adapters.
 
 ### MT-903 -- Propose and recut the solver follow-on
 
@@ -126,7 +127,7 @@ After the upstream solver and downstream replay boundaries are stable:
 
 ## Dependency order
 
-1. Track PR 19 and complete MT-901 when its exact merged revision is known.
+1. Keep MT-901's merged authority fixed at `06201787` until upstream advances.
 2. Complete MT-902 through both proving grounds.
 3. Complete MT-903 and MT-904 on the resulting current `upstream/master`.
 4. Reconcile the accepted result through the proving grounds governed by
@@ -138,8 +139,8 @@ After the upstream solver and downstream replay boundaries are stable:
 
 ## Worktree disposition
 
-- Use the repository root as the active workspace on the reconciled local
-  `master` lineage.
+- Use the repository root as the active topic workspace. Keep branch-specific
+  proving-ground work in the dedicated `dev` and `master` worktrees.
 - Keep dedicated dev, master, and upstream-layer-2 worktrees for their distinct
   proving-ground and upstream-review responsibilities.
 - Preserve the production-`G3`, plan-review, and superseded MT-402 work as

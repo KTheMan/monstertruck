@@ -8,8 +8,8 @@ after maintainer approval, an upstream contribution based on current
 
 | Tree | Revision | Status |
 | --- | --- | --- |
-| `upstream/master` | `609c1b5a` | Merged PR 13 continuity-traits foundation and current upstream authority. |
-| upstream PR 19 | `bf4cd9c5` | Maintainer-authored capability-inspection slice, open against `609c1b5a`; this is the current proposed capability shape. |
+| `upstream/master` | `06201787` | Merged PR 13 checked traits plus PR 19 inherent geometry capability inspection; current upstream authority. |
+| upstream PR 19 | `06201787` | Maintainer-authored capability-inspection slice, merged from reviewed head `bf4cd9c5`; this is the accepted capability shape. |
 | `agent/upstream-layer-2-replacement` | `39f6a86a` | Preserved local combined implementation. Its capability portion is superseded by PR 19, while its transition and solver work remain follow-on material. |
 | `dev` | current branch head | First proving ground; plan integration descends from `3a81e439`, while code evidence remains bound to `47e837ca`. |
 | `master` | current branch head | Second proving ground; runtime promotion lineage descends from `0dd9fdc9`. Not pushed. |
@@ -23,7 +23,7 @@ row. No hosted CI result or upstream acceptance is implied for a local branch.
 
 - The checked continuity vocabulary and crate ownership established by merged
   PR 13 are present in `upstream/master`.
-- PR 19 at `bf4cd9c5` carries the maintainer's revised capability-inspection
+- Merged PR 19 at `06201787` carries the maintainer's revised capability-inspection
   slice, including inherent methods and the checked unsupported-report helper.
 - Revision `39f6a86a` preserves the broader local transition and solver work,
   but is no longer a current upstream-shaped capability contribution.
@@ -34,13 +34,14 @@ row. No hosted CI result or upstream acceptance is implied for a local branch.
 - `G4` remains an explicitly experimental path and is not part of the
   production acceptance claim.
 
-These results establish local implementation and evidence. PR 19 remains open,
-and transition plus solver APIs have not been approved upstream.
+These results establish local implementation and evidence. Merged PR 19
+establishes the capability API only; transition plus solver APIs have not been
+approved upstream.
 
 ## Upstream proposal gate
 
-The immediate upstream-facing action is to track PR 19 to its exact merged
-revision. That PR contains only:
+The immediate upstream-facing action is to reconcile exact merged revision
+`06201787` through the local proving grounds. That PR contains only:
 
 1. concrete B-spline and NURBS capability inspection;
 2. typed unsupported outcomes and highest-supported-order reporting;
@@ -52,9 +53,10 @@ capability source is reconciled through the local proving grounds.
 
 ## Contribution sequence
 
-1. Track PR 19 from `bf4cd9c5` to its exact merged revision.
-2. Reconcile that merged revision into `master`, then `dev`, without preserving
-   the old free-function capability API as a compatibility layer.
+1. Record reviewed PR 19 head `bf4cd9c5` and merged revision `06201787`.
+2. Reconcile `06201787` into `master`, then `dev`. Production solver
+   code must consume the inherent methods; stricter downstream validation
+   adapters must remain outside the upstream recut.
 3. Adapt the local transition and solver implementation to the inherent
    capability methods and exact diagnostic precedence that upstream lands.
 4. Prepare a separate transition and solver proposal with typed truncation,
@@ -94,10 +96,10 @@ until upstream solver acceptance and an approved tracking/modeling shape.
 
 | Worktree | Role |
 | --- | --- |
-| Repository root | Active workspace on the reconciled local `master` lineage. |
+| Repository root | Active topic workspace; currently used for PR 19 reconciliation work. |
 | `monstertruck-dev-integration` | Current `dev` proving ground; plan integration descends from `3a81e439` and runtime evidence is bound to `47e837ca`. |
 | `monstertruck-master-strict-compliance` | Current local `master` proving ground; runtime promotion lineage descends from `0dd9fdc9`. |
-| `monstertruck-upstream-layer2` | Exact PR 19 review checkout at `bf4cd9c5`; the prior combined candidate remains preserved at `39f6a86a`. |
+| `monstertruck-upstream-layer2` | Historical PR 19 review checkout at `bf4cd9c5`; merged authority is `06201787`, and the prior combined candidate remains preserved at `39f6a86a`. |
 
 The production-`G3`, plan-review, and superseded MT-402 work remain preserved
 as branch refs at `8c4ec61c`, `e1708d66`, and `568c3c4f` after their dedicated

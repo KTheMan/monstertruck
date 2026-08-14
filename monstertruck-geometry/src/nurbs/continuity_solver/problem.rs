@@ -10,9 +10,7 @@ use super::types::{
     ContinuitySolveError, ContinuitySolverConfig, OrderResidual,
 };
 use crate::base::{InnerSpace, Vector3, Vector4};
-use crate::nurbs::continuity::{
-    BoundaryAlignment, ContinuityOrder, SurfaceAxis, capability_for_nurbs,
-};
+use crate::nurbs::continuity::{BoundaryAlignment, ContinuityOrder, SurfaceAxis};
 use crate::nurbs::{BasisWindow, KnotVector, NurbsSurface};
 use monstertruck_traits::ParametricSurface;
 
@@ -195,7 +193,7 @@ fn validate_capability(
     order: ContinuityOrder,
     endpoint: BoundaryEndpoint,
 ) -> Result<(), ContinuitySolveError> {
-    let capability = capability_for_nurbs(surface, boundary, order);
+    let capability = surface.continuity_capability(boundary, order);
     capability
         .require_supported()
         .map(|_| ())

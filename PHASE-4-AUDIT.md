@@ -9,8 +9,8 @@ solver branches.
 
 | Tree | Revision | Audit role |
 | --- | --- | --- |
-| `upstream/master` | `609c1b5a` | Merged PR 13 continuity-traits foundation and upstream semantic authority. |
-| upstream PR 19 | `bf4cd9c5` | Maintainer-authored capability-inspection slice, open against `609c1b5a`. |
+| `upstream/master` | `06201787` | Merged PR 13 checked traits plus PR 19 inherent geometry capability inspection; current upstream semantic authority. |
+| upstream PR 19 | `06201787` | Maintainer-authored capability-inspection slice, merged from reviewed head `bf4cd9c5`. |
 | `agent/upstream-layer-2-replacement` | `39f6a86a` | Preserved local combined capability, transition, and solver implementation; no longer the current upstream contribution shape. |
 | `dev` | `47e837ca` | First local proving ground, including the production `G3` evidence extension. |
 | `master` | `0dd9fdc9` | Second local proving-ground promotion. Not pushed. |
@@ -21,7 +21,7 @@ No hosted CI or upstream acceptance is claimed for the local branches.
 ## Architecture finding
 
 Merged PR 13 establishes the checked continuity vocabulary in
-`monstertruck-traits`. PR 19 now establishes the proposed geometry capability
+`monstertruck-traits`. Merged PR 19 establishes the geometry capability
 shape: inherent inspection methods on B-spline and NURBS surfaces, one checked
 unsupported-report helper, and no two-surface compatibility or solver
 feasibility in that slice.
@@ -36,8 +36,14 @@ Revision `39f6a86a` contains one coherent geometry layer:
 
 This combined local shape remains useful implementation evidence, but it is not
 the current upstream contribution boundary. Its capability code must be
-replaced by the exact PR 19 implementation after that PR merges, and transition
-plus solving must be proposed as a follow-on.
+replaced by the exact merged PR 19 implementation, and transition plus solving
+must be proposed as a follow-on.
+
+The current reconciliation incorporates the exact merged PR 19 capability
+implementation and changes production solver validation to call the inherent
+`NurbsSurface::continuity_capability` method. Stricter free-function adapters
+remain hidden for the established downstream robustness corpus only; they are
+not part of the future upstream solver recut.
 
 ## Evidence finding
 
@@ -68,13 +74,13 @@ and certifies it again. A partial trim returns the typed
 | Claim | Current disposition |
 | --- | --- |
 | Checked continuity foundation through `G4` vocabulary | Merged upstream in `609c1b5a`. |
-| Concrete B-spline and NURBS capability inspection | Proposed by the maintainer in open PR 19 at `bf4cd9c5`; hosted checks reported by `gh pr checks 19` pass for that head. |
+| Concrete B-spline and NURBS capability inspection | Merged upstream as `06201787` from reviewed head `bf4cd9c5`; all five hosted checks reported successful for the reviewed head before merge. |
 | Full-boundary polynomial and positive-rational repair through production `G3` | Implemented and locally evidenced on `47e837ca`. |
 | Bounded failure with typed truncation and no partial solved surface | Implemented in the local layer-2 candidate and exercised by the corpus. |
 | Imported STEP full-side `G3` repair and round trip | Exercised by the current headless example. |
 | Arbitrary trimmed-seam solving | Unsupported; the current path returns a typed refusal before solver work. |
 | Production `G4` | Not claimed. The public path and its evidence remain experimental. |
-| Upstream acceptance of capability inspection | Not yet claimed; PR 19 is open. Its exact source is the current review authority. |
+| Upstream acceptance of capability inspection | Established by merged PR 19 at `06201787`. |
 | Upstream acceptance of transition and solver APIs | Not claimed. A follow-on proposal is still required. |
 
 ## MT-402 boundary
@@ -90,7 +96,7 @@ program remain deferred until the upstream solver shape is accepted.
 
 ## Open audit work
 
-1. Track PR 19 from exact head `bf4cd9c5` through its merged revision.
+1. Reconcile merged PR 19 revision `06201787` through the local proving grounds.
 2. Reconcile the merged capability slice through `master`, then `dev`.
 3. Propose transition and solver APIs without duplicating the capability slice.
 4. Recut the approved follow-on on the then-current `upstream/master`.
