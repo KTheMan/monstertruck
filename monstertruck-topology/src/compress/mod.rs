@@ -385,7 +385,7 @@ impl<P, C, S> Shell<P, C, S> {
     /// # Errors
     /// Returns [`Error::NotSimpleWire`](crate::errors::Error::NotSimpleWire) if any boundary wire has repeated vertices.
     /// STEP files from other CAD systems often produce such wires. To handle this,
-    /// apply `SplitClosedEdgesAndFaces` or `RobustSplitClosedEdgesAndFaces`
+    /// apply `SplitClosedEdgesAndFaces` or `SplitClosedEdgesAndFaces`
     /// (from `monstertruck-healing`) to the `CompressedShell` before calling `extract`.
     /// The convenience function `monstertruck_healing::extract_healed` does both steps.
     pub fn extract(cshell: CompressedShell<P, C, S>) -> Result<Self> {
