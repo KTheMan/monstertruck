@@ -497,17 +497,33 @@ where
     ///
     /// Vertices and sampled edge curves define the box. Unbounded curves are
     /// skipped rather than panicking.
-    pub fn bounding_box(&self) -> BoundingBox<P> {
+    pub fn bounding_box(&self) -> BoundingBox<P> { self.bounding_box_with(|point| point) }
+
+    /// Bounding box of the shell's geometry, with every sampled point passed
+    /// through `map` first.
+    ///
+    /// Use this when the shell's geometry is not already in the space you
+    /// want the box in -- an assembly placement, say. Mapping each sample is
+    /// exact, where transforming the corners of an axis-aligned box computed
+    /// beforehand inflates it by up to `sqrt(3)` under rotation.
+    ///
+    /// Points come from vertices and sampled edge curves. Unbounded curves
+    /// are skipped rather than panicking. If neither yields anything the box
+    /// falls back to sampling the faces' surfaces; see [`Self::bounding_box`].
+    pub fn bounding_box_with(&self, mut map: impl FnMut(P) -> P) -> BoundingBox<P> {
         let mut bdd_box = BoundingBox::new();
-        self.vertices.iter().for_each(|point| bdd_box.push(*point));
-        self.edges.iter().for_each(|edge| {
-            if let Some((t0, t1)) = edge.curve.try_range_tuple() {
-                (0..=CURVE_BOUNDS_SAMPLES).for_each(|i| {
-                    let t = t0 + (t1 - t0) * i as f64 / CURVE_BOUNDS_SAMPLES as f64;
-                    bdd_box.push(edge.curve.evaluate(t));
-                });
+        for point in &self.vertices {
+            bdd_box.push(map(*point));
+        }
+        for edge in &self.edges {
+            let Some((t0, t1)) = edge.curve.try_range_tuple() else {
+                continue;
+            };
+            for i in 0..=CURVE_BOUNDS_SAMPLES {
+                let t = t0 + (t1 - t0) * i as f64 / CURVE_BOUNDS_SAMPLES as f64;
+                bdd_box.push(map(edge.curve.evaluate(t)));
             }
-        });
+        }
         if !bdd_box.is_empty() {
             return bdd_box;
         }
@@ -520,19 +536,19 @@ where
         // the face, so sampling it is correct. Reached only when the topology
         // pass came up empty, so trimmed shells are never inflated to their
         // surfaces' parameter rectangles.
-        self.faces.iter().for_each(|face| {
+        let samples = SURFACE_BOUNDS_SAMPLES as f64;
+        for face in &self.faces {
             let (Some((u0, u1)), Some((v0, v1))) = face.surface.try_range_tuple() else {
-                return;
+                continue;
             };
-            let samples = SURFACE_BOUNDS_SAMPLES as f64;
-            (0..=SURFACE_BOUNDS_SAMPLES).for_each(|i| {
+            for i in 0..=SURFACE_BOUNDS_SAMPLES {
                 let u = u0 + (u1 - u0) * i as f64 / samples;
-                (0..=SURFACE_BOUNDS_SAMPLES).for_each(|j| {
+                for j in 0..=SURFACE_BOUNDS_SAMPLES {
                     let v = v0 + (v1 - v0) * j as f64 / samples;
-                    bdd_box.push(face.surface.evaluate(u, v));
-                });
-            });
-        });
+                    bdd_box.push(map(face.surface.evaluate(u, v)));
+                }
+            }
+        }
 
         bdd_box
     }

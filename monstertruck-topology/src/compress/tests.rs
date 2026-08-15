@@ -136,3 +136,33 @@ fn relative_tolerance_never_falls_below_the_floor() {
         "a shell with no geometry must clamp to the tolerance floor",
     );
 }
+
+#[test]
+fn bounding_box_with_maps_every_sampled_point() {
+    let offset = Vector3::new(100.0, 200.0, 300.0);
+    let bdd_box = untrimmed_patch_shell().bounding_box_with(|point| point + offset);
+
+    // The mapping has to reach the surface-fallback tier too, not just the
+    // vertex/edge passes.
+    assert_eq!(bdd_box.min(), Point3::new(100.0, 200.0, 300.0));
+    assert_eq!(bdd_box.max(), Point3::new(110.0, 220.0, 300.0));
+}
+
+#[test]
+fn bounding_box_with_maps_vertices_and_edges() {
+    let mut shell = untrimmed_patch_shell();
+    shell.vertices = vec![Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 1.0, 1.0)];
+    let offset = Vector3::new(5.0, 0.0, 0.0);
+
+    let bdd_box = shell.bounding_box_with(|point| point + offset);
+
+    assert_eq!(bdd_box.min(), Point3::new(5.0, 0.0, 0.0));
+    assert_eq!(bdd_box.max(), Point3::new(6.0, 1.0, 1.0));
+}
+
+#[test]
+fn bounding_box_is_bounding_box_with_identity() {
+    let shell = untrimmed_patch_shell();
+
+    assert_eq!(shell.bounding_box(), shell.bounding_box_with(|point| point),);
+}
