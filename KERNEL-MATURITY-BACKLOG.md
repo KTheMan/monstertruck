@@ -139,8 +139,10 @@ After the upstream solver and downstream replay boundaries are stable:
 
 ## Worktree disposition
 
-- Use the repository root as the active topic workspace. Keep branch-specific
-  proving-ground work in the dedicated `dev` and `master` worktrees.
+- Use `monstertruck-workbench` as the active construction workspace. Keep
+  branch-specific proving-ground work in the dedicated `dev` and `master`
+  worktrees; the primary `monstertruck` checkout retains shared Git metadata
+  but is not an integration target.
 - Keep dedicated `dev` and `master` worktrees for their distinct proving-ground
   responsibilities. Create an upstream-contribution worktree only when a clean
   recut is ready to start from current `upstream/master`.

@@ -96,7 +96,8 @@ until upstream solver acceptance and an approved tracking/modeling shape.
 
 | Worktree | Role |
 | --- | --- |
-| Repository root | Active topic workspace; currently used for PR 19 reconciliation work. |
+| `monstertruck-workbench` | Active construction workspace on `agent/layer-2-workbench`; implementation is built here before integration shaping. |
+| `monstertruck` | Primary Git checkout retaining shared worktree metadata and the completed PR 19 reconciliation branch; not an integration target. |
 | `monstertruck-dev` | Current `dev` proving ground; plan integration descends from `3a81e439` and runtime evidence is bound to `47e837ca`. |
 | `monstertruck-master` | Current local `master` proving ground; runtime promotion lineage descends from `0dd9fdc9`. |
 
