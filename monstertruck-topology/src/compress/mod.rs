@@ -8,7 +8,11 @@
 //! They directly reflect the results of parsing data from json or STEP, and all member variables are public.
 //! Boundary connectivity and closure are checked when converting to proprietary data structures, `Vertex`, `Edge`, and so on.
 
-use monstertruck_core::{ContentHasher, DeterministicContentHash};
+use monstertruck_core::{
+    ContentHasher, DeterministicContentHash,
+    bounding_box::{Bounded, BoundingBox},
+    cgmath64::Point3,
+};
 use rustc_hash::FxHashMap as HashMap;
 use serde::{Deserialize, Serialize};
 
@@ -470,6 +474,98 @@ impl<S, T> CompressedTrimmedFace<S, T> {
                 .collect(),
             orientation: self.orientation,
             surface: self.surface.clone(),
+        }
+    }
+}
+
+/// Samples per parameter direction taken from each edge curve when computing
+/// a shell's bounding box.
+const CURVE_BOUNDS_SAMPLES: usize = 16;
+
+/// Samples per parameter direction taken from each face surface when a shell
+/// carries no vertices or edges at all. Only a fallback, so a coarse grid is
+/// plenty.
+const SURFACE_BOUNDS_SAMPLES: usize = 8;
+
+impl<P, C, S, T> CompressedTrimmedShell<P, C, S, T>
+where
+    P: Bounded,
+    C: ParametricCurve<Point = P>,
+    S: ParametricSurface<Point = P>,
+{
+    /// Bounding box of the shell's geometry.
+    ///
+    /// Vertices and sampled edge curves define the box. Unbounded curves are
+    /// skipped rather than panicking.
+    pub fn bounding_box(&self) -> BoundingBox<P> {
+        let mut bdd_box = BoundingBox::new();
+        self.vertices.iter().for_each(|point| bdd_box.push(*point));
+        self.edges.iter().for_each(|edge| {
+            if let Some((t0, t1)) = edge.curve.try_range_tuple() {
+                (0..=CURVE_BOUNDS_SAMPLES).for_each(|i| {
+                    let t = t0 + (t1 - t0) * i as f64 / CURVE_BOUNDS_SAMPLES as f64;
+                    bdd_box.push(edge.curve.evaluate(t));
+                });
+            }
+        });
+        if !bdd_box.is_empty() {
+            return bdd_box;
+        }
+
+        // No vertices and no edges at all: every face is untrimmed. Exporters
+        // write such faces as a surface bounded by a degenerate vertex loop,
+        // which carries no cartesian geometry, so the pass above finds
+        // nothing and callers deriving a tolerance from the box would get
+        // zero. With no trim curves the surface's parameter rectangle *is*
+        // the face, so sampling it is correct. Reached only when the topology
+        // pass came up empty, so trimmed shells are never inflated to their
+        // surfaces' parameter rectangles.
+        self.faces.iter().for_each(|face| {
+            let (Some((u0, u1)), Some((v0, v1))) = face.surface.try_range_tuple() else {
+                return;
+            };
+            let samples = SURFACE_BOUNDS_SAMPLES as f64;
+            (0..=SURFACE_BOUNDS_SAMPLES).for_each(|i| {
+                let u = u0 + (u1 - u0) * i as f64 / samples;
+                (0..=SURFACE_BOUNDS_SAMPLES).for_each(|j| {
+                    let v = v0 + (v1 - v0) * j as f64 / samples;
+                    bdd_box.push(face.surface.evaluate(u, v));
+                });
+            });
+        });
+
+        bdd_box
+    }
+}
+
+impl<C, S, T> CompressedTrimmedShell<Point3, C, S, T>
+where
+    C: ParametricCurve<Point = Point3>,
+    S: ParametricSurface<Point = Point3>,
+{
+    /// Absolute tessellation tolerance as a fraction of the shell's own size.
+    ///
+    /// Tessellation tolerances are absolute lengths, so a fixed value means
+    /// something different for a 1 mm part than for a 10 m one. `factor` is a
+    /// fraction of the shell's bounding-box diameter -- `1.0e-3` is a good
+    /// default -- and the result is clamped up to [`TOLERANCE`] so a
+    /// degenerate or single-point shell can never ask for an infinitely fine
+    /// mesh.
+    ///
+    /// ```no_run
+    /// # use monstertruck_topology::compress::CompressedTrimmedShell;
+    /// # fn demo<C, S, T>(shell: &CompressedTrimmedShell<monstertruck_core::cgmath64::Point3, C, S, T>)
+    /// # where C: monstertruck_traits::ParametricCurve<Point = monstertruck_core::cgmath64::Point3>,
+    /// #       S: monstertruck_traits::ParametricSurface<Point = monstertruck_core::cgmath64::Point3> {
+    /// let tolerance = shell.relative_tolerance(1.0e-3);
+    /// # let _ = tolerance;
+    /// # }
+    /// ```
+    pub fn relative_tolerance(&self, factor: f64) -> f64 {
+        let tolerance = self.bounding_box().diameter() * factor;
+        match tolerance.is_finite() {
+            true => f64::max(tolerance, TOLERANCE),
+            false => TOLERANCE,
         }
     }
 }
