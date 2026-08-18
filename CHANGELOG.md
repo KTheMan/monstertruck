@@ -1,8 +1,103 @@
 # Change Log
 
-The version is of the bottom crate `monstertruck-render`.
+This file carries two lineages, kept apart on purpose.
 
-## Unreleased
+Sections numbered plainly (`0.4.0`, `0.3.3`) are **monstertruck's own releases**,
+newest first. All `monstertruck-*` crates share one version number and are
+released together.
+
+Sections prefixed `truck` are **inherited from the upstream project** at the fork
+and are kept verbatim as history. Their numbering is upstream's, not ours, and
+the two do not line up -- upstream `truck v0.4` has nothing to do with
+monstertruck 0.4.0.
+
+
+## 0.4.0 -- 2026-08-17
+
+### Breaking
+
+- **`monstertruck-healing`: the exact-only closed-edge/face split is gone.**
+  `RobustSplitClosedEdgesAndFaces::robust_split_closed_edges_and_faces` takes
+  over the shorter name as
+  `SplitClosedEdgesAndFaces::split_closed_edges_and_faces`. The two differed only
+  in parameter inversion, and the removed one propagated `?` on an exact-inversion
+  miss, so the face was silently NOT split: callers got an unhealed shell back
+  with no error. Imported CAD routinely carries points a hair off their surface,
+  which is exactly when that missed and exactly the input the pass exists for.
+- **`monstertruck-io`: `to_solids` is deprecated in favour of `to_bodies`**,
+  which returns `Vec<ImportedBody>` where a body is a `Solid` or a `Sheet`.
+  Measured against cadmpeg 0.4: STEP yields solids, IGES yields sheets and wires.
+  A `Vec<CompressedSolid>` cannot carry most IGES files, so the old signature
+  would have returned an empty list for files full of geometry. Wire bodies now
+  produce `Error::UnsupportedBodyKind`, named rather than dropped.
+- **`monstertruck-step` is deprecated.** Every exchange format now lives in
+  `monstertruck-io` behind one feature per format, so a caller reaches them all
+  through a single dependency. `monstertruck-step` remains as a re-export, so an
+  existing `monstertruck-step = "0.3"` requirement keeps resolving.
+
+### Added
+
+- **ISO 10303-21 parses through [`step-p21`](https://crates.io/crates/step-p21)**,
+  our published fork of `ruststep`. Two fixes real CAD exports need had sat
+  unreleased upstream for four years: `''` as an escaped apostrophe, which
+  imperial CAD emits as inch marks in thread callouts, and `()` as an empty
+  aggregate. A `[patch.crates-io]` fixes your own build but never your
+  dependents, so shipping them required publishing.
+- **Checked surface continuity**, contributed by
+  [@KTheMan](https://github.com/KTheMan): `ContinuityOrder` (`G0`--`G4`, `G4`
+  experimental), `BoundarySide`, and a capability report carrying a typed reason
+  and the highest achievable order rather than a boolean. Plus
+  `BsplineSurface::continuity_capability` and `NurbsSurface::continuity_capability`,
+  which inspect knot vectors, clamping, cross-boundary degree and control rows.
+- **Girdle and apex analysis for periodic surfaces**: `girdle_axis_and_value`,
+  `girdle_band_range` and `apex_parameter`. A boundary polyline that runs one full
+  lap at a constant cross parameter encloses no area; it bounds the band between
+  itself and the next girdle, or the apex. Treating one as an ordinary trim loop
+  produced a zero-area region.
+- **`CompressedTrimmedShell::bounding_box`, `bounding_box_with` and
+  `relative_tolerance`.** The box falls back to sampling face-surface parameter
+  rectangles when a shell has no vertices and no edges -- which is what our own
+  STEP writer emits for untrimmed faces. Without it the box was empty, the derived
+  tolerance was zero, and every tolerance factor collapsed to the floor, producing
+  an identical ~6.5 M triangle mesh. `bounding_box_with` maps every sampled point,
+  so a caller with a placement gets an exact box instead of one inflated up to
+  `sqrt(3)` by transforming the corners.
+- **IGES 5.3 reading is scaffolded** on the
+  [`cadmpeg`](https://github.com/cadmpeg/cadmpeg) codecs behind an `iges` feature.
+  The conversion to B-rep is unwritten and returns a typed `Unimplemented` rather
+  than an empty model.
+- **A second STEP reader** behind a `cadmpeg` feature, alongside ours. Ours stays
+  the default and the measurement baseline; keeping both compiled lets them be run
+  over one corpus and diffed, so any future swap is a decision with evidence.
+
+### Fixed
+
+- **`vtkio` no longer drags `lz4_flex` (RUSTSEC-2026-0041).** Dropping vtkio's
+  compression feature removes it from the lockfile entirely. Gating the `vtk`
+  feature off by default had hidden the advisory from the default feature set but
+  not from anyone who enabled the feature. Ported from upstream truck.
+- **Randomised tests are deterministic.** Eight trials in `monstertruck-traits`,
+  and the three test helpers it exports to other crates, drew from the global
+  generator and asserted success on most attempts. Every run was a coin flip.
+  With the sample fixed, the thresholds were slack and are now measured exactly.
+- `concat_positive_test` cut a curve at `t = 0`, leaving one piece empty while
+  asserting the two pieces still meet.
+
+### Internal
+
+- Every module over 2,000 lines is split by responsibility, and unit tests moved
+  into sibling `tests.rs` files. Files over the hard limit went from 7 to 0.
+- Every STEP fixture in the repository is now loaded by one test, so a moved
+  fixture fails at the fixture instead of surfacing as unrelated failures
+  elsewhere.
+- proptest counterexamples are no longer discarded by `.gitignore`. They are
+  findings, and ignoring them left a real one on a single machine where it looked
+  like flakiness to everyone else.
+
+## 0.3.3 -- 2026-08-06
+
+Released without a changelog entry at the time; recorded here from the work it
+carried.
 
 - **READMEs are now generated from crate docs by `cargo rdme`**, verified in CI. The crate-level `//!` docs are the single source of truth; attribution and license lines sit outside the `cargo-rdme` markers and are preserved. New `just readme` regenerates, `just readme-check` verifies, and `ci` runs the check. This turned four rotted README examples into compiled doctests and fixed them: `monstertruck-topology` called the removed `Vertex::news`, `monstertruck-step` imported the pre-rename `monstertruck_step::in` module, `monstertruck-traits` was missing a `BoundedCurve` bound, and `monstertruck-solid` bound a `Result` to `Option` while demonstrating a cube union in the one configuration that fails. `monstertruck-fillet` and `monstertruck-healing` gained the READMEs they were missing.
 - Removed the `readme-generator` crate. It shelled out to `cargo readme`, which is no longer installed, and truncated each `README.md` *before* invoking it -- running it would have blanked 11 READMEs and then panicked.
@@ -20,6 +115,11 @@ The version is of the bottom crate `monstertruck-render`.
 - Fixed: a fixed `1e-6` tolerance in surface footpoint search was rejecting footpoints the caller had certified exact.
 - **`monstertruck-meshing`**: tessellation gains a strict mode and structured face-drop diagnostics, so a dropped face becomes a typed refusal or a logged warning instead of a silently smaller mesh. Adds a `log` dependency (a zero-cost facade when no logger is installed).
 - Empty-parameter-polyline and degenerate-torus inputs now return typed outcomes instead of panicking.
+
+## Inherited from truck: unreleased upstream at the fork
+
+These entries came with the fork and were never part of a monstertruck release.
+
 - Reference the adjacent face's surface entity from `SURFACE_CURVE` edge associations instead of re-emitting it, shrinking exported STEP files.
 - Save modeling cylinders as an analytic `CYLINDRICAL_SURFACE` in STEP output instead of a rational B-spline degrade.
 - Make the STEP length unit and `distance_accuracy_value` configurable via `StepMeasurementContext`.
@@ -83,7 +183,7 @@ The version is of the bottom crate `monstertruck-render`.
 
 2026-02-12
 
-## v0.6
+## truck v0.6
 
 ### Additional APIs
 
@@ -137,7 +237,7 @@ The version is of the bottom crate `monstertruck-render`.
 - Put `monstertruck_geometry::prelude` for resolve multiple re-export.
 - Tutorial for v0.6 series has been released.
 
-## v0.5
+## truck v0.5
 
 ### Additional APIs
 
@@ -183,7 +283,7 @@ The version is of the bottom crate `monstertruck-render`.
 - Updates `spade` to `v2`.
 - Change the profile of `monstertruck-wasm` and remove dependencies to `wee_alloc`.
 
-## v0.4
+## truck v0.4
 
 - The first version of `monstertruck-step` has been released! One can output shapes modeled by `monstertruck-modeling`.
 - WGSL utility `math.wgsl` has been released! One can calculate invert matrices and rotation matrices.
@@ -197,7 +297,7 @@ The version is of the bottom crate `monstertruck-render`.
 - In order to make meshing reproducible, we decided to implement random perturbations by means of a deterministic hash function.
 - Some lints has been added.
 
-## v0.3
+## truck v0.3
 
 - Specified surface for STEP I/O and modeling revolved sphere and cone.
   - In `monstertruck-core`, the trait `Surface` is decomposed into `ParametricSurface`, `BoundedSurface`, `IncludeCurve` and `Invertible`.
@@ -216,7 +316,7 @@ The version is of the bottom crate `monstertruck-render`.
 - Added a new crate `monstertruck-solid`, which provides solid boolean operator functions: `and` and `or`.
 - Added a new crate `monstertruck-wasm`, which provides wasm bindings of CAD APIs. (not released to crates.io)
 
-## v0.2
+## truck v0.2
 
 ### v0.2.1
 
@@ -258,7 +358,7 @@ The version is of the bottom crate `monstertruck-render`.
 - added [`Error`](https://docs.rs/monstertruck-modeling/0.2.1/monstertruck_modeling/errors/enum.Error.html) to `monstertruck_modeling`.
 - made [`monstertruck_topology::CompressedShell`](https://docs.rs/monstertruck-topology/0.2.0/monstertruck_topology/struct.CompressedShell.html) public API and added [`monstertruck_topology::CompressedSolid`](https://docs.rs/monstertruck-topology/0.2.0/monstertruck_topology/struct.CompressedSolid.html).
 
-## v0.1
+## truck v0.1
 
 ### v0.1.5
 

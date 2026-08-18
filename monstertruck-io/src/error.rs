@@ -30,6 +30,25 @@ pub enum Error {
         format: &'static str,
     },
 
+    /// The file carried a body kind this crate cannot represent.
+    ///
+    /// Measured 2026-08-06 against cadmpeg 0.4: STEP yields `solid` bodies, and
+    /// IGES yields `sheet` and `wire`. A sheet becomes a
+    /// [`ImportedBody::Sheet`]; a wire body is a curve collection with no faces
+    /// and monstertruck's compressed types have nowhere to put it, so it is
+    /// refused BY NAME rather than dropped from the returned list. Silently
+    /// returning fewer bodies than the file holds is the failure this variant
+    /// exists to prevent.
+    ///
+    /// [`ImportedBody::Sheet`]: crate::cadmpeg::ImportedBody::Sheet
+    #[error("{format} carried a {kind} body, which has no monstertruck equivalent")]
+    UnsupportedBodyKind {
+        /// Which format was being read.
+        format: &'static str,
+        /// The body kind cadmpeg reported.
+        kind: &'static str,
+    },
+
     /// This path is not written yet.
     ///
     /// Present so a placeholder cannot be mistaken for a successful import that

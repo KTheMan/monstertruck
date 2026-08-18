@@ -682,3 +682,111 @@ fn sub_parameter_division<S>(
 
 #[cfg(test)]
 mod division_budget_tests;
+
+/// Half the width of a surface at `band`, measured across the periodic axis.
+///
+/// The natural periodic range is one full lap, so its midpoint is the antipode
+/// of its start and the two samples are diametrically opposite.
+fn periodic_radius<S>(surface: &S, band_axis: usize, band: f64, lap: (f64, f64)) -> f64
+where S: ParametricSurface<Point = Point3> {
+    let point = |periodic: f64| match band_axis {
+        0 => surface.evaluate(band, periodic),
+        _ => surface.evaluate(periodic, band),
+    };
+    point(lap.0).distance(point((lap.0 + lap.1) * 0.5)) * 0.5
+}
+
+/// Parameter along `band_axis` at which a ruled surface collapses to a point --
+/// a cone's apex.
+///
+/// Found from the linear taper of the two end radii, then re-evaluated: a
+/// non-linear taper can extrapolate to somewhere the surface has not actually
+/// collapsed, and that answer is rejected. Returns `None` when the surface does
+/// not taper, is not periodic across `band_axis`, or never reaches zero radius.
+pub fn apex_parameter<S>(surface: &S, band_axis: usize, tolerance: f64) -> Option<f64>
+where S: ParametricSurface<Point = Point3> {
+    let (urange, vrange) = surface.try_range_tuple();
+    let (lap, band) = match band_axis {
+        0 => (vrange?, urange?),
+        _ => (urange?, vrange?),
+    };
+    let radius = |value| periodic_radius(surface, band_axis, value, lap);
+    let (low_radius, high_radius) = (radius(band.0), radius(band.1));
+    if (high_radius - low_radius).abs() <= tolerance {
+        return None;
+    }
+    let apex = band.0 - low_radius * (band.1 - band.0) / (high_radius - low_radius);
+    (apex.is_finite() && radius(apex) <= tolerance).then_some(apex)
+}
+
+/// Identifies a parameter-space polyline that runs one full lap around a
+/// periodic axis at a constant cross parameter -- the image of a cylinder or
+/// cone cap circle, which encloses no area of its own.
+///
+/// Returns the periodic axis and the constant cross value. `points` are
+/// `(u, v)` pairs.
+pub fn girdle_axis_and_value<S>(
+    points: &[(f64, f64)],
+    surface: &S,
+    tolerance: f64,
+) -> Option<(usize, f64)>
+where
+    S: ParametricSurface<Point = Point3>,
+{
+    let axis_value = |point: &(f64, f64), axis: usize| match axis {
+        0 => point.0,
+        _ => point.1,
+    };
+    let span = |axis: usize| {
+        points.iter().map(|point| axis_value(point, axis)).fold(
+            None,
+            |span: Option<(f64, f64)>, value| {
+                Some(span.map_or((value, value), |(low, high)| {
+                    (low.min(value), high.max(value))
+                }))
+            },
+        )
+    };
+    (0..=1usize).find_map(|axis| {
+        let period = match axis {
+            0 => surface.period_u(),
+            _ => surface.period_v(),
+        }?;
+        let (low, high) = span(axis)?;
+        let (cross_low, cross_high) = span(1 - axis)?;
+        ((high - low - period).abs() <= tolerance && cross_high - cross_low <= tolerance)
+            .then_some((axis, (cross_low + cross_high) * 0.5))
+    })
+}
+
+/// Cross-axis parameter interval bounded by girdles that all lap the same
+/// periodic axis, as returned by [`girdle_axis_and_value`].
+///
+/// Two or more girdles bound the band between the outermost pair; a lone
+/// girdle bounds the patch closing at the surface's apex. Returns the band
+/// axis and the interval, or `None` when the girdles disagree on which axis
+/// they lap or the band is degenerate.
+pub fn girdle_band_range<S>(
+    girdles: &[(usize, f64)],
+    surface: &S,
+    tolerance: f64,
+) -> Option<(usize, (f64, f64))>
+where
+    S: ParametricSurface<Point = Point3>,
+{
+    let (axis, _) = *girdles.first()?;
+    if girdles.iter().any(|(other, _)| *other != axis) {
+        return None;
+    }
+    let (low, high) = match girdles {
+        [(_, value)] => {
+            let apex = apex_parameter(surface, 1 - axis, tolerance)?;
+            (f64::min(*value, apex), f64::max(*value, apex))
+        }
+        _ => girdles.iter().fold(
+            (f64::INFINITY, f64::NEG_INFINITY),
+            |(low, high), (_, value)| (low.min(*value), high.max(*value)),
+        ),
+    };
+    (high - low > tolerance).then_some((axis, (low, high)))
+}
