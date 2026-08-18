@@ -26,6 +26,7 @@
 //! [`CompressedShell`]: monstertruck_topology::compress::CompressedShell
 //! [`Surface::Plane`]: monstertruck_modeling::Surface
 
+mod convert;
 pub mod step;
 
 use crate::{Error, Result};
@@ -57,17 +58,22 @@ pub enum ImportedBody {
     Sheet(ImportedSheet),
 }
 
-/// Convert every body in a decoded document into monstertruck solids.
+/// Convert every body in a decoded document into monstertruck bodies.
 ///
 /// Returns [`Error::NoGeometry`] when the document decoded but held no body,
 /// which is a fact about the file, not a failure to read it.
+///
+/// # Every body converts, or the call fails
+///
+/// A returned `Vec` cannot report that one of its entries was left out, so a body
+/// this crate cannot represent fails the whole call and names itself. See the
+/// note on `convert` for why silently returning fewer bodies than the file holds
+/// is the outcome worth failing to avoid.
 pub fn to_bodies(ir: &cadmpeg_ir::CadIr, format: &'static str) -> Result<Vec<ImportedBody>> {
     if ir.model.bodies.is_empty() {
         return Err(Error::NoGeometry { format });
     }
-    Err(Error::Unimplemented {
-        what: "cadmpeg intermediate representation to monstertruck B-rep",
-    })
+    convert::convert(ir, format)
 }
 
 /// Read solids only, discarding sheet bodies.
