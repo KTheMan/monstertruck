@@ -12,6 +12,36 @@ the two do not line up -- upstream `truck v0.4` has nothing to do with
 monstertruck 0.4.0.
 
 
+## Unreleased
+
+### Added
+
+- **`monstertruck-io`: reading IGES converts, instead of refusing.**
+  `cadmpeg::to_bodies` returned `Error::Unimplemented` at 0.4.0; the decoder and
+  the API were in place but the intermediate representation never reached a B-rep.
+  It now does, behind the `iges` feature.
+
+  Analytic carriers stay analytic: planes, cylinders, cones, spheres and tori
+  reach the same monstertruck variants the STEP loader routes them to, so the
+  closed-form parameter division survives the import. Free-form carriers become
+  B-spline or NURBS depending on whether the source sent weights. Circular edges
+  become exact rational arcs.
+
+  A body, surface or curve this crate cannot represent fails the call and names
+  itself, rather than being dropped from the returned list. Four new typed
+  variants carry those refusals: `UnsupportedSurfaceKind`, `UnsupportedCurveKind`,
+  `DanglingReference` and `MalformedGeometry`. `Error` is `#[non_exhaustive]`, so
+  this is additive.
+
+  Still refused by name, each pending its own work: ellipses, parabolas and
+  hyperbolas; composite curves; periodic NURBS; pole loops at surface
+  singularities; coedge-local (tolerant) edges.
+
+  **The end-to-end path from bytes has no test.** The repository carries no IGES
+  fixture, so the tests build an intermediate representation in memory. They
+  verify the mapping; they do not verify `iges::from_path`.
+
+
 ## 0.4.0 -- 2026-08-17
 
 ### Breaking

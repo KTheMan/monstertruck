@@ -49,6 +49,62 @@ pub enum Error {
         kind: &'static str,
     },
 
+    /// The file carried a surface kind with no exact monstertruck equivalent.
+    ///
+    /// Refused rather than approximated. A cone arriving as a spline patch, or a
+    /// source-native triangle soup arriving as a plane, is a loss of exactness
+    /// that the boolean kernel pays for much later and far from here. The caller
+    /// is told which kind was refused so the file can be re-exported in a form
+    /// this crate reads.
+    #[error("{format} carried a {kind} surface, which has no exact monstertruck equivalent")]
+    UnsupportedSurfaceKind {
+        /// Which format was being read.
+        format: &'static str,
+        /// The surface kind cadmpeg reported.
+        kind: &'static str,
+    },
+
+    /// The file carried a curve kind with no exact monstertruck equivalent.
+    ///
+    /// Same reasoning as [`Error::UnsupportedSurfaceKind`].
+    #[error("{format} carried a {kind} curve, which has no exact monstertruck equivalent")]
+    UnsupportedCurveKind {
+        /// Which format was being read.
+        format: &'static str,
+        /// The curve kind cadmpeg reported.
+        kind: &'static str,
+    },
+
+    /// A reference in the decoded graph named an entity the document lacks.
+    ///
+    /// The intermediate representation is a table of entities that refer to each
+    /// other by string id. A reference with no target means the decoded document
+    /// is not closed, so converting the part of it that IS closed would hand back
+    /// a body with holes in it.
+    #[error("{format} referenced a {kind} that the decoded document does not contain: {id}")]
+    DanglingReference {
+        /// Which format was being read.
+        format: &'static str,
+        /// Which entity table the missing target belongs to.
+        kind: &'static str,
+        /// The id that resolved to nothing.
+        id: String,
+    },
+
+    /// Geometry decoded, but its own numbers do not describe a usable shape.
+    ///
+    /// A zero-length axis, a knot vector too short for its control net, a radius
+    /// that is not finite. Separate from [`Error::Decode`]: the bytes parsed and
+    /// the entity is the kind it claims to be, but the values cannot be built
+    /// into geometry.
+    #[error("{format} carried malformed geometry: {detail}")]
+    MalformedGeometry {
+        /// Which format was being read.
+        format: &'static str,
+        /// What is wrong, naming the entity where the converter can.
+        detail: String,
+    },
+
     /// This path is not written yet.
     ///
     /// Present so a placeholder cannot be mistaken for a successful import that
