@@ -68,7 +68,11 @@ spade = "2"
 syn = { version = "2", features = ["derive", "printing"] }
 thiserror = { version = "2", default-features = false }
 ttf-parser = "0.25"
-vtkio = "0.6"
+# `default-features = false` drops vtkio's compression feature, which is the
+# only thing pulling `lz4_flex` (RUSTSEC-2026-0041). Ported from upstream truck
+# d6625230. Gating `vtk` off by default hid the advisory from the default
+# feature set but not from anyone who turned the feature on; this removes it.
+vtkio = { version = "0.6", default-features = false, features = ["xml"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 web-sys = "0.3"
@@ -77,24 +81,24 @@ wgpu = "29"
 winit = "0.30"
 
 # Internal crates
-monstertruck-assembly = { version = "0.3.3", path = "monstertruck-assembly" }
-monstertruck-core = { version = "0.3.3", path = "monstertruck-core" }
-monstertruck-derive = { version = "0.3.3", path = "monstertruck-derive" }
-monstertruck-fillet = { version = "0.3.3", path = "monstertruck-fillet" }
-monstertruck-geometry = { version = "0.3.3", path = "monstertruck-geometry" }
-monstertruck-healing = { version = "0.3.3", path = "monstertruck-healing" }
+monstertruck-assembly = { version = "0.4.0", path = "monstertruck-assembly" }
+monstertruck-core = { version = "0.4.0", path = "monstertruck-core" }
+monstertruck-derive = { version = "0.4.0", path = "monstertruck-derive" }
+monstertruck-fillet = { version = "0.4.0", path = "monstertruck-fillet" }
+monstertruck-geometry = { version = "0.4.0", path = "monstertruck-geometry" }
+monstertruck-healing = { version = "0.4.0", path = "monstertruck-healing" }
 # `default-features = false` here so each consumer names the formats it wants;
 # a workspace-inherited dependency cannot have this overridden downstream.
-monstertruck-io = { version = "0.3.3", path = "monstertruck-io", default-features = false }
-monstertruck-mesh = { version = "0.3.3", path = "monstertruck-mesh" }
-monstertruck-meshing = { version = "0.3.3", path = "monstertruck-meshing" }
-monstertruck-modeling = { version = "0.3.3", path = "monstertruck-modeling" }
-monstertruck-gpu = { version = "0.3.3", path = "monstertruck-gpu" }
-monstertruck-render = { version = "0.3.3", path = "monstertruck-render" }
-monstertruck-solid = { version = "0.3.3", path = "monstertruck-solid" }
-monstertruck-step = { version = "0.3.4", path = "monstertruck-step" }
-monstertruck-topology = { version = "0.3.3", path = "monstertruck-topology" }
-monstertruck-traits = { version = "0.3.3", path = "monstertruck-traits" }
+monstertruck-io = { version = "0.4.0", path = "monstertruck-io", default-features = false }
+monstertruck-mesh = { version = "0.4.0", path = "monstertruck-mesh" }
+monstertruck-meshing = { version = "0.4.0", path = "monstertruck-meshing" }
+monstertruck-modeling = { version = "0.4.0", path = "monstertruck-modeling" }
+monstertruck-gpu = { version = "0.4.0", path = "monstertruck-gpu" }
+monstertruck-render = { version = "0.4.0", path = "monstertruck-render" }
+monstertruck-solid = { version = "0.4.0", path = "monstertruck-solid" }
+monstertruck-step = { version = "0.4.0", path = "monstertruck-step" }
+monstertruck-topology = { version = "0.4.0", path = "monstertruck-topology" }
+monstertruck-traits = { version = "0.4.0", path = "monstertruck-traits" }
 
 
 [profile.release.package.monstertruck-wasm]

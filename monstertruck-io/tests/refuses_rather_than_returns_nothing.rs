@@ -10,7 +10,7 @@
 #![cfg(feature = "iges")]
 
 use cadmpeg_ir::{CadIr, examples, units::Units};
-use monstertruck_io::{Error, cadmpeg::to_solids};
+use monstertruck_io::{Error, cadmpeg::to_bodies};
 
 /// A document with no bodies is a fact about the file, so it gets its own error
 /// rather than the not-implemented one -- otherwise finishing the converter
@@ -18,7 +18,7 @@ use monstertruck_io::{Error, cadmpeg::to_solids};
 #[test]
 fn an_empty_document_reports_no_geometry_not_unimplemented() {
     let ir = CadIr::empty(Units::default());
-    match to_solids(&ir, "IGES") {
+    match to_bodies(&ir, "IGES") {
         Err(Error::NoGeometry { format }) => assert_eq!(format, "IGES"),
         other => panic!("expected NoGeometry, got {other:?}"),
     }
@@ -31,14 +31,14 @@ fn the_unwritten_conversion_refuses() {
     // the row exercises the path a decoded file takes rather than a stub.
     let ir = examples::unit_cube();
     assert!(!ir.model.bodies.is_empty(), "the example must carry a body");
-    match to_solids(&ir, "IGES") {
+    match to_bodies(&ir, "IGES") {
         Err(Error::Unimplemented { what }) => {
             assert!(!what.is_empty(), "the error must name what is missing");
         }
-        Ok(solids) => panic!(
-            "returned Ok with {} solids -- a placeholder that reports success is \
+        Ok(bodies) => panic!(
+            "returned Ok with {} bodies -- a placeholder that reports success is \
              indistinguishable from a working importer that found nothing",
-            solids.len()
+            bodies.len()
         ),
         other => panic!("expected Unimplemented, got {other:?}"),
     }
