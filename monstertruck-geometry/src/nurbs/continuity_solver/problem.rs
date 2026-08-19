@@ -10,7 +10,9 @@ use super::types::{
     ContinuitySolveError, ContinuitySolverConfig, OrderResidual,
 };
 use crate::base::{InnerSpace, Vector3, Vector4};
-use crate::nurbs::continuity::{BoundaryAlignment, ContinuityOrder, SurfaceAxis};
+use crate::nurbs::continuity::{
+    BoundaryAlignment, ContinuityOrder, SurfaceAxis, UnsupportedContinuityCapability,
+};
 use crate::nurbs::{BasisWindow, KnotVector, NurbsSurface};
 use monstertruck_traits::ParametricSurface;
 
@@ -194,14 +196,40 @@ fn validate_capability(
     endpoint: BoundaryEndpoint,
 ) -> Result<(), ContinuitySolveError> {
     let capability = surface.continuity_capability(boundary, order);
-    capability
-        .require_supported()
-        .map(|_| ())
-        .map_err(|reason| ContinuitySolveError::UnsupportedCapability {
+    match capability.require_supported() {
+        Ok(_) => Ok(()),
+        Err(UnsupportedContinuityCapability::NonPositiveWeight) => surface
+            .control_points()
+            .iter()
+            .enumerate()
+            .flat_map(|(row, points)| {
+                points
+                    .iter()
+                    .enumerate()
+                    .map(move |(column, point)| (row, column, point.w))
+            })
+            .find(|(_, _, weight)| *weight <= 0.0)
+            .map_or_else(
+                || {
+                    Err(ContinuitySolveError::UnsupportedCapability {
+                        endpoint,
+                        capability,
+                    })
+                },
+                |(row, column, weight)| {
+                    Err(ContinuitySolveError::NonPositiveWeight {
+                        endpoint,
+                        row,
+                        column,
+                        weight,
+                    })
+                },
+            ),
+        Err(_) => Err(ContinuitySolveError::UnsupportedCapability {
             endpoint,
-            capability: Box::new(capability),
-            reason,
-        })
+            capability,
+        }),
+    }
 }
 
 fn validate_along_knot_continuity(
@@ -230,10 +258,9 @@ fn validate_along_knot_continuity(
     }
 }
 
-fn validate_weights(
+fn validate_coordinates(
     surface: &NurbsSurface<Vector4>,
     endpoint: BoundaryEndpoint,
-    minimum: f64,
 ) -> Result<(), ContinuitySolveError> {
     surface
         .control_points()
@@ -241,25 +268,14 @@ fn validate_weights(
         .enumerate()
         .try_for_each(|(row, points)| {
             points.iter().enumerate().try_for_each(|(column, point)| {
-                if !point.x.is_finite()
-                    || !point.y.is_finite()
-                    || !point.z.is_finite()
-                    || !point.w.is_finite()
-                {
+                if !point.x.is_finite() || !point.y.is_finite() || !point.z.is_finite() {
                     Err(ContinuitySolveError::NonFiniteControlPoint {
                         endpoint,
                         row,
                         column,
                     })
-                } else if point.w >= minimum {
-                    Ok(())
                 } else {
-                    Err(ContinuitySolveError::NonPositiveWeight {
-                        endpoint,
-                        row,
-                        column,
-                        weight: point.w,
-                    })
+                    Ok(())
                 }
             })
         })

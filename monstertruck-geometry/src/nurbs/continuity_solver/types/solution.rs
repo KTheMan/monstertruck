@@ -6,7 +6,8 @@ use crate::base::Vector4;
 /// Transactional output from a successful continuity solve.
 ///
 /// The unchanged first surface is borrowed from the solve input. The solved
-/// second surface is the only owned geometry in the result.
+/// second surface, immutable boundary transition, and solve report are owned by
+/// the result.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BoundaryContinuitySolution<'first> {
     first: &'first NurbsSurface<Vector4>,
@@ -42,7 +43,8 @@ impl<'first> BoundaryContinuitySolution<'first> {
     /// Returns the convergence report.
     pub const fn report(&self) -> &ContinuitySolveReport { &self.report }
 
-    /// Consumes the result and returns both surfaces and the report.
+    #[doc(hidden)]
+    /// Compatibility decomposition that discards the solved transition.
     pub fn into_parts(
         self,
     ) -> (

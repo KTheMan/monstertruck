@@ -337,11 +337,12 @@ fn error_evidence(error: &ContinuitySolveError) -> Value {
         ContinuitySolveError::UnsupportedCapability {
             endpoint,
             capability,
-            reason,
         } => json!({
             "kind": "unsupported_capability",
             "endpoint": endpoint_name(*endpoint),
-            "reason": reason.to_string(),
+            "reason": capability
+                .unsupported_reason()
+                .map(|reason| reason.to_string()),
             "capability": {
                 "side": format!("{:?}", capability.side()),
                 "requested": capability.requested().as_usize(),

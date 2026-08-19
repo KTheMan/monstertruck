@@ -16,16 +16,17 @@ and QR limits verify exact typed truncation through the bounded-solve carrier.
 Successful cases are independently certified at 33 span-distributed Chebyshev
 seam coordinates, both endpoints, and every mapped span boundary from both the
 first and second seams. Mandatory endpoints, knot boundaries, and some
-interior coordinates may overlap solver collocation locations, but the
-certifier does not reuse solver residuals or evaluators. Each coordinate uses
-separate `9 x 9` finite-difference tensor stencils, including for G4. Seam
-stencils are centered in span interiors and one-sided at domain endpoints.
+interior coordinates may overlap solver collocation locations. The certifier
+uses the public solved transition and public surface evaluation, but does not
+reuse solver residuals, automatic derivatives, Jacobians, or the convergence
+decision. Each coordinate uses separate `9 x 9` finite-difference tensor
+stencils, including for G4. Seam stencils are centered in span interiors and
+one-sided at domain endpoints.
 Cross-seam stencils are one-sided within each surface domain and use the
 solver's signed common cross coordinate. The certifier records absolute and
 fixture-scale-normalized residuals from the solved public boundary transition
 and public surface evaluation. It checks every mixed derivative through the
-requested order without reusing automatic derivatives, Jacobians, or internal
-validation residuals.
+requested order.
 
 Each case runs twice in the same process. Raw solved surfaces, public
 transition samples, report, and independent metrics are hashed with the

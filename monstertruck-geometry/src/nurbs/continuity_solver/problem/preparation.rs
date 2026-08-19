@@ -14,12 +14,6 @@ impl<'surface> PreparedProblem<'surface> {
         if request.order() == ContinuityOrder::G4 && !config.allows_experimental_g4() {
             return Err(ContinuitySolveError::ExperimentalG4Disabled);
         }
-        let first_frame = BoundaryFrame::try_new(first, request.first_side())
-            .map_err(|_| ContinuitySolveError::InvalidBoundary(BoundaryEndpoint::First))?;
-        let second_frame = BoundaryFrame::try_new(second, request.second_side())
-            .map_err(|_| ContinuitySolveError::InvalidBoundary(BoundaryEndpoint::Second))?;
-        validate_weights(first, BoundaryEndpoint::First, config.minimum_weight())?;
-        validate_weights(second, BoundaryEndpoint::Second, config.minimum_weight())?;
         validate_capability(
             first,
             request.first_side(),
@@ -32,6 +26,12 @@ impl<'surface> PreparedProblem<'surface> {
             request.order(),
             BoundaryEndpoint::Second,
         )?;
+        validate_coordinates(first, BoundaryEndpoint::First)?;
+        validate_coordinates(second, BoundaryEndpoint::Second)?;
+        let first_frame = BoundaryFrame::try_new(first, request.first_side())
+            .map_err(|_| ContinuitySolveError::InvalidBoundary(BoundaryEndpoint::First))?;
+        let second_frame = BoundaryFrame::try_new(second, request.second_side())
+            .map_err(|_| ContinuitySolveError::InvalidBoundary(BoundaryEndpoint::Second))?;
         validate_along_knot_continuity(
             first,
             first_frame,
