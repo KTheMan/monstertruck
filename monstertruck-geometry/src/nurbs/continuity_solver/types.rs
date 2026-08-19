@@ -87,7 +87,6 @@ pub struct ContinuitySolverConfig {
     fairness_weight: f64,
     anchor_weight: f64,
     transition_weight: f64,
-    minimum_weight: f64,
     allow_experimental_g4: bool,
 }
 
@@ -105,7 +104,6 @@ impl Default for ContinuitySolverConfig {
             fairness_weight: 1.0e-4,
             anchor_weight: 1.0e-8,
             transition_weight: 1.0e-6,
-            minimum_weight: 1.0e-10,
             allow_experimental_g4: false,
         }
     }
@@ -148,9 +146,6 @@ impl ContinuitySolverConfig {
 
     /// Returns the seam-reparameterization regularization weight.
     pub const fn transition_weight(&self) -> f64 { self.transition_weight }
-
-    /// Returns the minimum accepted rational weight.
-    pub const fn minimum_weight(&self) -> f64 { self.minimum_weight }
 
     /// Returns whether experimental G4 solving is enabled.
     pub const fn allows_experimental_g4(&self) -> bool { self.allow_experimental_g4 }
@@ -221,12 +216,6 @@ impl ContinuitySolverConfig {
         self
     }
 
-    /// Sets the minimum accepted homogeneous weight.
-    pub const fn with_minimum_weight(mut self, minimum_weight: f64) -> Self {
-        self.minimum_weight = minimum_weight;
-        self
-    }
-
     /// Enables or disables experimental G4 solving.
     pub const fn with_experimental_g4(mut self, enabled: bool) -> Self {
         self.allow_experimental_g4 = enabled;
@@ -265,7 +254,6 @@ impl ContinuitySolverConfig {
                 "damping bounds must be positive, finite, and ordered",
             ))
         } else if !positive_finite(self.rank_tolerance)
-            || !positive_finite(self.minimum_weight)
             || [
                 self.fairness_weight,
                 self.anchor_weight,
@@ -451,4 +439,4 @@ mod transition;
 
 pub use error::ContinuitySolveError;
 pub use solution::BoundaryContinuitySolution;
-pub use transition::BoundaryTransition;
+pub use transition::{BoundaryTransition, BoundaryTransitionEvaluationError};

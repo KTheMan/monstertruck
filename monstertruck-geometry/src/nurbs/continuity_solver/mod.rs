@@ -33,7 +33,8 @@
 //!
 //! [`crate::nurbs::continuity_solver::BoundaryContinuitySolver::solve`] is
 //! transactional: it borrows both inputs, borrows the unchanged master in the
-//! result, and owns only the solved dependent surface.
+//! result, and owns the solved dependent surface, immutable transition, and
+//! solve report.
 
 mod boundary;
 mod dual;
@@ -52,8 +53,8 @@ pub use resource::{
 };
 pub use types::{
     BoundaryContinuityRequest, BoundaryContinuitySolution, BoundaryEndpoint, BoundaryTransition,
-    ContinuityResource, ContinuitySolveError, ContinuitySolveReport, ContinuitySolverConfig,
-    ContinuityTermination, OrderResidual,
+    BoundaryTransitionEvaluationError, ContinuityResource, ContinuitySolveError,
+    ContinuitySolveReport, ContinuitySolverConfig, ContinuityTermination, OrderResidual,
 };
 
 #[cfg(test)]
@@ -131,7 +132,8 @@ impl BoundaryContinuitySolver {
     ///
     /// assert_eq!(solution.first(), &first);
     /// assert_eq!(solution.second(), &second);
-    /// # Ok::<(), monstertruck_geometry::nurbs::continuity_solver::ContinuitySolveError>(())
+    /// assert_eq!(solution.transition().mapped_seam_coordinate(0.5)?, 0.5);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     ///
     /// # Errors

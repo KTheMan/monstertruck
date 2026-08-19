@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow, ensure};
 use monstertruck_geometry::base::{EuclideanSpace, InnerSpace, Point3, Vector3, Zero};
 use monstertruck_geometry::nurbs::NurbsSurface;
-use monstertruck_geometry::nurbs::continuity::BoundarySide;
+use monstertruck_geometry::nurbs::continuity::{BoundarySide, ContinuityOrder};
 use monstertruck_geometry::nurbs::continuity_solver::{
     BoundaryContinuityRequest, BoundaryContinuitySolution,
 };
@@ -221,13 +221,11 @@ fn certification_seams(
 fn transition_preimage(solution: &BoundaryContinuitySolution<'_>, target: f64) -> Result<f64> {
     let transition = solution.transition();
     let mapped_start = transition
-        .mapped_coordinates(0.0, 0.0)
-        .ok_or_else(|| anyhow!("the transition is non-finite at the seam start"))?
-        .0;
+        .mapped_seam_coordinate(0.0)
+        .map_err(|error| anyhow!("the transition is invalid at the seam start: {error}"))?;
     let mapped_end = transition
-        .mapped_coordinates(1.0, 0.0)
-        .ok_or_else(|| anyhow!("the transition is non-finite at the seam end"))?
-        .0;
+        .mapped_seam_coordinate(1.0)
+        .map_err(|error| anyhow!("the transition is invalid at the seam end: {error}"))?;
     if (target - mapped_start).abs() <= 1.0e-14 {
         Ok(0.0)
     } else if (target - mapped_end).abs() <= 1.0e-14 {
@@ -241,9 +239,8 @@ fn transition_preimage(solution: &BoundaryContinuitySolution<'_>, target: f64) -
         let (low, high) = (0..64).try_fold((0.0, 1.0), |(low, high), _| {
             let middle = 0.5 * (low + high);
             let mapped = transition
-                .mapped_coordinates(middle, 0.0)
-                .ok_or_else(|| anyhow!("the transition became non-finite during inversion"))?
-                .0;
+                .mapped_seam_coordinate(middle)
+                .map_err(|error| anyhow!("the transition failed during inversion: {error}"))?;
             Ok::<_, anyhow::Error>(if (mapped < target) == increasing {
                 (middle, high)
             } else {
@@ -285,11 +282,16 @@ fn sample_grids(
             first_cross_nodes
                 .iter()
                 .map(|&cross| {
+                    let inward = if request.order() == ContinuityOrder::G0 {
+                        0.0
+                    } else {
+                        -cross
+                    };
                     evaluate_boundary(
                         solution.first(),
                         request.first_side(),
                         seam + seam_delta,
-                        -cross,
+                        inward,
                     )
                 })
                 .collect::<Result<Vec<_>>>()
@@ -301,10 +303,12 @@ fn sample_grids(
             second_cross_nodes
                 .iter()
                 .map(|&cross| {
-                    let (mapped_seam, mapped_cross) = solution
-                        .transition()
-                        .mapped_coordinates(seam + seam_delta, cross)
-                        .ok_or_else(|| anyhow!("the solved transition became non-finite"))?;
+                    let transition = solution.transition();
+                    let (mapped_seam, mapped_cross) = if request.order() == ContinuityOrder::G0 {
+                        (transition.mapped_seam_coordinate(seam + seam_delta)?, 0.0)
+                    } else {
+                        transition.try_mapped_coordinates(seam + seam_delta, cross)?
+                    };
                     evaluate_boundary(
                         solution.second(),
                         request.second_side(),

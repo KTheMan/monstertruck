@@ -3,12 +3,13 @@ use monstertruck_core::{ContentHasher, DeterministicContentHash};
 use monstertruck_geometry::base::Vector4;
 use monstertruck_geometry::nurbs::NurbsSurface;
 use monstertruck_geometry::nurbs::continuity_solver::BoundaryContinuitySolution;
+use monstertruck_geometry::prelude::ContinuityOrder;
 use std::hash::Hasher;
 
 use crate::corpus::{CaseSpec, DenseSpec};
 use crate::dense::DenseMetrics;
 
-pub const DIGEST_VERSION: &str = "xxh3-64-public-transition-v7";
+pub const DIGEST_VERSION: &str = "xxh3-64-typed-transition-v8";
 
 /// Hashes a successful solved case in canonical index order.
 pub fn solved(
@@ -23,7 +24,7 @@ pub fn solved(
     "converged".content_hash(&mut hasher);
     hash_surface(solution.first(), &mut hasher);
     hash_surface(solution.second(), &mut hasher);
-    hash_transition(solution, &mut hasher);
+    hash_transition(solution, &mut hasher)?;
     hash_report(solution, &mut hasher);
     dense
         .maximum_absolute_residual_by_order
@@ -62,19 +63,28 @@ fn hash_context(
     Ok(())
 }
 
-fn hash_transition(solution: &BoundaryContinuitySolution<'_>, hasher: &mut ContentHasher) {
+fn hash_transition(
+    solution: &BoundaryContinuitySolution<'_>,
+    hasher: &mut ContentHasher,
+) -> Result<()> {
     let transition = solution.transition();
     format!("{:?}", transition.alignment()).content_hash(hasher);
     transition.order().as_usize().content_hash(hasher);
-    transition.cross_field_degree().content_hash(hasher);
-    transition.seam_map_degree().content_hash(hasher);
-    let samples = (0..=65)
-        .flat_map(|index| {
-            [-0.04, -0.03, -0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.04]
-                .map(move |cross| transition.mapped_coordinates(index as f64 / 65.0, cross))
-        })
-        .collect::<Vec<_>>();
-    samples.content_hash(hasher);
+    if transition.order() == ContinuityOrder::G0 {
+        let samples = (0..=65)
+            .map(|index| transition.mapped_seam_coordinate(index as f64 / 65.0))
+            .collect::<Result<Vec<_>, _>>()?;
+        samples.content_hash(hasher);
+    } else {
+        let samples = (0..=65)
+            .flat_map(|index| {
+                [-0.04, -0.03, -0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.04]
+                    .map(move |cross| transition.try_mapped_coordinates(index as f64 / 65.0, cross))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        samples.content_hash(hasher);
+    }
+    Ok(())
 }
 
 fn hash_report(solution: &BoundaryContinuitySolution<'_>, hasher: &mut ContentHasher) {

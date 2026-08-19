@@ -1,11 +1,23 @@
 //! Typed continuity-solver failures.
 
-use super::super::super::continuity::{
-    SurfaceContinuityCapability, UnsupportedContinuityCapability,
-};
+use std::fmt::{self, Display, Formatter};
+
+use thiserror::Error;
+
+use super::super::super::continuity::SurfaceContinuityCapability;
 use super::super::resource::ContinuityTruncated;
 use super::{BoundaryEndpoint, ContinuitySolveReport};
-use thiserror::Error;
+
+struct CapabilityReason(SurfaceContinuityCapability);
+
+impl Display for CapabilityReason {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self.0.unsupported_reason() {
+            Some(reason) => Display::fmt(&reason, formatter),
+            None => formatter.write_str("the capability report contains no unsupported reason"),
+        }
+    }
+}
 
 /// Failure to prepare or solve a geometric-continuity problem.
 #[derive(Clone, Debug, Error, PartialEq)]
@@ -20,19 +32,20 @@ pub enum ContinuitySolveError {
     #[error("G4 continuity solving requires explicit experimental opt-in")]
     ExperimentalG4Disabled,
     /// A boundary has an unsupported capability requirement or surface condition.
-    #[error("{endpoint:?} boundary cannot represent the requested continuity: {reason}")]
+    #[error(
+        "{endpoint:?} boundary cannot represent the requested continuity: {reason}",
+        reason = CapabilityReason(*.capability)
+    )]
     UnsupportedCapability {
         /// Problem endpoint that failed capability validation.
         endpoint: BoundaryEndpoint,
         /// Surface capability diagnostics.
-        capability: Box<SurfaceContinuityCapability>,
-        /// Specific capability requirement or surface condition that failed.
-        reason: UnsupportedContinuityCapability,
+        capability: SurfaceContinuityCapability,
     },
     /// A surface boundary is empty, non-finite, unclamped, or degenerate.
     #[error("{0:?} boundary has an invalid tensor-product parameter domain")]
     InvalidBoundary(BoundaryEndpoint),
-    /// A finite rational weight is below the configured positive minimum.
+    /// A rational weight is finite and non-positive.
     #[error("{endpoint:?} surface has invalid weight {weight} at ({row}, {column})")]
     NonPositiveWeight {
         /// Problem endpoint containing the weight.

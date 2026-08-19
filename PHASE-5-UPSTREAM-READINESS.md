@@ -8,11 +8,11 @@ after maintainer approval, an upstream contribution based on current
 
 | Tree | Revision | Status |
 | --- | --- | --- |
-| `upstream/master` | `06201787` | Merged PR 13 checked traits plus PR 19 inherent geometry capability inspection; current upstream authority. |
-| upstream PR 19 | `06201787` | Maintainer-authored capability-inspection slice, merged from reviewed head `bf4cd9c5`; this is the accepted capability shape. |
-| `agent/upstream-layer-2-replacement` | `39f6a86a` | Preserved local combined implementation. Its capability portion is superseded by PR 19, while its transition and solver work remain follow-on material. |
-| `dev` | current branch head | First proving ground; plan integration descends from `3a81e439`, while code evidence remains bound to `47e837ca`. |
-| `master` | current branch head | Second proving ground; runtime promotion lineage descends from `0dd9fdc9`. Not pushed. |
+| `upstream/master` | `4973612f` | Current upstream authority after merged PR 22; it contains PR 13 and PR 19 unchanged. |
+| upstream PR 19 | `06201787` | Historical merge provenance for the maintainer-authored capability-inspection slice, from reviewed head `bf4cd9c5`; this remains the accepted capability shape. |
+| `agent/layer-2-include` | `389e1da7` | Dev proving-ground code slice synchronized through `4973612f`; it assumes an included read-only transition evaluator without treating that shape as approved upstream. |
+| `dev` | `55bc8b32` | First proving ground synchronized through `4973612f`; code evidence also retains the fixed production-`G3` lineage at `47e837ca`. |
+| `master` | `7a5fa5e2` | Second proving ground synchronized through `4973612f`. Not pushed. |
 | `agent/mt402-state-snapshots` | `e1708d66` | Preserved review branch for the plan rewrite and superseded custom MT-402 assessment. |
 | `archive/mt402-superseded-modeling-harness` | `568c3c4f` | Unmerged preservation of the superseded harness and its useful probes. |
 
@@ -21,12 +21,14 @@ row. No hosted CI result or upstream acceptance is implied for a local branch.
 
 ## Completed locally
 
-- The checked continuity vocabulary and crate ownership established by merged
-  PR 13 are present in `upstream/master`.
-- Merged PR 19 at `06201787` carries the maintainer's revised capability-inspection
-  slice, including inherent methods and the checked unsupported-report helper.
-- Revision `39f6a86a` preserves the broader local transition and solver work,
-  but is no longer a current upstream-shaped capability contribution.
+- Current `upstream/master` at `4973612f` contains the checked continuity
+  vocabulary and crate ownership established by merged PR 13.
+- Merged PR 19 at `06201787` remains the provenance for the maintainer's revised
+  capability-inspection slice, including inherent methods and the checked
+  unsupported-report helper; no later upstream commit changes those files.
+- Current topic `agent/layer-2-include` preserves the broader local transition
+  and solver work on upstream 0.4.0. Its dev review assumes an included
+  read-only evaluator, but its public solver shape is not approved upstream.
 - Revision `47e837ca` adds the production `G3` proof matrix and passed its
   local phase verification.
 - Revision `0dd9fdc9` promotes the verified result through the second local
@@ -40,7 +42,9 @@ approved upstream.
 
 ## Upstream proposal gate
 
-Merged revision `06201787` is reconciled through both local proving grounds.
+Current upstream `4973612f`, including PR 19 provenance at `06201787`, is
+reconciled through both local proving grounds at master `7a5fa5e2` and dev
+`55bc8b32`. PR 22 makes no continuity-file change.
 The immediate upstream-facing action is to propose the transition and solver
 follow-on without extending the accepted capability slice, which contains only:
 
@@ -51,10 +55,23 @@ follow-on without extending the accepted capability slice, which contains only:
 Two-surface compatibility, transition semantics, and solver feasibility are
 explicitly outside PR 19. They must be proposed as a separate follow-on.
 
+The workbench already exposes a read-only `BoundaryTransition` evaluator used
+for independent certification, metrics, and deterministic evidence. Downstream
+control can be composed over the same evaluator. The dev proving-ground topic
+assumes that an upstream successful result should also include it; this remains
+a review hypothesis until the issue #4 follow-up receives maintainer direction.
+
+The workbench temporarily retains compatibility-only degree getters, an
+`Option` evaluator, and overlapping solution decompositions because existing
+integration tests exercise them and test ownership forbids rewriting those
+tests. The include topic adds a typed canonical evaluator and keeps numerical
+mechanics private. A clean upstream recut must omit the compatibility facade and
+preserve typed transactional failure.
+
 ## Contribution sequence
 
 1. Preserve reviewed PR 19 head `bf4cd9c5` and merged revision `06201787` as
-   provenance.
+   provenance while treating `4973612f` as the current contribution base.
 2. Keep the completed `master` then `dev` reconciliation synchronized if
    upstream advances.
 3. Keep the local transition and solver implementation on the inherent
@@ -74,6 +91,11 @@ evidence includes polynomial and positive-rational surfaces, multi-span and
 repeated-knot cases, scale and weight conditioning, unequal and reversed
 parameterization, independent dense certification, deterministic bounded
 failure, and imported full-side workflow evidence.
+
+Imported evidence uses the existing `monstertruck-io` STEP read/write path.
+IGES evidence remains outside geometry and can be shaped after upstream
+end-to-end support and a file fixture establish the appropriate adapter; neither
+format introduces a geometry dependency or a parallel exchange abstraction.
 
 This does not extend support to arbitrary trimmed subcurves, automatic seam
 discovery, topology sewing, global constraint networks, or production `G4`.
@@ -96,16 +118,18 @@ until upstream solver acceptance and an approved tracking/modeling shape.
 
 | Worktree | Role |
 | --- | --- |
-| `monstertruck-workbench` | Active construction workspace on `agent/layer-2-workbench`; implementation is built here before integration shaping. |
-| `monstertruck` | Primary Git checkout retaining shared worktree metadata and the completed PR 19 reconciliation branch; not an integration target. |
+| `monstertruck-workbench` | Active construction workspace on `agent/layer-2-include`; the include hypothesis is shaped here before dev review. |
+| `monstertruck` | Primary Git checkout retaining shared worktree metadata, detached at current `upstream/master`; not an integration target. |
 | `monstertruck-dev` | Current `dev` proving ground; plan integration descends from `3a81e439` and runtime evidence is bound to `47e837ca`. |
 | `monstertruck-master` | Current local `master` proving ground; runtime promotion lineage descends from `0dd9fdc9`. |
 
 The production-`G3`, plan-review, and superseded MT-402 work remain preserved
 as branch refs at `8c4ec61c`, `e1708d66`, and `568c3c4f` after their dedicated
 worktrees are retired. No worktree is evidence for a different revision.
-The historical PR 19 review worktree was retired after merged authority
-`06201787` was reconciled through both proving grounds.
+The historical PR 19 review worktree was retired after the merged capability
+semantics were reconciled. The obsolete `agent/pr19-plan-reconciliation` branch
+was deleted after its tree matched both proving grounds. Current upstream
+`4973612f` is now present in both proving grounds.
 
 ## Phase completion
 
