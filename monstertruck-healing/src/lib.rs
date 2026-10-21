@@ -621,7 +621,7 @@ where
     exact
 }
 
-/// Splits closed edges and faces
+/// Splits closed edges and faces.
 ///
 /// # Details
 /// The topology of the shapes handled by monstertruck has the following rules
@@ -629,8 +629,15 @@ where
 /// - The boundaries of the faces must be a simple wire.
 ///
 /// Shapes created in other CAD systems do not necessarily follow these rules.
-/// When such shapes are handled by monstertruck, this method is applied at the stage
-/// of `CompressedShell` and `CompressedSolid`, which are intermediate forms.
+/// When such shapes are handled by monstertruck, this method is applied at the
+/// stage of `CompressedShell` and `CompressedSolid`, which are intermediate
+/// forms.
+///
+/// Parameter inversion falls back through [`SearchParameter`] and then
+/// [`SearchNearestParameter`], with and without a hint. Imported CAD routinely
+/// carries points a hair off their surface, and an exact-only inversion
+/// silently declines to split those faces -- the caller gets an unhealed shell
+/// with no error, and it breaks somewhere else entirely.
 ///
 /// # Remarks
 /// Boundary simplification is still only implemented for cylinders.
@@ -651,134 +658,11 @@ where
         + SnapCurveEndpoints
         + TryFrom<ParameterCurve<Line<Point2>, S>>
         + Clone,
-    S: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
-{
-    fn split_closed_edges_and_faces(&mut self, tol: f64) {
-        fn sp<S>(surface: &S, point: Point3, hint: Option<(f64, f64)>) -> Option<(f64, f64)>
-        where S: SearchParameter<SurfaceParameter, Point = Point3> {
-            surface.search_parameter(point, hint, 100)
-        }
-        split_closed_edges(self);
-        split_pass_through_edges(self, tol);
-        split_closed_faces(self, tol, sp);
-    }
-}
-
-impl<C, S> SplitClosedEdgesAndFaces for CompressedSolid<Point3, C, S>
-where
-    C: ParametricCurve3D
-        + BoundedCurve
-        + Cut
-        + ParameterDivision1D<Point = Point3>
-        + ParameterBoundary2D<S>
-        + SearchNearestParameter<CurveParameter, Point = Point3>
-        + SnapCurveEndpoints
-        + TryFrom<ParameterCurve<Line<Point2>, S>>
-        + Clone,
-    S: ParametricSurface3D + SearchParameter<SurfaceParameter, Point = Point3>,
-{
-    fn split_closed_edges_and_faces(&mut self, tol: f64) {
-        self.boundaries
-            .iter_mut()
-            .for_each(|shell| shell.split_closed_edges_and_faces(tol))
-    }
-}
-
-impl<C, S, T> SplitClosedEdgesAndFaces for CompressedTrimmedShell<Point3, C, S, T>
-where
-    C: ParametricCurve3D
-        + BoundedCurve
-        + Cut
-        + ParameterDivision1D<Point = Point3>
-        + ParameterBoundary2D<S>
-        + SearchNearestParameter<CurveParameter, Point = Point3>
-        + SnapCurveEndpoints
-        + TryFrom<ParameterCurve<Line<Point2>, S>>
-        + ExactParameterBoundary2D<S, BoundaryCurve = T>
-        + Clone,
-    S: ParametricSurface3D
-        + SearchParameter<SurfaceParameter, Point = Point3>
-        + SearchNearestParameter<SurfaceParameter, Point = Point3>
-        + Clone,
-    T: ParametricCurve3D<Point = Point3>
-        + BoundedCurve<Point = Point3>
-        + SearchNearestParameter<CurveParameter, Point = Point3>
-        + BoundaryCurveFromSamples<S>
-        + Cut
-        + Clone
-        + Invertible,
-{
-    fn split_closed_edges_and_faces(&mut self, tol: f64) {
-        fn sp<S>(surface: &S, point: Point3, hint: Option<(f64, f64)>) -> Option<(f64, f64)>
-        where S: SearchParameter<SurfaceParameter, Point = Point3> {
-            surface.search_parameter(point, hint, 100)
-        }
-        split_closed_edges_trimmed(self);
-        split_pass_through_edges_trimmed(self, tol);
-        let mut plain = self.cloned_without_trims();
-        if split_closed_faces(&mut plain, tol, sp) {
-            let original = self.clone();
-            *self = reattach_preserved_face_trims(&original, plain, tol);
-        }
-    }
-}
-
-impl<C, S, T> SplitClosedEdgesAndFaces for CompressedTrimmedSolid<Point3, C, S, T>
-where
-    C: ParametricCurve3D
-        + BoundedCurve
-        + Cut
-        + ParameterDivision1D<Point = Point3>
-        + ParameterBoundary2D<S>
-        + SearchNearestParameter<CurveParameter, Point = Point3>
-        + SnapCurveEndpoints
-        + TryFrom<ParameterCurve<Line<Point2>, S>>
-        + ExactParameterBoundary2D<S, BoundaryCurve = T>
-        + Clone,
-    S: ParametricSurface3D
-        + SearchParameter<SurfaceParameter, Point = Point3>
-        + SearchNearestParameter<SurfaceParameter, Point = Point3>
-        + Clone,
-    T: ParametricCurve3D<Point = Point3>
-        + BoundedCurve<Point = Point3>
-        + SearchNearestParameter<CurveParameter, Point = Point3>
-        + BoundaryCurveFromSamples<S>
-        + Cut
-        + Clone
-        + Invertible,
-{
-    fn split_closed_edges_and_faces(&mut self, tol: f64) {
-        self.boundaries
-            .iter_mut()
-            .for_each(|shell| shell.split_closed_edges_and_faces(tol))
-    }
-}
-
-/// robust version of splitting closed edges and faces.
-///
-/// # Details
-/// Robust version of [`SplitClosedEdgesAndFaces`] based on [`SearchNearestParameter`].
-pub trait RobustSplitClosedEdgesAndFaces {
-    /// Splits closed edges and faces
-    fn robust_split_closed_edges_and_faces(&mut self, tol: f64);
-}
-
-impl<C, S> RobustSplitClosedEdgesAndFaces for CompressedShell<Point3, C, S>
-where
-    C: ParametricCurve3D
-        + BoundedCurve
-        + Cut
-        + ParameterDivision1D<Point = Point3>
-        + ParameterBoundary2D<S>
-        + SearchNearestParameter<CurveParameter, Point = Point3>
-        + SnapCurveEndpoints
-        + TryFrom<ParameterCurve<Line<Point2>, S>>
-        + Clone,
     S: ParametricSurface3D
         + SearchParameter<SurfaceParameter, Point = Point3>
         + SearchNearestParameter<SurfaceParameter, Point = Point3>,
 {
-    fn robust_split_closed_edges_and_faces(&mut self, tol: f64) {
+    fn split_closed_edges_and_faces(&mut self, tol: f64) {
         let debug_trace = env::var("MT_BOOL_TRACE").is_ok();
         let enable_pass_through = env::var("MT_BOOL_DISABLE_PASS_THROUGH_SPLIT").is_err();
         let force_single_face_pass_through =
@@ -830,7 +714,7 @@ where
     }
 }
 
-impl<C, S> RobustSplitClosedEdgesAndFaces for CompressedSolid<Point3, C, S>
+impl<C, S> SplitClosedEdgesAndFaces for CompressedSolid<Point3, C, S>
 where
     C: ParametricCurve3D
         + BoundedCurve
@@ -845,13 +729,13 @@ where
         + SearchParameter<SurfaceParameter, Point = Point3>
         + SearchNearestParameter<SurfaceParameter, Point = Point3>,
 {
-    fn robust_split_closed_edges_and_faces(&mut self, tol: f64) {
-        let fs = RobustSplitClosedEdgesAndFaces::robust_split_closed_edges_and_faces;
+    fn split_closed_edges_and_faces(&mut self, tol: f64) {
+        let fs = SplitClosedEdgesAndFaces::split_closed_edges_and_faces;
         self.boundaries.iter_mut().for_each(|shell| fs(shell, tol))
     }
 }
 
-impl<C, S, T> RobustSplitClosedEdgesAndFaces for CompressedTrimmedShell<Point3, C, S, T>
+impl<C, S, T> SplitClosedEdgesAndFaces for CompressedTrimmedShell<Point3, C, S, T>
 where
     C: ParametricCurve3D
         + BoundedCurve
@@ -875,7 +759,7 @@ where
         + Clone
         + Invertible,
 {
-    fn robust_split_closed_edges_and_faces(&mut self, tol: f64) {
+    fn split_closed_edges_and_faces(&mut self, tol: f64) {
         let debug_trace = env::var("MT_BOOL_TRACE").is_ok();
         let debug_heal_split = env::var("MT_BOOL_DEBUG_HEAL_SPLIT").is_ok();
         let enable_pass_through = env::var("MT_BOOL_DISABLE_PASS_THROUGH_SPLIT").is_err();
@@ -997,7 +881,7 @@ where
     }
 }
 
-impl<C, S, T> RobustSplitClosedEdgesAndFaces for CompressedTrimmedSolid<Point3, C, S, T>
+impl<C, S, T> SplitClosedEdgesAndFaces for CompressedTrimmedSolid<Point3, C, S, T>
 where
     C: ParametricCurve3D
         + BoundedCurve
@@ -1021,15 +905,15 @@ where
         + Clone
         + Invertible,
 {
-    fn robust_split_closed_edges_and_faces(&mut self, tol: f64) {
-        let fs = RobustSplitClosedEdgesAndFaces::robust_split_closed_edges_and_faces;
+    fn split_closed_edges_and_faces(&mut self, tol: f64) {
+        let fs = SplitClosedEdgesAndFaces::split_closed_edges_and_faces;
         self.boundaries.iter_mut().for_each(|shell| fs(shell, tol))
     }
 }
 
 /// Convenience function: heal a compressed shell and extract it.
 ///
-/// Applies [`RobustSplitClosedEdgesAndFaces`] before calling
+/// Applies [`SplitClosedEdgesAndFaces`] before calling
 /// [`Shell::extract`](monstertruck_topology::Shell::extract), which avoids
 /// `NotSimpleWire` errors from STEP files with repeated vertices.
 pub fn extract_healed<C, S>(
@@ -1051,7 +935,7 @@ where
         + SearchNearestParameter<SurfaceParameter, Point = Point3>
         + Clone,
 {
-    cshell.robust_split_closed_edges_and_faces(tol);
+    cshell.split_closed_edges_and_faces(tol);
     monstertruck_topology::Shell::extract(cshell)
 }
 
@@ -1087,7 +971,7 @@ where
     if let Ok(shell) = TrimmedShell::try_from(cshell.clone()) {
         Ok(shell)
     } else {
-        cshell.robust_split_closed_edges_and_faces(tol);
+        cshell.split_closed_edges_and_faces(tol);
         TrimmedShell::try_from(cshell)
     }
 }
@@ -1147,7 +1031,7 @@ where
     let solid = if let Ok(solid) = TrimmedSolid::try_from(csolid.clone()) {
         solid
     } else {
-        csolid.robust_split_closed_edges_and_faces(tol);
+        csolid.split_closed_edges_and_faces(tol);
         TrimmedSolid::try_from(csolid)?
     };
     // Real-world STEP files routinely ship shells whose faces disagree on

@@ -7,8 +7,6 @@ use monstertruck_topology::compress::*;
 use std::path::PathBuf;
 use std::time::Instant;
 
-type CShell = CompressedTrimmedShell<Point3, Curve3D, Surface, StepParameterCurve>;
-
 #[derive(Parser, Debug)]
 struct Args {
     /// Input STEP file.
@@ -63,18 +61,6 @@ fn surface_kind(surface: &Surface) -> &'static str {
         Surface::BsplineSurface(_) => "BsplineSurface",
         Surface::NurbsSurface(_) => "NurbsSurface",
     }
-}
-
-fn shell_bounding_box(shell: &CShell) -> BoundingBox<Point3> {
-    let mut bdd: BoundingBox<Point3> = shell.vertices.iter().copied().collect();
-    shell.edges.iter().for_each(|edge| {
-        let (t0, t1) = edge.curve.range_tuple();
-        (0..=4).for_each(|i| {
-            let t = t0 + (t1 - t0) * i as f64 / 4.0;
-            bdd.push(edge.curve.subs(t));
-        });
-    });
-    bdd
 }
 
 fn point_segment_distance(point: Point3, front: Point3, back: Point3) -> f64 {
@@ -222,8 +208,8 @@ fn main() {
         .enumerate()
         .filter(|(shell_idx, _)| shell.is_none_or(|target| *shell_idx == target))
         .for_each(|(shell_idx, shell)| {
-            let diameter = shell_bounding_box(&shell).diameter();
-            let tolerance = f64::max(diameter * tolerance_factor, TOLERANCE);
+            let diameter = shell.bounding_box().diameter();
+            let tolerance = shell.relative_tolerance(tolerance_factor);
             eprintln!(
                 "profile shell={shell_idx} faces={} diameter={diameter:.6} tolerance={tolerance:.9}",
                 shell.faces.len(),

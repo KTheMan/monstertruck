@@ -7,26 +7,26 @@
 
 use crate::{
     Result,
-    cadmpeg::{ImportedSolid, to_solids},
+    cadmpeg::{ImportedBody, to_bodies},
 };
 use cadmpeg_core::ReadSeek;
 use cadmpeg_ir::codec::{CodecEntry, DecodeOptions};
 
 const FORMAT: &str = "IGES";
 
-/// Read solids from an IGES 5.3 stream.
-pub fn from_reader(reader: &mut dyn ReadSeek) -> Result<Vec<ImportedSolid>> {
+/// Read bodies from an IGES 5.3 stream.
+pub fn from_reader(reader: &mut dyn ReadSeek) -> Result<Vec<ImportedBody>> {
     let decoded = cadmpeg_codec_iges::IgesCodec
         .decode(reader, &DecodeOptions::default())
         .map_err(|error| crate::Error::Decode {
             format: FORMAT,
             message: error.to_string(),
         })?;
-    to_solids(&decoded.ir, FORMAT)
+    to_bodies(&decoded.ir, FORMAT)
 }
 
-/// Read solids from an IGES 5.3 file.
-pub fn from_path(path: impl AsRef<std::path::Path>) -> Result<Vec<ImportedSolid>> {
+/// Read bodies from an IGES 5.3 file.
+pub fn from_path(path: impl AsRef<std::path::Path>) -> Result<Vec<ImportedBody>> {
     let mut file = std::fs::File::open(path)?;
     from_reader(&mut file)
 }

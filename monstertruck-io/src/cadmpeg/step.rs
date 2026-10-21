@@ -33,7 +33,7 @@
 
 use crate::{
     Error, Result,
-    cadmpeg::{ImportedSolid, to_solids},
+    cadmpeg::{ImportedBody, to_bodies},
 };
 use cadmpeg_core::ReadSeek;
 use cadmpeg_ir::CadIr;
@@ -64,18 +64,18 @@ pub fn decode_file_to_ir(path: impl AsRef<std::path::Path>) -> Result<CadIr> {
     decode_to_ir(&mut file)
 }
 
-/// Read solids from a STEP stream, through cadmpeg rather than [`crate::step`].
+/// Read bodies from a STEP stream, through cadmpeg rather than [`crate::step`].
 ///
-/// Shares [`to_solids`] with every other format, so it carries that converter's
+/// Shares [`to_bodies`] with every other format, so it carries that converter's
 /// current state: while the conversion is unwritten this returns
 /// [`Error::Unimplemented`] rather than an empty model.
-pub fn from_reader(reader: &mut dyn ReadSeek) -> Result<Vec<ImportedSolid>> {
+pub fn from_reader(reader: &mut dyn ReadSeek) -> Result<Vec<ImportedBody>> {
     let ir = decode_to_ir(reader)?;
-    to_solids(&ir, FORMAT)
+    to_bodies(&ir, FORMAT)
 }
 
-/// Read solids from a STEP file, through cadmpeg rather than [`crate::step`].
-pub fn from_path(path: impl AsRef<std::path::Path>) -> Result<Vec<ImportedSolid>> {
+/// Read bodies from a STEP file, through cadmpeg rather than [`crate::step`].
+pub fn from_path(path: impl AsRef<std::path::Path>) -> Result<Vec<ImportedBody>> {
     let mut file = std::fs::File::open(path)?;
     from_reader(&mut file)
 }
